@@ -1,0 +1,26 @@
+# dependencies
+node_modules/
+
+# env files
+.env
+.env.*
+!.env.example
+
+# next.js
+.next/
+out/
+
+# build
+dist/
+build/
+
+# misc
+.DS_Store
+*.pem
+Thumbs.db
+
+# debug
+npm-debug.log*
+
+# docker
+postgres-data/
