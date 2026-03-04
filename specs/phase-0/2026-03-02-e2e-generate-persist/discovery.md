@@ -30,7 +30,7 @@
 | Next.js App mit App Router, TypeScript, Tailwind v4, shadcn/ui |
 | PostgreSQL (Docker) mit Drizzle ORM |
 | Cloudflare R2 Bild-Storage (Public Bucket) |
-| Replicate API: Blocking API (`replicate.run()`) |
+| Replicate API: Blocking API (`predictions.create()` + `replicate.wait()` fuer Zugriff auf prediction_id + seed) |
 | 6 Modelle: FLUX 2 Pro, Nano Banana 2, Recraft V4, Seedream 5 Lite, Seedream 4.5, Gemini 2.5 Flash Image |
 | Dynamische Modell-Parameter via Replicate Schema API |
 | Prompt Builder: Style + Colors Kategorien (je 9 Optionen, Text-Labels) |

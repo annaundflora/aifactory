@@ -1,7 +1,7 @@
 ---
 name: slice-impl-coordinator
-description: "Ebene-1 Coordinator: Implementiert + testet 1 Slice via Task(slice-implementer) + Task(test-writer) + Task(test-validator) + Task(debugger). Retry-Loop (max 9). Returns JSON."
-tools: Read, Write, Glob, Grep, Task
+description: "Ebene-1 Coordinator: Implementiert + testet 1 Slice via Task(slice-implementer) + Task(test-writer) + Task(test-validator) + Task(debugger). Stack-Detection + Deterministic Gate (Lint/TypeCheck). Retry-Loop (max 9). Returns JSON."
+tools: Read, Write, Glob, Grep, Task, Bash
 ---
 
 # Slice-Impl-Coordinator
@@ -56,6 +56,151 @@ Extrahiere aus der Slice-Spec:
 - `feature_name` aus `spec_path` (letztes Pfad-Segment, z.B. "build-command")
 - `slice_id` aus Metadata Section
 - `test_strategy` aus der Test-Strategy Section
+
+---
+
+## Phase 1a: Stack Detection
+
+Erkenne den Tech-Stack des Projekts anhand von Indicator-Files im `working_dir`. Das Ergebnis (`detected_stack`) wird fuer den Deterministic Gate (Phase 2c) und die Weitergabe an Sub-Agents benoetigt.
+
+```
+detected_stack = null
+
+# 1. Python Stacks (pyproject.toml)
+pyproject = Read("{working_dir}/pyproject.toml")
+IF pyproject EXISTS:
+  IF "fastapi" IN pyproject:
+    detected_stack = {
+      stack_name: "Python/FastAPI",
+      lint_autofix_cmd: "ruff check --fix .",
+      lint_check_cmd: "ruff check .",
+      typecheck_cmd: "mypy .",
+      test_cmd: "python -m pytest {path} -v",
+      start_cmd: "uvicorn app.main:app --host 0.0.0.0 --port 8000",
+      health_endpoint: "http://localhost:8000/health"
+    }
+  ELIF "django" IN pyproject:
+    detected_stack = {
+      stack_name: "Python/Django",
+      lint_autofix_cmd: "ruff check --fix .",
+      lint_check_cmd: "ruff check .",
+      typecheck_cmd: "mypy .",
+      test_cmd: "python -m pytest {path} -v",
+      start_cmd: "python manage.py runserver",
+      health_endpoint: "http://localhost:8000/health"
+    }
+
+# 2. Python Stacks (requirements.txt Fallback)
+IF detected_stack == null:
+  requirements = Read("{working_dir}/requirements.txt")
+  IF requirements EXISTS AND "fastapi" IN requirements:
+    detected_stack = {
+      stack_name: "Python/FastAPI",
+      lint_autofix_cmd: "ruff check --fix .",
+      lint_check_cmd: "ruff check .",
+      typecheck_cmd: "mypy .",
+      test_cmd: "python -m pytest {path} -v",
+      start_cmd: "uvicorn app.main:app --host 0.0.0.0 --port 8000",
+      health_endpoint: "http://localhost:8000/health"
+    }
+
+# 3. Node.js Stacks (package.json)
+IF detected_stack == null:
+  package_json = Read("{working_dir}/package.json")
+  IF package_json EXISTS:
+    deps = package_json.dependencies + package_json.devDependencies
+    IF "next" IN deps:
+      detected_stack = {
+        stack_name: "TypeScript/Next.js",
+        lint_autofix_cmd: "pnpm eslint --fix .",
+        lint_check_cmd: "pnpm lint",
+        typecheck_cmd: "pnpm tsc --noEmit",
+        test_cmd: "pnpm test {path}",
+        start_cmd: "pnpm dev",
+        health_endpoint: "http://localhost:3000/api/health"
+      }
+    ELIF "nuxt" IN deps:
+      detected_stack = {
+        stack_name: "TypeScript/Nuxt",
+        lint_autofix_cmd: "pnpm eslint --fix .",
+        lint_check_cmd: "pnpm lint",
+        typecheck_cmd: "pnpm tsc --noEmit",
+        test_cmd: "pnpm test {path}",
+        start_cmd: "pnpm dev",
+        health_endpoint: "http://localhost:3000/api/health"
+      }
+    ELIF "vue" IN deps AND version startswith "^3":
+      detected_stack = {
+        stack_name: "TypeScript/Vue 3",
+        lint_autofix_cmd: "pnpm eslint --fix .",
+        lint_check_cmd: "pnpm lint",
+        typecheck_cmd: "pnpm tsc --noEmit",
+        test_cmd: "pnpm test {path}",
+        start_cmd: "pnpm dev",
+        health_endpoint: "http://localhost:5173"
+      }
+    ELIF "vue" IN deps AND version startswith "^2":
+      detected_stack = {
+        stack_name: "JavaScript/Vue 2",
+        lint_autofix_cmd: "pnpm eslint --fix .",
+        lint_check_cmd: "pnpm lint",
+        typecheck_cmd: "pnpm tsc --noEmit",
+        test_cmd: "pnpm test {path}",
+        start_cmd: "pnpm serve",
+        health_endpoint: "http://localhost:8080"
+      }
+    ELIF "express" IN deps:
+      detected_stack = {
+        stack_name: "TypeScript/Express",
+        lint_autofix_cmd: "pnpm eslint --fix .",
+        lint_check_cmd: "pnpm lint",
+        typecheck_cmd: "pnpm tsc --noEmit",
+        test_cmd: "pnpm test {path}",
+        start_cmd: "node server.js",
+        health_endpoint: "http://localhost:3000/health"
+      }
+
+# 4. PHP Stack (composer.json)
+IF detected_stack == null:
+  composer = Read("{working_dir}/composer.json")
+  IF composer EXISTS AND "laravel/framework" IN composer:
+    detected_stack = {
+      stack_name: "PHP/Laravel",
+      lint_autofix_cmd: "./vendor/bin/pint",
+      lint_check_cmd: "./vendor/bin/pint --test",
+      typecheck_cmd: "phpstan analyse",
+      test_cmd: "php artisan test {path}",
+      start_cmd: "php artisan serve",
+      health_endpoint: "http://localhost:8000/health"
+    }
+
+# 5. Go Stack (go.mod)
+IF detected_stack == null:
+  go_mod = Read("{working_dir}/go.mod")
+  IF go_mod EXISTS:
+    detected_stack = {
+      stack_name: "Go",
+      lint_autofix_cmd: "",
+      lint_check_cmd: "golangci-lint run",
+      typecheck_cmd: "go vet ./...",
+      test_cmd: "go test {path}",
+      start_cmd: "go run .",
+      health_endpoint: "http://localhost:8080/health"
+    }
+
+# 6. Kein Stack erkannt
+IF detected_stack == null:
+  LOG WARNING: "Kein Stack erkannt in {working_dir}. Deterministic Gate wird uebersprungen."
+  detected_stack = {
+    stack_name: "unknown",
+    lint_autofix_cmd: "",
+    lint_check_cmd: "",
+    typecheck_cmd: "",
+    test_cmd: "",
+    start_cmd: "",
+    health_endpoint: ""
+  }
+```
 
 ---
 
@@ -114,6 +259,106 @@ IF impl_json.status == "failed":
 # Speichere: files_changed, commit_hash
 files_changed = impl_json.files_changed
 commit_hash = impl_json.commit_hash
+```
+
+---
+
+## Phase 2c: Deterministic Gate
+
+Fuehre Lint und TypeCheck als deterministische Checks aus. Bei unbekanntem Stack wird das Gate uebersprungen.
+
+```
+IF detected_stack.stack_name == "unknown":
+  LOG WARNING: "Stack unbekannt -- Deterministic Gate uebersprungen"
+  GOTO Phase 3
+
+lint_retries = 0
+MAX_LINT_RETRIES = 3
+
+WHILE lint_retries < MAX_LINT_RETRIES:
+
+  # Step 1: Auto-Fix (best effort, Exit-Code ignorieren)
+  IF detected_stack.lint_autofix_cmd != "":
+    Bash("cd {working_dir} && {detected_stack.lint_autofix_cmd}")
+
+  # Step 2: Lint Check
+  lint_result = Bash("cd {working_dir} && {detected_stack.lint_check_cmd}")
+
+  # Step 3: Type Check
+  IF detected_stack.typecheck_cmd != "":
+    type_result = Bash("cd {working_dir} && {detected_stack.typecheck_cmd}")
+  ELSE:
+    type_result = { exit_code: 0, stdout: "no typecheck configured" }
+
+  # Step 4: Evaluate
+  IF lint_result.exit_code == 0 AND type_result.exit_code == 0:
+    LOG: "Deterministic Gate PASSED"
+    BREAK  # Gate bestanden -> weiter zu Phase 3
+
+  # Step 5: Fix-Versuch via Implementer
+  lint_retries++
+
+  IF lint_retries < MAX_LINT_RETRIES:
+    # Sammle Fehlermeldungen (max 2000 Zeichen pro Output)
+    error_summary = ""
+    IF lint_result.exit_code != 0:
+      error_summary += "LINT ERRORS:\n" + truncate(lint_result.stdout, 2000)
+    IF type_result.exit_code != 0:
+      error_summary += "\nTYPE ERRORS:\n" + truncate(type_result.stdout, 2000)
+
+    Task(
+      subagent_type: "slice-implementer",
+      description: "Fix lint/typecheck errors for {slice_id} (Retry {lint_retries})",
+      prompt: "
+        Fixe Lint/TypeCheck-Fehler fuer Slice: {slice_id}
+
+        ## Fehler
+        {error_summary}
+
+        ## Input-Dateien (MUSS gelesen werden)
+        - Slice-Spec: {spec_path}/slices/{slice_file}
+        - Architecture: {architecture_path}
+
+        ## Anweisungen
+        1. Lies die Fehlermeldungen oben
+        2. Fixe ALLE gemeldeten Lint- und TypeCheck-Fehler
+        3. Aendere KEINE Funktionalitaet -- nur Lint/Type Compliance
+        4. Committe den Fix mit Message: 'fix({slice_id}): lint/typecheck errors (retry {lint_retries})'
+
+        ## Output
+        Gib am Ende ein JSON zurueck:
+        ```json
+        {
+          \"status\": \"fixed | unable_to_fix\",
+          \"files_changed\": [\"pfad/zur/datei\"],
+          \"errors_fixed\": \"Beschreibung der Fixes\"
+        }
+        ```
+      "
+    )
+
+    fix_json = parse_last_json_block(task_output)
+
+    IF parse_failure OR fix_json.status == "unable_to_fix":
+      RETURN {
+        "status": "failed",
+        "retries": lint_retries,
+        "evidence": {"files_changed": files_changed, "test_files": [], "test_count": 0, "commit_hash": commit_hash},
+        "error": "lint/typecheck: implementer unable to fix after {lint_retries} retries"
+      }
+
+    # Merge files_changed
+    files_changed = merge(files_changed, fix_json.files_changed)
+    CONTINUE  # Re-Check
+
+# Max Retries erreicht
+IF lint_retries >= MAX_LINT_RETRIES:
+  RETURN {
+    "status": "failed",
+    "retries": lint_retries,
+    "evidence": {"files_changed": files_changed, "test_files": [], "test_count": 0, "commit_hash": commit_hash},
+    "error": "lint/typecheck: persistent failures after 3 retries"
+  }
 ```
 
 ---
@@ -193,6 +438,12 @@ WHILE retry_count < MAX_RETRIES:
 
       ## Mode
       slice_validation
+
+      ## Stack Info (detected by Coordinator)
+      Stack: {detected_stack.stack_name}
+      Test Command: {detected_stack.test_cmd}
+      Start Command: {detected_stack.start_cmd}
+      Health Endpoint: {detected_stack.health_endpoint}
 
       ## Input-Dateien (MUSS gelesen werden)
       - Slice-Spec: {spec_path}/slices/{slice_file}

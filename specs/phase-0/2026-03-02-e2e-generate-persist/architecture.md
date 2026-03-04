@@ -546,3 +546,4 @@ docker-compose.yml                # PostgreSQL container
 | 2 | Welchen API-Style soll die App nutzen? (Server Actions vs Route Handlers vs Mix) | Server Actions (direkte Funktionsaufrufe, kein REST) |
 | 3 | PostgreSQL-Driver fuer Drizzle: postgres.js oder node-postgres? | postgres.js (schneller, reiner JS, kein native Build) |
 | 4 | OpenRouter-Anbindung: SDK oder plain fetch? | Plain fetch (kein SDK noetig fuer einen einzigen API Call) |
+| 5 | Replicate API: `replicate.run()` (Discovery) vs `predictions.create()` + `replicate.wait()` (Architecture)? | `predictions.create()` + `replicate.wait()` gewaehlt. Begruendung: `replicate.run()` liefert nur FileOutput (Bild-Stream), aber keinen Zugriff auf Prediction-Metadaten (prediction_id, seed aus logs). Fuer Debugging (prediction_id) und Reproduzierbarkeit (seed) benoetigen wir das volle Prediction-Objekt. Discovery wurde bewusst abstrahiert ("Blocking API"), Architecture konkretisiert die Methode. |
