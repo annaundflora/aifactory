@@ -83,8 +83,30 @@ Fuehre Stages in dieser Reihenfolge aus. Bei Failure: ABBRUCH, alle nachfolgende
 3. Polling-Loop: Alle 1 Sekunde `curl -s -o /dev/null -w "%{http_code}" {health_endpoint}`
 4. Timeout: 30 Sekunden
 5. Erfolg: HTTP Status 200
-6. App stoppen: `kill {PID}`, nach 5s `kill -9 {PID}` falls noch laufend
-7. Output fields: app_started, health_status, startup_duration_ms
+6. [NEU] Chrome DevTools MCP Check:
+   a. TRY: mcp__chrome-devtools__navigate(url: "{health_endpoint}")
+   b. IF verfuegbar (kein Fehler):
+      - DOM Snapshot: mcp__chrome-devtools__accessibility_snapshot()
+        -> Parse: element_count, expected_elements_found, missing_elements
+        -> Fehlende Elemente = WARNING (kein Failure)
+      - Console Logs: mcp__chrome-devtools__console_messages()
+        -> Filter: nur level == "error"
+        -> Console Errors = WARNING (kein Failure)
+        -> Max 20 Eintraege, max 500 Zeichen pro Eintrag
+      - Screenshot: mcp__chrome-devtools__screenshot()
+        -> Speichere unter: .claude/evidence/{feature}/{slice_id}-smoke.png
+        -> Fehler bei Screenshot = WARNING (kein Failure)
+      - smoke_mode = "functional"
+   c. IF nicht verfuegbar (ToolNotFound / MCPError / Timeout):
+      - smoke_mode = "health_only"
+      - WARNING: "Chrome DevTools MCP nicht verfuegbar -- Smoke Test laeuft im health_only Modus"
+7. App stoppen: `kill {PID}`, nach 5s `kill -9 {PID}` falls noch laufend
+8. Output fields: app_started, health_status, startup_duration_ms, smoke_mode, dom_snapshot, console_errors, screenshot_path
+
+**Truncation-Regeln (Stage 4):**
+- DOM Snapshot (raw): max 10.000 Zeichen -- nur element_count, expected_elements_found, missing_elements im Output
+- Console Errors: max 20 Eintraege
+- Console Error Text: max 500 Zeichen pro Eintrag
 
 #### Stage 5: Regression
 - Command: `{test_command} {all_previous_test_paths} -v`
@@ -120,7 +142,7 @@ Falls ein Test-Verzeichnis nicht existiert:
 Wenn ein Stage fehlschlaegt:
 - ALLE nachfolgenden Stages werden uebersprungen
 - Uebersprungene Stages: exit_code: -1, duration_ms: 0, summary: "skipped (previous stage failed)"
-- Smoke: app_started: false, health_status: 0, startup_duration_ms: 0
+- Smoke: app_started: false, health_status: 0, startup_duration_ms: 0, smoke_mode: "health_only", dom_snapshot: null, console_errors: [], screenshot_path: ""
 - Regression: exit_code: -1, slices_tested: []
 - overall_status: "failed"
 - failed_stage: Name des fehlgeschlagenen Stages
@@ -154,7 +176,15 @@ Wenn ein Stage fehlschlaegt:
     "smoke": {
       "app_started": true,
       "health_status": 200,
-      "startup_duration_ms": 4500
+      "startup_duration_ms": 4500,
+      "smoke_mode": "functional",
+      "dom_snapshot": {
+        "element_count": 42,
+        "expected_elements_found": ["header", "nav", "main"],
+        "missing_elements": []
+      },
+      "console_errors": [],
+      "screenshot_path": ".claude/evidence/feature/slice-01-smoke.png"
     },
     "regression": {
       "exit_code": 0,
@@ -188,7 +218,11 @@ Wenn ein Stage fehlschlaegt:
     "smoke": {
       "app_started": false,
       "health_status": 0,
-      "startup_duration_ms": 0
+      "startup_duration_ms": 0,
+      "smoke_mode": "health_only",
+      "dom_snapshot": null,
+      "console_errors": [],
+      "screenshot_path": ""
     },
     "regression": {
       "exit_code": -1,
