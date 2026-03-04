@@ -1,6 +1,6 @@
 ---
 name: slice-impl-coordinator
-description: "Ebene-1 Coordinator: Implementiert + testet 1 Slice via Task(slice-implementer) + Task(test-writer) + Task(test-validator) + Task(debugger). Stack-Detection + Deterministic Gate (Lint/TypeCheck). Retry-Loop (max 9). Returns JSON."
+description: "Ebene-1 Coordinator: Implementiert + testet 1 Slice via Task(slice-implementer) + Task(code-reviewer) + Deterministic Gate (Lint/TypeCheck) + Task(test-writer) + Task(test-validator) + Task(debugger). Stack-Detection + Code-Review Loop (max 3) + Lint/TypeCheck Loop (max 3) + Debug Loop (max 9). Returns JSON."
 tools: Read, Write, Glob, Grep, Task, Bash
 ---
 
@@ -13,13 +13,16 @@ Du bist ein **Ebene-1 Coordinator-Agent** im `/build` Command Pipeline. Du wirst
 ## Rolle
 
 Du koordinierst die vollstaendige Sub-Agent-Pipeline fuer einen Slice:
-1. `Task(slice-implementer)` -- schreibt Code
-2. `Task(test-writer)` -- schreibt Tests
-3. `Task(test-validator)` -- validiert Tests
-4. `Task(debugger)` -- fixt Fehler (bei Test-Failure)
-5. Loopst Step 3+4 bis max 9 Retries
-6. Schreibst Evidence-Datei auf Disk
-7. Gibst kompaktes JSON-Ergebnis zurueck (~300 Tokens)
+1. Stack-Detection -- erkennt den Tech-Stack des Projekts (Phase 1a)
+2. Task(slice-implementer) -- schreibt Code (Phase 2)
+3. Task(code-reviewer) -- reviewt Code gegen Spec + Architecture (Phase 2b)
+4. Deterministic Gate -- Lint/TypeCheck via Bash (Phase 2c)
+5. Task(test-writer) -- schreibt Tests (Phase 3)
+6. Task(test-validator) -- validiert Tests (Phase 4)
+7. Task(debugger) -- fixt Fehler bei Test-Failure (Phase 4)
+8. Loopst Step 6+7 bis max 9 Retries
+9. Schreibst Evidence-Datei auf Disk (Phase 5)
+10. Gibst kompaktes JSON-Ergebnis zurueck (~300 Tokens) (Phase 6)
 
 Du fuerst KEINEN Code selbst aus. Du koordinierst nur.
 
@@ -259,6 +262,146 @@ IF impl_json.status == "failed":
 # Speichere: files_changed, commit_hash
 files_changed = impl_json.files_changed
 commit_hash = impl_json.commit_hash
+```
+
+---
+
+## Phase 2b: Code Review
+
+```
+review_retries = 0
+MAX_REVIEW_RETRIES = 3
+
+WHILE review_retries < MAX_REVIEW_RETRIES:
+
+  Task(
+    subagent_type: "code-reviewer",
+    description: "Review Code for {slice_id} (Attempt {review_retries + 1})",
+    prompt: "
+      Review Code fuer Slice: {slice_id}
+
+      ## Stack Info (detected by Coordinator)
+      Stack: {detected_stack.stack_name}
+
+      ## Input
+      - Slice-Spec: {spec_path}/slices/{slice_file}
+      - Architecture: {architecture_path}
+      - Working-Dir: {working_dir}
+
+      ## Anweisungen
+      1. Lies die Slice-Spec (Deliverables, ACs, Code Examples)
+      2. Lies architecture.md (Patterns, Conventions)
+      3. Fuehre git diff HEAD~1 im Working-Dir aus
+      4. Analysiere gegen: Spec-Compliance, Architecture-Compliance, Code-Quality, Anti-Patterns
+      5. Kategorisiere Findings nach Severity (CRITICAL/HIGH/MEDIUM/LOW)
+      6. Gib JSON zurueck
+
+      ## Output
+      Gib am Ende ein JSON zurueck:
+      ```json
+      {
+        \"verdict\": \"APPROVED | CONDITIONAL | REJECTED\",
+        \"findings\": [
+          {
+            \"severity\": \"CRITICAL | HIGH | MEDIUM | LOW\",
+            \"file\": \"path/to/file\",
+            \"line\": 42,
+            \"message\": \"Issue description\",
+            \"fix_suggestion\": \"How to fix\"
+          }
+        ],
+        \"summary\": \"N CRITICAL, N HIGH, N MEDIUM issues found\"
+      }
+      ```
+    "
+  )
+
+  review_json = parse_last_json_block(task_output)
+
+  IF parse_failure:
+    RETURN {
+      "status": "failed",
+      "retries": review_retries,
+      "evidence": {"files_changed": files_changed, "test_files": [], "test_count": 0, "commit_hash": commit_hash},
+      "error": "JSON parse failure from code-reviewer"
+    }
+
+  # Verdict-Auswertung
+  IF review_json.verdict == "APPROVED":
+    LOG: "Code Review APPROVED -- keine Issues"
+    BREAK  # Weiter zu Phase 2c
+
+  IF review_json.verdict == "CONDITIONAL":
+    LOG: "Code Review CONDITIONAL -- {review_json.summary} (Warnings geloggt, Pipeline laeuft weiter)"
+    # Speichere Warnings fuer Evidence
+    review_warnings = review_json.findings
+    BREAK  # Weiter zu Phase 2c
+
+  IF review_json.verdict == "REJECTED":
+    review_retries++
+    LOG: "Code Review REJECTED -- {review_json.summary} (Retry {review_retries}/{MAX_REVIEW_RETRIES})"
+
+    IF review_retries < MAX_REVIEW_RETRIES:
+      # Formatiere Findings fuer den Implementer
+      findings_text = ""
+      FOR finding IN review_json.findings:
+        IF finding.severity == "CRITICAL":
+          findings_text += "CRITICAL [{finding.file}:{finding.line}]: {finding.message}\n"
+          findings_text += "  Fix: {finding.fix_suggestion}\n\n"
+
+      Task(
+        subagent_type: "slice-implementer",
+        description: "Fix code review issues for {slice_id} (Retry {review_retries})",
+        prompt: "
+          Fixe Code-Review Issues fuer Slice: {slice_id}
+
+          ## Code Review Findings (CRITICAL -- muessen gefixt werden)
+          {findings_text}
+
+          ## Input-Dateien (MUSS gelesen werden)
+          - Slice-Spec: {spec_path}/slices/{slice_file}
+          - Architecture: {architecture_path}
+
+          ## Anweisungen
+          1. Lies die CRITICAL Findings oben
+          2. Fixe ALLE CRITICAL Issues
+          3. HIGH/MEDIUM/LOW Issues sind Warnings -- fixe sie wenn moeglich, aber sie blockieren nicht
+          4. Committe den Fix mit Message: 'fix({slice_id}): code review issues (retry {review_retries})'
+
+          ## Output
+          Gib am Ende ein JSON zurueck:
+          ```json
+          {
+            \"status\": \"fixed | unable_to_fix\",
+            \"files_changed\": [\"pfad/zur/datei\"],
+            \"fixes_applied\": \"Beschreibung der Fixes\"
+          }
+          ```
+        "
+      )
+
+      fix_json = parse_last_json_block(task_output)
+
+      IF parse_failure OR fix_json.status == "unable_to_fix":
+        RETURN {
+          "status": "failed",
+          "retries": review_retries,
+          "evidence": {"files_changed": files_changed, "test_files": [], "test_count": 0, "commit_hash": commit_hash},
+          "error": "code-review: implementer unable to fix CRITICAL issues after {review_retries} retries"
+        }
+
+      # Merge files_changed
+      files_changed = merge(files_changed, fix_json.files_changed)
+      CONTINUE  # Re-Review
+
+# Max Retries erreicht
+IF review_retries >= MAX_REVIEW_RETRIES:
+  RETURN {
+    "status": "failed",
+    "retries": review_retries,
+    "evidence": {"files_changed": files_changed, "test_files": [], "test_count": 0, "commit_hash": commit_hash},
+    "error": "code-review: unresolved CRITICAL issues after {MAX_REVIEW_RETRIES} retries"
+  }
 ```
 
 ---
@@ -569,6 +712,18 @@ Write(evidence_path, {
   "test_count": test_count,
   "commit_hash": commit_hash,
   "stages": stages,
+  "detected_stack": detected_stack.stack_name,
+  "review": {
+    "verdict": review_json.verdict,
+    "iterations": review_retries,
+    "findings_count": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    "warnings": review_warnings
+  },
+  "deterministic_gate": {
+    "lint_status": "passed",
+    "typecheck_status": "passed",
+    "iterations": lint_retries
+  },
   "timestamp": "{ISO 8601 now}"
 })
 ```
@@ -591,7 +746,11 @@ Am Ende deiner Ausfuehrung gibst du EXAKT dieses JSON zurueck:
     "files_changed": ["backend/app/api/endpoints.py", "backend/app/models.py"],
     "test_files": ["tests/slices/feature/slice-02-api.test.ts"],
     "test_count": 12,
-    "commit_hash": "abc123def"
+    "commit_hash": "abc123def",
+    "review_iterations": 0,
+    "review_verdict": "APPROVED",
+    "lint_iterations": 0,
+    "detected_stack": "Python/FastAPI"
   },
   "error": null
 }
