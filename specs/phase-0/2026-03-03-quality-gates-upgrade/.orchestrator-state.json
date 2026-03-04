@@ -1,13 +1,29 @@
 {
   "spec_path": "specs/phase-0/2026-03-03-quality-gates-upgrade",
   "feature_name": "quality-gates-upgrade",
-  "status": "in_progress",
-  "current_state": "wave_1",
+  "status": "feature_complete",
+  "current_state": "feature_complete",
   "waves": [
-    {"id": 1, "slices": ["slice-01-code-reviewer-agent", "slice-02-deterministic-pre-test-gate"], "status": "in_progress"},
-    {"id": 2, "slices": ["slice-03-pipeline-integration"], "status": "pending"},
-    {"id": 3, "slices": ["slice-04-chrome-devtools-smoke"], "status": "pending"}
+    {"id": 1, "slices": ["slice-01-code-reviewer-agent", "slice-02-deterministic-pre-test-gate"], "status": "completed"},
+    {"id": 2, "slices": ["slice-03-pipeline-integration"], "status": "completed"},
+    {"id": 3, "slices": ["slice-04-chrome-devtools-smoke"], "status": "completed"}
   ],
-  "completed_slices": [],
-  "evidence_files": []
+  "completed_slices": [
+    "slice-01-code-reviewer-agent",
+    "slice-02-deterministic-pre-test-gate",
+    "slice-03-pipeline-integration",
+    "slice-04-chrome-devtools-smoke"
+  ],
+  "evidence_files": [
+    ".claude/evidence/quality-gates-upgrade/slice-01-code-reviewer-agent.json",
+    ".claude/evidence/quality-gates-upgrade/slice-02-deterministic-pre-test-gate.json",
+    ".claude/evidence/quality-gates-upgrade/slice-03-pipeline-integration.json",
+    ".claude/evidence/quality-gates-upgrade/slice-04-chrome-devtools-smoke.json"
+  ],
+  "commits": [
+    {"slice": "slice-01", "hash": "7c87082", "message": "feat(slice-01-code-reviewer-agent): add code-reviewer agent definition"},
+    {"slice": "slice-02", "hash": "1b86b74", "message": "feat(slice-02-deterministic-pre-test-gate): add stack detection and deterministic lint/typecheck gate"},
+    {"slice": "slice-03", "hash": "fdefced", "message": "feat(slice-03-pipeline-integration): add code review loop, update pipeline to 6-step"},
+    {"slice": "slice-04", "hash": "f4141b3", "message": "feat(slice-04-chrome-devtools-smoke): extend smoke test with DevTools MCP integration"}
+  ]
 }
