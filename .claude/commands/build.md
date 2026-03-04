@@ -1,5 +1,5 @@
 ---
-description: "Unified Autonomous Feature Pipeline. Ultra-Lean Coordinator: Planning + Gate 3 + Implementation + Final Validation + PR. Delegiert pro Slice an Coordinator-Agents. ~5.000 Tokens Context. Unterstuetzt Single-Spec und Multi-Spec."
+description: "DEPRECATED als Claude-Prompt. Nutze stattdessen: .claude/scripts/build.sh {spec_path}. Bash-Script startet separate claude -p Sessions pro Phase (Planner, Orchestrate) mit 100% frischem Context. Loest Context-Erschoepfung und 3-Ebenen-Nesting-Problem."
 ---
 
 # /build Command

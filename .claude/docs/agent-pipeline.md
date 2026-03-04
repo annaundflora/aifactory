@@ -14,11 +14,34 @@ Feature-Idee
  discovery.md   wireframes.md   architecture.md   slices/*.md    Code + Tests
                    |               |                |              |
                  Gate 0          Gate 1           Gate 2+3       Evidence
-                                                 ╰── /build ───────╯
-                                                  (= /planner + /orchestrate + PR)
+                                                 ╰── build.sh ──────╯
+                                            (Bash: separate claude -p Sessions)
 ```
 
-`/build` vereint `/planner` + `/orchestrate` + PR-Erstellung in einem autonomen Durchlauf.
+`build.sh` (.claude/scripts/build.sh) orchestriert den gesamten Flow als Bash-Script.
+Jede Phase (Planner, Orchestrate) laeuft in einer eigenen `claude -p` Session mit 100% frischem Context.
+Loest die Context-Erschoepfung und das 3-Ebenen-Nesting-Problem des alten `/build` Claude-Prompts.
+
+```
+build.sh (Bash = Ebene 0)
+  |
+  ├── Phase 1: Validierung (Bash - kein Claude noetig)
+  │     └── Pruefe discovery.md + architecture.md existieren
+  │
+  ├── Phase 2: Git Branch (Bash)
+  │     └── git checkout main && git checkout -b feat/{name}
+  │
+  ├── Phase 3: Planning (claude -p mit planner.md als System-Prompt)
+  │     └── Eigene Session → .planner-state.json status:"completed"
+  │
+  ├── Phase 4: Implementation (claude -p mit orchestrate.md als System-Prompt)
+  │     └── Eigene Session → .orchestrator-state.json status:"feature_complete"
+  │
+  ├── Phase 5: Git Push + PR (Bash)
+  │     └── git push -u origin + gh pr create
+  │
+  └── Multi-Spec: Loop ueber alle Specs
+```
 
 ---
 
@@ -74,7 +97,7 @@ Feature-Idee
 | `/architecture` | Autonom | Technische Architektur + Gate 1 |
 | `/planner` | Autonom | Slice-Specs + Gate 2 + Gate 3 |
 | `/orchestrate` | Autonom | Implementation wave-by-wave (6-Step Pipeline) |
-| `/build` | Autonom | Planner + Orchestrate + PR (alles in einem) |
+| `build.sh` | Autonom | Bash-Script: Planner + Orchestrate + PR (separate claude -p Sessions) |
 | `/roadmap` | Interaktiv | Strategische Produkt-Orientierung |
 | `/qa-manual` | Interaktiv | Gefuehrtes Feature-Testing |
 | `/pm-ux-review-de` | Autonom | Standalone UX Expert Review |
@@ -241,37 +264,41 @@ Erkennt den Tech-Stack einmal pro Feature anhand von Indicator-Dateien:
 
 ---
 
-## /build vs /planner + /orchestrate
+## build.sh vs /planner + /orchestrate vs /build (deprecated)
 
 ```
-/planner + /orchestrate (2 Ebenen)      /build (3 Ebenen)
+/planner + /orchestrate (2 Ebenen)      build.sh (Bash + 2 Ebenen)
 ================================         ================================
 
 User                                     User
   |                                        |
-  ├── /planner                             └── /build (Ebene 0)
+  ├── /planner (Claude Session 1)          └── build.sh (Bash = Ebene 0)
   │     ├── Task(slice-writer)                   |
-  │     ├── Task(slice-compliance)               ├── Task(slice-plan-coordinator) ─ Ebene 1
-  │     └── Task(integration-map)                │     ├── Task(slice-writer)
-  │                                              │     └── Task(slice-compliance)
-  └── /orchestrate                               │
-        ├── Task(slice-implementer)              ├── Task(integration-map)
-        ├── Task(code-reviewer)                  │
-        ├── Bash(lint/typecheck)                 ├── Task(slice-impl-coordinator) ─ Ebene 1
-        ├── Task(test-writer)                    │     ├── Task(slice-implementer)
-        ├── Task(test-validator)                 │     ├── Task(code-reviewer)
-        └── Task(debugger)                       │     ├── Bash(lint/typecheck)
-                                                 │     ├── Task(test-writer)
-                                                 │     ├── Task(test-validator)
-                                                 │     └── Task(debugger)
+  │     ├── Task(slice-compliance)               ├── Phase 1-2: Bash (validate, branch)
+  │     └── Task(integration-map)                │
+  │                                              ├── Phase 3: claude -p (Session 1)
+  └── /orchestrate (Claude Session 2)            │     └── planner.md als System-Prompt
+        ├── Task(slice-implementer)              │           ├── Task(slice-writer)
+        ├── Task(code-reviewer)                  │           ├── Task(slice-compliance)
+        ├── Bash(lint/typecheck)                 │           └── Task(integration-map)
+        ├── Task(test-writer)                    │
+        ├── Task(test-validator)                 ├── Phase 4: claude -p (Session 2)
+        └── Task(debugger)                       │     └── orchestrate.md als System-Prompt
+                                                 │           ├── Task(slice-implementer)
+                                                 │           ├── Task(code-reviewer)
+                                                 │           ├── Bash(lint/typecheck)
+                                                 │           ├── Task(test-writer)
+                                                 │           ├── Task(test-validator)
+                                                 │           └── Task(debugger)
                                                  │
-                                                 ├── Task(test-validator) ─ Final
-                                                 └── git push + gh pr create
+                                                 └── Phase 5: Bash (push, PR)
 ```
 
-**Gleiche Leaf-Agents**, unterschiedliche Orchestrierung:
-- `/planner` + `/orchestrate`: Direkte Task()-Calls (2 Ebenen)
-- `/build`: Coordinator-Agents als Zwischenschicht (3 Ebenen), plus PR-Erstellung
+**build.sh Vorteile gegenueber /build (deprecated Claude-Prompt):**
+- Jede Phase bekommt 100% frischen Context (keine Context-Erschoepfung)
+- Nur 2 Ebenen Nesting (Bash -> claude -p -> Task), nicht 3
+- State-Uebergabe via Dateien (.planner-state.json, .orchestrator-state.json)
+- Resume-Support: Erkennt abgeschlossene Phasen und ueberspringt sie
 
 ---
 
