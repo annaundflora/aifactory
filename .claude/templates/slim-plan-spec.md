@@ -104,8 +104,9 @@ describe('{Slice Name}', () => {
 <!-- DELIVERABLES_START -->
 - [ ] `{pfad/datei.ts}` — {Kurzbeschreibung}
 - [ ] `{pfad/datei.ts}` — {Kurzbeschreibung}
-- [ ] `{test/pfad.test.ts}` — Tests für AC-1 bis AC-N
 <!-- DELIVERABLES_END -->
+
+> **Hinweis:** Test-Dateien gehoeren NICHT in Deliverables. Der Test-Writer-Agent erstellt Tests basierend auf den Test Skeletons oben.
 
 ---
 

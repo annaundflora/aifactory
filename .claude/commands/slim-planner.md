@@ -61,17 +61,53 @@ IF EXISTS STATE_FILE:
     STOP
 
   IF state.status == "in_progress":
+    # ─── State-Recovery aus Filesystem (Single Source of Truth) ───
+    # Der State-File kann veraltet sein (z.B. nach Crash).
+    # Das Filesystem (vorhandene Slices + Compliance-Reports) ist die Wahrheit.
+
+    actual_approved = []
+    FOR each compliance_file IN Glob("{spec_path}/slices/compliance-slice-*.md"):
+      content = Read(compliance_file)
+      slice_num = extract_number(compliance_file)  # compliance-slice-03.md → 3
+      IF content CONTAINS "VERDICT: APPROVED":
+        actual_approved.append(slice_num)
+
+    # State-File mit Filesystem-Wahrheit abgleichen
+    IF actual_approved != state.approved_slices:
+      OUTPUT: "🔧 State-Recovery: State-File sagte {len(state.approved_slices)} approved, Filesystem hat {len(actual_approved)} approved. Korrigiere..."
+      state.approved_slices = sorted(actual_approved)
+      FOR each num IN actual_approved:
+        state.slices[num - 1].status = "approved"
+
+    # Naechsten unerledigten Slice finden
+    next_index = 0
+    FOR i, slice IN enumerate(state.slices):
+      IF slice.number NOT IN actual_approved:
+        next_index = i
+        BREAK
+      IF i == len(state.slices) - 1:
+        next_index = len(state.slices)  # Alle fertig → Gate 3
+
+    state.current_slice_index = next_index
+    state.last_updated = ISO_TIMESTAMP
+    Write(STATE_FILE, JSON.stringify(state, indent=2))
+
     OUTPUT: "
     ═══════════════════════════════════════════════════════════
-    🔄 RESUME: Fortsetzen von Slice {state.current_slice}/{state.total_slices}
+    🔄 RESUME: Fortsetzen ab Slice {next_index + 1}/{state.total_slices}
     ═══════════════════════════════════════════════════════════
-    Bereits approved: {state.approved_slices}
-    Letzter Status: {state.last_action}
+    Approved (aus Filesystem): {actual_approved}
+    Naechster Slice: {next_index + 1 if next_index < len(state.slices) else 'Gate 3'}
     "
+
     slices = state.slices
-    approved_slices = state.approved_slices
-    current_index = state.current_slice_index
-    SKIP to Phase 4 at current_index
+    approved_slices = actual_approved
+    current_index = next_index
+
+    IF current_index >= len(state.slices):
+      SKIP to Phase 5  # Alle Slices fertig, Gate 3
+    ELSE:
+      SKIP to Phase 4 at current_index
 
 # ─────────────────────────────────────────────────────────
 # Step 2: Stack Detection (einmal, für alle Slices)

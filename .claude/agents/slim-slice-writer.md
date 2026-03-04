@@ -127,7 +127,7 @@ it('should delete project', async () => {
 #### Deliverables
 - **Exakte Dateipfade** aus der slim-slices.md Decomposition
 - **Zwischen DELIVERABLES_START/END Markern**
-- **Tests als eigenes Deliverable**
+- **NUR produktive Dateien** — KEINE Test-Dateien (Test-Writer-Agent erstellt Tests)
 
 #### Constraints
 - **Scope-Grenzen:** Was dieser Slice explizit NICHT macht
@@ -205,8 +205,8 @@ Zähle die Zeilen deines Outputs:
 
 ### Deliverables
 - [ ] Exakte Dateipfade
-- [ ] Tests als Deliverable aufgeführt
-- [ ] Maximal ~3 produktive Dateien (ohne Tests)
+- [ ] KEINE Test-Dateien (Test-Writer-Agent uebernimmt Tests)
+- [ ] Maximal ~3 produktive Dateien
 
 ---
 
