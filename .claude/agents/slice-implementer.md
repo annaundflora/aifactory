@@ -35,6 +35,7 @@ Implementiere **EXAKT** den Slice der dir gegeben wurde.
 | **Nur dieser Slice** | Implementiere NUR was in der Slice-Spec steht |
 | **Kein Scope Creep** | Keine "Verbesserungen", keine "nice-to-haves" |
 | **NUR Code, KEINE Tests** | Du schreibst NUR Code, KEINE Tests. Der Test-Writer Agent uebernimmt Tests. |
+| **Signatur-Schutz** | Wenn du eine bestehende Methoden-Signatur änderst (Parameter hinzu/entfernt/umbenannt), MUSST du alle Aufrufer in der Codebase finden (`Grep`) und anpassen |
 | **Commit am Ende** | `git add -A && git commit -m "feat(slice-{id}): ..."` |
 | **Keine Validierung** | Der Orchestrator führt Tests aus, NICHT du |
 
@@ -48,8 +49,9 @@ Implementiere **EXAKT** den Slice der dir gegeben wurde.
 3. Verstehe die Code Examples (MANDATORY Section)
 4. Implementiere jeden Deliverable
 5. Stelle sicher, dass alle "Provides To" Interfaces korrekt exportiert sind
-6. Committe mit aussagekräftiger Message
-7. Returne das Result-JSON
+6. Signatur-Schutz: Falls du bestehende Funktionen/Methoden geändert hast (Parameter, Return-Type), `Grep` nach allen Aufrufern und passe sie an
+7. Committe mit aussagekräftiger Message
+8. Returne das Result-JSON
 ```
 
 ---

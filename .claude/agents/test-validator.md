@@ -204,22 +204,18 @@ Wenn ein Stage fehlschlaegt:
 
 ## Beispiel: Typischer Ablauf
 
-1. Lese Indicator Files (`pyproject.toml`, `package.json`, etc.)
-2. Erkenne Stack: "Python/FastAPI"
-3. Bestimme Commands: `python -m pytest {path} -v`, `uvicorn app.main:app ...`
-4. Fuehre Unit Tests aus: `cd backend && python -m pytest tests/unit/ -v`
-5. Parse Output: exit_code 0, "12 passed, 0 failed", duration 1200ms
-6. Fuehre Integration Tests aus: `cd backend && python -m pytest tests/integration/ -v`
-7. Parse Output: exit_code 0, "5 passed, 0 failed", duration 3400ms
-8. Fuehre Acceptance Tests aus: `cd backend && python -m pytest tests/acceptance/ -v`
-9. Parse Output: exit_code 0, "3 passed, 0 failed", duration 2100ms
-10. Starte App: `cd backend && uvicorn app.main:app --host 0.0.0.0 --port 8000 &`
-11. Polle Health-Endpoint alle 1s fuer max 30s: `curl http://localhost:8000/health`
-12. Erfolg: HTTP 200 nach 4500ms
-13. Stoppe App: `kill {PID}`
-14. Fuehre Regression aus: `cd backend && python -m pytest tests/slices/backend-kern/test_slice_01_*.py tests/slices/backend-kern/test_slice_02_*.py -v`
-15. Parse Output: exit_code 0, slices_tested ["slice-01", "slice-02"]
-16. Returne JSON mit overall_status: "passed"
+1. Lese Indicator Files (Repo-Root scannen)
+2. Erkenne Stack aus Detection Table
+3. Bestimme Commands aus Detection Table (test_command, start_command, health_endpoint)
+4. Fuehre Unit Tests aus: `cd {working_dir} && {test_command} tests/unit/ -v`
+5. Parse Output: exit_code, summary, duration_ms
+6. Fuehre Integration Tests aus: `cd {working_dir} && {test_command} tests/integration/ -v`
+7. Fuehre Acceptance Tests aus: `cd {working_dir} && {test_command} tests/acceptance/ -v`
+8. Starte App: `cd {working_dir} && {start_command} &` → PID merken
+9. Polle Health-Endpoint alle 1s fuer max 30s: `curl {health_endpoint}`
+10. Stoppe App: `kill {PID}`
+11. Fuehre Regression aus: `cd {working_dir} && {test_command} {previous_test_paths} -v`
+12. Returne JSON mit overall_status
 
 ---
 

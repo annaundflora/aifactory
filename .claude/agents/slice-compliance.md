@@ -170,7 +170,32 @@ Wenn der Slice Build-Configs als Deliverable hat (vite.config, webpack.config, t
 - [ ] Test-Pfad ist definiert
 - [ ] Test-Typ ist klar (Unit/Integration/E2E)
 
-#### F) Discovery Compliance (wenn anwendbar)
+#### G) LLM Boundary Validation (bei Slices mit LLM-Aufrufen)
+
+Wenn der Slice LLM-Aufrufe enthält deren Output in DB-Operationen fliesst:
+
+- [ ] LLM-Response wird durch ein Schema validiert (Pydantic Model, Zod Schema, Struct) bevor sie in DB/State geschrieben wird
+- [ ] UUID-Felder werden explizit auf UUID-Format geprüft (kein direktes Durchreichen von LLM-Strings an DB)
+- [ ] Mindestens ein AC existiert für malformed LLM-Output: "GIVEN LLM returns invalid output WHEN pipeline runs THEN graceful error"
+- [ ] Fallback-Logik ist spezifiziert (Retry, Skip, Error-State)
+
+#### H) Framework Architecture Patterns
+
+**Shared Layout Check (bei Multi-Tab/Sub-Page Slices):**
+- [ ] Wenn der Slice mehrere Tabs oder Sub-Pages unter einem gemeinsamen Parent einführt → MUSS ein `layout`-Deliverable spezifiziert sein das Header/Tabs/Navigation shared
+- [ ] Wenn ein vorheriger Slice bereits eine Page hat und dieser Slice neue Sibling-Pages hinzufügt → MUSS die Shared-Layout-Frage geklärt sein
+
+**Server/Client Boundary Check:**
+- [ ] Components die Event-Handler brauchen (`onClick`, `onChange`, `onSubmit`) sind als Client Components markiert
+- [ ] Components die in Server Components gemountet werden und interaktiv sein müssen haben einen Client Component Wrapper
+
+**Proxy Route Check (bei Frontend-Backend-Integration):**
+- [ ] Wenn ein Frontend-Slice einen Backend-Endpoint konsumiert und der Request über den Frontend-Server proxied wird → MUSS eine Proxy-Route als Deliverable existieren
+- [ ] SSE/WebSocket-Endpoints: Proxy-Route mit Streaming-Support als Deliverable spezifiziert
+
+---
+
+#### I) Discovery Compliance (wenn anwendbar)
 
 **UI Components Check:**
 - [ ] UI-Elemente aus "UI Components & States" Tabelle, die zu diesem Slice gehören, sind im Slice spezifiziert
@@ -357,7 +382,33 @@ Erstelle `compliance-slice-{NN}.md`:
 
 ---
 
-## G) Discovery Compliance
+## G) LLM Boundary Validation
+
+> Nur ausfuellen wenn Slice LLM-Aufrufe enthaelt deren Output in DB/State fliesst. Sonst "N/A".
+
+| Pruef-Aspekt | Vorhanden? | Status |
+|--------------|------------|--------|
+| Response-Schema (Pydantic/Zod/Struct) | Yes/No/N/A | ✅/❌/➖ |
+| UUID-Feld-Validierung vor DB-Write | Yes/No/N/A | ✅/❌/➖ |
+| AC fuer malformed LLM-Output | Yes/No/N/A | ✅/❌/➖ |
+| Fallback-Logik (Retry/Skip/Error) | Yes/No/N/A | ✅/❌/➖ |
+
+---
+
+## H) Framework Architecture Patterns
+
+> Nur ausfuellen wenn Slice UI-Pages/Tabs oder Frontend-Backend-Integration enthaelt. Sonst "N/A".
+
+| Pruef-Aspekt | Relevant? | Vorhanden? | Status |
+|--------------|-----------|------------|--------|
+| Shared Layout bei Multi-Tab/Sub-Pages | Yes/No | Yes/No/N/A | ✅/❌/➖ |
+| Client Component Wrapper fuer interaktive Elemente in Server Components | Yes/No | Yes/No/N/A | ✅/❌/➖ |
+| Proxy Route fuer Backend-Endpoints | Yes/No | Yes/No/N/A | ✅/❌/➖ |
+| SSE/WebSocket Proxy mit Streaming | Yes/No | Yes/No/N/A | ✅/❌/➖ |
+
+---
+
+## I) Discovery Compliance
 
 | Discovery Section | Element | Relevant? | Covered? | Status |
 |-------------------|---------|-----------|----------|--------|
@@ -432,6 +483,10 @@ Begruendung: Gate 2 prueft Spec-Qualitaet. Wenn 2 Versuche nicht reichen, muss d
 - Fehlende Tests für Acceptance Criteria
 - Wireframe-Details nicht im Slice berücksichtigt
 - Documentation unvollständig
+- LLM-Output wird ohne Schema-Validierung direkt an DB übergeben
+- Multi-Tab/Sub-Page Slice ohne Shared Layout Deliverable
+- Interaktive Component in Server Component ohne Client Wrapper
+- Backend-Endpoint konsumiert via Frontend ohne Proxy Route Deliverable
 
 ### PASS (✅)
 

@@ -131,6 +131,27 @@ FOR each row in "Data":
   IF not found → ❌ MISSING: Field "{field}" not in any slice
 ```
 
+#### F) Runtime Path Analysis
+
+Für JEDEN User-Flow aus der Discovery prüfen, ob die **komplette Aufrufkette** durch Slice-Deliverables abgedeckt ist:
+
+```
+FOR each User-Flow in Discovery "User Flow" / "Transitions":
+  1. Identifiziere die Aufrufkette: User-Action → Frontend → (Proxy?) → Backend → Service → (Pipeline?)
+  2. Prüfe für JEDES Glied der Kette:
+     - Existiert ein Deliverable in einem Slice?
+     - Ist der Trigger-Aufruf spezifiziert (nicht nur die Existenz)?
+  3. WENN ein Glied fehlt → ❌ GAP: "Runtime path '{flow}' breaks at '{missing_link}'"
+```
+
+**Typische Lücken:**
+
+| Lücke | Beispiel | Prüfung |
+|-------|----------|---------|
+| Fehlender Trigger | Service existiert, wird aber nie aufgerufen | Alle Entry Points des Service gegen User-Flows abgleichen |
+| Fehlende Proxy-Route | Backend-Endpoint existiert, Frontend-Proxy-Route fehlt | Frontend-Requests prüfen: gehen sie über den Frontend-Server? |
+| Fehlende Pipeline-Verkettung | Service A ruft Service B nicht auf | DI-Chain und fire-and-forget Tasks prüfen |
+
 ### Phase 4: Output generieren
 
 Erstelle drei Dateien:
@@ -231,6 +252,12 @@ All declared dependencies have matching outputs.
 | Component | Defined In | Consumer Page | Page In Deliverables? | Action |
 |-----------|------------|---------------|-----------------------|--------|
 | [component] | Slice X | [page file] | No → ❌ GAP | Add page modification to Slice X or Y |
+
+### ❌ Runtime Path Gaps: {N}
+
+| User-Flow | Break Point | Expected Chain | Missing Link | Action |
+|-----------|-------------|----------------|--------------|--------|
+| [flow] | [where it breaks] | [full chain] | [missing piece] | [fix] |
 
 ---
 
@@ -481,6 +508,7 @@ During implementation:
 - Zirkuläre Dependency gefunden → Architektur-Problem
 - Discovery Element ohne Slice → Slice muss ergänzt oder erweitert werden
 - Deliverable-Consumer Gap → Component ohne Mount-Point in Consumer-Page → Slice-Deliverables erweitern
+- Runtime Path Gap → User-Flow bricht ab weil ein Trigger/Proxy/Aufruf fehlt → Slice-Spec um fehlenden Trigger erweitern
 
 ## Dateipfad-Konvention
 

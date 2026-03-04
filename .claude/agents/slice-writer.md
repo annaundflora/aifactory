@@ -265,8 +265,8 @@ Schreibe diese in die "Test-Strategy" Section der Slice-Spec:
 | `mocking_strategy` | Determined | `mock_external`, `no_mocks`, `test_containers` |
 
 Mocking-Strategy Regeln:
-- `mock_external`: Default. Externe APIs/Services werden gemockt
-- `no_mocks`: Kein Mocking noetig (reine Business-Logik)
+- `no_mocks`: Default. Echte Aufrufe fuer alles (DB, Services, APIs). Auch bei Kosten
+- `mock_external`: NUR wenn technisch unmoeglich anders zu testen (kein Sandbox, keine Test-Credentials)
 - `test_containers`: Integration Tests mit echten Services (Docker)
 
 ---
@@ -316,6 +316,23 @@ Prüfe deinen Slice gegen diese Checkliste:
 - [ ] Code Examples fuer Build-Configs enthalten ALLE notwendigen Imports und Plugin-Registrierungen
 - [ ] Bei IIFE/UMD Builds: `define: { 'process.env.NODE_ENV': JSON.stringify('production') }` in Vite/Webpack Config (Browser hat kein `process`)
 - [ ] Bei CSS-Frameworks mit Build-Plugins (Tailwind v4, PostCSS): Plugin in Build-Config registriert, nicht nur CSS-Import
+
+### LLM Output Validation (bei Slices mit LLM-Aufrufen)
+- [ ] Wenn LLM-Output in DB/State fliesst → Pydantic/Zod Response-Schema als Deliverable spezifiziert
+- [ ] UUID-Felder werden vor DB-Write explizit validiert (kein direktes Durchreichen)
+- [ ] Mindestens ein AC für malformed LLM-Output vorhanden ("GIVEN LLM returns invalid WHEN ... THEN graceful error")
+- [ ] Fallback-Logik spezifiziert (Retry, Skip, Error-State)
+
+### Framework Architecture Patterns
+- [ ] Wenn Slice mehrere Tabs/Sub-Pages unter gleichem Parent einführt → Shared Layout Deliverable spezifiziert
+- [ ] Interaktive Components die in Server Components gemountet werden → Client Component Wrapper als Deliverable
+- [ ] Backend-Endpoints die über Frontend-Server proxied werden → Proxy-Route als Deliverable
+- [ ] SSE/WebSocket-Endpoints → Streaming-fähige Proxy-Route als Deliverable
+
+### Trigger-Path Coverage (bei Slices mit Pipelines/Services)
+- [ ] Alle Entry Points die den Service aufrufen sind identifiziert und spezifiziert
+- [ ] Trigger-Liste gegen Discovery "User Flow" und "Transitions" abgeglichen — kein User-Flow ohne Trigger
+- [ ] Fire-and-forget Tasks (Background Tasks) sind explizit als Trigger dokumentiert
 
 ### Testfälle-Qualität
 - [ ] Keine `expect(true).toBe(true)` Placeholder-Tests - verwende stattdessen `it.todo('Beschreibung')` für Tests die der Test-Writer implementieren soll

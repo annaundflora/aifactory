@@ -2,7 +2,7 @@
 
 **Epic:** --
 **Status:** Draft
-**Wireframes:** -- (optional, later)
+**Wireframes:** `wireframes.md`
 
 ---
 
@@ -130,6 +130,14 @@
 4. Baustein wird gespeichert und erscheint unter der gewaehlten Kategorie
 5. Beim naechsten Prompt-Bauen: Klick auf Baustein fuegt Snippet zum Prompt hinzu
 
+### Flow 5b: Prompt-Baustein bearbeiten/loeschen
+
+1. User oeffnet Prompt Builder -> Tab "Meine Bausteine"
+2. User hovert ueber Baustein -> Edit-Icon und Loeschen-Icon werden sichtbar
+3. Klick auf Edit-Icon -> snippet-form oeffnet sich, vorbefuellt mit Snippet-Text und Kategorie
+4. User aendert Text oder Kategorie -> Klickt "Speichern" -> Baustein wird aktualisiert
+5. Klick auf Loeschen-Icon -> Inline-Bestaetigung: "Baustein loeschen?" -> Bestaetigen entfernt Baustein
+
 ### Flow 6: Bild herunterladen
 
 1. User klickt auf Bild in Galerie -> Lightbox
@@ -141,10 +149,17 @@
 2. User klickt Loeschen-Icon bei Projekt -> Bestaetigungs-Dialog: "Projekt und alle Generierungen loeschen?"
 3. User bestaetigt -> Projekt, alle Generierungen in DB und alle Bilder in R2 werden geloescht
 
+### Flow 8: Projekt umbenennen
+
+1. User ist im Projekt-Workspace oder Projekt-Uebersicht
+2. User klickt auf Projekt-Namen (oder Edit-Icon neben dem Namen) -> Name wird editierbar (Inline-Input)
+3. User aendert Namen -> Enter oder Blur speichert neuen Namen
+4. Projektname wird in DB aktualisiert, Sidebar und Card zeigen neuen Namen
+
 **Error Paths:**
 - Generation fehlgeschlagen -> Toast-Notification mit Fehlermeldung, Platzhalter in Galerie zeigt "Fehlgeschlagen" + Retry-Button
 - R2 Upload fehlgeschlagen -> Toast: "Bild konnte nicht gespeichert werden. Retry?"
-- LLM-Verbesserung fehlgeschlagen -> Toast: "Prompt-Verbesserung fehlgeschlagen", Original bleibt unveraendert
+- LLM-Verbesserung fehlgeschlagen -> Toast: "Prompt-Verbesserung fehlgeschlagen", Original bleibt unveraendert, Panel schliesst sich automatisch
 - Replicate Rate Limit -> Toast: "Zu viele Anfragen. Bitte kurz warten."
 
 ---
@@ -178,7 +193,7 @@
     - Prompt-Eingabefeld (Textarea, mehrzeilig)
     - Negativ-Prompt Feld (nur sichtbar wenn Modell es unterstuetzt)
     - Aktions-Buttons: "Generate", "Prompt Builder", "Prompt verbessern"
-    - Varianten-Anzahl: Slider/Dropdown 1-4 (nur sichtbar wenn > 0 Generierungen existieren)
+    - Varianten-Anzahl: Slider/Dropdown 1-4 (immer sichtbar, Default: 1)
   - **Mittlerer Bereich: Parameter-Panel**
     - Dynamisch generierte Controls basierend auf Modell-Schema (Slider, Dropdowns, Number-Inputs)
     - Aspect Ratio, Seed, Output Format, modellspezifische Parameter
@@ -203,6 +218,7 @@
   - Parameter (alle, die bei Generation gesetzt waren)
   - Erstelldatum
   - Bildabmessungen
+- Navigation: Prev/Next Chevron-Buttons links/rechts vom Bild + Pfeiltasten
 - Aktions-Buttons: "Download (PNG)", "Variation", "Loeschen"
 - Schliessen: X-Button oder Klick auf Overlay
 
@@ -246,13 +262,14 @@
 
 | Element | Type | Location | States | Behavior |
 |---------|------|----------|--------|----------|
-| `project-card` | Card | Projekt-Uebersicht | `default`, `hover` | Klick oeffnet Projekt-Workspace |
+| `project-card` | Card | Projekt-Uebersicht | `default`, `hover`, `renaming` | Klick oeffnet Projekt-Workspace. Doppelklick auf Namen oder Edit-Icon ermoeglicht Umbenennung |
 | `new-project-btn` | Button | Uebersicht + Sidebar | `default`, `hover` | Oeffnet Inline-Input fuer Projektname |
 | `project-name-input` | Input | Uebersicht | `empty`, `filled`, `error` | Enter oder Blur speichert Projekt |
+| `rename-project-input` | Input | Projekt-Uebersicht, Sidebar | `hidden`, `visible`, `saving` | Edit-Icon neben Projektname. Klick macht Namen editierbar (Inline-Input). Enter/Blur speichert |
 | `model-dropdown` | Select | Workspace Header | `default`, `open`, `selected` | Zeigt Modellname + Preis. Aenderung laedt Parameter-Schema neu |
-| `prompt-textarea` | Textarea | Workspace Header | `empty`, `filled`, `disabled` | Mehrzeilig, Auto-Resize. Disabled waehrend Generation |
+| `prompt-textarea` | Textarea | Workspace Header | `empty`, `filled` | Mehrzeilig, Auto-Resize. Cmd/Ctrl+Enter triggert Generation |
 | `negative-prompt-input` | Textarea | Workspace Header | `hidden`, `empty`, `filled` | Nur sichtbar wenn Modell Negativ-Prompt unterstuetzt |
-| `generate-btn` | Button | Workspace Header | `default`, `loading`, `disabled` | Startet Generation. Loading waehrend Blocking API Call |
+| `generate-btn` | Button | Workspace Header | `default`, `loading` | Startet Generation. Zeigt Spinner waehrend API Call, Prompt-Bereich bleibt bedienbar |
 | `prompt-builder-btn` | Button | Workspace Header | `default`, `active` | Oeffnet Prompt Builder Drawer |
 | `improve-prompt-btn` | Button | Workspace Header | `default`, `loading`, `disabled` | Startet LLM-Verbesserung |
 | `variant-count` | Slider/Select | Workspace Header | `default`, `selected` | Werte: 1, 2, 3, 4 |
@@ -261,7 +278,9 @@
 | `generation-placeholder` | Card | Gallery Grid | `loading`, `failed` | Skeleton waehrend Generation, Error-State bei Fehler |
 | `generation-card` | Card | Gallery Grid | `default`, `hover` | Thumbnail, Klick oeffnet Lightbox |
 | `retry-btn` | Button | Generation Placeholder | `default` | Re-triggert fehlgeschlagene Generation |
-| `lightbox-modal` | Modal | Overlay | `open`, `closed` | Grosses Bild + Details + Aktionen |
+| `lightbox-modal` | Modal | Overlay | `open`, `closed` | Grosses Bild + Details + Aktionen. Prev/Next Navigation via Pfeiltasten und Chevron-Buttons |
+| `lightbox-prev-btn` | Button | Lightbox | `default` | Vorheriges Bild in Galerie. Auch via linke Pfeiltaste. Wrap-Around am Anfang |
+| `lightbox-next-btn` | Button | Lightbox | `default` | Naechstes Bild in Galerie. Auch via rechte Pfeiltaste. Wrap-Around am Ende |
 | `download-btn` | Button | Lightbox | `default`, `downloading` | Download als PNG |
 | `variation-btn` | Button | Lightbox | `default` | Uebernimmt Prompt + Parameter in Eingabe |
 | `delete-generation-btn` | Button | Lightbox | `default`, `confirm` | Loescht Generierung nach Bestaetigung |
@@ -270,7 +289,8 @@
 | `option-chip` | Button | Builder Grid | `default`, `selected` | Klick toggelt Selection, fuegt/entfernt Snippet im Prompt |
 | `surprise-me-btn` | Button | Builder Header | `default` | Wuerfelt zufaellige Kombination |
 | `snippet-form` | Form | Builder (Meine Bausteine) | `hidden`, `visible` | Eingabe fuer neuen Baustein |
-| `snippet-chip` | Button | Builder (Meine Bausteine) | `default`, `selected` | Eigener Baustein, Klick fuegt zum Prompt hinzu |
+| `new-snippet-btn` | Button | Builder (Meine Bausteine) | `default` | Toggelt Sichtbarkeit des snippet-form Formulars |
+| `snippet-chip` | Button | Builder (Meine Bausteine) | `default`, `selected`, `hover` | Eigener Baustein, Klick fuegt zum Prompt hinzu. Hover zeigt Edit/Loeschen-Icons |
 | `llm-comparison` | Panel | Unter Prompt-Feld | `hidden`, `loading`, `ready` | Zeigt Original vs. Verbesserter Prompt |
 | `adopt-btn` | Button | LLM Panel | `default` | Uebernimmt verbesserten Prompt |
 | `discard-btn` | Button | LLM Panel | `default` | Verwirft Verbesserung |
@@ -289,7 +309,7 @@
 | `project-list` | Projekt-Uebersicht mit Cards | Projekt oeffnen, Neues Projekt, Projekt loeschen |
 | `workspace-empty` | Projekt offen, keine Generierungen | Prompt eingeben, Modell waehlen, Parameter setzen, Builder oeffnen, Prompt verbessern, Generate |
 | `workspace-ready` | Projekt offen, Prompt eingegeben | Generate, Builder oeffnen, Prompt verbessern |
-| `generating` | Loading-Placeholder(s) in Galerie, Generate-Button disabled | Warten (kein Cancel moeglich bei Blocking API) |
+| `generating` | Loading-Placeholder(s) in Galerie, Generate-Button zeigt Spinner | Prompt editieren, Builder oeffnen, Prompt verbessern, erneut Generate (queued) |
 | `workspace-populated` | Generierungen in Galerie sichtbar | Alle workspace-ready Aktionen + Variation, Bild anschauen |
 | `lightbox-open` | Bild-Detail Modal offen | Download, Variation, Loeschen, Schliessen |
 | `builder-open` | Prompt Builder Drawer offen | Kategorie wechseln, Option waehlen, Surprise Me, Baustein erstellen, Schliessen |
@@ -306,7 +326,7 @@
 | `project-list` | Projekt-Name eingegeben + Enter | Projekt wird erstellt, Navigation | `workspace-empty` | -- |
 | `project-list` | Loeschen-Icon -> Bestaetigen | Projekt + Generierungen + R2-Bilder geloescht | `project-list` | Bestaetigung erforderlich |
 | `workspace-empty` | Prompt eingeben | Prompt-Feld gefuellt | `workspace-ready` | -- |
-| `workspace-ready` | Klick "Generate" | Placeholder(s) in Galerie, Button disabled | `generating` | Prompt darf nicht leer sein, Modell muss gewaehlt sein |
+| `workspace-ready` | Klick "Generate" oder Cmd/Ctrl+Enter | Placeholder(s) in Galerie, Button zeigt Spinner | `generating` | Prompt darf nicht leer sein, Modell muss gewaehlt sein |
 | `generating` | Replicate API antwortet (Erfolg) | Bild erscheint, Placeholder wird ersetzt | `workspace-populated` | Bild wird in R2 gespeichert, DB-Eintrag erstellt |
 | `generating` | Replicate API antwortet (Fehler) | Placeholder zeigt Error + Retry | `generation-failed` | Toast-Notification mit Fehlermeldung |
 | `generation-failed` | Klick "Retry" | Neuer Placeholder, API-Call wiederholt | `generating` | Gleicher Prompt + Parameter |
@@ -314,10 +334,11 @@
 | `lightbox-open` | Klick "Variation" | Prompt + Parameter in Eingabe uebernommen, Lightbox schliesst | `workspace-ready` | -- |
 | `lightbox-open` | Klick "Download" | PNG-Download startet | `lightbox-open` | -- |
 | `lightbox-open` | Klick "Loeschen" -> Bestaetigen | Generierung + R2-Bild geloescht | `workspace-populated` oder `workspace-empty` | Bestaetigung erforderlich |
+| `lightbox-open` | Klick Prev/Next oder Pfeiltasten | Naechstes/Vorheriges Bild wird angezeigt | `lightbox-open` | Wrap-Around am Ende/Anfang der Galerie |
 | `lightbox-open` | Klick Schliessen/Overlay | Lightbox schliesst | `workspace-populated` | -- |
 | `workspace-ready` | Klick "Prompt Builder" | Drawer oeffnet | `builder-open` | -- |
 | `builder-open` | Klick auf Option-Chip | Snippet zum Prompt hinzugefuegt/entfernt | `builder-open` | Toggle-Verhalten |
-| `builder-open` | Klick "Surprise Me" | Zufaellige Auswahl in allen Kategorien | `builder-open` | Bestehende manuelle Auswahl wird ersetzt |
+| `builder-open` | Klick "Surprise Me" | Falls Auswahl existiert: Bestaetigung. Dann zufaellige Auswahl in allen Kategorien | `builder-open` | Bestaetigung wenn bestehende Auswahl vorhanden |
 | `builder-open` | Klick Schliessen | Drawer schliesst, Prompt ist aktualisiert | `workspace-ready` | -- |
 | `workspace-ready` | Klick "Prompt verbessern" | LLM-Panel erscheint, Loading | `improving-prompt` | Prompt darf nicht leer sein |
 | `improving-prompt` | LLM-Antwort erhalten | Verbesserter Prompt erscheint neben Original | `prompt-improved` | -- |
@@ -338,9 +359,12 @@
 - Download-Format: Immer PNG (Server-Konvertierung wenn Replicate anderes Format liefert)
 - Projekt loeschen: Hard Delete -- Projekt, alle Generierungen (DB) und alle zugehoerigen Bilder (R2) werden geloescht
 - Prompt Builder Concatenation: Ausgewaehlte Snippets werden kommasepariert an den Base-Prompt angehaengt
-- Surprise Me: Ersetzt bestehende Prompt-Builder-Auswahl durch zufaellige Kombination
+- Surprise Me: Ersetzt bestehende Prompt-Builder-Auswahl durch zufaellige Kombination. Falls bereits Optionen ausgewaehlt sind, wird vorher eine Bestaetigung angezeigt: "Aktuelle Auswahl ersetzen?"
 - Prompt-Bausteine: User kann beliebig viele Snippets in beliebig vielen eigenen Kategorien erstellen
 - LLM-Verbesserung: OpenRouter API, Default-Modell `openai/gpt-oss-120b:exacto`
+- Keyboard Shortcut: Cmd/Ctrl+Enter im Prompt-Feld triggert Generation
+- UI waehrend Generation: Prompt-Bereich bleibt bedienbar (nicht gesperrt). Generation laeuft im Hintergrund, Placeholder in Galerie trackt Status unabhaengig
+- Projekt umbenennen: Doppelklick auf Projektname oder Edit-Icon, Inline-Input, Enter/Blur speichert
 
 ---
 

@@ -1,0 +1,21 @@
+{
+  "spec_path": "specs/phase-0/2026-03-02-e2e-generate-persist",
+  "status": "in_progress",
+  "phase": "slice_planning",
+  "started_at": "2026-03-03T10:00:00Z",
+  "total_slices": 7,
+  "current_slice_index": 1,
+  "slices": [
+    { "number": 1, "name": "infrastruktur-projekt-crud", "status": "approved", "retries": 2 },
+    { "number": 2, "name": "bild-generation-pipeline", "status": "retrying", "retries": 3 },
+    { "number": 3, "name": "galerie-lightbox", "status": "pending", "retries": 0 },
+    { "number": 4, "name": "prompt-builder", "status": "pending", "retries": 0 },
+    { "number": 5, "name": "llm-prompt-verbesserung", "status": "pending", "retries": 0 },
+    { "number": 6, "name": "variationen-batch", "status": "pending", "retries": 0 },
+    { "number": 7, "name": "eigene-prompt-bausteine", "status": "pending", "retries": 0 }
+  ],
+  "approved_slices": [1],
+  "failed_slices": [],
+  "last_action": "Slice 2 failed, retry 3/9",
+  "last_updated": "2026-03-03T11:30:00Z"
+}

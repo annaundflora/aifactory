@@ -132,6 +132,7 @@ Dies ist die **Single Source of Truth** für alle Pflicht-Sections. Vollständig
 | Feature State Machine | States + Triggers + UI Feedback + Business Rules | State-Machine-Tabelle |
 | Business Rules | Fachliche Regeln (Berechtigungen, Limits, Uniqueness) | Regeln-Liste |
 | Data Fields | Required? Validierung? | Data-Tabelle |
+| Trigger-Inventory | Alle Entry Points pro Pipeline/Service explizit auflisten | Trigger-Tabelle |
 | Implementation Slices | Testbare, deploybare Inkremente mit Abhängigkeiten | Slice-Liste |
 
 ### Wireframes (optional)
@@ -163,6 +164,7 @@ Agent geht Flows/States/Components/Business Rules gedanklich durch:
 | Feld ohne Validierung | Proaktiv fragen |
 | Business Rule implizit | "Wer darf X?" |
 | Keine Slice-Aufteilung | "Wie aufteilen?" |
+| Pipeline/Service ohne vollständige Trigger-Liste | "Welche Actions lösen X aus?" |
 | **Behavior existiert bereits im Code** | **→ STREICHEN** |
 | **Info steht schon in anderer Section** | **→ STREICHEN (nur 1 Stelle)** |
 | **THEN ist vage ("shows details", "all fields")** | **→ ENUMERIEREN** |
