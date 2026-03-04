@@ -1,5 +1,5 @@
 ---
-description: "Feature-Orchestrator mit Sub-Agent Pipeline. Implementiert Features wave-by-wave mit 4 Sub-Agent-Steps (Implementer -> Test-Writer -> Test-Validator -> Debugger), JSON-Parsing, 9 Retries und stack-agnostischer Final Validation."
+description: "Feature-Orchestrator mit Sub-Agent Pipeline. Implementiert Features wave-by-wave mit 6-Step Pipeline (Stack-Detection -> Implementer -> Code-Reviewer -> Deterministic Gate -> Test-Writer -> Test-Validator/Debugger), JSON-Parsing, 9 Retries und stack-agnostischer Final Validation."
 ---
 
 # Orchestrate Feature Implementation
@@ -9,9 +9,9 @@ Du orchestrierst die Implementierung eines Features slice-by-slice mit Sub-Agent
 **KRITISCHE REGELN (KEINE Ausnahmen):**
 1. **Autonomer Betrieb:** Frage NIEMALS zwischen Waves oder Slices nach Bestaetigung.
 2. **Exit Code ist Wahrheit:** exit_code != 0 = FEHLGESCHLAGEN. Immer.
-3. **Kein direktes Bash:** Du fuehrst KEINE Tests, Lint, Type-Check oder Build direkt aus. ALLES via Sub-Agents.
+3. **Kein direktes Bash:** Du fuehrst KEINE Tests direkt aus. ALLES via Sub-Agents. Ausnahme: Deterministic Gate (Lint/TypeCheck) laeuft direkt via Bash.
 4. **JSON-Parsing:** Jeder Sub-Agent-Output wird als JSON geparsed (letzter ```json``` Block). Bei Parse-Failure: HARD STOP.
-5. **9 Retries:** Max 9 Debugger-Retries pro Slice. Danach HARD STOP.
+5. **9 Retries:** Max 9 Debugger-Retries pro Slice, max 3 Code-Review-Retries, max 3 Lint/TypeCheck-Retries. Danach HARD STOP.
 
 **Input:** $ARGUMENTS (Spec-Pfad)
 
@@ -124,6 +124,64 @@ FUNCTION parse_agent_json(agent_output):
 
 ---
 
+## Phase 2b: Stack Detection
+
+```
+# Erkenne Tech-Stack anhand von Indicator-Dateien im Projekt
+# Wird einmal pro Feature ausgefuehrt, nicht pro Slice
+
+STACK_INDICATORS = {
+  "pyproject.toml":    "Python",
+  "requirements.txt":  "Python",
+  "package.json":      "Node.js",
+  "tsconfig.json":     "TypeScript",
+  "go.mod":            "Go",
+  "Cargo.toml":        "Rust",
+  "composer.json":     "PHP",
+  "Gemfile":           "Ruby",
+  "pom.xml":           "Java/Maven",
+  "build.gradle":      "Java/Gradle",
+}
+
+detected_stack = null
+
+FOR each (file, stack_name) IN STACK_INDICATORS:
+  locations = Glob("**/{file}", exclude=["node_modules", ".venv", "vendor"])
+  IF locations.length > 0:
+    detected_stack = {
+      "stack_name": stack_name,
+      "indicator_file": locations[0],
+      "lint_autofix_cmd": null,
+      "lint_check_cmd": null,
+      "typecheck_cmd": null,
+      "test_cmd": null,
+    }
+
+    # Stack-spezifische Commands ableiten
+    IF stack_name == "TypeScript" OR stack_name == "Node.js":
+      pkg = Read(locations[0])
+      IF pkg.scripts.lint: detected_stack.lint_autofix_cmd = "npm run lint -- --fix"
+      IF pkg.scripts.lint: detected_stack.lint_check_cmd = "npm run lint"
+      IF file == "tsconfig.json" OR EXISTS "tsconfig.json":
+        detected_stack.typecheck_cmd = "npx tsc --noEmit"
+      detected_stack.test_cmd = "npm test"
+
+    ELIF stack_name == "Python":
+      detected_stack.lint_autofix_cmd = "ruff check --fix . 2>&1 || black . 2>&1"
+      detected_stack.lint_check_cmd = "ruff check . 2>&1 || flake8 . 2>&1"
+      detected_stack.typecheck_cmd = "mypy . 2>&1 || pyright . 2>&1"
+      detected_stack.test_cmd = "pytest"
+
+    BREAK  # Erste Erkennung reicht
+
+IF detected_stack != null:
+  OUTPUT: "Stack erkannt: {detected_stack.stack_name}"
+ELSE:
+  OUTPUT: "Kein bekannter Stack erkannt. Lint/TypeCheck wird uebersprungen."
+```
+
+---
+
 ## Phase 3: Wave-Based Implementation
 
 ```
@@ -154,7 +212,102 @@ FOR each wave IN waves:
     IF impl_json.status == "failed":
       HARD STOP: "Implementer failed: {impl_json.notes}"
 
-    # ── Step 2: Task(test-writer) → Tests ──
+    # ── Step 2: Task(code-reviewer) → Adversarial Review ──
+    state.current_state = "code_review"
+    review_retries = 0
+    MAX_REVIEW_RETRIES = 3
+    Write(STATE_FILE, state)
+
+    WHILE review_retries < MAX_REVIEW_RETRIES:
+      review_result = Task(
+        subagent_type: "code-reviewer",
+        prompt: "
+          Review Code fuer {slice_id}.
+          Slice-Spec: {spec_file}
+          Architecture: {architecture_file}
+          Geaenderte Dateien: {impl_json.files_changed}
+          Commit: HEAD~1
+        "
+      )
+
+      review_json = parse_agent_json(review_result)
+
+      IF review_json.verdict == "APPROVED" OR review_json.verdict == "CONDITIONAL":
+        OUTPUT: "Code Review: {review_json.verdict} (Iteration {review_retries + 1})"
+        BREAK
+
+      IF review_json.verdict == "REJECTED":
+        review_retries++
+        OUTPUT: "Code Review REJECTED (Versuch {review_retries}/{MAX_REVIEW_RETRIES}) → Auto-Fix..."
+
+        IF review_retries >= MAX_REVIEW_RETRIES:
+          HARD STOP: "Code Review nach 3 Versuchen REJECTED fuer {slice_id}"
+
+        # Fix via Implementer
+        fix_impl_result = Task(
+          subagent_type: "slice-implementer",
+          prompt: "
+            Fixe Code-Review-Findings fuer {slice_id}.
+            Review-Findings: {review_json.findings}
+            Slice-Spec: {spec_file}
+            Fixe NUR die CRITICAL und HIGH Findings.
+            Committe mit: git add -A && git commit -m 'fix({slice_id}): address code review findings'
+          "
+        )
+        impl_json = parse_agent_json(fix_impl_result)
+
+    # ── Step 3: Deterministic Gate (Lint/TypeCheck) ──
+    IF detected_stack != null:
+      state.current_state = "deterministic_gate"
+      lint_retries = 0
+      MAX_LINT_RETRIES = 3
+      Write(STATE_FILE, state)
+
+      WHILE lint_retries < MAX_LINT_RETRIES:
+        gate_passed = true
+
+        # Step 3a: Lint Auto-Fix (einmal)
+        IF detected_stack.lint_autofix_cmd != null AND lint_retries == 0:
+          Bash(detected_stack.lint_autofix_cmd)
+          # Auto-fix darf nicht fehlschlagen, Ergebnis wird im Check geprueft
+
+        # Step 3b: Lint Check
+        IF detected_stack.lint_check_cmd != null:
+          lint_result = Bash(detected_stack.lint_check_cmd)
+          IF lint_result.exit_code != 0:
+            gate_passed = false
+            OUTPUT: "Lint Check FAILED (Versuch {lint_retries + 1}/{MAX_LINT_RETRIES})"
+
+        # Step 3c: TypeCheck
+        IF detected_stack.typecheck_cmd != null:
+          tc_result = Bash(detected_stack.typecheck_cmd)
+          IF tc_result.exit_code != 0:
+            gate_passed = false
+            OUTPUT: "TypeCheck FAILED (Versuch {lint_retries + 1}/{MAX_LINT_RETRIES})"
+
+        IF gate_passed:
+          OUTPUT: "Deterministic Gate PASSED"
+          # Committe Auto-Fix Aenderungen falls vorhanden
+          Bash("git diff --quiet || git add -A && git commit -m 'style({slice_id}): lint auto-fix'")
+          BREAK
+
+        lint_retries++
+        IF lint_retries >= MAX_LINT_RETRIES:
+          HARD STOP: "Deterministic Gate (Lint/TypeCheck) nach 3 Versuchen fehlgeschlagen fuer {slice_id}"
+
+        # Fix via Debugger
+        fix_result = Task(
+          subagent_type: "debugger",
+          prompt: "
+            Lint/TypeCheck fuer {slice_id} fehlgeschlagen.
+            Lint Output: {lint_result.output if lint_result else 'N/A'}
+            TypeCheck Output: {tc_result.output if tc_result else 'N/A'}
+            Geaenderte Dateien: {impl_json.files_changed}
+            Fixe die Lint/TypeCheck-Fehler.
+          "
+        )
+
+    # ── Step 4: Task(test-writer) → Tests ──
     state.current_state = "writing_tests"
     Write(STATE_FILE, state)
 
@@ -174,7 +327,7 @@ FOR each wave IN waves:
     IF tw_json.ac_coverage.total != tw_json.ac_coverage.covered:
       HARD STOP: "AC-Coverage nicht 100%. Fehlend: {tw_json.ac_coverage.missing}"
 
-    # ── Step 3: Task(test-validator) → Validate ──
+    # ── Step 5: Task(test-validator) → Validate ──
     state.current_state = "validating"
     state.retry_count = 0
     Write(STATE_FILE, state)
@@ -192,7 +345,7 @@ FOR each wave IN waves:
 
     val_json = parse_agent_json(validator_result)
 
-    # ── Step 4: Retry Loop (max 9x) ──
+    # ── Step 6: Retry Loop (max 9x) ──
     MAX_RETRIES = 9
     WHILE val_json.overall_status == "failed" AND state.retry_count < MAX_RETRIES:
       state.retry_count += 1
@@ -243,9 +396,16 @@ FOR each wave IN waves:
       "timestamp": ISO_TIMESTAMP,
       "status": "completed",
       "implementation": impl_json,  # { status, files_changed, commit_hash, notes }
+      "review": review_json,        # { verdict, findings, summary }
+      "deterministic_gate": {
+        "detected_stack": detected_stack.stack_name if detected_stack else null,
+        "lint_passed": gate_passed,
+        "lint_iterations": lint_retries
+      },
       "tests": tw_json,              # { status, test_files, test_count, ac_coverage: { total, covered, missing } }
       "validation": val_json,        # { overall_status, stages: { tests, lint, typecheck }, failed_stage?, error_output? }
-      "retries": state.retry_count
+      "retries": state.retry_count,
+      "review_iterations": review_retries
     }
     Write("{EVIDENCE_DIR}/{slice_id}.json", evidence)
 ```
