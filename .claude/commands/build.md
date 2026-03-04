@@ -434,12 +434,15 @@ FOR EACH wave IN waves:
 
         ## Anweisungen
         1. Lies die Slice-Spec, Architecture und Integration-Map
-        2. Rufe Task(slice-implementer) auf
-        3. Rufe Task(test-writer) auf
-        4. Rufe Task(test-validator) auf
-        5. Bei Test-Failure: Task(debugger) + Re-Validate (max 9 Retries)
-        6. Schreibe Evidence nach .claude/evidence/
-        7. Gib am Ende ein JSON zurueck
+        2. Stack-Detection: Erkenne den Tech-Stack (Phase 1a)
+        3. Rufe Task(slice-implementer) auf (Phase 2)
+        4. Rufe Task(code-reviewer) auf -- Code-Review Loop max 3 Retries (Phase 2b)
+        5. Deterministic Gate: Lint/TypeCheck via Bash -- Fix-Loop max 3 Retries (Phase 2c)
+        6. Rufe Task(test-writer) auf (Phase 3)
+        7. Rufe Task(test-validator) auf (Phase 4)
+        8. Bei Test-Failure: Task(debugger) + Re-Validate (max 9 Retries)
+        9. Schreibe Evidence nach .claude/evidence/
+        10. Gib am Ende ein JSON zurueck
 
         ## Output
         Gib am Ende ein JSON zurueck:
@@ -451,7 +454,11 @@ FOR EACH wave IN waves:
             \"files_changed\": [],
             \"test_files\": [],
             \"test_count\": 0,
-            \"commit_hash\": \"abc123\"
+            \"commit_hash\": \"abc123\",
+            \"review_iterations\": 0,
+            \"review_verdict\": \"APPROVED\",
+            \"lint_iterations\": 0,
+            \"detected_stack\": \"Python/FastAPI\"
           },
           \"error\": null
         }
