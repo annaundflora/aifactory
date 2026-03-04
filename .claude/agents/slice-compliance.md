@@ -42,6 +42,12 @@ Sicherstellen dass jeder Slice:
 3. Lies wireframes.md
 4. Lies alle vorherigen Slices (Dependencies verstehen)
 5. Lies discovery.md (Sections: "UI Components & States", "Feature State Machine", "Business Rules", "Data")
+
+WICHTIG - Anti-Bias-Regel:
+- Lies KEINE compliance-slice-*.md Dateien (auch nicht deine eigenen vorherigen Reports)
+- Nutze NICHT Glob auf dem slices/ Ordner um nach compliance-*.md zu suchen
+- Dein Urteil basiert AUSSCHLIESSLICH auf: Slice + Architecture + Wireframes + Discovery + vorherige genehmigte Slices
+- Vorherige Compliance-Ergebnisse sind IRRELEVANT für deine Bewertung
 ```
 
 ### Phase 2: Compliance Checks
