@@ -1,5 +1,5 @@
 import { getProjects } from "@/app/actions/projects";
-import { ProjectList } from "@/components/project-list";
+import { ProjectOverviewList } from "@/components/project-overview-list";
 
 export default async function Home() {
   const result = await getProjects();
@@ -10,7 +10,7 @@ export default async function Home() {
   return (
     <div className="min-h-screen bg-background">
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <ProjectList projects={projects} />
+        <ProjectOverviewList projects={projects} />
       </main>
     </div>
   );

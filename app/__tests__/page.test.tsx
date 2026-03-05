@@ -86,7 +86,7 @@ vi.mock("@/components/shared/confirm-dialog", () => ({
 }));
 
 // Import the client component (not the server component page.tsx)
-import { ProjectList } from "@/components/project-list";
+import { ProjectOverviewList } from "@/components/project-overview-list";
 
 const makeProject = (
   id: string,
@@ -123,7 +123,7 @@ describe("Root Page (/) - ProjectList", () => {
    * und einem prominenten New-Project-Button
    */
   it('AC-1: should render empty state with "Create your first project" and New Project button when no projects exist', () => {
-    render(<ProjectList projects={[]} />);
+    render(<ProjectOverviewList projects={[]} />);
 
     expect(screen.getByText("Create your first project")).toBeInTheDocument();
     expect(
@@ -143,7 +143,7 @@ describe("Root Page (/) - ProjectList", () => {
       makeProject("p3", "Project Gamma"),
     ];
 
-    render(<ProjectList projects={projects} />);
+    render(<ProjectOverviewList projects={projects} />);
 
     expect(screen.getByText("Project Alpha")).toBeInTheDocument();
     expect(screen.getByText("Project Beta")).toBeInTheDocument();
@@ -159,7 +159,7 @@ describe("Root Page (/) - ProjectList", () => {
     const user = userEvent.setup();
     const projects = [makeProject("p1", "Existing")];
 
-    render(<ProjectList projects={projects} />);
+    render(<ProjectOverviewList projects={projects} />);
 
     const newBtn = screen.getByRole("button", { name: /new project/i });
     await user.click(newBtn);
@@ -177,7 +177,7 @@ describe("Root Page (/) - ProjectList", () => {
   it('AC-4: should call createProject on Enter with "My Design"', async () => {
     const user = userEvent.setup();
 
-    render(<ProjectList projects={[]} />);
+    render(<ProjectOverviewList projects={[]} />);
 
     // In empty state, click the new project button
     const newBtn = screen.getByRole("button", { name: /new project/i });
@@ -201,7 +201,7 @@ describe("Root Page (/) - ProjectList", () => {
     const user = userEvent.setup();
     const projects = [makeProject("p1", "Existing")];
 
-    render(<ProjectList projects={projects} />);
+    render(<ProjectOverviewList projects={projects} />);
 
     const newBtn = screen.getByRole("button", { name: /new project/i });
     await user.click(newBtn);
@@ -221,7 +221,7 @@ describe("Root Page (/) - ProjectList", () => {
     const user = userEvent.setup();
     const projects = [makeProject("p1", "Existing")];
 
-    render(<ProjectList projects={projects} />);
+    render(<ProjectOverviewList projects={projects} />);
 
     const newBtn = screen.getByRole("button", { name: /new project/i });
     await user.click(newBtn);
@@ -250,7 +250,7 @@ describe("Root Page (/) - ProjectList", () => {
     const user = userEvent.setup();
     const projects = [makeProject("p1", "To Delete")];
 
-    render(<ProjectList projects={projects} />);
+    render(<ProjectOverviewList projects={projects} />);
 
     // Open delete dialog by clicking delete button on the card
     const deleteBtn = screen.getByRole("button", { name: /delete project/i });
@@ -284,7 +284,7 @@ describe("Root Page (/) - ProjectList", () => {
 
     const user = userEvent.setup();
 
-    render(<ProjectList projects={[]} />);
+    render(<ProjectOverviewList projects={[]} />);
 
     const newBtn = screen.getByRole("button", { name: /new project/i });
     await user.click(newBtn);

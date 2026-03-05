@@ -6,15 +6,9 @@ import Link from "next/link";
 import { ArrowLeft, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { SidebarProjectList } from "@/components/sidebar-project-list";
+import { ProjectList } from "@/components/project-list";
 import { createProject } from "@/app/actions/projects";
-
-interface Project {
-  id: string;
-  name: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+import type { Project } from "@/lib/db/queries";
 
 interface SidebarProps {
   projects: Project[];
@@ -62,7 +56,7 @@ export function Sidebar({ projects }: SidebarProps) {
 
       {/* Project list */}
       <nav className="flex-1 overflow-y-auto px-2 py-2">
-        <SidebarProjectList
+        <ProjectList
           projects={projects}
           activeProjectId={activeProjectId}
         />
