@@ -30,10 +30,11 @@ export async function replicateRun(
     });
   } catch (error: unknown) {
     if (isRateLimitError(error)) {
-      throw new Error("Zu viele Anfragen. Bitte kurz warten.");
+      throw new Error("Zu viele Anfragen. Bitte kurz warten.", { cause: error });
     }
     throw new Error(
-      `Replicate API Fehler: ${error instanceof Error ? error.message : String(error)}`
+      `Replicate API Fehler: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
     );
   }
 
@@ -41,10 +42,11 @@ export async function replicateRun(
     prediction = await client.wait(prediction);
   } catch (error: unknown) {
     if (isRateLimitError(error)) {
-      throw new Error("Zu viele Anfragen. Bitte kurz warten.");
+      throw new Error("Zu viele Anfragen. Bitte kurz warten.", { cause: error });
     }
     throw new Error(
-      `Replicate API Fehler beim Warten: ${error instanceof Error ? error.message : String(error)}`
+      `Replicate API Fehler beim Warten: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
     );
   }
 

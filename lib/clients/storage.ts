@@ -88,7 +88,8 @@ export async function upload(
     body = await streamToBuffer(stream);
   } catch (error: unknown) {
     throw new Error(
-      `Fehler beim Lesen des Streams: ${error instanceof Error ? error.message : String(error)}`
+      `Fehler beim Lesen des Streams: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
     );
   }
 
@@ -103,7 +104,8 @@ export async function upload(
     );
   } catch (error: unknown) {
     throw new Error(
-      `R2 Upload fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`
+      `R2 Upload fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
     );
   }
 
@@ -123,7 +125,8 @@ export async function deleteObject(key: string): Promise<void> {
     );
   } catch (error: unknown) {
     throw new Error(
-      `R2 Delete fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`
+      `R2 Delete fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
     );
   }
 }
