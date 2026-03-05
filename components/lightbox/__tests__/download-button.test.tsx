@@ -32,6 +32,9 @@ vi.mock("lucide-react", () => ({
   Loader2: (props: Record<string, unknown>) => (
     <svg data-testid="loader-icon" {...props} />
   ),
+  Copy: (props: Record<string, unknown>) => (
+    <svg data-testid="copy-icon" {...props} />
+  ),
 }));
 
 // Mock lib/models
