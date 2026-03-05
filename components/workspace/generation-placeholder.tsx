@@ -81,7 +81,7 @@ export function useGenerationPolling(
         intervalRef.current = null;
       }
     };
-  }, [projectId, pendingIds.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [projectId, pendingIds.length > 0]);
 
   return generations;
 }
