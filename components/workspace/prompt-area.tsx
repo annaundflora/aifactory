@@ -12,6 +12,7 @@ import {
 import { MODELS } from "@/lib/models";
 import { getModelSchema } from "@/app/actions/models";
 import { generateImages } from "@/app/actions/generations";
+import { useWorkspaceVariation } from "@/lib/workspace-state";
 import {
   Select,
   SelectContent,
@@ -72,6 +73,27 @@ export function PromptArea({ projectId }: PromptAreaProps) {
   // ----- Generation state -----
   const [isGenerating, startGeneration] = useTransition();
 
+  // ----- Variation state consumption -----
+  const { variationData, clearVariation } = useWorkspaceVariation();
+  const pendingVariationParamsRef = useRef<Record<string, unknown> | null>(null);
+
+  useEffect(() => {
+    if (!variationData) return;
+
+    setPrompt(variationData.prompt);
+    setNegativePrompt(variationData.negativePrompt ?? "");
+
+    if (variationData.modelId !== selectedModelId) {
+      // Store params to restore after schema load clears them
+      pendingVariationParamsRef.current = variationData.modelParams;
+      setSelectedModelId(variationData.modelId);
+    } else {
+      setParamValues(variationData.modelParams);
+    }
+
+    clearVariation();
+  }, [variationData, clearVariation, selectedModelId]);
+
   // ----- Load schema on model change -----
   const loadSchema = useCallback(async (modelId: string) => {
     setSchemaLoading(true);
@@ -87,6 +109,11 @@ export function PromptArea({ projectId }: PromptAreaProps) {
       setSchema(null);
     } finally {
       setSchemaLoading(false);
+      // Restore variation params after schema load if pending
+      if (pendingVariationParamsRef.current) {
+        setParamValues(pendingVariationParamsRef.current);
+        pendingVariationParamsRef.current = null;
+      }
     }
   }, []);
 

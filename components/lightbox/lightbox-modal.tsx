@@ -2,11 +2,12 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
-import { Download, Loader2, X } from "lucide-react";
+import { Copy, Download, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { type Generation } from "@/lib/db/queries";
 import { getModelById } from "@/lib/models";
 import { downloadImage, generateDownloadFilename } from "@/lib/utils";
+import { useWorkspaceVariation } from "@/lib/workspace-state";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -51,6 +52,17 @@ export function LightboxModal({
   onClose,
 }: LightboxModalProps) {
   const [isDownloading, setIsDownloading] = useState(false);
+  const { setVariation } = useWorkspaceVariation();
+
+  const handleVariation = useCallback(() => {
+    setVariation({
+      prompt: generation.prompt,
+      negativePrompt: generation.negativePrompt ?? undefined,
+      modelId: generation.modelId,
+      modelParams: (generation.modelParams ?? {}) as Record<string, unknown>,
+    });
+    onClose();
+  }, [generation, setVariation, onClose]);
 
   const handleDownload = useCallback(async () => {
     if (!generation.imageUrl || isDownloading) return;
@@ -216,7 +228,15 @@ export function LightboxModal({
 
           {/* Actions */}
           {generation.imageUrl && (
-            <div className="pt-2">
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
+                onClick={handleVariation}
+                data-testid="variation-btn"
+              >
+                <Copy className="size-4" />
+                Variation
+              </button>
               <button
                 className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
                 onClick={handleDownload}
