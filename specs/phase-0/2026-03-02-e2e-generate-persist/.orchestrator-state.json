@@ -2,22 +2,83 @@
   "spec_path": "specs/phase-0/2026-03-02-e2e-generate-persist",
   "feature_name": "e2e-generate-persist",
   "status": "in_progress",
-  "current_state": "pre_check",
-  "current_slice_id": null,
+  "current_state": "validating",
+  "current_slice_id": "slice-04-project-overview-ui",
+  "current_wave": 4,
   "retry_count": 0,
   "failed_stage": null,
   "waves": [
-    { "id": 1, "name": "Foundation", "slices": ["slice-01-docker-db-schema", "slice-06-model-registry-schema-service"] },
-    { "id": 2, "name": "Data + Clients", "slices": ["slice-02-db-connection-queries", "slice-07-replicate-storage-clients"] },
-    { "id": 3, "name": "Services", "slices": ["slice-03-project-server-actions", "slice-08-generation-service-actions", "slice-19-snippet-crud"] },
-    { "id": 4, "name": "Project UI", "slices": ["slice-04-project-overview-ui"] },
-    { "id": 5, "name": "Workspace", "slices": ["slice-05-workspace-layout-sidebar"] },
-    { "id": 6, "name": "Core UI", "slices": ["slice-09-prompt-area-parameter-panel", "slice-11-gallery-grid-generation-cards"] },
-    { "id": 7, "name": "Features", "slices": ["slice-10-generation-placeholder-polling", "slice-12-lightbox-modal", "slice-16-generation-delete-retry", "slice-17-prompt-builder-drawer", "slice-21-llm-prompt-improvement"] },
-    { "id": 8, "name": "Lightbox+", "slices": ["slice-13-lightbox-navigation-actions", "slice-15-download-png", "slice-18-surprise-me"] },
-    { "id": 9, "name": "Integration", "slices": ["slice-14-variation-flow", "slice-20-snippet-ui-builder"] }
+    { "id": 1, "name": "Foundation", "slices": ["slice-01-docker-db-schema", "slice-06-model-registry-schema-service"], "status": "completed" },
+    { "id": 2, "name": "Data + Clients", "slices": ["slice-02-db-connection-queries", "slice-07-replicate-storage-clients"], "status": "completed" },
+    { "id": 3, "name": "Services", "slices": ["slice-03-project-server-actions", "slice-08-generation-service-actions", "slice-19-snippet-crud"], "status": "completed" },
+    { "id": 4, "name": "Project UI", "slices": ["slice-04-project-overview-ui"], "status": "in_progress" },
+    { "id": 5, "name": "Workspace", "slices": ["slice-05-workspace-layout-sidebar"], "status": "pending" },
+    { "id": 6, "name": "Core UI", "slices": ["slice-09-prompt-area-parameter-panel", "slice-11-gallery-grid-generation-cards"], "status": "pending" },
+    { "id": 7, "name": "Features", "slices": ["slice-10-generation-placeholder-polling", "slice-12-lightbox-modal", "slice-16-generation-delete-retry", "slice-17-prompt-builder-drawer", "slice-21-llm-prompt-improvement"], "status": "pending" },
+    { "id": 8, "name": "Lightbox+", "slices": ["slice-13-lightbox-navigation-actions", "slice-15-download-png", "slice-18-surprise-me"], "status": "pending" },
+    { "id": 9, "name": "Integration", "slices": ["slice-14-variation-flow", "slice-20-snippet-ui-builder"], "status": "pending" }
   ],
-  "completed_slices": [],
-  "evidence_files": [],
-  "started_at": "2026-03-05T00:00:00Z"
+  "completed_slices": [
+    {
+      "id": "slice-01-docker-db-schema",
+      "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
+      "test_files": ["lib/db/__tests__/schema.test.ts", "tests/acceptance/test_slice_01_docker_db_schema.test.ts"]
+    },
+    {
+      "id": "slice-06-model-registry-schema-service",
+      "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
+      "test_files": ["lib/__tests__/models.test.ts", "lib/services/__tests__/model-schema-service.test.ts", "app/actions/__tests__/models.test.ts"]
+    },
+    {
+      "id": "slice-02-db-connection-queries",
+      "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
+      "test_files": ["lib/db/__tests__/queries.test.ts"]
+    },
+    {
+      "id": "slice-07-replicate-storage-clients",
+      "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
+      "test_files": ["lib/clients/__tests__/replicate.test.ts", "lib/clients/__tests__/storage.test.ts"]
+    },
+    {
+      "id": "slice-03-project-server-actions",
+      "pipeline": { "implementer": "done", "code_review": "REJECTED->fixed->APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
+      "test_files": ["app/actions/__tests__/projects.test.ts"]
+    },
+    {
+      "id": "slice-08-generation-service-actions",
+      "pipeline": { "implementer": "done", "code_review": "REJECTED->fixed->APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
+      "test_files": ["lib/services/__tests__/generation-service.test.ts", "app/actions/__tests__/generations.test.ts"]
+    },
+    {
+      "id": "slice-19-snippet-crud",
+      "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
+      "test_files": ["lib/services/__tests__/snippet-service.test.ts", "app/actions/__tests__/prompts.test.ts"]
+    }
+  ],
+  "in_progress_slices": [
+    {
+      "id": "slice-04-project-overview-ui",
+      "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "NEXT" },
+      "test_files": ["components/__tests__/project-card.test.tsx", "components/__tests__/confirm-dialog.test.tsx", "app/__tests__/page.test.tsx"],
+      "resume_note": "Test-Validator ist der nächste Schritt. Danach Evidence schreiben, Slice abschließen, dann Wave 5 (Slice 05) starten."
+    }
+  ],
+  "evidence_files": [
+    ".claude/evidence/e2e-generate-persist/slice-01.json",
+    ".claude/evidence/e2e-generate-persist/slice-06.json",
+    ".claude/evidence/e2e-generate-persist/slice-02.json",
+    ".claude/evidence/e2e-generate-persist/slice-07.json",
+    ".claude/evidence/e2e-generate-persist/slice-03.json",
+    ".claude/evidence/e2e-generate-persist/slice-08.json",
+    ".claude/evidence/e2e-generate-persist/slice-19.json"
+  ],
+  "total_tests_passing": 101,
+  "detected_stack": {
+    "stack_name": "TypeScript/Next.js",
+    "lint_check_cmd": "pnpm run lint",
+    "typecheck_cmd": "npx tsc --noEmit",
+    "test_cmd": "pnpm test"
+  },
+  "started_at": "2026-03-05T00:00:00Z",
+  "last_updated": "2026-03-05T23:00:00Z"
 }
