@@ -6,6 +6,9 @@ const mockUpdate = vi.fn()
 const mockDelete = vi.fn()
 const mockGetAll = vi.fn()
 
+// Mock PromptService
+const mockImprove = vi.fn()
+
 vi.mock('@/lib/services/snippet-service', () => ({
   SnippetService: {
     create: (...args: unknown[]) => mockCreate(...args),
@@ -15,7 +18,13 @@ vi.mock('@/lib/services/snippet-service', () => ({
   },
 }))
 
-import { createSnippet, updateSnippet, deleteSnippet, getSnippets } from '@/app/actions/prompts'
+vi.mock('@/lib/services/prompt-service', () => ({
+  PromptService: {
+    improve: (...args: unknown[]) => mockImprove(...args),
+  },
+}))
+
+import { createSnippet, updateSnippet, deleteSnippet, getSnippets, improvePrompt } from '@/app/actions/prompts'
 
 describe('Snippet Server Actions - Validation', () => {
   beforeEach(() => {
@@ -168,5 +177,54 @@ describe('Snippet Server Actions - CRUD via Service', () => {
     const result = await getSnippets()
 
     expect(result).toEqual({})
+  })
+})
+
+describe('improvePrompt Server Action', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  /**
+   * AC-4: GIVEN ein leerer Prompt-String
+   *       WHEN die Server Action improvePrompt({ prompt: "" }) aufgerufen wird
+   *       THEN gibt die Action { error: "Prompt darf nicht leer sein" } zurueck
+   *            ohne den OpenRouter-Client aufzurufen
+   */
+  it('AC-4: should return error object when prompt is empty without calling OpenRouter', async () => {
+    const result = await improvePrompt({ prompt: '' })
+
+    expect(result).toEqual({ error: 'Prompt darf nicht leer sein' })
+    expect(mockImprove).not.toHaveBeenCalled()
+  })
+
+  it('AC-4: should return error object when prompt is only whitespace without calling OpenRouter', async () => {
+    const result = await improvePrompt({ prompt: '   ' })
+
+    expect(result).toEqual({ error: 'Prompt darf nicht leer sein' })
+    expect(mockImprove).not.toHaveBeenCalled()
+  })
+
+  it('should call PromptService.improve and return result for valid prompt', async () => {
+    mockImprove.mockResolvedValueOnce({
+      original: 'A cat',
+      improved: 'A majestic cat',
+    })
+
+    const result = await improvePrompt({ prompt: 'A cat' })
+
+    expect(result).toEqual({
+      original: 'A cat',
+      improved: 'A majestic cat',
+    })
+    expect(mockImprove).toHaveBeenCalledWith('A cat')
+  })
+
+  it('should return error object when PromptService.improve throws', async () => {
+    mockImprove.mockRejectedValueOnce(new Error('API error'))
+
+    const result = await improvePrompt({ prompt: 'A cat' })
+
+    expect(result).toHaveProperty('error')
   })
 })
