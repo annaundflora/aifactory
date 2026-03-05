@@ -66,6 +66,16 @@ vi.mock("sonner", () => ({
   },
 }));
 
+// Mock workspace-state (LightboxModal uses useWorkspaceVariation internally;
+// variation-specific behaviour is tested in variation-flow.test.tsx)
+vi.mock("@/lib/workspace-state", () => ({
+  useWorkspaceVariation: () => ({
+    variationData: null,
+    setVariation: vi.fn(),
+    clearVariation: vi.fn(),
+  }),
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

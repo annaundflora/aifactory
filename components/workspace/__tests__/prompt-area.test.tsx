@@ -75,6 +75,16 @@ vi.mock("lucide-react", () => ({
   ),
 }));
 
+// Mock workspace-state (PromptArea uses useWorkspaceVariation internally;
+// variation-specific behaviour is tested in variation-flow.test.tsx)
+vi.mock("@/lib/workspace-state", () => ({
+  useWorkspaceVariation: () => ({
+    variationData: null,
+    setVariation: vi.fn(),
+    clearVariation: vi.fn(),
+  }),
+}));
+
 // Import AFTER mocks
 import { PromptArea } from "@/components/workspace/prompt-area";
 
