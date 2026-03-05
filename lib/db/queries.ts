@@ -80,6 +80,17 @@ export async function createGeneration(input: {
   return generation;
 }
 
+export async function getGeneration(id: string): Promise<Generation> {
+  const [generation] = await db
+    .select()
+    .from(generations)
+    .where(eq(generations.id, id));
+  if (!generation) {
+    throw new Error(`Generation nicht gefunden: ${id}`);
+  }
+  return generation;
+}
+
 export async function getGenerations(
   projectId: string
 ): Promise<Generation[]> {

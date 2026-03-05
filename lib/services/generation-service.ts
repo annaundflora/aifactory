@@ -3,6 +3,7 @@ import { ReplicateClient } from "@/lib/clients/replicate";
 import { StorageService } from "@/lib/clients/storage";
 import {
   createGeneration,
+  getGeneration,
   updateGeneration,
   type Generation,
 } from "@/lib/db/queries";
@@ -182,27 +183,7 @@ async function generate(
  * Retry a failed generation (AC-7, AC-8).
  */
 async function retry(generationId: string): Promise<Generation> {
-  // We need to fetch the generation first — use updateGeneration to reset
-  // But first we need the current state. Import getGeneration or do inline query.
-  // Since queries.ts doesn't export getGeneration by id, we'll use updateGeneration
-  // with a status check. Let's use a different approach: reset to pending then process.
-
-  // First, try to reset to pending. We need the generation data.
-  // updateGeneration returns the updated record, so we reset and check old status.
-  // Actually we need to read the generation first. Let's import db directly.
-
-  const { db } = await import("@/lib/db/index");
-  const { generations } = await import("@/lib/db/schema");
-  const { eq } = await import("drizzle-orm");
-
-  const [generation] = await db
-    .select()
-    .from(generations)
-    .where(eq(generations.id, generationId));
-
-  if (!generation) {
-    throw new Error(`Generation nicht gefunden: ${generationId}`);
-  }
+  const generation = await getGeneration(generationId);
 
   // AC-8: Only failed generations can be retried
   if (generation.status !== "failed") {
