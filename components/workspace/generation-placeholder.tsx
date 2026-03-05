@@ -7,6 +7,7 @@ import { fetchGenerations } from "@/app/actions/generations";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -116,6 +117,17 @@ export function GenerationPlaceholder({
   const [isRetrying, setIsRetrying] = useState(false);
   const prevStatusRef = useRef(generation.status);
 
+  const showErrorToast = useCallback((errorMessage: string) => {
+    const lower = errorMessage.toLowerCase();
+    if (lower.includes("429") || lower.includes("rate limit")) {
+      toast.error("Zu viele Anfragen. Bitte kurz warten.");
+    } else if (lower.includes("r2") || lower.includes("upload")) {
+      toast.error("Bild konnte nicht gespeichert werden");
+    } else {
+      toast.error(errorMessage);
+    }
+  }, []);
+
   // Sync local status when the generation prop changes (e.g. from polling)
   useEffect(() => {
     if (generation.status !== prevStatusRef.current) {
@@ -125,8 +137,12 @@ export function GenerationPlaceholder({
       if (generation.status === "completed" && onCompleted) {
         onCompleted(generation);
       }
+
+      if (generation.status === "failed" && generation.errorMessage) {
+        showErrorToast(generation.errorMessage);
+      }
     }
-  }, [generation, onCompleted]);
+  }, [generation, onCompleted, showErrorToast]);
 
   const handleRetry = useCallback(async () => {
     setIsRetrying(true);
@@ -138,16 +154,16 @@ export function GenerationPlaceholder({
       if ("error" in result) {
         // Retry failed, go back to failed state
         setLocalStatus("failed");
-        console.error("Retry failed:", result.error);
+        toast.error(result.error);
       } else {
         // Retry started successfully, notify parent
         if (onRetry) {
           onRetry(result);
         }
       }
-    } catch (error) {
+    } catch {
       setLocalStatus("failed");
-      console.error("Retry error:", error);
+      toast.error("Ein unerwarteter Fehler ist aufgetreten.");
     } finally {
       setIsRetrying(false);
     }
