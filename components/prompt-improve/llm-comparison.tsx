@@ -36,7 +36,6 @@ export function LLMComparison({
       setResult(response);
     });
     // Run only once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (isPending || !result) {
