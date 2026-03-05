@@ -12,15 +12,6 @@ import { getModelById } from "@/lib/models";
 // Types
 // ---------------------------------------------------------------------------
 
-interface GenerateInput {
-  projectId: string;
-  prompt: string;
-  negativePrompt?: string;
-  modelId: string;
-  params: Record<string, unknown>;
-  count: number;
-}
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -54,7 +45,8 @@ async function streamToPngBuffer(
     if (done) break;
     chunks.push(value);
   }
-  let buffer = Buffer.concat(chunks);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let buffer: any = Buffer.concat(chunks);
 
   // Convert to PNG if not already PNG (AC-6)
   if (!isPng(buffer)) {
