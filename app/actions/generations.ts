@@ -1,8 +1,15 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { GenerationService } from "@/lib/services/generation-service";
 import { getModelById } from "@/lib/models";
-import { getGenerations, type Generation } from "@/lib/db/queries";
+import {
+  getGenerations,
+  getGeneration,
+  deleteGeneration as deleteGenerationFromDb,
+  type Generation,
+} from "@/lib/db/queries";
+import { StorageService } from "@/lib/clients/storage";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -18,6 +25,10 @@ interface GenerateImagesInput {
 }
 
 interface RetryGenerationInput {
+  id: string;
+}
+
+interface DeleteGenerationInput {
   id: string;
 }
 
@@ -92,4 +103,45 @@ export async function fetchGenerations(
   projectId: string
 ): Promise<Generation[]> {
   return getGenerations(projectId);
+}
+
+export async function deleteGeneration(
+  input: DeleteGenerationInput
+): Promise<{ success: boolean }> {
+  try {
+    // Fetch the generation first to check existence and get image_url
+    let generation: Generation;
+    try {
+      generation = await getGeneration(input.id);
+    } catch {
+      // Generation not found
+      return { success: false };
+    }
+
+    // DB DELETE first (data integrity)
+    await deleteGenerationFromDb(input.id);
+
+    // R2 DELETE second — extract key from image_url
+    if (generation.imageUrl) {
+      try {
+        // Extract the R2 object key from the full URL
+        const url = new URL(generation.imageUrl);
+        const key = url.pathname.startsWith("/")
+          ? url.pathname.slice(1)
+          : url.pathname;
+        await StorageService.delete(key);
+      } catch (error) {
+        // Log but don't fail — DB record is already deleted
+        console.error("Failed to delete R2 object:", error);
+      }
+    }
+
+    // Revalidate gallery
+    revalidatePath("/");
+
+    return { success: true };
+  } catch (error) {
+    console.error("deleteGeneration error:", error);
+    return { success: false };
+  }
 }
