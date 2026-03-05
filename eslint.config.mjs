@@ -31,4 +31,10 @@ export default [
       },
     },
   },
+  {
+    files: ["**/__tests__/**", "**/*.test.*", "tests/**"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
 ];
