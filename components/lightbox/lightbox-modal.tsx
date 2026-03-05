@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
-import { X } from "lucide-react";
+import { Download, Loader2, X } from "lucide-react";
+import { toast } from "sonner";
 import { type Generation } from "@/lib/db/queries";
 import { getModelById } from "@/lib/models";
+import { downloadImage, generateDownloadFilename } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -48,6 +50,24 @@ export function LightboxModal({
   isOpen,
   onClose,
 }: LightboxModalProps) {
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownload = useCallback(async () => {
+    if (!generation.imageUrl || isDownloading) return;
+    setIsDownloading(true);
+    try {
+      const filename = generateDownloadFilename(
+        generation.prompt,
+        generation.createdAt,
+      );
+      await downloadImage(generation.imageUrl, filename);
+    } catch {
+      toast.error("Download fehlgeschlagen");
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [generation.imageUrl, generation.prompt, generation.createdAt, isDownloading]);
+
   // Escape key handler
   useEffect(() => {
     if (!isOpen) return;
@@ -193,6 +213,25 @@ export function LightboxModal({
               {formatDate(generation.createdAt)}
             </p>
           </div>
+
+          {/* Actions */}
+          {generation.imageUrl && (
+            <div className="pt-2">
+              <button
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+                onClick={handleDownload}
+                disabled={isDownloading}
+                data-testid="download-btn"
+              >
+                {isDownloading ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Download className="size-4" />
+                )}
+                Download PNG
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
