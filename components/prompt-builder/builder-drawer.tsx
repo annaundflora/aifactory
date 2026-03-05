@@ -103,6 +103,12 @@ export function BuilderDrawer({
     new Set()
   );
   const [activeTab, setActiveTab] = useState("style");
+  const [selectedSnippets, setSelectedSnippets] = useState<Set<string>>(
+    new Set()
+  );
+  const [snippetTexts, setSnippetTexts] = useState<Map<string, string>>(
+    new Map()
+  );
 
   // AC-11: When drawer opens, parse the current prompt to restore selections
   useEffect(() => {
@@ -125,14 +131,38 @@ export function BuilderDrawer({
     });
   }, []);
 
-  // Build the composed prompt: base (without builder options) + selections
+  const handleToggleSnippet = useCallback(
+    (snippetId: string, snippetText: string) => {
+      setSelectedSnippets((prev) => {
+        const next = new Set(prev);
+        if (next.has(snippetId)) {
+          next.delete(snippetId);
+        } else {
+          next.add(snippetId);
+        }
+        return next;
+      });
+      setSnippetTexts((prev) => {
+        const next = new Map(prev);
+        next.set(snippetId, snippetText);
+        return next;
+      });
+    },
+    []
+  );
+
+  // Build the composed prompt: base (without builder options) + selections + snippets
   const composedPrompt = useMemo(() => {
     const base = extractBasePrompt(basePrompt);
-    const selections = Array.from(selectedOptions);
-    if (selections.length === 0) return base;
-    if (!base) return selections.join(", ");
-    return base + ", " + selections.join(", ");
-  }, [basePrompt, selectedOptions]);
+    const optionSelections = Array.from(selectedOptions);
+    const snippetSelections = Array.from(selectedSnippets)
+      .map((id) => snippetTexts.get(id))
+      .filter(Boolean);
+    const allSelections = [...optionSelections, ...snippetSelections];
+    if (allSelections.length === 0) return base;
+    if (!base) return allSelections.join(", ");
+    return base + ", " + allSelections.join(", ");
+  }, [basePrompt, selectedOptions, selectedSnippets, snippetTexts]);
 
   const handleDone = useCallback(() => {
     onClose(composedPrompt);
@@ -166,6 +196,8 @@ export function BuilderDrawer({
             colorOptions={[...COLOR_OPTIONS]}
             selectedOptions={selectedOptions}
             onToggleOption={handleToggleOption}
+            selectedSnippets={selectedSnippets}
+            onToggleSnippet={handleToggleSnippet}
           />
 
           {/* Live Preview */}
