@@ -23,7 +23,6 @@ export function GenerationCard({ generation, onSelect }: GenerationCardProps) {
       className="group relative w-full overflow-hidden rounded-lg border border-border bg-card break-inside-avoid mb-4 cursor-pointer transition-all duration-200 hover:border-primary hover:shadow-lg hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       {/* Thumbnail */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={generation.imageUrl ?? ""}
         alt={generation.prompt}
