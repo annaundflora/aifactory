@@ -20,3 +20,5 @@
 {"ts":"2026-03-06T00:00:00Z","slice":"slice-21-llm-prompt-improvement","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
 {"ts":"2026-03-06T00:00:30Z","slice":"slice-21-llm-prompt-improvement","gate":"lint","result":"PASSED","attempt":1}
 {"ts":"2026-03-06T00:10:00Z","slice":"slice-21-llm-prompt-improvement","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-06T00:15:00Z","slice":"slice-16-generation-delete-retry","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-06T00:15:30Z","slice":"slice-16-generation-delete-retry","gate":"lint","result":"PASSED","attempt":1}
