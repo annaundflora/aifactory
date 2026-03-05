@@ -46,12 +46,12 @@ export async function createProject(input: {
   }
 }
 
-export async function getProjects(): Promise<Project[]> {
+export async function getProjects(): Promise<Project[] | { error: string }> {
   try {
     return await getProjectsQuery();
   } catch (err) {
     console.error("getProjects DB error:", err);
-    return [];
+    return { error: "Datenbankfehler" };
   }
 }
 
