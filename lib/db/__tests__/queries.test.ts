@@ -20,8 +20,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Each chainable method returns `this` so .from().where().orderBy() etc. work.
 
 function createChainableMock(resolvedValue: unknown = []) {
-  const chain: Record<string, ReturnType<typeof vi.fn>> = {};
-
   const createChain = (): Record<string, ReturnType<typeof vi.fn>> => {
     const proxy: Record<string, ReturnType<typeof vi.fn>> = {};
     const methods = [
