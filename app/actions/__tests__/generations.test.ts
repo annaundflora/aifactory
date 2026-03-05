@@ -18,6 +18,7 @@ vi.mock("@/lib/db/queries", () => ({
   createGeneration: vi.fn(),
   getGeneration: vi.fn(),
   updateGeneration: vi.fn(),
+  deleteGeneration: vi.fn(),
 }));
 
 // Mock next/cache to prevent server-side Next.js errors
@@ -26,9 +27,18 @@ vi.mock("next/cache", () => ({
   revalidateTag: vi.fn(),
 }));
 
-import { generateImages, retryGeneration } from "@/app/actions/generations";
+// Mock lib/clients/storage for deleteGeneration tests
+vi.mock("@/lib/clients/storage", () => ({
+  StorageService: {
+    delete: vi.fn(),
+  },
+}));
+
+import { generateImages, retryGeneration, deleteGeneration } from "@/app/actions/generations";
 import { GenerationService } from "@/lib/services/generation-service";
-import type { Generation } from "@/lib/db/queries";
+import { getGeneration, deleteGeneration as deleteGenerationFromDb, type Generation } from "@/lib/db/queries";
+import { StorageService } from "@/lib/clients/storage";
+import { revalidatePath } from "next/cache";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -184,5 +194,84 @@ describe("retryGeneration Server Action", () => {
     expect(result).toEqual({
       error: "Nur fehlgeschlagene Generierungen koennen wiederholt werden",
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: deleteGeneration Server Action (Slice 13)
+// ---------------------------------------------------------------------------
+
+describe("deleteGeneration Server Action", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /**
+   * AC-11: GIVEN die deleteGeneration Server Action wird mit einer gueltigen Generation-ID aufgerufen
+   * WHEN die Generation existiert und eine image_url hat
+   * THEN wird der DB-Eintrag geloescht, das R2-Objekt geloescht und { success: true } zurueckgegeben
+   */
+  it("AC-11: should delete generation from DB and image from R2 and return success true", async () => {
+    const gen = makeGeneration({
+      id: "gen-to-delete",
+      imageUrl: "https://cdn.example.com/images/gen-to-delete.png",
+    });
+
+    (getGeneration as Mock).mockResolvedValue(gen);
+    (deleteGenerationFromDb as Mock).mockResolvedValue(undefined);
+    (StorageService.delete as Mock).mockResolvedValue(undefined);
+
+    const result = await deleteGeneration({ id: "gen-to-delete" });
+
+    // Should fetch the generation first
+    expect(getGeneration).toHaveBeenCalledWith("gen-to-delete");
+
+    // DB delete first (data integrity)
+    expect(deleteGenerationFromDb).toHaveBeenCalledWith("gen-to-delete");
+
+    // R2 delete second — key extracted from URL
+    expect(StorageService.delete).toHaveBeenCalledWith(
+      "images/gen-to-delete.png"
+    );
+
+    // revalidatePath called for gallery update
+    expect(revalidatePath).toHaveBeenCalledWith("/");
+
+    // Return success
+    expect(result).toEqual({ success: true });
+  });
+
+  it("AC-11: should still succeed when generation has no image_url", async () => {
+    const gen = makeGeneration({
+      id: "gen-no-image",
+      imageUrl: null,
+    });
+
+    (getGeneration as Mock).mockResolvedValue(gen);
+    (deleteGenerationFromDb as Mock).mockResolvedValue(undefined);
+
+    const result = await deleteGeneration({ id: "gen-no-image" });
+
+    expect(deleteGenerationFromDb).toHaveBeenCalledWith("gen-no-image");
+    expect(StorageService.delete).not.toHaveBeenCalled();
+    expect(result).toEqual({ success: true });
+  });
+
+  /**
+   * AC-12: GIVEN die deleteGeneration Server Action wird mit einer nicht-existierenden ID aufgerufen
+   * WHEN die Aktion ausgefuehrt wird
+   * THEN wird { success: false } zurueckgegeben
+   */
+  it("AC-12: should return success false for non-existing generation ID", async () => {
+    (getGeneration as Mock).mockRejectedValue(
+      new Error("Generation not found")
+    );
+
+    const result = await deleteGeneration({ id: "gen-nonexistent" });
+
+    expect(getGeneration).toHaveBeenCalledWith("gen-nonexistent");
+    expect(deleteGenerationFromDb).not.toHaveBeenCalled();
+    expect(StorageService.delete).not.toHaveBeenCalled();
+    expect(result).toEqual({ success: false });
   });
 });
