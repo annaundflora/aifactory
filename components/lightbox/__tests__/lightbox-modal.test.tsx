@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
@@ -14,8 +14,9 @@ import { type Generation } from "@/lib/db/queries";
 // Mock next/image as plain img element
 vi.mock("next/image", () => ({
   default: (props: Record<string, unknown>) => {
-    // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
-    const { priority, fill, ...rest } = props as Record<string, unknown>;
+    const rest = Object.fromEntries(
+      Object.entries(props).filter(([k]) => k !== "priority" && k !== "fill")
+    );
     return <img {...(rest as React.ImgHTMLAttributes<HTMLImageElement>)} />;
   },
 }));
