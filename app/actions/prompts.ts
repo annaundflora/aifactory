@@ -1,6 +1,10 @@
 "use server";
 
 import { SnippetService, type Snippet } from "@/lib/services/snippet-service";
+import {
+  PromptService,
+  type ImproveResult,
+} from "@/lib/services/prompt-service";
 
 function validateSnippetInput(input: {
   text: string;
@@ -84,5 +88,27 @@ export async function getSnippets(): Promise<Record<string, Snippet[]>> {
     return await SnippetService.getAll();
   } catch {
     return {};
+  }
+}
+
+export async function improvePrompt(input: {
+  prompt: string;
+}): Promise<ImproveResult | { error: string }> {
+  const prompt = input.prompt.trim();
+
+  if (!prompt) {
+    return { error: "Prompt darf nicht leer sein" };
+  }
+
+  try {
+    return await PromptService.improve(prompt);
+  } catch (error) {
+    console.error("Prompt improvement failed:", error);
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Prompt-Verbesserung fehlgeschlagen",
+    };
   }
 }
