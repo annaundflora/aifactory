@@ -11,7 +11,7 @@
 | **ID** | `slice-21-llm-prompt-improvement` |
 | **Test** | `pnpm test lib/clients/__tests__/openrouter.test.ts lib/services/__tests__/prompt-service.test.ts components/prompt-improve/__tests__/llm-comparison.test.tsx` |
 | **E2E** | `false` |
-| **Dependencies** | `["slice-09-prompt-area-parameter-panel"]` |
+| **Dependencies** | `["slice-09-prompt-area-parameter-panel", "slice-19-snippet-crud"]` |
 
 ---
 
@@ -21,17 +21,17 @@
 |-----|-------|
 | **Stack** | `typescript-nextjs` |
 | **Test Command** | `pnpm test lib/clients/__tests__/openrouter.test.ts lib/services/__tests__/prompt-service.test.ts components/prompt-improve/__tests__/llm-comparison.test.tsx` |
-| **Integration Command** | `pnpm test lib/clients/__tests__/openrouter.test.ts lib/services/__tests__/prompt-service.test.ts components/prompt-improve/__tests__/llm-comparison.test.tsx` |
-| **Acceptance Command** | `pnpm test lib/clients/__tests__/openrouter.test.ts lib/services/__tests__/prompt-service.test.ts components/prompt-improve/__tests__/llm-comparison.test.tsx` |
+| **Integration Command** | `pnpm test lib/clients/__tests__/openrouter.test.ts lib/services/__tests__/prompt-service.test.ts` |
+| **Acceptance Command** | `pnpm test components/prompt-improve/__tests__/llm-comparison.test.tsx` |
 | **Start Command** | `pnpm dev` |
 | **Health Endpoint** | `http://localhost:3000/` |
-| **Mocking Strategy** | `mock_external` (OpenRouter API via global fetch Mock, Server Action gemockt in Component-Tests) |
+| **Mocking Strategy** | `mock_external` (OpenRouter API via globalem fetch-Mock, Server Action gemockt in Component-Tests) |
 
 ---
 
 ## Ziel
 
-OpenRouter-Client als dünner fetch-Wrapper, PromptService mit `improve()`-Methode (System-Prompt + User-Prompt an OpenRouter), Server Action `improvePrompt`, und ein LLM-Comparison-Panel das Original und verbesserten Prompt nebeneinander zeigt. Adopt uebernimmt den verbesserten Prompt ins Eingabefeld, Discard schliesst das Panel. Fehler zeigen Toast und schliessen das Panel automatisch.
+OpenRouter-Client als duenner fetch-Wrapper, PromptService mit `improve()`-Methode (System-Prompt + User-Prompt an OpenRouter), Server Action `improvePrompt` als Erweiterung der bestehenden `app/actions/prompts.ts` (aus Slice 19), und ein LLM-Comparison-Panel das Original und verbesserten Prompt nebeneinander zeigt. Adopt uebernimmt den verbesserten Prompt ins Eingabefeld, Discard schliesst das Panel. Fehler zeigen Toast und schliessen das Panel automatisch.
 
 ---
 
@@ -112,8 +112,18 @@ describe('PromptService', () => {
 
   // AC-3: Fehlerweiterleitung
   it.todo('should throw error with descriptive message when openRouterClient fails')
+})
+```
+</test_spec>
 
-  // AC-4: Leerer Prompt Validierung (Server Action)
+### Test-Datei: `app/actions/__tests__/prompts.test.ts`
+
+<test_spec>
+```typescript
+import { describe, it } from 'vitest'
+
+describe('improvePrompt Server Action', () => {
+  // AC-4: Leerer Prompt Validierung
   it.todo('should return error object when prompt is empty without calling OpenRouter')
 })
 ```
@@ -155,8 +165,9 @@ describe('LLMComparison', () => {
 
 | Slice | Resource | Type | Validation |
 |-------|----------|------|------------|
-| `slice-09` | `PromptArea` | Client Component | Stellt das Prompt-Eingabefeld bereit, in das der verbesserte Prompt uebernommen wird |
+| `slice-09` | `PromptArea` | Client Component | Stellt das Prompt-Eingabefeld bereit; Setter-Funktion wird via `onAdopt` Callback weitergegeben |
 | `slice-09` | Prompt-State | React State | Zugriff auf aktuellen Prompt-Text und Setter-Funktion |
+| `slice-19` | `app/actions/prompts.ts` | Datei (MODIFY) | Existierende Server-Actions-Datei; `improvePrompt` wird als neue Export-Funktion hinzugefuegt |
 
 ### Provides To Other Slices
 
@@ -164,7 +175,7 @@ describe('LLMComparison', () => {
 |----------|------|----------|-----------|
 | `openRouterClient.chat` | Function | `PromptService` | `(params: { model: string, messages: ChatMessage[] }) => Promise<string>` |
 | `PromptService.improve` | Function | Server Action | `(prompt: string) => Promise<{ original: string, improved: string }>` |
-| `improvePrompt` | Server Action | `LLMComparison` | `(input: { prompt: string }) => Promise<{ original: string, improved: string } \| { error: string }>` |
+| `improvePrompt` | Server Action (Erweiterung) | `LLMComparison` | `(input: { prompt: string }) => Promise<{ original: string, improved: string } \| { error: string }>` |
 | `LLMComparison` | Client Component | `PromptArea` | `<LLMComparison prompt={string} onAdopt={(improved: string) => void} onDiscard={() => void} />` |
 
 ---
@@ -172,26 +183,29 @@ describe('LLMComparison', () => {
 ## Deliverables (SCOPE SAFEGUARD)
 
 <!-- DELIVERABLES_START -->
-- [ ] `lib/clients/openrouter.ts` -- Duenner fetch-Wrapper fuer OpenRouter Chat Completions API
-- [ ] `lib/services/prompt-service.ts` -- PromptService.improve() mit System-Prompt und User-Prompt
-- [ ] `app/actions/prompts.ts` -- Server Action `improvePrompt` (Validierung + Service-Aufruf) (erweitern falls existent, sonst neu)
-- [ ] `components/prompt-improve/llm-comparison.tsx` -- Client Component: Loading-State, Side-by-Side Original/Improved, Adopt/Discard Buttons
+- [ ] `lib/clients/openrouter.ts` — Duenner fetch-Wrapper fuer OpenRouter Chat Completions API (neu)
+- [ ] `lib/services/prompt-service.ts` — PromptService.improve() mit System-Prompt und User-Prompt (neu)
+- [ ] `app/actions/prompts.ts` — MODIFY: `improvePrompt` Action als neue Export-Funktion ergaenzen (Datei existiert aus Slice 19, NICHT neu anlegen)
+- [ ] `components/prompt-improve/llm-comparison.tsx` — Client Component: Loading-State, Side-by-Side Original/Improved, Adopt/Discard Buttons (neu)
 <!-- DELIVERABLES_END -->
+
+> **Hinweis:** Test-Dateien gehoeren NICHT in Deliverables. Der Test-Writer-Agent erstellt Tests basierend auf den Test Skeletons oben.
 
 ---
 
 ## Constraints
 
 **Scope-Grenzen:**
-- KEIN Streaming der LLM-Antwort -- einfacher Request/Response
-- KEIN SDK fuer OpenRouter -- plain fetch reicht
-- KEINE Snippet-CRUD Actions in `app/actions/prompts.ts` -- kommt in einem anderen Slice
-- KEIN Prompt-Builder-Button -- kommt in Slice 14
-- KEINE Konfigurierbarkeit des LLM-Modells -- hardcoded `openai/gpt-oss-120b:exacto`
+- KEIN Streaming der LLM-Antwort — einfacher Request/Response
+- KEIN SDK fuer OpenRouter — plain fetch reicht
+- KEINE Veraenderung bestehender Snippet-CRUD Actions in `app/actions/prompts.ts` — nur `improvePrompt` hinzufuegen
+- KEIN Prompt-Builder-Button — kommt in Slice 14
+- KEINE Konfigurierbarkeit des LLM-Modells — hardcoded `openai/gpt-oss-120b:exacto`
 
 **Technische Constraints:**
 - `lib/clients/openrouter.ts`: Plain `fetch()`, kein SDK, keine externe Dependency
 - `lib/services/prompt-service.ts`: Stateless Function, kein Caching
+- `app/actions/prompts.ts`: Bestehende Datei ERWEITERN (aus Slice 19), NICHT neu anlegen
 - `components/prompt-improve/llm-comparison.tsx`: Client Component (`"use client"`)
 - shadcn/ui Button fuer Adopt/Discard
 - shadcn/ui Skeleton fuer Loading-State
@@ -199,8 +213,9 @@ describe('LLMComparison', () => {
 - Tailwind v4 fuer Styling
 
 **Referenzen:**
-- Architecture: `architecture.md` -> Section "Server Logic > Business Logic Flow: Prompt Improvement" (Request-Struktur, Model, Endpoint)
-- Architecture: `architecture.md` -> Section "API Design > Server Actions" (`improvePrompt` Signatur)
-- Architecture: `architecture.md` -> Section "Error Handling Strategy" (OpenRouter Error -> Toast + Panel schliesst)
-- Wireframes: `wireframes.md` -> Section "Screen: LLM Prompt Improvement" (Layout, Annotations, State Variations)
-- Discovery: `discovery.md` -> Section "User Flow > Flow 3: Prompt verbessern" (User-Journey)
+- Architecture: `architecture.md` → Section "Server Logic > Business Logic Flow: Prompt Improvement" (Request-Struktur, Model, Endpoint)
+- Architecture: `architecture.md` → Section "API Design > Server Actions" (`improvePrompt` Signatur und Input)
+- Architecture: `architecture.md` → Section "Error Handling Strategy" (OpenRouter Error → Toast + Panel schliesst)
+- Architecture: `architecture.md` → Section "Architecture Layers > Project Structure" (`app/actions/prompts.ts` Ort)
+- Wireframes: `wireframes.md` → Section "Screen: LLM Prompt Improvement" (Layout, Annotations, State Variations)
+- Discovery: `discovery.md` → Section "User Flow > Flow 3: Prompt verbessern" (User-Journey)

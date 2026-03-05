@@ -9,7 +9,7 @@
 | Key | Value |
 |-----|-------|
 | **ID** | `slice-05-workspace-layout-sidebar` |
-| **Test** | `pnpm test app/projects/__tests__/page.test.tsx app/__tests__/layout.test.tsx components/__tests__/sidebar.test.tsx components/shared/__tests__/confirm-dialog.test.tsx` |
+| **Test** | `pnpm test app/projects/__tests__/page.test.tsx app/__tests__/layout.test.tsx components/__tests__/sidebar.test.tsx components/__tests__/project-list.test.tsx` |
 | **E2E** | `false` |
 | **Dependencies** | `["slice-04-project-overview-ui"]` |
 
@@ -20,9 +20,9 @@
 | Key | Value |
 |-----|-------|
 | **Stack** | `typescript-nextjs` |
-| **Test Command** | `pnpm test app/projects/__tests__/page.test.tsx app/__tests__/layout.test.tsx components/__tests__/sidebar.test.tsx components/shared/__tests__/confirm-dialog.test.tsx` |
+| **Test Command** | `pnpm test app/projects/__tests__/page.test.tsx app/__tests__/layout.test.tsx components/__tests__/sidebar.test.tsx components/__tests__/project-list.test.tsx` |
 | **Integration Command** | `docker compose up -d && pnpm drizzle-kit migrate && pnpm dev & sleep 5 && pnpm test app/projects/__tests__/page.integration.test.tsx` |
-| **Acceptance Command** | `pnpm test app/projects/__tests__/page.test.tsx app/__tests__/layout.test.tsx components/__tests__/sidebar.test.tsx components/shared/__tests__/confirm-dialog.test.tsx` |
+| **Acceptance Command** | `pnpm test app/projects/__tests__/page.test.tsx app/__tests__/layout.test.tsx components/__tests__/sidebar.test.tsx components/__tests__/project-list.test.tsx` |
 | **Start Command** | `pnpm dev` |
 | **Health Endpoint** | `http://localhost:3000/` |
 | **Mocking Strategy** | `mock_external` (Server Actions werden in Unit-Tests gemockt) |
@@ -31,31 +31,31 @@
 
 ## Ziel
 
-Workspace-Seite (`/projects/[id]`) mit Sidebar-Navigation aufbauen. Root-Layout erhaelt Toaster fuer globale Notifications. Sidebar listet alle Projekte, hebt das aktive hervor, bietet New-Project-Button und Zurueck-Link. ConfirmDialog wird als shared Component extrahiert.
+Workspace-Seite (`/projects/[id]`) mit persistenter Sidebar-Navigation aufbauen. Root-Layout erhaelt den Toaster fuer globale Benachrichtigungen. Die Sidebar listet alle Projekte (`project-list`), hebt das aktive hervor, bietet einen New-Project-Button und einen "Zurueck zur Uebersicht" Link. `ProjectList` wird als eigenstaendige Component extrahiert, damit sie sowohl in der Sidebar als auch in der Overview nutzbar ist.
 
 ---
 
 ## Acceptance Criteria
 
-1) GIVEN die Route `/projects/{id}` wird aufgerufen mit einer gueltigen Projekt-ID
+1) GIVEN die Route `/projects/{id}` wird mit einer gueltigen Projekt-ID aufgerufen
    WHEN die Seite geladen wird
    THEN wird der Projektname als Ueberschrift im Main-Bereich angezeigt und die Sidebar ist links sichtbar
 
-2) GIVEN die Route `/projects/{id}` wird aufgerufen mit einer nicht existierenden ID
+2) GIVEN die Route `/projects/{id}` wird mit einer nicht existierenden ID aufgerufen
    WHEN die Seite geladen wird
-   THEN wird ein `notFound()` ausgeloest (Next.js 404-Seite)
+   THEN wird `notFound()` ausgeloest (Next.js 404-Seite)
 
 3) GIVEN 4 Projekte existieren und Projekt B ist aktiv (URL: `/projects/{id-b}`)
    WHEN die Sidebar gerendert wird
-   THEN werden alle 4 Projekte in der `sidebar-project-list` angezeigt und Projekt B hat eine visuelle Hervorhebung (z.B. aktive Background-Farbe, font-weight bold)
+   THEN zeigt die `sidebar-project-list` alle 4 Projekte und Projekt B hat eine visuelle Hervorhebung (aktive Background-Farbe oder `font-weight: bold`)
 
 4) GIVEN die Sidebar ist sichtbar
-   WHEN der User auf einen anderen Projektnamen in der Sidebar klickt
+   WHEN der User auf einen anderen Projektnamen in der Liste klickt
    THEN wird zur Route `/projects/{andere-id}` navigiert
 
 5) GIVEN die Sidebar ist sichtbar
    WHEN der User auf den `[+ New]` Button in der Sidebar klickt
-   THEN wird die `createProject` Server Action mit einem Default-Namen aufgerufen und zur neuen Projekt-Route navigiert
+   THEN wird die `createProject` Server Action mit einem Default-Namen aufgerufen und anschliessend zur neuen Projekt-Route navigiert
 
 6) GIVEN die Sidebar ist sichtbar
    WHEN der User auf den "Zurueck zur Uebersicht" Link klickt
@@ -63,23 +63,15 @@ Workspace-Seite (`/projects/[id]`) mit Sidebar-Navigation aufbauen. Root-Layout 
 
 7) GIVEN die App wird auf einer beliebigen Route geladen
    WHEN `app/layout.tsx` gerendert wird
-   THEN ist der Toaster (sonner) im Root-Layout eingebunden und Toast-Notifications koennen global angezeigt werden
+   THEN ist der Toaster (sonner) im Root-Layout eingebunden, sodass Toast-Notifications global angezeigt werden koennen
 
-8) GIVEN eine destruktive Aktion wird ausgeloest (z.B. Projekt loeschen)
-   WHEN der `ConfirmDialog` mit title="Delete Project?" und description="This will permanently delete..." geoeffnet wird
-   THEN zeigt der Dialog Titel, Beschreibungstext, einen "Cancel"-Button und einen destruktiven "Delete"-Button (rot gestylt)
+8) GIVEN die Workspace-Seite ist geladen
+   WHEN der Main-Bereich gerendert wird
+   THEN zeigt er einen Platzhalter-Bereich fuer zukuenftige Workspace-Inhalte (Prompt Area, Gallery) mit dem Projektnamen
 
-9) GIVEN der `ConfirmDialog` ist offen
-   WHEN der User auf "Cancel" klickt
-   THEN schliesst sich der Dialog und der `onConfirm` Callback wird NICHT aufgerufen
-
-10) GIVEN der `ConfirmDialog` ist offen
-    WHEN der User auf den destruktiven Button klickt
-    THEN wird der `onConfirm` Callback aufgerufen und der Dialog schliesst sich
-
-11) GIVEN die Workspace-Seite ist geladen
-    WHEN der Main-Bereich gerendert wird
-    THEN zeigt er einen Platzhalter-Bereich fuer zukuenftige Workspace-Inhalte (Prompt Area, Gallery) mit dem Projektnamen
+9) GIVEN `ProjectList` wird mit einer Liste von Projekten und einer aktiven Projekt-ID gerendert
+   WHEN die Component dargestellt wird
+   THEN werden alle Projekte als anklickbare Links gerendert und das aktive Projekt ist visuell hervorgehoben
 
 ---
 
@@ -101,7 +93,7 @@ describe('Workspace Page (/projects/[id])', () => {
   // AC-2: Ungueltige Projekt-ID
   it.todo('should call notFound() for non-existent project ID')
 
-  // AC-11: Platzhalter-Bereich
+  // AC-8: Platzhalter-Bereich
   it.todo('should render placeholder area with project name for future workspace content')
 })
 ```
@@ -142,21 +134,15 @@ describe('Sidebar', () => {
 ```
 </test_spec>
 
-### Test-Datei: `components/shared/__tests__/confirm-dialog.test.tsx`
+### Test-Datei: `components/__tests__/project-list.test.tsx`
 
 <test_spec>
 ```typescript
 import { describe, it } from 'vitest'
 
-describe('ConfirmDialog', () => {
-  // AC-8: Dialog-Inhalte
-  it.todo('should render title, description, cancel button, and destructive confirm button')
-
-  // AC-9: Cancel
-  it.todo('should close dialog without calling onConfirm when cancel is clicked')
-
-  // AC-10: Confirm
-  it.todo('should call onConfirm and close dialog when destructive button is clicked')
+describe('ProjectList', () => {
+  // AC-9: Projekte als Links, aktives hervorgehoben
+  it.todo('should render all projects as links and highlight the active project')
 })
 ```
 </test_spec>
@@ -172,6 +158,7 @@ describe('ConfirmDialog', () => {
 | `slice-03-project-server-actions` | `getProjects` | Server Action | `() => Promise<Project[]>` |
 | `slice-03-project-server-actions` | `getProject` | Server Action | `(input: { id: string }) => Promise<Project \| { error: string }>` |
 | `slice-03-project-server-actions` | `createProject` | Server Action | `(input: { name: string }) => Promise<{ id, name, createdAt } \| { error: string }>` |
+| `slice-04-project-overview-ui` | `ConfirmDialog` | React Component | `<ConfirmDialog title description onConfirm onCancel open />` (fuer spaetere Nutzung im Workspace) |
 | `slice-04-project-overview-ui` | `app/page.tsx` | Next.js Page | Root-Page existiert unter `/` |
 
 ### Provides To Other Slices
@@ -180,40 +167,42 @@ describe('ConfirmDialog', () => {
 |----------|------|----------|-----------|
 | `app/projects/[id]/page.tsx` | Next.js Page | Router | Server Component, rendert `/projects/[id]` |
 | `app/layout.tsx` | Root Layout | Alle Pages | Layout mit Toaster, umschliesst `{children}` |
-| `ConfirmDialog` | React Component | Alle Slices mit destruktiven Aktionen | `<ConfirmDialog open title description onConfirm onCancel />` |
-| Sidebar | React Component | Workspace-Sub-Slices | Sidebar mit Projekt-Liste, integriert in Workspace-Layout |
+| `ProjectList` | React Component | Sidebar, Overview (spaetere Refactoring-Option) | `<ProjectList projects={Project[]} activeProjectId={string} />` |
+| `Sidebar` | React Component | Workspace-Sub-Slices | Sidebar mit Projekt-Liste, New-Button, Zurueck-Link |
 
 ---
 
 ## Deliverables (SCOPE SAFEGUARD)
 
 <!-- DELIVERABLES_START -->
-- [ ] `app/projects/[id]/page.tsx` -- Workspace Server Component, laedt Projekt via getProject, rendert Sidebar + Main-Platzhalter
-- [ ] `app/layout.tsx` -- Root Layout mit Toaster (sonner), globale Styles, umschliesst alle Pages
-- [ ] `components/sidebar.tsx` -- Sidebar Client Component mit Projekt-Liste, aktivem Highlight, New-Project-Button und Zurueck-Link
-- [ ] `components/shared/confirm-dialog.tsx` -- Wiederverwendbarer Bestaetigungs-Dialog (shadcn/ui AlertDialog)
+- [ ] `app/projects/[id]/page.tsx` — Workspace Server Component, laedt Projekt via `getProject` + `getProjects`, rendert Sidebar + Main-Platzhalter
+- [ ] `app/layout.tsx` — Root Layout mit Toaster (sonner), globale Styles, umschliesst alle Pages
+- [ ] `components/sidebar.tsx` — Sidebar Client Component mit `ProjectList`, New-Project-Button und Zurueck-Link
+- [ ] `components/project-list.tsx` — Wiederverwendbare Projektliste mit aktivem Highlight fuer Sidebar und potenzielle Overview-Nutzung
 <!-- DELIVERABLES_END -->
+
+> **Hinweis:** Test-Dateien gehoeren NICHT in Deliverables. Der Test-Writer-Agent erstellt Tests basierend auf den Test Skeletons oben.
 
 ---
 
 ## Constraints
 
 **Scope-Grenzen:**
-- KEINE Prompt Area, Parameter Panel, Gallery -- kommt in spaeteren Slices (09, 10, 11)
-- KEIN Model-Dropdown oder Generate-Button -- kommt in Slice 09
-- KEINE Rename/Delete-Funktionalitaet in der Sidebar -- Sidebar zeigt nur Projekt-Liste mit Navigation
-- KEIN Sidebar-Collapsing oder Responsive-Verhalten -- einfache persistente Sidebar
+- KEINE Prompt Area, Parameter Panel, Gallery — kommt in spaeteren Slices (09, 10, 11)
+- KEIN Model-Dropdown oder Generate-Button — kommt in Slice 09
+- KEINE Rename/Delete-Funktionalitaet in der Sidebar — nur Navigation und New-Project
+- KEIN Sidebar-Collapsing oder Responsive-Verhalten — einfache persistente Sidebar
+- KEIN `confirm-dialog.tsx` — wurde in Slice 04 erstellt, hier nur als Dependency im Contract
 
 **Technische Constraints:**
-- `app/projects/[id]/page.tsx` ist ein Server Component (Data Fetching via getProject + getProjects)
-- Sidebar ist ein Client Component (fuer aktive Hervorhebung via `usePathname`)
-- `ConfirmDialog` basiert auf shadcn/ui AlertDialog
+- `app/projects/[id]/page.tsx` ist ein Server Component (Data Fetching via `getProject` + `getProjects`)
+- `Sidebar` ist ein Client Component (`usePathname` fuer aktive Hervorhebung)
+- `ProjectList` kann als Server- oder Client Component implementiert werden, je nach Bedarf fuer `usePathname`
 - Toaster via sonner (shadcn/ui Integration) im Root Layout
 - Tailwind v4 fuer Styling
 - `notFound()` aus `next/navigation` fuer ungueltige Projekt-IDs
 
 **Referenzen:**
-- Wireframes: `wireframes.md` -- Section "Screen: Project Workspace" (Sidebar-Annotations 1, 2, "Zurueck zur Uebersicht")
-- Wireframes: `wireframes.md` -- Section "Screen: Confirmation Dialog" (Dialog-Layout und Annotations)
-- Architecture: `architecture.md` -- Section "Project Structure" (Dateipfade app/layout.tsx, app/projects/[id]/page.tsx, components/shared/)
-- Architecture: `architecture.md` -- Section "Architecture Layers" (Pages Layer, Server Components)
+- Wireframes: `wireframes.md` → Section "Screen: Project Workspace" (Sidebar-Annotations ①②, "← Overview" Link)
+- Architecture: `architecture.md` → Section "Project Structure" (Dateipfade `app/layout.tsx`, `app/projects/[id]/page.tsx`, `components/`)
+- Architecture: `architecture.md` → Section "Architecture Layers" (Pages Layer, Server Components vs Client Components)

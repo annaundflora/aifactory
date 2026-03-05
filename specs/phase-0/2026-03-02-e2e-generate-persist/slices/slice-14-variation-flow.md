@@ -9,7 +9,7 @@
 | Key | Value |
 |-----|-------|
 | **ID** | `slice-14-variation-flow` |
-| **Test** | `pnpm test components/lightbox/__tests__/variation-flow.test.tsx lib/__tests__/variation-utils.test.ts` |
+| **Test** | `pnpm test lib/__tests__/workspace-state.test.ts components/lightbox/__tests__/variation-flow.test.tsx` |
 | **E2E** | `false` |
 | **Dependencies** | `["slice-13-lightbox-navigation-actions", "slice-09-prompt-area-parameter-panel"]` |
 
@@ -20,7 +20,7 @@
 | Key | Value |
 |-----|-------|
 | **Stack** | `typescript-nextjs` |
-| **Test Command** | `pnpm test components/lightbox/__tests__/variation-flow.test.tsx lib/__tests__/variation-utils.test.ts` |
+| **Test Command** | `pnpm test lib/__tests__/workspace-state.test.ts components/lightbox/__tests__/variation-flow.test.tsx` |
 | **Integration Command** | `pnpm test components/lightbox/__tests__/variation-flow.test.tsx` |
 | **Acceptance Command** | -- |
 | **Start Command** | `pnpm dev` |
@@ -31,7 +31,7 @@
 
 ## Ziel
 
-Variation-Button in der Lightbox implementieren, der Prompt, Negativ-Prompt, Modell-ID und Parameter der aktuellen Generation in die Workspace-Eingabefelder uebertraegt. Nach Klick schliesst die Lightbox automatisch. Der User kann anschliessend Werte anpassen und mit Variant-Count 1-4 erneut generieren.
+Variation-Button in der Lightbox implementieren, der Prompt, Negativ-Prompt, Modell-ID und Parameter der aktuellen Generation in die Workspace-Eingabefelder uebertraegt. Shared State (`lib/workspace-state.ts`) definiert den Typ und den Context/Hook. Nach Klick schliesst die Lightbox automatisch. Der User kann Werte anpassen und mit Variant-Count 1-4 erneut generieren.
 
 ---
 
@@ -39,35 +39,35 @@ Variation-Button in der Lightbox implementieren, der Prompt, Negativ-Prompt, Mod
 
 1) GIVEN eine geoeffnete Lightbox mit einer Generation (prompt: "A fox in oil painting style", model_id: "black-forest-labs/flux-2-pro", model_params: { aspect_ratio: "1:1", num_inference_steps: 28 })
    WHEN der User auf den "Variation"-Button klickt
-   THEN werden prompt, model_id und model_params in den Shared Variation-State geschrieben
+   THEN werden `prompt`, `modelId` und `modelParams` in den `WorkspaceVariationState` aus `lib/workspace-state.ts` geschrieben
 
 2) GIVEN der User hat auf "Variation" geklickt
    WHEN der Variation-State gesetzt wurde
-   THEN schliesst sich die Lightbox automatisch (onClose wird aufgerufen)
+   THEN schliesst sich die Lightbox automatisch (`onClose` wird aufgerufen)
 
-3) GIVEN eine Generation mit negative_prompt: "blurry, low quality"
+3) GIVEN eine Generation mit `negative_prompt: "blurry, low quality"`
    WHEN der User auf "Variation" klickt
-   THEN wird der negative_prompt ebenfalls in den Variation-State uebernommen
+   THEN wird `negativePrompt` mit dem Wert "blurry, low quality" in den `WorkspaceVariationState` geschrieben
 
-4) GIVEN eine Generation mit negative_prompt: null
+4) GIVEN eine Generation mit `negative_prompt: null`
    WHEN der User auf "Variation" klickt
-   THEN wird negative_prompt als leerer String oder undefined in den Variation-State geschrieben
+   THEN wird `negativePrompt` als `undefined` oder leerer String in den `WorkspaceVariationState` geschrieben
 
-5) GIVEN der Variation-State wurde mit Werten aus der Lightbox befuellt
-   WHEN die PromptArea-Komponente den State konsumiert
-   THEN wird das Prompt-Textarea mit dem uebernommenen Prompt befuellt, das Modell-Dropdown auf die uebernommene model_id gesetzt, das Parameter-Panel mit den uebernommenen model_params vorbelegt und das Negativ-Prompt-Feld (falls vorhanden) befuellt
+5) GIVEN der `WorkspaceVariationState` wurde mit Werten gesetzt
+   WHEN `PromptArea` den State via `useWorkspaceVariation()` konsumiert
+   THEN wird `prompt-textarea` mit dem uebernommenen Prompt befuellt, das Model-Dropdown auf `modelId` gesetzt, das `ParameterPanel` mit `modelParams` vorbelegt und das Negativ-Prompt-Feld (falls sichtbar) befuellt
 
-6) GIVEN die PromptArea hat die Variation-Daten uebernommen
+6) GIVEN `PromptArea` hat die Variation-Daten uebernommen
    WHEN die Uebernahme abgeschlossen ist
-   THEN wird der Variation-State zurueckgesetzt (consumed/cleared), damit keine erneute Uebernahme bei Re-Render stattfindet
+   THEN ruft `PromptArea` `clearVariation()` aus `useWorkspaceVariation()` auf, sodass kein Re-Render die Daten erneut uebertraegt
 
 7) GIVEN die Variation-Daten wurden in die Eingabefelder uebernommen
-   WHEN der User den Prompt aendert und Variant-Count auf 3 setzt und "Generate" klickt
-   THEN wird `generateImages` mit dem geaenderten Prompt, dem uebernommenen Modell, den (ggf. angepassten) Parametern und count: 3 aufgerufen
+   WHEN der User den Prompt anpasst, Variant-Count auf 3 setzt und auf "Generate" klickt
+   THEN wird `generateImages` mit dem geaenderten Prompt, dem uebernommenen Modell, den (ggf. angepassten) Parametern und `count: 3` aufgerufen
 
-8) GIVEN der Variation-Button in der Lightbox
-   WHEN die Lightbox gerendert wird
-   THEN ist der Button mit Label "Variation" im Actions-Bereich sichtbar (neben Download und Delete)
+8) GIVEN die Lightbox ist geoeffnet
+   WHEN der Actions-Bereich gerendert wird
+   THEN ist der "Variation"-Button sichtbar (neben Download und Delete), entsprechend wireframes.md Annotation 8
 
 ---
 
@@ -76,24 +76,24 @@ Variation-Button in der Lightbox implementieren, der Prompt, Negativ-Prompt, Mod
 > **Fuer den Test-Writer-Agent:** Jedes `it.todo()` referenziert ein AC.
 > Der Test-Writer implementiert die Assertions selbststaendig.
 
-### Test-Datei: `lib/__tests__/variation-utils.test.ts`
+### Test-Datei: `lib/__tests__/workspace-state.test.ts`
 
 <test_spec>
 ```typescript
 import { describe, it } from 'vitest'
 
-describe('Variation State/Utils', () => {
-  // AC-1: Variation-State aus Generation extrahieren
-  it.todo('should extract prompt, model_id, and model_params from generation into variation state')
+describe('WorkspaceState', () => {
+  // AC-1: Variation-State setzen
+  it.todo('should write prompt, modelId, and modelParams into variation state')
 
   // AC-3: Negativ-Prompt uebernehmen
-  it.todo('should include negative_prompt in variation state when present')
+  it.todo('should include negativePrompt in variation state when generation has a value')
 
   // AC-4: Negativ-Prompt null behandeln
-  it.todo('should set negative_prompt to empty string or undefined when generation has null')
+  it.todo('should set negativePrompt to undefined or empty string when generation negative_prompt is null')
 
   // AC-6: State-Reset nach Konsumierung
-  it.todo('should clear variation state after consumption')
+  it.todo('should return cleared state after clearVariation is called')
 })
 ```
 </test_spec>
@@ -109,7 +109,7 @@ describe('Variation Flow', () => {
   it.todo('should render Variation button in lightbox actions area')
 
   // AC-1: Klick setzt Variation-State
-  it.todo('should write generation data to variation state when Variation button is clicked')
+  it.todo('should write generation data into WorkspaceVariationState when Variation button is clicked')
 
   // AC-2: Lightbox schliesst nach Variation-Klick
   it.todo('should call onClose after variation state is set')
@@ -131,27 +131,28 @@ describe('Variation Flow', () => {
 
 | Slice | Resource | Type | Validation |
 |-------|----------|------|------------|
-| `slice-12` | `LightboxModal` | React Component | Stellt Modal-Shell und Actions-Bereich bereit |
-| `slice-13` | `LightboxNavigation` | React Component | Stellt Actions-Bereich bereit (Delete-Button bereits vorhanden) |
-| `slice-09` | `PromptArea` | React Component | Konsumiert Variation-State und befuellt Eingabefelder |
-| `slice-09` | `ParameterPanel` | React Component | Akzeptiert vorgegebene Werte fuer Parameter-Controls |
-| `slice-08` | `generateImages` | Server Action | `(input: GenerateImagesInput) => Promise<Generation[]>` |
+| `slice-13` | `LightboxNavigation` | React Component | Stellt Actions-Bereich bereit; Variation-Button wird ergaenzt |
+| `slice-12` | `LightboxModal` | React Component | Stellt Modal-Shell mit Detail-Panel bereit |
+| `slice-09` | `PromptArea` | React Component | Konsumiert `useWorkspaceVariation()` und befuellt Eingabefelder |
+| `slice-09` | `ParameterPanel` | React Component | Akzeptiert vorgegebene Werte via `PromptArea`-State |
+| `slice-09` | `getModelSchema` | Server Action | Wird bei Modellwechsel via Variation neu getriggert |
 
 ### Provides To Other Slices
 
 | Resource | Type | Consumer | Interface |
 |----------|------|----------|-----------|
-| `VariationState` | Type/Interface | PromptArea, LightboxModal | `{ prompt: string, negativePrompt?: string, modelId: string, modelParams: Record<string, unknown> }` |
-| `useVariation` oder Context | Shared State Hook/Context | PromptArea, LightboxModal | `{ variationData, setVariation, clearVariation }` |
+| `WorkspaceVariationState` | TypeScript Type | `LightboxModal`, `PromptArea` | `{ prompt: string; negativePrompt?: string; modelId: string; modelParams: Record<string, unknown> }` |
+| `WorkspaceStateProvider` | React Context Provider | Workspace Page (root) | `<WorkspaceStateProvider>{children}</WorkspaceStateProvider>` |
+| `useWorkspaceVariation` | React Hook | `LightboxModal`, `PromptArea` | `() => { variationData: WorkspaceVariationState \| null; setVariation: (data: WorkspaceVariationState) => void; clearVariation: () => void }` |
 
 ---
 
 ## Deliverables (SCOPE SAFEGUARD)
 
 <!-- DELIVERABLES_START -->
-- [ ] `lib/variation-state.ts` -- Shared State/Context/Store fuer Variation-Daten (Type, Provider, Hook)
-- [ ] `components/lightbox/lightbox-modal.tsx` -- Erweitern: Variation-Button im Actions-Bereich, setzt Variation-State bei Klick
-- [ ] `components/workspace/prompt-area.tsx` -- Erweitern: Konsumiert Variation-State, befuellt Eingabefelder, cleared State nach Uebernahme
+- [ ] `lib/workspace-state.ts` — `WorkspaceVariationState` Type, React Context, `WorkspaceStateProvider` und `useWorkspaceVariation` Hook fuer Variation-Daten-Uebergabe zwischen `LightboxModal` und `PromptArea`
+- [ ] `components/lightbox/lightbox-modal.tsx` — MODIFY: Variation-Button im Actions-Bereich ergaenzen; bei Klick `setVariation()` aufrufen und `onClose` triggern
+- [ ] `components/workspace/prompt-area.tsx` — MODIFY: `useWorkspaceVariation()` konsumieren; bei vorhandenem `variationData` Eingabefelder befuellen und `clearVariation()` aufrufen
 <!-- DELIVERABLES_END -->
 
 > **Hinweis:** Test-Dateien gehoeren NICHT in Deliverables. Der Test-Writer-Agent erstellt Tests basierend auf den Test Skeletons oben.
@@ -168,14 +169,14 @@ describe('Variation Flow', () => {
 - KEIN automatisches Generieren nach Variation -- User muss manuell "Generate" klicken
 
 **Technische Constraints:**
-- Variation-State via React Context, Zustand Store oder aehnlichem Shared-State-Pattern
-- State muss zwischen LightboxModal (Setter) und PromptArea (Consumer) geteilt werden
-- `PromptArea` muss bei Variation-Uebernahme auch `getModelSchema` triggern falls sich das Modell aendert
-- Variation-State ist einmalig konsumierbar (clear after read) um Re-Render-Loops zu vermeiden
-- Client Components (`"use client"`) fuer beide erweiterten Dateien
+- `lib/workspace-state.ts` exportiert Type, Context und Hook als einzelne Datei (kein Split)
+- `WorkspaceStateProvider` muss in `app/projects/[id]/page.tsx` oder einem uebergeordneten Layout eingebunden werden, sodass `LightboxModal` und `PromptArea` denselben Context teilen
+- `useWorkspaceVariation` darf nur in Client Components aufgerufen werden
+- Variation-State ist einmalig konsumierbar: `clearVariation()` nach Uebernahme verhindert Re-Render-Loops
+- Bei Variation mit anderem Modell als dem aktuell ausgewaehlten muss `PromptArea` `getModelSchema` fuer das neue Modell aufrufen
 
 **Referenzen:**
 - Wireframes: `wireframes.md` -> Section "Screen: Lightbox / Image Detail Modal" (Annotation 8: `variation-btn`)
-- Discovery: `discovery.md` -> Section "User Flow" -> Flow 4 (Variation erstellen, Schritte 3-6)
-- Discovery: `discovery.md` -> Section "Feature State Machine" -> Transition `lightbox-open` -> "Variation" -> `workspace-ready`
-- Architecture: `architecture.md` -> Section "Server Actions" (`generateImages` Input-Signatur)
+- Architecture: `architecture.md` -> Section "API Design > Server Actions" (`generateImages` Input-Signatur: `GenerateImagesInput`)
+- Architecture: `architecture.md` -> Section "Project Structure" (`lib/`, `components/lightbox/`, `components/workspace/`)
+- Discovery: `discovery.md` -> Section "User Flow" -> Variation Flow (Schritte 3-6)

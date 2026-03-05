@@ -1,7 +1,7 @@
-# Gate 2: Slim Compliance Report -- Slice 13
+# Gate 2: Slim Compliance Report — Slice 13
 
-**Geprüfter Slice:** `specs/phase-0/2026-03-02-e2e-generate-persist/slices/slice-13-lightbox-navigation-actions.md`
-**Prüfdatum:** 2026-03-04
+**Gepruefter Slice:** `specs/phase-0/2026-03-02-e2e-generate-persist/slices/slice-13-lightbox-navigation-actions.md`
+**Pruefdatum:** 2026-03-05
 
 ---
 
@@ -9,15 +9,16 @@
 
 | Check | Status | Detail |
 |-------|--------|--------|
-| D-1: Metadata | ✅ | Alle 4 Felder vorhanden: ID, Test, E2E (false), Dependencies (slice-12) |
-| D-2: Test-Strategy | ✅ | Alle 7 Felder vorhanden, Stack: typescript-nextjs |
-| D-3: AC Format | ✅ | 12 ACs, alle mit GIVEN/WHEN/THEN |
-| D-4: Test Skeletons | ✅ | 12 Tests (10 + 2) vs 12 ACs, zwei test_spec Bloecke |
-| D-5: Integration Contract | ✅ | Requires From (4 Eintraege) und Provides To (2 Eintraege) vorhanden |
-| D-6: Deliverables Marker | ✅ | 2 Deliverables zwischen DELIVERABLES_START/END |
-| D-7: Constraints | ✅ | Scope-Grenzen und technische Constraints definiert |
-| D-8: Groesse | ✅ | 208 Zeilen, weit unter 400 |
-| D-9: Anti-Bloat | ✅ | Kein Code-Bloat, keine ASCII-Art, kein Schema-Kopie |
+| D-1: Metadata | OK | ID `slice-13-lightbox-navigation-actions`, Test Command, E2E `false`, Dependencies — alle 4 Felder vorhanden |
+| D-2: Test-Strategy | OK | Alle 7 Felder vorhanden: Stack, Test Command, Integration Command, Acceptance Command, Start Command, Health Endpoint, Mocking Strategy |
+| D-3: AC Format | OK | 12 ACs, alle enthalten GIVEN/WHEN/THEN |
+| D-4: Test Skeletons | OK | 12 Tests (10 in lightbox-navigation.test.tsx + 2 in generations.test.ts) vs 12 ACs; `<test_spec>` Block vorhanden; `it.todo(` Pattern fuer TS/Next.js |
+| D-5: Integration Contract | OK | "Requires From Other Slices" Tabelle und "Provides To Other Slices" Tabelle vorhanden |
+| D-6: Deliverables Marker | OK | DELIVERABLES_START + DELIVERABLES_END Marker vorhanden; 2 Deliverables mit Dateipfaden |
+| D-7: Constraints | OK | Constraints Section vorhanden mit Scope-Grenzen und technischen Constraints |
+| D-8: Groesse | OK | 211 Zeilen (deutlich unter 400-Zeilen-Warnschwelle); kein Code-Block > 20 Zeilen |
+| D-9: Anti-Bloat | OK | Keine Code-Examples-Section, kein ASCII-Art mit Box-Drawing, kein DB-Schema, keine vollstaendigen Type-Definitionen |
+| D-10: Codebase Reference | SKIP | `app/actions/generations.ts` ist MODIFY-Deliverable, aber das File existiert noch nicht im Codebase (wird von Slice 08 als neues File erstellt — Ausnahme-Regel greift) |
 
 **Phase 2 Verdict:** PASS
 
@@ -27,11 +28,12 @@
 
 | Check | Status | Detail |
 |-------|--------|--------|
-| L-1: AC-Qualitaet | ✅ | Alle 12 ACs spezifisch und testbar. Konkrete Werte (z.B. "Delete this generation?", `{ success: true/false }`). Klare GIVEN/WHEN/THEN-Trennung. AC-10 hat mehrere THEN-Klauseln, die aber zusammengehoerende Delete-Schritte beschreiben |
-| L-2: Architecture Alignment | ✅ | `deleteGeneration` Signatur stimmt mit architecture.md Server Actions ueberein (Input: `{ id: UUID }`, Output: `{ success: boolean }`). Dateipfade (`app/actions/generations.ts`, `components/lightbox/lightbox-navigation.tsx`) entsprechen Project Structure. Quality Attribute "Data Integrity: DB first, then R2" korrekt in Constraints reflektiert |
-| L-3: Contract Konsistenz | ✅ | Requires from slice-12 (LightboxModal, Generation Type) korrekt -- slice-12 deklariert diese als Provides. Requires from slice-02 (StorageService.delete) und slice-01 (DB) konsistent mit Architecture. Provides (LightboxNavigation, deleteGeneration) mit klaren Interfaces |
-| L-4: Deliverable-Coverage | ✅ | `lightbox-navigation.tsx` deckt ACs 1-10 ab (Navigation UI + Delete UI). `app/actions/generations.ts` deckt ACs 11-12 ab (Server Action). Kein verwaistes Deliverable |
-| L-5: Discovery Compliance | ✅ | Alle relevanten Discovery-Flows abgedeckt: Lightbox Navigation (Prev/Next, Wrap-Around, Pfeiltasten), Delete mit Bestaetigung. Wireframe-Annotationen 2, 3, 9 und State Variation `confirm-delete` korrekt umgesetzt. Business Rule "Bestaetigung erforderlich" bei Loeschen beachtet |
+| L-1: AC-Qualitaet | OK | Alle 12 ACs testbar: konkrete Zahlen (5 Generierungen, Position 3, 4, 2), exakte Komponenten-Pfade, eindeutige Server Action-Namen und Return-Types; AC-7 ("NICHT sichtbar oder disabled") ist die einzige Formulierung mit Implementierungs-Spielraum, aber beabsichtigt und akzeptabel |
+| L-2: Architecture Alignment | OK | `deleteGeneration` Signatur `{ id: UUID } -> { success: boolean }` stimmt mit architecture.md Server Actions-Tabelle ueberein; Delete-Reihenfolge DB-first dann R2 passt zu Quality Attributes "Data Integrity"; Dateipfade `components/lightbox/lightbox-navigation.tsx` und `app/actions/generations.ts` stimmen mit Project Structure ueberein; `StorageService.delete` passt zu StorageService-Responsibility "R2 Bild-Upload/Delete" |
+| L-3: Contract Konsistenz | OK | Slice-12 bietet `LightboxModal` (bestaetigt in slice-12 Provides-Tabelle); Slice-08 erstellt `app/actions/generations.ts` (bestaetigt in slice-08 Deliverables + Constraints "KEINE deleteGeneration Action — kommt in Slice 13"); Slice-04 bietet `ConfirmDialog` aus `components/shared/confirm-dialog.tsx` (bestaetigt in slice-04 Provides-Tabelle); Interfaces sind typenkompatibel |
+| L-4: Deliverable-Coverage | OK | `lightbox-navigation.tsx` deckt AC-1 bis AC-10 ab; MODIFY `app/actions/generations.ts` deckt AC-11 und AC-12 ab; kein verwaistes Deliverable; Test-Dateien korrekt in Test Skeletons referenziert |
+| L-5: Discovery Compliance | OK | Prev/Next mit Wrap-Around (discovery.md Transitions-Tabelle), Keyboard-Navigation (ArrowLeft/ArrowRight), Delete mit Bestaetigung (discovery.md "Bestaetigung erforderlich") — alle discovery-relevanten Aspekte dieses Slice abgedeckt; Wireframes Annotationen 2, 3, 9 und State Variation `confirm-delete` reflektiert |
+| L-6: Consumer Coverage | SKIP | `deleteGeneration` wird als neue Funktion zur bestehenden Datei hinzugefuegt; da die Datei noch nicht im Codebase existiert, gibt es keine bestehenden Aufrufer zu pruefen; kuenftige Consumer (slice-15, slice-16) sind in "Provides To" dokumentiert |
 
 ---
 

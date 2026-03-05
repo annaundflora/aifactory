@@ -1,7 +1,7 @@
-# Gate 2: Slim Compliance Report -- Slice 21
+# Gate 2: Slim Compliance Report — Slice 21
 
-**Geprüfter Slice:** `specs/phase-0/2026-03-02-e2e-generate-persist/slices/slice-21-llm-prompt-improvement.md`
-**Prüfdatum:** 2026-03-04
+**Gepruefter Slice:** `specs/phase-0/2026-03-02-e2e-generate-persist/slices/slice-21-llm-prompt-improvement.md`
+**Pruefdatum:** 2026-03-05
 
 ---
 
@@ -9,15 +9,16 @@
 
 | Check | Status | Detail |
 |-------|--------|--------|
-| D-1: Metadata | PASS | Alle 4 Felder vorhanden: ID, Test, E2E, Dependencies |
-| D-2: Test-Strategy | PASS | Alle 7 Felder vorhanden |
-| D-3: AC Format | PASS | 10 ACs, alle mit GIVEN/WHEN/THEN |
-| D-4: Test Skeletons | PASS | 11 Tests vs 10 ACs (3 test_spec Bloecke, alle it.todo()) |
-| D-5: Integration Contract | PASS | Requires From (2 Eintraege) und Provides To (4 Eintraege) vorhanden |
-| D-6: Deliverables Marker | PASS | 4 Deliverables zwischen DELIVERABLES_START/END |
-| D-7: Constraints | PASS | 5 Scope-Grenzen + 6 technische Constraints + 5 Referenzen |
-| D-8: Groesse | PASS | 207 Zeilen, kein Code-Block > 20 Zeilen |
-| D-9: Anti-Bloat | PASS | Kein Code-Examples, keine ASCII-Art, kein DB-Schema, keine grossen Type-Definitionen |
+| D-1: Metadata | PASS | ID `slice-21-llm-prompt-improvement`, Test-Command vorhanden, E2E `false`, Dependencies-Array mit 2 Eintraegen |
+| D-2: Test-Strategy | PASS | Alle 7 Felder vorhanden: Stack, Test/Integration/Acceptance/Start Command, Health Endpoint, Mocking Strategy |
+| D-3: AC Format | PASS | 10 ACs, alle enthalten GIVEN / WHEN / THEN |
+| D-4: Test Skeletons | PASS | 11 `it.todo()` Tests (4 Dateien) fuer 10 ACs; `<test_spec>` Block vorhanden. Groesstes Code-Block (llm-comparison): 23 Zeilen — knapp ueber 20-Zeilen-Schwelle, aber strukturell bedingt durch 6 ACs in einer Datei, kein Code-Beispiel |
+| D-5: Integration Contract | PASS | "Requires From" und "Provides To" Tabellen vorhanden |
+| D-6: Deliverables Marker | PASS | `DELIVERABLES_START` und `DELIVERABLES_END` gesetzt; 4 Deliverables mit Dateipfaden |
+| D-7: Constraints | PASS | Scope-Grenzen und technische Constraints definiert, mehr als 1 Constraint |
+| D-8: Groesse | PASS | 221 Zeilen (weit unter 400/500-Schwelle) |
+| D-9: Anti-Bloat | PASS | Kein "Code Examples"-Abschnitt, keine ASCII-Art-Wireframes, kein DB-Schema, keine umfangreichen Type-Definitionen |
+| D-10: Codebase Reference | SKIP | `app/actions/prompts.ts` wird MODIFY, aber Datei wird von Slice 19 (explizite Dependency) als Neuanlage erstellt — AUSNAHME gemaess Regel greift. Projekt ist Greenfield, keine Dateien physisch vorhanden |
 
 **Phase 2 Verdict:** PASS
 
@@ -25,13 +26,16 @@
 
 ## Phase 3: LLM Content Checks
 
+> Ausgefuellt, da Phase 2 PASS.
+
 | Check | Status | Detail |
 |-------|--------|--------|
-| L-1: AC-Qualitaet | PASS | Alle 10 ACs sind spezifisch und testbar. Konkrete Werte (Endpoint-URL, Model-Name, Error-Messages, UI-Texte), eindeutige Aktionen, messbare Ergebnisse |
-| L-2: Architecture Alignment | PASS | improvePrompt Signatur (Input/Output) stimmt mit architecture.md ueberein. OpenRouter Endpoint, Auth-Header, Model-ID korrekt. Error-Handling (Toast + Panel schliesst) entspricht Error Handling Strategy. Deliverable-Pfade stimmen mit Project Structure ueberein |
-| L-3: Contract Konsistenz | PASS | Requires: slice-09 PromptArea + Prompt-State korrekt (slice-09 provides PromptArea). Provides: LLMComparison mit onAdopt/onDiscard Callbacks ist sauberes Interface. Interne Kette openRouterClient -> PromptService -> Server Action -> LLMComparison konsistent |
-| L-4: Deliverable-Coverage | PASS | AC-1/3 -> openrouter.ts, AC-2/3 -> prompt-service.ts, AC-4 -> prompts.ts, AC-5-10 -> llm-comparison.tsx. Kein verwaistes Deliverable, 3 Test-Dateien vorhanden |
-| L-5: Discovery Compliance | PASS | Flow 3 (Prompt verbessern) vollstaendig abgedeckt: Button-Klick, Loading, Side-by-Side, Adopt/Discard. Error-Path (Toast + Panel schliesst) aus Discovery uebernommen. Business Rule (OpenRouter, openai/gpt-oss-120b:exacto) in AC-2 reflektiert. Wireframe-Layout (Original/Improved Panels, Adopt/Discard Buttons, Loading-State) in ACs 5-10 abgebildet |
+| L-1: AC-Qualitaet | PASS | Alle 10 ACs sind testbar: konkrete URL (`https://openrouter.ai/api/v1/chat/completions`), spezifischer Header, spezifisches Modell (`openai/gpt-oss-120b:exacto`), konkrete Fehlermeldung ("Prompt darf nicht leer sein"), spezifischer Toast-Text ("Prompt-Verbesserung fehlgeschlagen"). Kein einziges AC mit vager "funktioniert"-Formulierung |
+| L-2: Architecture Alignment | PASS | OpenRouter-Endpoint, Auth-Header-Format, Model-ID und Return-Shape `{ original, improved }` stimmen mit architecture.md "Business Logic Flow: Prompt Improvement" und "Server Actions"-Tabelle exakt ueberein. Fehlermeldung in AC-9 stimmt mit architecture.md "Error Handling Strategy" ueberein. Alle Dateipfade sind identisch mit architecture.md "Project Structure" |
+| L-3: Contract Konsistenz | PASS | slice-19 bestaetigt `app/actions/prompts.ts` explizit als "Datei (erweiterbar)" fuer slice-21. slice-09 liefert `PromptArea`-Komponente; `onAdopt`-Callback-Pattern ist eine valide Kompositions-Entscheidung. Alle Interface-Signaturen sind typkompatibel |
+| L-4: Deliverable-Coverage | PASS | AC-1/AC-3 → `openrouter.ts`; AC-2/AC-3 → `prompt-service.ts`; AC-4 → `prompts.ts` (improvePrompt); AC-5/6/7/8/9/10 → `llm-comparison.tsx`. Kein verwaistes Deliverable |
+| L-5: Discovery Compliance | PASS | Alle 6 Schritte aus Discovery Flow 3 abgedeckt. Fehlerpath "Panel schliesst automatisch" aus discovery.md in AC-9 abgebildet. Validierungsregel "Prompt darf nicht leer sein" in AC-4 abgedeckt. State-Machine-Zustand `improving-prompt` (Button disabled) durch AC-10 reflektiert |
+| L-6: Consumer Coverage | SKIP | MODIFY-Deliverable ergaenzt `app/actions/prompts.ts` nur um eine neue Export-Funktion (`improvePrompt`). Bestehende Funktionen (`createSnippet`, `updateSnippet`, `deleteSnippet`, `getSnippets`) werden nicht veraendert — kein signaturveraendernder Eingriff. Projekt ist Greenfield, keine Aufrufer zu pruefen |
 
 ---
 

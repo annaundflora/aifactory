@@ -40,7 +40,7 @@ slice-06 (Model Registry + Schema Service)
                                   |
                                   +---> slice-15 (Download als PNG)
                                   |
-                                  +---> slice-16 (Generation Delete + Retry)
+                                  +---> slice-16 (Generation Retry + Toast Provider)
 
 slice-09 ---> slice-17 (Prompt Builder Drawer + Style/Colors)
                   |
@@ -95,11 +95,11 @@ slice-09 ---> slice-21 (LLM Prompt Improvement)
 
 ### Slice 04: Project Overview UI
 
-- **Scope:** Root-Page (`/`) mit Projekt-Uebersicht: project-card Grid (Thumbnail, Name, Count, Datum), new-project-btn mit Inline-Input, rename-project-input, delete-project-btn mit confirm-dialog. Empty State.
+- **Scope:** Root-Page (`/`) mit Projekt-Uebersicht: project-card Grid (Thumbnail, Name, Count, Datum), new-project-btn mit Inline-Input, rename-project-input, delete-project-btn mit confirm-dialog. Empty State. confirm-dialog als shared Component (wird hier erstellt, da es zuerst in dieser Slice benoetigt wird).
 - **Deliverables:**
   - `app/page.tsx`
   - `components/project-card.tsx`
-  - `components/project-list.tsx`
+  - `components/shared/confirm-dialog.tsx`
 - **Done-Signal:** Seite rendert Projekt-Cards, neues Projekt erstellen funktioniert, Umbenennen und Loeschen mit Bestaetigung funktionieren
 - **Dependencies:** ["slice-03"]
 - **Discovery-Quelle:** Slice 1 "Infrastruktur & Projekt-CRUD"
@@ -108,11 +108,11 @@ slice-09 ---> slice-21 (LLM Prompt Improvement)
 
 ### Slice 05: Project Workspace Layout + Sidebar
 
-- **Scope:** Workspace-Page (`/projects/[id]`), Root-Layout mit Toaster, Sidebar mit Projekt-Navigation (sidebar-project-list, aktives Projekt hervorgehoben), new-project-btn in Sidebar, "Zurueck zur Uebersicht" Link.
+- **Scope:** Workspace-Page (`/projects/[id]`), Root-Layout mit Toaster, Sidebar mit Projekt-Navigation (sidebar-project-list, aktives Projekt hervorgehoben), new-project-btn in Sidebar, "Zurueck zur Uebersicht" Link. project-list Component fuer Sidebar und Overview-Nutzung.
 - **Deliverables:**
   - `app/projects/[id]/page.tsx`
   - `app/layout.tsx`
-  - `components/shared/confirm-dialog.tsx`
+  - `components/project-list.tsx`
 - **Done-Signal:** Navigation zwischen Overview und Workspace funktioniert, Sidebar zeigt alle Projekte, aktives ist hervorgehoben
 - **Dependencies:** ["slice-04"]
 - **Discovery-Quelle:** Slice 1 "Infrastruktur & Projekt-CRUD"
@@ -146,7 +146,7 @@ slice-09 ---> slice-21 (LLM Prompt Improvement)
 
 ### Slice 08: Generation Service + Actions
 
-- **Scope:** GenerationService (Orchestrierung: DB-Insert pending, Replicate-Call, R2-Upload, DB-Update completed/failed, PNG-Konvertierung via sharp bei Nicht-PNG), Server Actions generateImages und retryGeneration.
+- **Scope:** GenerationService (Orchestrierung: DB-Insert pending, Replicate-Call, R2-Upload, DB-Update completed/failed, PNG-Konvertierung via sharp bei Nicht-PNG), Server Actions generateImages, retryGeneration und getGenerations.
 - **Deliverables:**
   - `lib/services/generation-service.ts`
   - `app/actions/generations.ts`
@@ -202,12 +202,12 @@ slice-09 ---> slice-21 (LLM Prompt Improvement)
 
 ---
 
-### Slice 13: Lightbox Navigation + Actions
+### Slice 13: Lightbox Navigation + Generation Delete
 
-- **Scope:** Prev/Next Navigation (Chevron-Buttons + Pfeiltasten + Wrap-Around), delete-generation-btn mit Bestaetigung (loescht aus DB + R2), Server Action deleteGeneration.
+- **Scope:** Prev/Next Navigation (Chevron-Buttons + Pfeiltasten + Wrap-Around) als lightbox-navigation Component. delete-generation-btn mit Bestaetigung (loescht aus DB + R2 via deleteGeneration Server Action aus `app/actions/generations.ts`). deleteGeneration Action wird in `app/actions/generations.ts` aus Slice 08 ergaenzt.
 - **Deliverables:**
   - `components/lightbox/lightbox-navigation.tsx`
-- **Done-Signal:** Pfeiltasten und Buttons navigieren durch Bilder mit Wrap-Around. Loeschen entfernt Bild aus DB und R2 nach Bestaetigung.
+- **Done-Signal:** Pfeiltasten und Buttons navigieren durch Bilder mit Wrap-Around. Loeschen entfernt Bild aus DB und R2 nach Bestaetigung via confirm-dialog.
 - **Dependencies:** ["slice-12"]
 - **Discovery-Quelle:** Slice 3 "Galerie & Lightbox"
 
@@ -215,10 +215,9 @@ slice-09 ---> slice-21 (LLM Prompt Improvement)
 
 ### Slice 14: Variation Flow
 
-- **Scope:** variation-btn in Lightbox: Uebernimmt Prompt, Modell und Parameter in die Eingabefelder. Lightbox schliesst sich. User kann anpassen und mit variant-count 1-4 erneut generieren.
+- **Scope:** variation-btn in Lightbox: Uebernimmt Prompt, Modell und Parameter in die Eingabefelder via shared State (React Context oder URL-State). Lightbox schliesst sich. User kann anpassen und mit variant-count 1-4 erneut generieren.
 - **Deliverables:**
-  - (Integration in bestehende Components: `components/lightbox/lightbox-modal.tsx` und `components/workspace/prompt-area.tsx` via shared State/Context)
-  - `lib/utils.ts` (Shared state/types fuer Variation-Uebernahme)
+  - `lib/workspace-state.ts` (Shared Context/State-Typen fuer Variation-Uebernahme zwischen Lightbox und Prompt Area)
 - **Done-Signal:** Klick auf "Variation" in Lightbox fuellt Prompt-Feld, waehlt Modell, setzt Parameter. Lightbox schliesst. User kann Batch 1-4 waehlen und generieren.
 - **Dependencies:** ["slice-13", "slice-09"]
 - **Discovery-Quelle:** Slice 6 "Variationen & Batch"
@@ -227,22 +226,21 @@ slice-09 ---> slice-21 (LLM Prompt Improvement)
 
 ### Slice 15: Download als PNG
 
-- **Scope:** download-btn in Lightbox: Laedt Bild als PNG herunter (Client-seitiger Download via fetch + Blob + anchor-click).
+- **Scope:** download-btn in Lightbox: Laedt Bild als PNG herunter (Client-seitiger Download via fetch + Blob + anchor-click). Download-Helper als separate Utility-Funktion.
 - **Deliverables:**
-  - (Integration in `components/lightbox/lightbox-modal.tsx`)
-  - `lib/utils.ts` (Download-Helper-Funktion)
-- **Done-Signal:** Klick auf "Download PNG" startet Browser-Download der PNG-Datei mit sinnvollem Dateinamen
+  - `lib/utils.ts` (Download-Helper downloadAsPng)
+- **Done-Signal:** Klick auf "Download PNG" startet Browser-Download der PNG-Datei mit sinnvollem Dateinamen (z.B. `generation-{id}.png`)
 - **Dependencies:** ["slice-12"]
 - **Discovery-Quelle:** Slice 3 "Galerie & Lightbox"
 
 ---
 
-### Slice 16: Generation Delete + Retry
+### Slice 16: Generation Retry + Toast Provider
 
-- **Scope:** retry-btn auf failed generation-placeholder (re-triggert Generation mit gleichen Parametern). Error-Toast-Notifications fuer alle Fehlerszenarien (Replicate, R2, Rate Limit). Toast-Provider Setup.
+- **Scope:** retry-btn auf failed generation-placeholder (re-triggert retryGeneration Action mit gleichen Parametern). Toast-Provider Setup (sonner via shadcn/ui) und zentrales Error-Toast-Handling fuer alle definierten Fehlerszenarien (Replicate, R2, Rate Limit, OpenRouter).
 - **Deliverables:**
   - `components/shared/toast-provider.tsx`
-- **Done-Signal:** Retry auf fehlgeschlagener Generation startet neuen API-Call. Toast-Notifications erscheinen bei allen definierten Fehlerszenarien.
+- **Done-Signal:** Retry auf fehlgeschlagener Generation startet neuen API-Call und zeigt neuen Placeholder. Toast-Notifications erscheinen bei allen definierten Fehlerszenarien (Replicate-Fehler, R2-Fehler, Rate-Limit-429).
 - **Dependencies:** ["slice-10", "slice-08"]
 - **Discovery-Quelle:** Slice 3 "Galerie & Lightbox"
 
@@ -274,7 +272,7 @@ slice-09 ---> slice-21 (LLM Prompt Improvement)
 
 ### Slice 19: Snippet CRUD -- DB + Service + Actions
 
-- **Scope:** SnippetService (CRUD-Operationen fuer prompt_snippets), Server Actions createSnippet, updateSnippet, deleteSnippet, getSnippets. Validierung (text non-empty max 500, category non-empty max 100).
+- **Scope:** SnippetService (CRUD-Operationen fuer prompt_snippets), Server Actions createSnippet, updateSnippet, deleteSnippet, getSnippets in `app/actions/prompts.ts`. Validierung (text non-empty max 500, category non-empty max 100). Hinweis: Die Datei `app/actions/prompts.ts` wird in Slice 21 um die improvePrompt Action erweitert.
 - **Deliverables:**
   - `lib/services/snippet-service.ts`
   - `app/actions/prompts.ts`
@@ -286,10 +284,10 @@ slice-09 ---> slice-21 (LLM Prompt Improvement)
 
 ### Slice 20: Snippet UI im Builder
 
-- **Scope:** "Meine Bausteine" Tab im Prompt Builder: snippet-form (Inline-Formular fuer neuen Baustein mit Text + Kategorie-Dropdown), snippet-chip (User-Snippets gruppiert nach Kategorie, Toggle-Auswahl, Hover zeigt Edit/Delete), new-snippet-btn, Edit/Delete Flow.
+- **Scope:** "Meine Bausteine" Tab im Prompt Builder: snippet-form (Inline-Formular fuer neuen Baustein mit Text + Kategorie-Dropdown), snippet-chip (User-Snippets gruppiert nach Kategorie, Toggle-Auswahl, Hover zeigt Edit/Delete), new-snippet-btn, Edit/Delete Flow mit Inline-Bestaetigung.
 - **Deliverables:**
   - `components/prompt-builder/snippet-form.tsx`
-  - (Integration: `components/prompt-builder/category-tabs.tsx` erweitern um "Meine Bausteine" Tab)
+  - (Erweiterung: `components/prompt-builder/category-tabs.tsx` um "Meine Bausteine" Tab)
 - **Done-Signal:** Neuer Baustein erstellen, im Tab sichtbar, Klick fuegt zum Prompt hinzu, Edit oeffnet Form vorbefuellt, Delete mit Inline-Bestaetigung entfernt Baustein.
 - **Dependencies:** ["slice-19", "slice-17"]
 - **Discovery-Quelle:** Slice 7 "Eigene Prompt-Bausteine"
@@ -298,13 +296,13 @@ slice-09 ---> slice-21 (LLM Prompt Improvement)
 
 ### Slice 21: LLM Prompt Improvement
 
-- **Scope:** OpenRouter Client (plain fetch), PromptService.improve (System-Prompt + User-Prompt an OpenRouter senden), Server Action improvePrompt, llm-comparison Panel (Original vs. Improved nebeneinander), adopt-btn und discard-btn, Loading- und Error-States.
+- **Scope:** OpenRouter Client (plain fetch), PromptService.improve (System-Prompt + User-Prompt an OpenRouter senden), improvePrompt Server Action als Ergaenzung in `app/actions/prompts.ts` (Datei existiert bereits aus Slice 19), llm-comparison Panel (Original vs. Improved nebeneinander), adopt-btn und discard-btn, Loading- und Error-States.
 - **Deliverables:**
   - `lib/clients/openrouter.ts`
   - `lib/services/prompt-service.ts`
   - `components/prompt-improve/llm-comparison.tsx`
 - **Done-Signal:** Klick auf "Prompt verbessern" zeigt Loading, dann Original und verbesserter Prompt nebeneinander. "Uebernehmen" ersetzt Prompt im Eingabefeld. "Verwerfen" schliesst Panel. Bei Fehler: Toast + Panel schliesst automatisch.
-- **Dependencies:** ["slice-09"]
+- **Dependencies:** ["slice-09", "slice-19"]
 - **Discovery-Quelle:** Slice 5 "LLM Prompt-Verbesserung"
 
 ---
@@ -330,3 +328,37 @@ slice-09 ---> slice-21 (LLM Prompt Improvement)
 - [x] Kein Slice hat mehr als ein Concern (DB+UI = zu viel)
 - [x] Schema/Service-Slices kommen vor UI-Slices
 - [x] Stack ist korrekt erkannt und dokumentiert
+
+---
+
+## Review-Aenderungen (2026-03-05)
+
+### Problem 1: confirm-dialog.tsx in falschem Slice (Slice 04 vs. 05)
+
+**Vorher:** `components/shared/confirm-dialog.tsx` war als Deliverable in Slice 05 (Workspace Layout + Sidebar) gelistet. Slice 04 (Project Overview UI) benutzt aber bereits den delete-project-btn mit confirm-dialog, haette also eine implizite Forward-Dependency auf Slice 05 gehabt -- das ist ein Dependency-Fehler.
+
+**Nachher:** `confirm-dialog.tsx` ist jetzt Deliverable von Slice 04, weil es dort zuerst benoetigt wird (delete-project-btn). Slice 05 benutzt es implizit weiter. `components/project-list.tsx` rueckt als Deliverable in Slice 05 nach (war vorher nicht explizit aufgefuehrt).
+
+### Problem 2: lib/utils.ts als doppeltes Deliverable in Slice 14 und 15
+
+**Vorher:** Slice 14 (Variation Flow) und Slice 15 (Download als PNG) nannten beide `lib/utils.ts` als Deliverable. Eine Datei kann nicht in zwei Slices als primaeres Deliverable definiert sein -- das fuehrt zu Unklarheit ueber den Implementierungs-Kontext.
+
+**Nachher:** Slice 14 erhaelt als eigenes Deliverable `lib/workspace-state.ts` (Context/State-Typen fuer Variation-Uebernahme). Slice 15 behaelt `lib/utils.ts` (Download-Helper downloadAsPng). Die Concerns sind jetzt klar getrennt: State-Management vs. Utility-Funktion.
+
+### Problem 3: app/actions/prompts.ts Doppelnutzung in Slice 19 und 21
+
+**Vorher:** `app/actions/prompts.ts` war als Deliverable in Slice 19 (Snippet CRUD) definiert. Laut Architecture-Dokument enthaelt diese Datei aber auch die `improvePrompt` Action (Slice 21). Slice 21 hatte keine explizite Dependency auf Slice 19, obwohl es dieselbe Datei erweitert.
+
+**Nachher:** Slice 19 erstellt `app/actions/prompts.ts` mit den Snippet-Actions. Slice 21 erhaelt eine explizite Dependency auf `["slice-09", "slice-19"]` und der Scope-Text dokumentiert klar, dass `improvePrompt` als Ergaenzung in die bestehende Datei eingefuegt wird. So ist die Implementierungs-Reihenfolge eindeutig.
+
+### Problem 4: Slice 16 Name irreführend
+
+**Vorher:** Name war "Generation Delete + Retry". deleteGeneration ist aber eine Action aus Slice 08/13, nicht Slice 16. Slice 16 implementiert nur Retry auf dem Placeholder und den Toast-Provider.
+
+**Nachher:** Name geaendert zu "Generation Retry + Toast Provider" -- beschreibt exakt was dieser Slice liefert.
+
+### Problem 5: Slice 13 Name-Anpassung
+
+**Vorher:** "Lightbox Navigation + Actions" -- "Actions" war zu vage und liess offen, welche Actions gemeint sind.
+
+**Nachher:** "Lightbox Navigation + Generation Delete" -- explizit, was die Action-Seite dieses Slices ist (deleteGeneration als Ergaenzung in `app/actions/generations.ts`). Der Scope-Text klaert, dass die Action-Datei aus Slice 08 erweitert wird, keine neue Datei entsteht.

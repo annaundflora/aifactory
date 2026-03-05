@@ -31,7 +31,7 @@
 
 ## Ziel
 
-SnippetService und zugehoerige Server Actions bereitstellen, damit Prompt-Bausteine (Snippets) erstellt, gelesen, aktualisiert und geloescht werden koennen. Die getSnippets-Action liefert Snippets gruppiert nach Kategorie. Validierung stellt sicher, dass Text und Kategorie nicht leer und nicht zu lang sind.
+SnippetService und zugehoerige Server Actions bereitstellen, damit Prompt-Bausteine (Snippets) erstellt, gelesen, aktualisiert und geloescht werden koennen. Die getSnippets-Action liefert Snippets gruppiert nach Kategorie. Validierung stellt sicher, dass Text und Kategorie nicht leer und nicht zu lang sind. Die Datei `app/actions/prompts.ts` wird in Slice 21 um die `improvePrompt` Action erweitert.
 
 ---
 
@@ -163,10 +163,11 @@ describe('Snippet Server Actions - Validation', () => {
 
 | Resource | Type | Consumer | Interface |
 |----------|------|----------|-----------|
-| `createSnippet` | Server Action | Prompt Builder UI | `(input: { text: string, category: string }) => Promise<Snippet>` |
-| `updateSnippet` | Server Action | Prompt Builder UI | `(input: { id: string, text: string, category: string }) => Promise<Snippet>` |
-| `deleteSnippet` | Server Action | Prompt Builder UI | `(input: { id: string }) => Promise<{ success: boolean }>` |
+| `createSnippet` | Server Action | Prompt Builder UI | `(input: { text: string, category: string }) => Promise<Snippet \| { error: string }>` |
+| `updateSnippet` | Server Action | Prompt Builder UI | `(input: { id: string, text: string, category: string }) => Promise<Snippet \| { error: string }>` |
+| `deleteSnippet` | Server Action | Prompt Builder UI | `(input: { id: string }) => Promise<{ success: boolean } \| { error: string }>` |
 | `getSnippets` | Server Action | Prompt Builder UI | `() => Promise<Record<string, Snippet[]>>` |
+| `app/actions/prompts.ts` | Datei (erweiterbar) | `slice-21-llm-prompt-improve` | Slice 21 fuegt `improvePrompt` Action in diese Datei ein |
 
 ---
 
@@ -174,7 +175,7 @@ describe('Snippet Server Actions - Validation', () => {
 
 <!-- DELIVERABLES_START -->
 - [ ] `lib/services/snippet-service.ts` — SnippetService mit CRUD-Operationen und Gruppierung nach Kategorie
-- [ ] `app/actions/prompts.ts` — Server Actions createSnippet, updateSnippet, deleteSnippet, getSnippets mit Validierung
+- [ ] `app/actions/prompts.ts` — Server Actions createSnippet, updateSnippet, deleteSnippet, getSnippets mit Validierung (wird von Slice 21 um improvePrompt erweitert)
 <!-- DELIVERABLES_END -->
 
 > **Hinweis:** Test-Dateien gehoeren NICHT in Deliverables. Der Test-Writer-Agent erstellt Tests basierend auf den Test Skeletons oben.
@@ -186,7 +187,7 @@ describe('Snippet Server Actions - Validation', () => {
 **Scope-Grenzen:**
 - KEINE Snippet-Queries in `lib/db/queries.ts` -- SnippetService nutzt Drizzle direkt mit dem `db`-Singleton
 - KEINE UI-Komponenten (snippet-form, snippet-chip) -- kommt in einem separaten UI-Slice
-- KEINE Prompt-Improve-Logik in `app/actions/prompts.ts` -- nur Snippet-CRUD in diesem Slice
+- KEINE `improvePrompt` Action in `app/actions/prompts.ts` -- wird von Slice 21 ergaenzt
 - KEIN Schema-Aenderungen -- `prompt_snippets` Tabelle existiert bereits aus Slice 01
 
 **Technische Constraints:**

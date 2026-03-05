@@ -1,4 +1,4 @@
-# Slice 13: Lightbox Navigation + Actions
+# Slice 13: Lightbox Navigation + Generation Delete
 
 > **Slice 13 von 21** fuer `E2E Generate & Persist`
 
@@ -31,7 +31,7 @@
 
 ## Ziel
 
-Lightbox um Prev/Next-Navigation (Chevron-Buttons + Pfeiltasten mit Wrap-Around) und eine Delete-Aktion mit Bestaetigungsdialog erweitern. Das Loeschen entfernt die Generation aus der Datenbank und das zugehoerige Bild aus R2 via Server Action `deleteGeneration`.
+Lightbox um Prev/Next-Navigation (Chevron-Buttons + Pfeiltasten mit Wrap-Around) und eine Delete-Aktion mit Bestaetigungsdialog erweitern. Das Loeschen entfernt die Generation aus der Datenbank und das zugehoerige Bild aus R2. Die `deleteGeneration` Server Action wird als Ergaenzung zur bestehenden `app/actions/generations.ts` aus Slice 08 hinzugefuegt.
 
 ---
 
@@ -67,7 +67,7 @@ Lightbox um Prev/Next-Navigation (Chevron-Buttons + Pfeiltasten mit Wrap-Around)
 
 8) GIVEN eine geoeffnete Lightbox mit einer Generation
    WHEN der User auf den Delete-Button klickt
-   THEN wird ein Bestaetigungsdialog angezeigt mit dem Text "Delete this generation?"
+   THEN wird ein Bestaetigungsdialog (`ConfirmDialog` aus `components/shared/confirm-dialog.tsx`) angezeigt
 
 9) GIVEN ein sichtbarer Bestaetigungsdialog fuer das Loeschen
    WHEN der User auf "Cancel" klickt
@@ -75,18 +75,17 @@ Lightbox um Prev/Next-Navigation (Chevron-Buttons + Pfeiltasten mit Wrap-Around)
 
 10) GIVEN ein sichtbarer Bestaetigungsdialog fuer das Loeschen
     WHEN der User auf "Delete" bestaetigt
-    THEN wird die Server Action `deleteGeneration` mit der Generation-ID aufgerufen
-    AND die Generation wird aus der DB geloescht
-    AND das Bild wird aus R2 geloescht
-    AND die Lightbox zeigt die naechste Generation (oder schliesst bei letztem Bild)
+    THEN wird die Server Action `deleteGeneration({ id })` aufgerufen
+    AND die Generation wird aus der DB geloescht und das Bild aus R2 geloescht
+    AND die Lightbox zeigt die naechste Generation oder schliesst sich bei letztem Bild
 
-11) GIVEN die `deleteGeneration` Server Action wird mit einer gültigen Generation-ID aufgerufen
+11) GIVEN die `deleteGeneration` Server Action wird mit einer gueltigen Generation-ID aufgerufen
     WHEN die Generation existiert und eine `image_url` hat
     THEN wird der DB-Eintrag geloescht, das R2-Objekt geloescht und `{ success: true }` zurueckgegeben
 
 12) GIVEN die `deleteGeneration` Server Action wird mit einer nicht-existierenden ID aufgerufen
     WHEN die Aktion ausgefuehrt wird
-    THEN wird `{ success: false }` oder ein Fehler zurueckgegeben
+    THEN wird `{ success: false }` zurueckgegeben
 
 ---
 
@@ -124,7 +123,7 @@ describe('LightboxNavigation', () => {
   it.todo('should hide or disable navigation buttons when only one generation exists')
 
   // AC-8: Delete-Button oeffnet Bestaetigungsdialog
-  it.todo('should show confirmation dialog when delete button is clicked')
+  it.todo('should show ConfirmDialog when delete button is clicked')
 
   // AC-9: Cancel schliesst Dialog
   it.todo('should close confirmation dialog and keep generation when cancel is clicked')
@@ -146,7 +145,7 @@ describe('deleteGeneration Server Action', () => {
   it.todo('should delete generation from DB and image from R2 and return success true')
 
   // AC-12: Nicht-existierende Generation
-  it.todo('should return success false or error for non-existing generation ID')
+  it.todo('should return success false for non-existing generation ID')
 })
 ```
 </test_spec>
@@ -159,25 +158,27 @@ describe('deleteGeneration Server Action', () => {
 
 | Slice | Resource | Type | Validation |
 |-------|----------|------|------------|
-| `slice-12` | `LightboxModal` | React Component | Stellt Modal-Shell bereit, in die Navigation und Actions integriert werden |
+| `slice-12` | `LightboxModal` | React Component | Stellt Modal-Shell bereit; Navigation und Delete werden darin integriert |
 | `slice-12` | `Generation` Type | TypeScript Type | Generation-Entity mit `id`, `image_url` aus `lib/db/schema.ts` |
-| `slice-02` | `StorageService.delete` | Function | Loescht Bild aus R2 anhand des Keys |
-| `slice-01` | DB Connection + Schema | Module | `lib/db/` fuer Generation-Queries |
+| `slice-08` | `app/actions/generations.ts` | Server Action Module | Datei existiert bereits mit `generateImages` + `retryGeneration`; wird um `deleteGeneration` ergaenzt |
+| `slice-07` | `StorageService.delete` | Async Function | `(key: string) => Promise<void>` aus `lib/clients/storage.ts` |
+| `slice-04` | `ConfirmDialog` | React Component | `components/shared/confirm-dialog.tsx`; hier erstmals fuer Lightbox-Delete wiederverwendet |
+| `slice-02` | DB Connection + Queries | Module | `lib/db/` fuer Generation DELETE Query |
 
 ### Provides To Other Slices
 
 | Resource | Type | Consumer | Interface |
 |----------|------|----------|-----------|
-| `LightboxNavigation` | React Component | slice-12 (Integration) | `<LightboxNavigation generations={Generation[]} currentIndex={number} onNavigate={(index: number) => void} />` |
-| `deleteGeneration` | Server Action | slice-12, slice-15 | `(id: string) => Promise<{ success: boolean }>` |
+| `LightboxNavigation` | React Component | slice-12 (Integration), slice-15, slice-16 | `<LightboxNavigation generations={Generation[]} currentIndex={number} onNavigate={(index: number) => void} onDelete={() => void} />` |
+| `deleteGeneration` | Server Action (Ergaenzung in slice-08-Datei) | slice-15, slice-16 | `(input: { id: string }) => Promise<{ success: boolean }>` |
 
 ---
 
 ## Deliverables (SCOPE SAFEGUARD)
 
 <!-- DELIVERABLES_START -->
-- [ ] `components/lightbox/lightbox-navigation.tsx` -- Prev/Next Chevron-Buttons, Keyboard-Navigation, Delete-Button mit Bestaetigungsdialog
-- [ ] `app/actions/generations.ts` -- `deleteGeneration` Server Action (DB DELETE + R2 DELETE)
+- [ ] `components/lightbox/lightbox-navigation.tsx` — Prev/Next Chevron-Buttons, ArrowLeft/ArrowRight Keyboard-Navigation, Delete-Button mit ConfirmDialog (NEU)
+- [ ] `app/actions/generations.ts` — MODIFY: `deleteGeneration` Action hinzufuegen (DB DELETE + R2 DELETE + revalidatePath); `generateImages` und `retryGeneration` unveraendert lassen
 <!-- DELIVERABLES_END -->
 
 > **Hinweis:** Test-Dateien gehoeren NICHT in Deliverables. Der Test-Writer-Agent erstellt Tests basierend auf den Test Skeletons oben.
@@ -189,19 +190,21 @@ describe('deleteGeneration Server Action', () => {
 **Scope-Grenzen:**
 - KEINE Download-Funktionalitaet -- kommt in Slice 15
 - KEINE Variation-Funktionalitaet -- kommt in spaeterem Slice
-- KEINE Aenderung an der LightboxModal-Shell (Detail-Panel, Overlay, Close) -- das ist Slice 12
+- KEINE Aenderung an der LightboxModal-Shell (Detail-Panel, Overlay, Close-Button, Escape) -- das ist Slice 12
+- KEINE neuen Funktionen in `generations.ts` ausser `deleteGeneration`
 
 **Technische Constraints:**
-- Client Component (`"use client"`) fuer Navigation (Keyboard-Events, State)
-- Keyboard-Listener muss Escape (Slice 12) NICHT interferieren -- nur ArrowLeft/ArrowRight abfangen
-- `deleteGeneration` Server Action nutzt `"use server"`, fuehrt DB DELETE zuerst aus, dann R2 DELETE
-- Bestaetigungsdialog via `confirm-dialog` Shared Component (siehe `components/shared/confirm-dialog.tsx`)
-- `revalidatePath` nach erfolgreichem Loeschen fuer Gallery-Update
+- `lightbox-navigation.tsx` ist Client Component (`"use client"`) -- benoetigt State und Keyboard-Events
+- Keyboard-Listener faengt nur ArrowLeft/ArrowRight ab; Escape bleibt bei Slice 12
+- `deleteGeneration` in `app/actions/generations.ts` ergaenzen (Datei enthaelt bereits `"use server"`)
+- Delete-Reihenfolge: DB DELETE zuerst, dann R2 DELETE (Data Integrity, architecture.md -> Quality Attributes)
+- `revalidatePath` nach erfolgreichem Loeschen fuer Gallery-Update aufrufen
+- Bestaetigungsdialog via `ConfirmDialog` Shared Component aus `components/shared/confirm-dialog.tsx`
 
 **Referenzen:**
-- Architecture: `architecture.md` -> Section "Server Actions" (`deleteGeneration` Signatur)
+- Architecture: `architecture.md` -> Section "API Design > Server Actions" (`deleteGeneration` Signatur)
 - Architecture: `architecture.md` -> Section "Quality Attributes" (Data Integrity: DB first, then R2)
+- Architecture: `architecture.md` -> Section "Project Structure" (`components/lightbox/`, `app/actions/generations.ts`)
 - Wireframes: `wireframes.md` -> Section "Screen: Lightbox / Image Detail Modal" (Annotationen 2, 3, 9)
 - Wireframes: `wireframes.md` -> Section "State Variations" (`confirm-delete`)
 - Wireframes: `wireframes.md` -> Section "Screen: Confirmation Dialog"
-- Discovery: `discovery.md` -> Section "Feature State Machine" -> Transition `lightbox-open` + Delete/Navigation
