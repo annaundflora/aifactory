@@ -21,11 +21,28 @@ vi.mock("next/image", () => ({
   },
 }));
 
-// Mock lucide-react X icon
+// Mock lucide-react icons
 vi.mock("lucide-react", () => ({
   X: (props: Record<string, unknown>) => (
     <svg data-testid="x-icon" {...props} />
   ),
+  Download: (props: Record<string, unknown>) => (
+    <svg data-testid="download-icon" {...props} />
+  ),
+  Loader2: (props: Record<string, unknown>) => (
+    <svg data-testid="loader2-icon" {...props} />
+  ),
+}));
+
+// Mock sonner toast
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn(), success: vi.fn() },
+}));
+
+// Mock lib/utils download helpers
+vi.mock("@/lib/utils", () => ({
+  downloadImage: vi.fn().mockResolvedValue(undefined),
+  generateDownloadFilename: vi.fn().mockReturnValue("test-image.png"),
 }));
 
 // Mock lib/models
