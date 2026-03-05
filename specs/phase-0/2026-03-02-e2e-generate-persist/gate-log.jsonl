@@ -11,3 +11,8 @@
 {"ts":"2026-03-05T23:15:00Z","slice":"slice-10-generation-placeholder-polling","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
 {"ts":"2026-03-05T23:15:30Z","slice":"slice-10-generation-placeholder-polling","gate":"lint","result":"PASSED","attempt":1}
 {"ts":"2026-03-05T23:25:00Z","slice":"slice-10-generation-placeholder-polling","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-05T23:30:00Z","slice":"slice-12-lightbox-modal","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-05T23:30:30Z","slice":"slice-12-lightbox-modal","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-03-05T23:40:00Z","slice":"slice-12-lightbox-modal","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-05T23:45:00Z","slice":"slice-17-prompt-builder-drawer","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-05T23:45:30Z","slice":"slice-17-prompt-builder-drawer","gate":"lint","result":"PASSED","attempt":1}
