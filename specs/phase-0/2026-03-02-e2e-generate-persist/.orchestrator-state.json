@@ -1,0 +1,23 @@
+{
+  "spec_path": "specs/phase-0/2026-03-02-e2e-generate-persist",
+  "feature_name": "e2e-generate-persist",
+  "status": "in_progress",
+  "current_state": "pre_check",
+  "current_slice_id": null,
+  "retry_count": 0,
+  "failed_stage": null,
+  "waves": [
+    { "id": 1, "name": "Foundation", "slices": ["slice-01-docker-db-schema", "slice-06-model-registry-schema-service"] },
+    { "id": 2, "name": "Data + Clients", "slices": ["slice-02-db-connection-queries", "slice-07-replicate-storage-clients"] },
+    { "id": 3, "name": "Services", "slices": ["slice-03-project-server-actions", "slice-08-generation-service-actions", "slice-19-snippet-crud"] },
+    { "id": 4, "name": "Project UI", "slices": ["slice-04-project-overview-ui"] },
+    { "id": 5, "name": "Workspace", "slices": ["slice-05-workspace-layout-sidebar"] },
+    { "id": 6, "name": "Core UI", "slices": ["slice-09-prompt-area-parameter-panel", "slice-11-gallery-grid-generation-cards"] },
+    { "id": 7, "name": "Features", "slices": ["slice-10-generation-placeholder-polling", "slice-12-lightbox-modal", "slice-16-generation-delete-retry", "slice-17-prompt-builder-drawer", "slice-21-llm-prompt-improvement"] },
+    { "id": 8, "name": "Lightbox+", "slices": ["slice-13-lightbox-navigation-actions", "slice-15-download-png", "slice-18-surprise-me"] },
+    { "id": 9, "name": "Integration", "slices": ["slice-14-variation-flow", "slice-20-snippet-ui-builder"] }
+  ],
+  "completed_slices": [],
+  "evidence_files": [],
+  "started_at": "2026-03-05T00:00:00Z"
+}

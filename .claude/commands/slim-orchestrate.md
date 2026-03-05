@@ -394,6 +394,7 @@ FOR each wave IN waves:
       },
       "tests": tw_json,
       "validation": val_json,
+      "e2e": val_json.stages.e2e if val_json.stages.e2e else null,
       "retries": state.retry_count,
       "review_iterations": review_retries
     }
