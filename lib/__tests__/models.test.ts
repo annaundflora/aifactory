@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { MODELS, getModelById, type Model } from '@/lib/models'
+import { MODELS, getModelById } from '@/lib/models'
 
 describe('Model Registry', () => {
   // AC-1: GIVEN lib/models.ts existiert
