@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { type Generation } from "@/lib/db/queries";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { deleteGeneration } from "@/app/actions/generations";
+import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -49,6 +50,7 @@ export function LightboxNavigation({
   // Keyboard navigation (ArrowLeft / ArrowRight only)
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      if (showConfirm) return;
       if (e.key === "ArrowLeft") {
         e.preventDefault();
         goPrev();
@@ -60,7 +62,7 @@ export function LightboxNavigation({
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [goNext, goPrev]);
+  }, [goNext, goPrev, showConfirm]);
 
   // Delete handlers
   const handleDeleteClick = () => {
@@ -75,11 +77,16 @@ export function LightboxNavigation({
     if (!currentGeneration || isDeleting) return;
     setIsDeleting(true);
     try {
-      await deleteGeneration({ id: currentGeneration.id });
-      setShowConfirm(false);
-      onDelete();
+      const result = await deleteGeneration({ id: currentGeneration.id });
+      if (result.success) {
+        setShowConfirm(false);
+        onDelete();
+      } else {
+        toast.error("Löschen fehlgeschlagen");
+        setShowConfirm(false);
+      }
     } catch {
-      // Let the parent handle errors via onDelete or show nothing
+      toast.error("Löschen fehlgeschlagen");
       setShowConfirm(false);
     } finally {
       setIsDeleting(false);
