@@ -1,9 +1,9 @@
 {
   "spec_path": "specs/phase-0/2026-03-02-e2e-generate-persist",
   "feature_name": "e2e-generate-persist",
-  "status": "in_progress",
-  "current_state": "implementing",
-  "current_slice_id": "slice-14-variation-flow",
+  "status": "feature_complete",
+  "current_state": "feature_complete",
+  "current_slice_id": null,
   "current_wave": 9,
   "retry_count": 0,
   "failed_stage": null,
@@ -16,104 +16,30 @@
     { "id": 6, "name": "Core UI", "slices": ["slice-09-prompt-area-parameter-panel", "slice-11-gallery-grid-generation-cards"], "status": "completed" },
     { "id": 7, "name": "Features", "slices": ["slice-10-generation-placeholder-polling", "slice-12-lightbox-modal", "slice-16-generation-delete-retry", "slice-17-prompt-builder-drawer", "slice-21-llm-prompt-improvement"], "status": "completed" },
     { "id": 8, "name": "Lightbox+", "slices": ["slice-13-lightbox-navigation-actions", "slice-15-download-png", "slice-18-surprise-me"], "status": "completed" },
-    { "id": 9, "name": "Integration", "slices": ["slice-14-variation-flow", "slice-20-snippet-ui-builder"], "status": "in_progress" }
+    { "id": 9, "name": "Integration", "slices": ["slice-14-variation-flow", "slice-20-snippet-ui-builder"], "status": "completed" }
   ],
   "completed_slices": [
-    {
-      "id": "slice-01-docker-db-schema",
-      "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
-      "test_files": ["lib/db/__tests__/schema.test.ts", "tests/acceptance/test_slice_01_docker_db_schema.test.ts"]
-    },
-    {
-      "id": "slice-06-model-registry-schema-service",
-      "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
-      "test_files": ["lib/__tests__/models.test.ts", "lib/services/__tests__/model-schema-service.test.ts", "app/actions/__tests__/models.test.ts"]
-    },
-    {
-      "id": "slice-02-db-connection-queries",
-      "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
-      "test_files": ["lib/db/__tests__/queries.test.ts"]
-    },
-    {
-      "id": "slice-07-replicate-storage-clients",
-      "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
-      "test_files": ["lib/clients/__tests__/replicate.test.ts", "lib/clients/__tests__/storage.test.ts"]
-    },
-    {
-      "id": "slice-03-project-server-actions",
-      "pipeline": { "implementer": "done", "code_review": "REJECTED->fixed->APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
-      "test_files": ["app/actions/__tests__/projects.test.ts"]
-    },
-    {
-      "id": "slice-08-generation-service-actions",
-      "pipeline": { "implementer": "done", "code_review": "REJECTED->fixed->APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
-      "test_files": ["lib/services/__tests__/generation-service.test.ts", "app/actions/__tests__/generations.test.ts"]
-    },
-    {
-      "id": "slice-19-snippet-crud",
-      "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
-      "test_files": ["lib/services/__tests__/snippet-service.test.ts", "app/actions/__tests__/prompts.test.ts"]
-    },
-    {
-      "id": "slice-04-project-overview-ui",
-      "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
-      "test_files": ["components/__tests__/project-card.test.tsx", "components/__tests__/confirm-dialog.test.tsx", "app/__tests__/page.test.tsx"]
-    },
-    {
-      "id": "slice-05-workspace-layout-sidebar",
-      "pipeline": { "implementer": "done", "code_review": "REJECTED->fixed->APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
-      "test_files": ["app/projects/__tests__/page.test.tsx", "app/__tests__/layout.test.tsx", "components/__tests__/sidebar.test.tsx", "components/__tests__/project-list.test.tsx"]
-    },
-    {
-      "id": "slice-09-prompt-area-parameter-panel",
-      "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
-      "test_files": ["components/workspace/__tests__/prompt-area.test.tsx", "components/workspace/__tests__/parameter-panel.test.tsx"]
-    },
-    {
-      "id": "slice-11-gallery-grid-generation-cards",
-      "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
-      "test_files": ["components/workspace/__tests__/gallery-grid.test.tsx", "components/workspace/__tests__/generation-card.test.tsx"]
-    },
-    {
-      "id": "slice-10-generation-placeholder-polling",
-      "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
-      "test_files": ["components/workspace/__tests__/generation-placeholder.test.tsx"]
-    },
-    {
-      "id": "slice-12-lightbox-modal",
-      "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
-      "test_files": ["components/lightbox/__tests__/lightbox-modal.test.tsx"]
-    },
-    {
-      "id": "slice-16-generation-delete-retry",
-      "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
-      "test_files": ["components/shared/__tests__/toast-provider.test.tsx", "components/workspace/__tests__/generation-retry.test.tsx"]
-    },
-    {
-      "id": "slice-17-prompt-builder-drawer",
-      "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
-      "test_files": ["components/prompt-builder/__tests__/builder-drawer.test.tsx", "components/prompt-builder/__tests__/category-tabs.test.tsx", "components/prompt-builder/__tests__/option-chip.test.tsx"]
-    },
-    {
-      "id": "slice-21-llm-prompt-improvement",
-      "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
-      "test_files": ["components/prompt-improve/__tests__/llm-comparison.test.tsx", "lib/clients/__tests__/openrouter.test.ts", "lib/services/__tests__/prompt-service.test.ts"]
-    },
-    {
-      "id": "slice-13-lightbox-navigation-actions",
-      "pipeline": { "implementer": "done", "code_review": "REJECTED->fixed->APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
-      "test_files": ["components/lightbox/__tests__/lightbox-navigation.test.tsx", "app/actions/__tests__/generations.test.ts"]
-    },
-    {
-      "id": "slice-15-download-png",
-      "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
-      "test_files": ["lib/__tests__/download-utils.test.ts", "components/lightbox/__tests__/download-button.test.tsx"]
-    },
-    {
-      "id": "slice-18-surprise-me",
-      "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" },
-      "test_files": ["components/prompt-builder/__tests__/surprise-me-button.test.tsx"]
-    }
+    { "id": "slice-01-docker-db-schema", "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" }, "test_files": ["lib/db/__tests__/schema.test.ts", "tests/acceptance/test_slice_01_docker_db_schema.test.ts"] },
+    { "id": "slice-06-model-registry-schema-service", "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" }, "test_files": ["lib/__tests__/models.test.ts", "lib/services/__tests__/model-schema-service.test.ts", "app/actions/__tests__/models.test.ts"] },
+    { "id": "slice-02-db-connection-queries", "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" }, "test_files": ["lib/db/__tests__/queries.test.ts"] },
+    { "id": "slice-07-replicate-storage-clients", "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" }, "test_files": ["lib/clients/__tests__/replicate.test.ts", "lib/clients/__tests__/storage.test.ts"] },
+    { "id": "slice-03-project-server-actions", "pipeline": { "implementer": "done", "code_review": "REJECTED->fixed->APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" }, "test_files": ["app/actions/__tests__/projects.test.ts"] },
+    { "id": "slice-08-generation-service-actions", "pipeline": { "implementer": "done", "code_review": "REJECTED->fixed->APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" }, "test_files": ["lib/services/__tests__/generation-service.test.ts", "app/actions/__tests__/generations.test.ts"] },
+    { "id": "slice-19-snippet-crud", "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" }, "test_files": ["lib/services/__tests__/snippet-service.test.ts", "app/actions/__tests__/prompts.test.ts"] },
+    { "id": "slice-04-project-overview-ui", "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" }, "test_files": ["components/__tests__/project-card.test.tsx", "components/__tests__/confirm-dialog.test.tsx", "app/__tests__/page.test.tsx"] },
+    { "id": "slice-05-workspace-layout-sidebar", "pipeline": { "implementer": "done", "code_review": "REJECTED->fixed->APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" }, "test_files": ["app/projects/__tests__/page.test.tsx", "app/__tests__/layout.test.tsx", "components/__tests__/sidebar.test.tsx", "components/__tests__/project-list.test.tsx"] },
+    { "id": "slice-09-prompt-area-parameter-panel", "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" }, "test_files": ["components/workspace/__tests__/prompt-area.test.tsx", "components/workspace/__tests__/parameter-panel.test.tsx"] },
+    { "id": "slice-11-gallery-grid-generation-cards", "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" }, "test_files": ["components/workspace/__tests__/gallery-grid.test.tsx", "components/workspace/__tests__/generation-card.test.tsx"] },
+    { "id": "slice-10-generation-placeholder-polling", "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" }, "test_files": ["components/workspace/__tests__/generation-placeholder.test.tsx"] },
+    { "id": "slice-12-lightbox-modal", "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" }, "test_files": ["components/lightbox/__tests__/lightbox-modal.test.tsx"] },
+    { "id": "slice-16-generation-delete-retry", "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" }, "test_files": ["components/shared/__tests__/toast-provider.test.tsx", "components/workspace/__tests__/generation-retry.test.tsx"] },
+    { "id": "slice-17-prompt-builder-drawer", "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" }, "test_files": ["components/prompt-builder/__tests__/builder-drawer.test.tsx", "components/prompt-builder/__tests__/category-tabs.test.tsx", "components/prompt-builder/__tests__/option-chip.test.tsx"] },
+    { "id": "slice-21-llm-prompt-improvement", "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" }, "test_files": ["components/prompt-improve/__tests__/llm-comparison.test.tsx", "lib/clients/__tests__/openrouter.test.ts", "lib/services/__tests__/prompt-service.test.ts"] },
+    { "id": "slice-13-lightbox-navigation-actions", "pipeline": { "implementer": "done", "code_review": "REJECTED->fixed->APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" }, "test_files": ["components/lightbox/__tests__/lightbox-navigation.test.tsx", "app/actions/__tests__/generations.test.ts"] },
+    { "id": "slice-15-download-png", "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" }, "test_files": ["lib/__tests__/download-utils.test.ts", "components/lightbox/__tests__/download-button.test.tsx"] },
+    { "id": "slice-18-surprise-me", "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" }, "test_files": ["components/prompt-builder/__tests__/surprise-me-button.test.tsx"] },
+    { "id": "slice-14-variation-flow", "pipeline": { "implementer": "done", "code_review": "REJECTED->fixed->APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" }, "test_files": ["lib/__tests__/workspace-state.test.ts", "components/lightbox/__tests__/variation-flow.test.tsx"] },
+    { "id": "slice-20-snippet-ui-builder", "pipeline": { "implementer": "done", "code_review": "APPROVED", "deterministic_gate": "passed", "test_writer": "done", "test_validator": "passed" }, "test_files": ["components/prompt-builder/__tests__/snippet-ui.test.tsx"] }
   ],
   "in_progress_slices": [],
   "evidence_files": [
@@ -135,9 +61,11 @@
     ".claude/evidence/e2e-generate-persist/slice-21.json",
     ".claude/evidence/e2e-generate-persist/slice-13.json",
     ".claude/evidence/e2e-generate-persist/slice-15.json",
-    ".claude/evidence/e2e-generate-persist/slice-18.json"
+    ".claude/evidence/e2e-generate-persist/slice-18.json",
+    ".claude/evidence/e2e-generate-persist/slice-14.json",
+    ".claude/evidence/e2e-generate-persist/slice-20.json"
   ],
-  "total_tests_passing": 252,
+  "total_tests_passing": 276,
   "detected_stack": {
     "stack_name": "TypeScript/Next.js",
     "lint_check_cmd": "pnpm run lint",
@@ -145,5 +73,6 @@
     "test_cmd": "pnpm test"
   },
   "started_at": "2026-03-05T00:00:00Z",
-  "last_updated": "2026-03-06T01:15:00Z"
+  "completed_at": "2026-03-06T02:20:00Z",
+  "last_updated": "2026-03-06T02:20:00Z"
 }

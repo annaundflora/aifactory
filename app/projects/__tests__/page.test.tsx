@@ -33,6 +33,32 @@ vi.mock("@/app/actions/projects", () => ({
   createProject: (...args: unknown[]) => mockCreateProject(...args),
 }));
 
+// Mock generations actions
+const mockFetchGenerations = vi.fn().mockResolvedValue([]);
+vi.mock("@/app/actions/generations", () => ({
+  fetchGenerations: (...args: unknown[]) => mockFetchGenerations(...args),
+  generateImages: vi.fn().mockResolvedValue([]),
+  retryGeneration: vi.fn(),
+  deleteGeneration: vi.fn(),
+}));
+
+// Mock workspace-state (used by WorkspaceContent)
+vi.mock("@/lib/workspace-state", () => ({
+  WorkspaceStateProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  useWorkspaceVariation: () => ({ variationData: null, setVariation: vi.fn(), clearVariation: vi.fn() }),
+}));
+
+// Mock models
+vi.mock("@/lib/models", () => ({
+  MODELS: [{ id: "test-model", displayName: "Test Model", pricePerImage: 0.01 }],
+  getModelById: () => ({ id: "test-model", displayName: "Test Model", pricePerImage: 0.01 }),
+}));
+
+// Mock model schema action
+vi.mock("@/app/actions/models", () => ({
+  getModelSchema: vi.fn().mockResolvedValue({ properties: {} }),
+}));
+
 // Mock next/link
 vi.mock("next/link", () => ({
   default: ({
@@ -58,11 +84,17 @@ vi.mock("sonner", () => ({
   },
 }));
 
-// Mock lucide-react icons to simple spans
-vi.mock("lucide-react", () => ({
-  ArrowLeft: (props: Record<string, unknown>) => <span data-testid="arrow-left-icon" {...props} />,
-  Plus: (props: Record<string, unknown>) => <span data-testid="plus-icon" {...props} />,
-}));
+// Mock lucide-react icons to simple spans — return Proxy for any icon
+vi.mock("lucide-react", () => {
+  const handler = {
+    get(_target: Record<string, unknown>, prop: string) {
+      if (prop === "__esModule") return true;
+      if (typeof prop === "symbol") return undefined;
+      return (props: Record<string, unknown>) => <span data-testid={`icon-${prop}`} {...(Object.fromEntries(Object.entries(props).filter(([k]) => typeof k === "string" && !k.startsWith("__"))))} />;
+    },
+  };
+  return new Proxy({}, handler);
+});
 
 // Import AFTER mocks are set up
 import WorkspacePage from "@/app/projects/[id]/page";
@@ -145,22 +177,18 @@ describe("Workspace Page (/projects/[id])", () => {
   /**
    * AC-8: GIVEN die Workspace-Seite ist geladen
    * WHEN der Main-Bereich gerendert wird
-   * THEN zeigt er einen Platzhalter-Bereich fuer zukuenftige Workspace-Inhalte (Prompt Area, Gallery) mit dem Projektnamen
+   * THEN zeigt er den Workspace-Content (Prompt Area + Gallery) mit dem Projektnamen
    */
-  it("AC-8: should render placeholder area with project name for future workspace content", async () => {
+  it("AC-8: should render workspace content with prompt area and gallery", async () => {
     mockGetProject.mockResolvedValue(makeProject("proj-b", "Project Beta"));
 
     await renderServerComponent("proj-b");
 
-    // Placeholder text mentioning project name
-    const workspaceText = screen.getByText(/Workspace for/i);
-    expect(workspaceText).toBeInTheDocument();
-    // The project name appears inside the "Workspace for" paragraph
-    expect(workspaceText.textContent).toContain("Project Beta");
+    // Project name in header
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading).toHaveTextContent("Project Beta");
 
-    // Placeholder mentions future content areas
-    expect(
-      screen.getByText(/prompt area.*parameter panel.*gallery/i)
-    ).toBeInTheDocument();
+    // Prompt area is rendered (via WorkspaceContent)
+    expect(screen.getByTestId("prompt-area")).toBeInTheDocument();
   });
 });

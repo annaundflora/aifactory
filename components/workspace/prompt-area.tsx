@@ -34,7 +34,11 @@ import { Loader2 } from "lucide-react";
 
 interface PromptAreaProps {
   projectId: string;
+  onGenerationsCreated?: (generations: Generation[]) => void;
 }
+
+// Re-export Generation type for callback
+import { type Generation } from "@/lib/db/queries";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -51,7 +55,7 @@ function formatPrice(price: number): string {
 // Component
 // ---------------------------------------------------------------------------
 
-export function PromptArea({ projectId }: PromptAreaProps) {
+export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps) {
   // ----- Model state -----
   const [selectedModelId, setSelectedModelId] = useState(MODELS[0].id);
 
@@ -142,7 +146,7 @@ export function PromptArea({ projectId }: PromptAreaProps) {
     if (!prompt.trim()) return;
 
     startGeneration(async () => {
-      await generateImages({
+      const result = await generateImages({
         projectId,
         prompt: prompt.trim(),
         negativePrompt: negativePrompt.trim() || undefined,
@@ -150,6 +154,9 @@ export function PromptArea({ projectId }: PromptAreaProps) {
         params: paramValues,
         count: variantCount,
       });
+      if (Array.isArray(result)) {
+        onGenerationsCreated?.(result);
+      }
     });
   }, [
     prompt,
@@ -158,6 +165,7 @@ export function PromptArea({ projectId }: PromptAreaProps) {
     paramValues,
     variantCount,
     projectId,
+    onGenerationsCreated,
   ]);
 
   // ----- Keyboard shortcut (Cmd/Ctrl+Enter) -----

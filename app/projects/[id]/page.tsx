@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import { getProject, getProjects } from "@/app/actions/projects";
+import { fetchGenerations } from "@/app/actions/generations";
 import { Sidebar } from "@/components/sidebar";
 import { WorkspaceStateProvider } from "@/lib/workspace-state";
+import { WorkspaceContent } from "@/components/workspace/workspace-content";
 
 interface WorkspacePageProps {
   params: Promise<{ id: string }>;
@@ -10,9 +12,10 @@ interface WorkspacePageProps {
 export default async function WorkspacePage({ params }: WorkspacePageProps) {
   const { id } = await params;
 
-  const [projectResult, projectsResult] = await Promise.all([
+  const [projectResult, projectsResult, generations] = await Promise.all([
     getProject({ id }),
     getProjects(),
+    fetchGenerations(id),
   ]);
 
   // Handle not found
@@ -35,17 +38,10 @@ export default async function WorkspacePage({ params }: WorkspacePageProps) {
             <h1 className="text-2xl font-bold">{project.name}</h1>
           </header>
 
-          {/* Placeholder for future workspace content (Prompt Area, Gallery, etc.) */}
-          <div className="flex flex-1 items-center justify-center p-6">
-            <div className="text-center">
-              <p className="text-lg text-muted-foreground">
-                Workspace for <span className="font-semibold text-foreground">{project.name}</span>
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Prompt area, parameter panel, and gallery will appear here.
-              </p>
-            </div>
-          </div>
+          <WorkspaceContent
+            projectId={id}
+            initialGenerations={generations}
+          />
         </main>
       </div>
     </WorkspaceStateProvider>
