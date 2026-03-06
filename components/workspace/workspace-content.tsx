@@ -144,22 +144,20 @@ export function WorkspaceContent({
       </div>
 
       {/* Lightbox */}
-      {currentGeneration && (
-        <>
+      {currentGeneration && lightboxOpen && (
+        <div className="fixed inset-0 z-50">
           <LightboxModal
             generation={currentGeneration}
             isOpen={lightboxOpen}
             onClose={handleLightboxClose}
           />
-          {lightboxOpen && (
-            <LightboxNavigation
-              generations={completedGenerations}
-              currentIndex={lightboxIndex}
-              onNavigate={handleLightboxNavigate}
-              onDelete={handleLightboxDelete}
-            />
-          )}
-        </>
+          <LightboxNavigation
+            generations={completedGenerations}
+            currentIndex={lightboxIndex}
+            onNavigate={handleLightboxNavigate}
+            onDelete={handleLightboxDelete}
+          />
+        </div>
       )}
     </div>
   );

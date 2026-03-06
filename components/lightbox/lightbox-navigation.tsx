@@ -99,7 +99,7 @@ export function LightboxNavigation({
       {hasMultiple && (
         <>
           <button
-            className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-background/80 p-2 text-foreground shadow-md transition-colors hover:bg-background"
+            className="fixed left-4 top-1/2 z-[60] -translate-y-1/2 rounded-full bg-background/80 p-2 text-foreground shadow-md transition-colors hover:bg-background"
             onClick={goPrev}
             aria-label="Previous"
             data-testid="lightbox-prev"
@@ -107,7 +107,7 @@ export function LightboxNavigation({
             <ChevronLeft className="size-5" />
           </button>
           <button
-            className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-background/80 p-2 text-foreground shadow-md transition-colors hover:bg-background"
+            className="fixed right-4 top-1/2 z-[60] -translate-y-1/2 rounded-full bg-background/80 p-2 text-foreground shadow-md transition-colors hover:bg-background"
             onClick={goNext}
             aria-label="Next"
             data-testid="lightbox-next"
@@ -119,7 +119,7 @@ export function LightboxNavigation({
 
       {/* Delete Button */}
       <button
-        className="absolute bottom-3 right-3 z-10 rounded-full p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+        className="fixed bottom-4 right-4 z-[60] rounded-full p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
         onClick={handleDeleteClick}
         aria-label="Delete"
         data-testid="lightbox-delete"
