@@ -26,7 +26,9 @@ import {
   ParameterPanel,
   type SchemaProperties,
 } from "@/components/workspace/parameter-panel";
-import { Loader2 } from "lucide-react";
+import { Loader2, Wand2, Sparkles } from "lucide-react";
+import { BuilderDrawer } from "@/components/prompt-builder/builder-drawer";
+import { LLMComparison } from "@/components/prompt-improve/llm-comparison";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -76,6 +78,10 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
   // ----- Generation state -----
   const [isGenerating, startGeneration] = useTransition();
+
+  // ----- Builder drawer + LLM comparison -----
+  const [builderOpen, setBuilderOpen] = useState(false);
+  const [showImprove, setShowImprove] = useState(false);
 
   // ----- Variation state consumption -----
   const { variationData, clearVariation } = useWorkspaceVariation();
@@ -217,7 +223,55 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
           rows={3}
           className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm resize-none overflow-hidden"
         />
+        {/* Prompt Helper Buttons */}
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setBuilderOpen(true)}
+            data-testid="builder-btn"
+          >
+            <Wand2 className="mr-1 size-3" />
+            Builder
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowImprove(true)}
+            disabled={!prompt.trim() || showImprove}
+            data-testid="improve-btn"
+          >
+            <Sparkles className="mr-1 size-3" />
+            Improve
+          </Button>
+        </div>
       </div>
+
+      {/* LLM Prompt Improvement */}
+      {showImprove && (
+        <LLMComparison
+          prompt={prompt}
+          onAdopt={(improved) => {
+            setPrompt(improved);
+            setShowImprove(false);
+          }}
+          onDiscard={() => setShowImprove(false)}
+        />
+      )}
+
+      {/* Prompt Builder Drawer */}
+      <BuilderDrawer
+        open={builderOpen}
+        onClose={(composedPrompt) => {
+          setBuilderOpen(false);
+          if (composedPrompt) {
+            setPrompt(composedPrompt);
+          }
+        }}
+        basePrompt={prompt}
+      />
 
       {/* Negative Prompt (conditionally visible) */}
       {hasNegativePrompt && (
