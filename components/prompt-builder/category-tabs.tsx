@@ -66,7 +66,7 @@ export function CategoryTabs({
   }, [activeTab, loadSnippets]);
 
   const handleSnippetSaved = useCallback(
-    (_snippet: Snippet) => {
+    () => {
       setShowForm(false);
       setEditingSnippet(undefined);
       loadSnippets();
