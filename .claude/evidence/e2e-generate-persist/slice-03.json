@@ -1,0 +1,9 @@
+{
+  "feature": "e2e-generate-persist",
+  "slice": "slice-03-project-server-actions",
+  "status": "completed",
+  "review": { "verdict": "REJECTED then APPROVED after fix", "blocking": 1, "fix": "getProjects returns error object on DB error" },
+  "tests": { "ac_coverage": { "total": 11, "covered": 11 } },
+  "validation": { "overall_status": "passed" },
+  "retries": 1
+}

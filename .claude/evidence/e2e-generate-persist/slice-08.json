@@ -1,0 +1,9 @@
+{
+  "feature": "e2e-generate-persist",
+  "slice": "slice-08-generation-service-actions",
+  "status": "completed",
+  "review": { "verdict": "REJECTED then APPROVED after fix", "blocking": 1, "fix": "Use queries layer for getGeneration instead of raw db access" },
+  "tests": { "ac_coverage": { "total": 12, "covered": 12 } },
+  "validation": { "overall_status": "passed" },
+  "retries": 1
+}

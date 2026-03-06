@@ -1,0 +1,13 @@
+{
+  "feature": "e2e-generate-persist",
+  "slice": "slice-16-generation-delete-retry",
+  "timestamp": "2026-03-06T00:25:00Z",
+  "status": "completed",
+  "implementation": { "status": "done", "files_changed": ["components/shared/toast-provider.tsx", "components/workspace/generation-placeholder.tsx", "app/layout.tsx"] },
+  "review": { "verdict": "APPROVED", "iterations": 1 },
+  "deterministic_gate": { "detected_stack": "TypeScript/Next.js", "lint_passed": true },
+  "tests": { "test_files": ["components/shared/__tests__/toast-provider.test.tsx", "components/workspace/__tests__/generation-retry.test.tsx"], "tests_passed": 7 },
+  "validation": { "overall_status": "passed", "unit_passed": 7, "regression_passed": 209 },
+  "retries": 0,
+  "review_iterations": 1
+}

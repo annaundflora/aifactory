@@ -1,0 +1,9 @@
+{
+  "feature": "e2e-generate-persist",
+  "slice": "slice-19-snippet-crud",
+  "status": "completed",
+  "review": { "verdict": "APPROVED", "blocking": 0 },
+  "tests": { "ac_coverage": { "total": 12, "covered": 12 } },
+  "validation": { "overall_status": "passed" },
+  "retries": 0
+}

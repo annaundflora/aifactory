@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: aifactory-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aifactory}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aifactory_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-aifactory}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  postgres-data:
