@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
-import { Copy, Download, Loader2, X } from "lucide-react";
+import { Copy, Download, Loader2, Maximize2, Minimize2, X } from "lucide-react";
 import { toast } from "sonner";
 import { type Generation } from "@/lib/db/queries";
 import { getModelById } from "@/lib/models";
@@ -52,6 +52,7 @@ export function LightboxModal({
   onClose,
 }: LightboxModalProps) {
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const { setVariation } = useWorkspaceVariation();
 
   const handleVariation = useCallback(() => {
@@ -86,13 +87,17 @@ export function LightboxModal({
 
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        onClose();
+        if (isFullscreen) {
+          setIsFullscreen(false);
+        } else {
+          onClose();
+        }
       }
     }
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, isFullscreen, onClose]);
 
   // Lock body scroll when open
   useEffect(() => {
@@ -115,17 +120,43 @@ export function LightboxModal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
       data-testid="lightbox-overlay"
-      onClick={onClose}
+      onClick={isFullscreen ? undefined : onClose}
     >
       {/* Modal Content */}
       <div
-        className="relative flex max-h-[90vh] max-w-[90vw] flex-col gap-6 rounded-lg bg-background p-6 shadow-2xl md:flex-row"
+        className={
+          isFullscreen
+            ? "fixed inset-0 z-50 flex items-center justify-center bg-black"
+            : "relative flex max-h-[90vh] max-w-[90vw] flex-col gap-6 rounded-lg bg-background p-6 shadow-2xl md:flex-row"
+        }
         data-testid="lightbox-content"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Fullscreen Toggle Button */}
+        <button
+          className={
+            isFullscreen
+              ? "absolute right-12 top-3 z-10 rounded-full p-1 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+              : "absolute right-12 top-3 z-10 rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          }
+          onClick={() => setIsFullscreen((prev) => !prev)}
+          aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+          data-testid="fullscreen-toggle"
+        >
+          {isFullscreen ? (
+            <Minimize2 className="size-5" />
+          ) : (
+            <Maximize2 className="size-5" />
+          )}
+        </button>
+
         {/* Close Button */}
         <button
-          className="absolute right-3 top-3 z-10 rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className={
+            isFullscreen
+              ? "absolute right-3 top-3 z-10 rounded-full p-1 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+              : "absolute right-3 top-3 z-10 rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          }
           onClick={onClose}
           aria-label="Close"
           data-testid="lightbox-close"
@@ -134,14 +165,14 @@ export function LightboxModal({
         </button>
 
         {/* Large Image */}
-        <div className="flex flex-1 items-center justify-center overflow-hidden">
+        <div className={isFullscreen ? "flex w-full h-full items-center justify-center" : "flex flex-1 items-center justify-center overflow-hidden"}>
           {generation.imageUrl ? (
             <Image
               src={generation.imageUrl}
               alt={generation.prompt}
               width={generation.width ?? 512}
               height={generation.height ?? 512}
-              className="max-h-[70vh] w-auto rounded object-contain"
+              className={isFullscreen ? "w-full h-full object-contain" : "max-h-[70vh] w-auto rounded object-contain"}
               data-testid="lightbox-image"
               priority
             />
@@ -152,107 +183,109 @@ export function LightboxModal({
           )}
         </div>
 
-        {/* Detail Panel */}
-        <div
-          className="flex w-full flex-col gap-4 overflow-y-auto md:w-80"
-          data-testid="lightbox-details"
-        >
-          {/* Prompt */}
-          <div>
-            <h3 className="text-xs font-semibold uppercase text-muted-foreground">
-              Prompt
-            </h3>
-            <p className="mt-1 text-sm" data-testid="lightbox-prompt">
-              {generation.prompt}
-            </p>
-          </div>
-
-          {/* Negative Prompt (only if present) */}
-          {generation.negativePrompt != null && (
+        {/* Detail Panel — hidden in fullscreen */}
+        {!isFullscreen && (
+          <div
+            className="flex w-full flex-col gap-4 overflow-y-auto md:w-80"
+            data-testid="lightbox-details"
+          >
+            {/* Prompt */}
             <div>
               <h3 className="text-xs font-semibold uppercase text-muted-foreground">
-                Negative Prompt
+                Prompt
               </h3>
-              <p
-                className="mt-1 text-sm"
-                data-testid="lightbox-negative-prompt"
-              >
-                {generation.negativePrompt}
+              <p className="mt-1 text-sm" data-testid="lightbox-prompt">
+                {generation.prompt}
               </p>
             </div>
-          )}
 
-          {/* Model */}
-          <div>
-            <h3 className="text-xs font-semibold uppercase text-muted-foreground">
-              Model
-            </h3>
-            <p className="mt-1 text-sm" data-testid="lightbox-model">
-              {modelName}
-            </p>
-          </div>
+            {/* Negative Prompt (only if present) */}
+            {generation.negativePrompt != null && (
+              <div>
+                <h3 className="text-xs font-semibold uppercase text-muted-foreground">
+                  Negative Prompt
+                </h3>
+                <p
+                  className="mt-1 text-sm"
+                  data-testid="lightbox-negative-prompt"
+                >
+                  {generation.negativePrompt}
+                </p>
+              </div>
+            )}
 
-          {/* Parameters */}
-          {formattedParams && (
+            {/* Model */}
             <div>
               <h3 className="text-xs font-semibold uppercase text-muted-foreground">
-                Parameters
+                Model
               </h3>
-              <p className="mt-1 text-sm" data-testid="lightbox-params">
-                {formattedParams}
+              <p className="mt-1 text-sm" data-testid="lightbox-model">
+                {modelName}
               </p>
             </div>
-          )}
 
-          {/* Dimensions */}
-          {generation.width != null && generation.height != null && (
+            {/* Parameters */}
+            {formattedParams && (
+              <div>
+                <h3 className="text-xs font-semibold uppercase text-muted-foreground">
+                  Parameters
+                </h3>
+                <p className="mt-1 text-sm" data-testid="lightbox-params">
+                  {formattedParams}
+                </p>
+              </div>
+            )}
+
+            {/* Dimensions */}
+            {generation.width != null && generation.height != null && (
+              <div>
+                <h3 className="text-xs font-semibold uppercase text-muted-foreground">
+                  Dimensions
+                </h3>
+                <p className="mt-1 text-sm" data-testid="lightbox-dimensions">
+                  {generation.width} x {generation.height}
+                </p>
+              </div>
+            )}
+
+            {/* Created Date */}
             <div>
               <h3 className="text-xs font-semibold uppercase text-muted-foreground">
-                Dimensions
+                Created
               </h3>
-              <p className="mt-1 text-sm" data-testid="lightbox-dimensions">
-                {generation.width} x {generation.height}
+              <p className="mt-1 text-sm" data-testid="lightbox-created">
+                {formatDate(generation.createdAt)}
               </p>
             </div>
-          )}
 
-          {/* Created Date */}
-          <div>
-            <h3 className="text-xs font-semibold uppercase text-muted-foreground">
-              Created
-            </h3>
-            <p className="mt-1 text-sm" data-testid="lightbox-created">
-              {formatDate(generation.createdAt)}
-            </p>
+            {/* Actions */}
+            {generation.imageUrl && (
+              <div className="flex flex-col gap-2 pt-2">
+                <button
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
+                  onClick={handleVariation}
+                  data-testid="variation-btn"
+                >
+                  <Copy className="size-4" />
+                  Variation
+                </button>
+                <button
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+                  onClick={handleDownload}
+                  disabled={isDownloading}
+                  data-testid="download-btn"
+                >
+                  {isDownloading ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Download className="size-4" />
+                  )}
+                  Download PNG
+                </button>
+              </div>
+            )}
           </div>
-
-          {/* Actions */}
-          {generation.imageUrl && (
-            <div className="flex flex-col gap-2 pt-2">
-              <button
-                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
-                onClick={handleVariation}
-                data-testid="variation-btn"
-              >
-                <Copy className="size-4" />
-                Variation
-              </button>
-              <button
-                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-                onClick={handleDownload}
-                disabled={isDownloading}
-                data-testid="download-btn"
-              >
-                {isDownloading ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Download className="size-4" />
-                )}
-                Download PNG
-              </button>
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );
