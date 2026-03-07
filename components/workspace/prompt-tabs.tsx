@@ -2,6 +2,8 @@
 
 import type { ReactNode } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { HistoryList } from "@/components/workspace/history-list";
+import type { PromptHistoryEntry } from "@/lib/services/prompt-history-service";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -13,6 +15,12 @@ interface PromptTabsProps {
   activeTab: PromptTab;
   onTabChange: (tab: PromptTab) => void;
   children: ReactNode;
+  /** Called when a history entry is loaded; switches tab to "prompt" */
+  onLoadHistoryEntry?: (entry: PromptHistoryEntry) => void;
+  /** Current prompt field values for confirmation dialog logic */
+  promptMotiv?: string;
+  promptStyle?: string;
+  negativePrompt?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -23,6 +31,10 @@ export function PromptTabs({
   activeTab,
   onTabChange,
   children,
+  onLoadHistoryEntry,
+  promptMotiv = "",
+  promptStyle = "",
+  negativePrompt = "",
 }: PromptTabsProps) {
   return (
     <Tabs
@@ -59,9 +71,15 @@ export function PromptTabs({
       </TabsContent>
 
       <TabsContent value="history">
-        <p className="py-6 text-center text-sm text-muted-foreground">
-          Prompt history will appear here.
-        </p>
+        <HistoryList
+          onLoadEntry={(entry) => {
+            onLoadHistoryEntry?.(entry);
+            onTabChange("prompt");
+          }}
+          promptMotiv={promptMotiv}
+          promptStyle={promptStyle}
+          negativePrompt={negativePrompt}
+        />
       </TabsContent>
 
       <TabsContent value="favorites">

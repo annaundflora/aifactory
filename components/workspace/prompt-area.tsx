@@ -30,6 +30,7 @@ import {
 import { Loader2, Wand2, Sparkles } from "lucide-react";
 import { BuilderDrawer } from "@/components/prompt-builder/builder-drawer";
 import { LLMComparison } from "@/components/prompt-improve/llm-comparison";
+import { TemplateSelector } from "@/components/workspace/template-selector";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -224,7 +225,18 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
   return (
     <div className="space-y-4" data-testid="prompt-area">
-      <PromptTabs activeTab={activeTab} onTabChange={setActiveTab}>
+      <PromptTabs
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onLoadHistoryEntry={(entry) => {
+          setPromptMotiv(entry.promptMotiv);
+          setPromptStyle(entry.promptStyle ?? "");
+          setNegativePrompt(entry.negativePrompt ?? "");
+        }}
+        promptMotiv={promptMotiv}
+        promptStyle={promptStyle}
+        negativePrompt={negativePrompt}
+      >
         <div className="space-y-4 pt-2">
           {/* Model Dropdown */}
           <div className="space-y-2">
@@ -283,6 +295,19 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
                 Improve
               </Button>
             </div>
+            {/* Template Selector */}
+            <TemplateSelector
+              hasContent={
+                promptMotiv.trim().length > 0 ||
+                promptStyle.trim().length > 0 ||
+                negativePrompt.trim().length > 0
+              }
+              onApplyTemplate={(template) => {
+                setPromptMotiv(template.motiv);
+                setPromptStyle(template.style);
+                setNegativePrompt(template.negativePrompt);
+              }}
+            />
           </div>
 
           {/* Style / Modifier Textarea (optional) */}
