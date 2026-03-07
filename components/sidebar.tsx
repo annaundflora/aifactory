@@ -3,14 +3,13 @@
 import { useTransition } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import {
   Sidebar as ShadcnSidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
@@ -58,8 +57,8 @@ export function Sidebar({ projects }: SidebarProps) {
     <ShadcnSidebar collapsible="icon">
       {/* Header with collapse trigger */}
       <SidebarHeader>
-        <div className="flex items-center justify-between px-1">
-          <SidebarTrigger className="-ml-1" />
+        <div className="flex items-center justify-between px-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+          <SidebarTrigger className="-ml-1 group-data-[collapsible=icon]:ml-0" />
         </div>
       </SidebarHeader>
 
@@ -67,33 +66,12 @@ export function Sidebar({ projects }: SidebarProps) {
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Projects</SidebarGroupLabel>
-          {/* Visible in expanded mode: positioned action button */}
-          <SidebarGroupAction
-            onClick={handleNewProject}
-            disabled={isPending}
-            title="New Project"
-            data-testid="sidebar-new-project"
-          >
-            <Plus className="size-4" />
-            <span className="sr-only">New Project</span>
-          </SidebarGroupAction>
           <SidebarGroupContent>
-            {/* Fallback for icon mode: "+" as a menu button, hidden in expanded mode */}
-            <SidebarMenu className="hidden group-data-[collapsible=icon]:flex">
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  onClick={handleNewProject}
-                  disabled={isPending}
-                  tooltip="New Project"
-                >
-                  <Plus className="size-4" />
-                  <span className="sr-only">New Project</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
             <ProjectList
               projects={projects}
               activeProjectId={activeProjectId}
+              onNewProject={handleNewProject}
+              isCreating={isPending}
             />
           </SidebarGroupContent>
         </SidebarGroup>

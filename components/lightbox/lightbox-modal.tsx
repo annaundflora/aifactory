@@ -2,12 +2,14 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
-import { Copy, Download, Loader2, Maximize2, Minimize2, X } from "lucide-react";
+import { Copy, Download, Loader2, Maximize2, Minimize2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { type Generation } from "@/lib/db/queries";
 import { getModelById } from "@/lib/models";
 import { downloadImage, generateDownloadFilename } from "@/lib/utils";
 import { useWorkspaceVariation } from "@/lib/workspace-state";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { deleteGeneration } from "@/app/actions/generations";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -17,6 +19,7 @@ export interface LightboxModalProps {
   generation: Generation;
   isOpen: boolean;
   onClose: () => void;
+  onDeleted?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -50,9 +53,12 @@ export function LightboxModal({
   generation,
   isOpen,
   onClose,
+  onDeleted,
 }: LightboxModalProps) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { setVariation } = useWorkspaceVariation();
 
   const handleVariation = useCallback(() => {
@@ -80,6 +86,26 @@ export function LightboxModal({
       setIsDownloading(false);
     }
   }, [generation.imageUrl, generation.prompt, generation.createdAt, isDownloading]);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (isDeleting) return;
+    setIsDeleting(true);
+    try {
+      const result = await deleteGeneration({ id: generation.id });
+      if (result.success) {
+        setShowDeleteConfirm(false);
+        onDeleted?.();
+      } else {
+        toast.error("Löschen fehlgeschlagen");
+        setShowDeleteConfirm(false);
+      }
+    } catch {
+      toast.error("Löschen fehlgeschlagen");
+      setShowDeleteConfirm(false);
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [generation.id, isDeleting, onDeleted]);
 
   // Escape key handler
   useEffect(() => {
@@ -282,11 +308,30 @@ export function LightboxModal({
                   )}
                   Download PNG
                 </button>
+                <button
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  data-testid="lightbox-delete-btn"
+                >
+                  <Trash2 className="size-4" />
+                  Delete
+                </button>
               </div>
             )}
           </div>
         )}
       </div>
+
+      {/* Delete Confirm Dialog */}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Delete Generation"
+        description="Are you sure you want to delete this generation? This action cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

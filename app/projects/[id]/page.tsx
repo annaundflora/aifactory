@@ -32,7 +32,7 @@ export default async function WorkspacePage({ params }: WorkspacePageProps) {
   const projects = Array.isArray(projectsResult) ? projectsResult : [];
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={false}>
       <WorkspaceStateProvider>
         {/* Sidebar */}
         <Sidebar projects={projects} />
@@ -40,8 +40,8 @@ export default async function WorkspacePage({ params }: WorkspacePageProps) {
         {/* Main content: SidebarInset handles dynamic width adjustment */}
         <SidebarInset>
           <header className="flex h-14 items-center border-b px-4 gap-2">
-            {/* SidebarTrigger: hamburger on mobile, collapse toggle on desktop */}
-            <SidebarTrigger className="shrink-0" />
+            {/* SidebarTrigger: only visible on mobile as hamburger */}
+            <SidebarTrigger className="shrink-0 md:hidden" />
             <h1 className="text-xl font-bold truncate">{project.name}</h1>
           </header>
 

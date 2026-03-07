@@ -170,12 +170,12 @@ export function WorkspaceContent({
             generation={currentGeneration}
             isOpen={lightboxOpen}
             onClose={handleLightboxClose}
+            onDeleted={handleLightboxDelete}
           />
           <LightboxNavigation
             generations={completedGenerations}
             currentIndex={lightboxIndex}
             onNavigate={handleLightboxNavigate}
-            onDelete={handleLightboxDelete}
           />
         </div>
       )}

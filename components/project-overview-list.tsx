@@ -11,6 +11,7 @@ import {
   createProject,
   renameProject,
   deleteProject,
+  generateThumbnail,
 } from "@/app/actions/projects";
 
 interface Project {
@@ -18,6 +19,8 @@ interface Project {
   name: string;
   createdAt: Date;
   updatedAt: Date;
+  thumbnailUrl?: string | null;
+  thumbnailStatus?: string;
 }
 
 interface ProjectOverviewListProps {
@@ -85,6 +88,15 @@ export function ProjectOverviewList({ projects }: ProjectOverviewListProps) {
     }
   };
 
+  const handleRefreshThumbnail = async (id: string) => {
+    const result = await generateThumbnail({ projectId: id });
+    if ("error" in result) {
+      toast.error(result.error);
+    } else {
+      router.refresh();
+    }
+  };
+
   // Empty state
   if (projects.length === 0 && !isCreating) {
     return (
@@ -145,6 +157,7 @@ export function ProjectOverviewList({ projects }: ProjectOverviewListProps) {
             generationCount={0}
             onRename={handleRename}
             onDelete={handleDelete}
+            onRefreshThumbnail={handleRefreshThumbnail}
           />
         ))}
       </div>

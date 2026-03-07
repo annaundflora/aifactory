@@ -98,7 +98,7 @@ export function CategoryTabs({
   return (
     <Tabs value={activeTab} onValueChange={onTabChange}>
       {/* Two-row tab layout: 3 tabs per row */}
-      <TabsList className="grid grid-cols-3 h-auto gap-1 p-1" data-testid="category-tabs-list">
+      <TabsList className="grid grid-cols-3 !h-auto gap-1 p-1" data-testid="category-tabs-list">
         {BUILDER_CATEGORIES.map((cat) => (
           <TabsTrigger
             key={cat.id}
