@@ -125,6 +125,35 @@ export async function deleteGeneration(id: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Thumbnail Queries (Slice 16)
+// ---------------------------------------------------------------------------
+
+/**
+ * Updates a project's thumbnail URL and status.
+ * Returns the updated Project record.
+ * Throws if the project is not found.
+ */
+export async function updateProjectThumbnail(input: {
+  projectId: string;
+  thumbnailUrl: string | null;
+  thumbnailStatus: string;
+}): Promise<Project> {
+  const [project] = await db
+    .update(projects)
+    .set({
+      thumbnailUrl: input.thumbnailUrl,
+      thumbnailStatus: input.thumbnailStatus,
+      updatedAt: new Date(),
+    })
+    .where(eq(projects.id, input.projectId))
+    .returning();
+  if (!project) {
+    throw new Error(`Project not found: ${input.projectId}`);
+  }
+  return project;
+}
+
+// ---------------------------------------------------------------------------
 // Prompt History Queries (Slice 11)
 // ---------------------------------------------------------------------------
 

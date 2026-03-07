@@ -9,6 +9,9 @@ import {
   deleteProject as deleteProjectQuery,
   type Project,
 } from "@/lib/db/queries";
+import {
+  refreshForProject,
+} from "@/lib/services/thumbnail-service";
 
 // ---------------------------------------------------------------------------
 // Validation
@@ -103,4 +106,53 @@ export async function deleteProject(input: {
     console.error("deleteProject DB error:", err);
     return { error: "Datenbankfehler" };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Thumbnail Actions (Slice 16)
+// ---------------------------------------------------------------------------
+
+/**
+ * Trigger thumbnail generation/refresh for a project (fire-and-forget).
+ * Validates projectId, starts refreshForProject without awaiting, revalidates
+ * the root path, and returns the current project record.
+ *
+ * AC-9: happy path
+ * AC-10: returns { error } for invalid/empty projectId
+ */
+export async function generateThumbnail(input: {
+  projectId: string;
+}): Promise<Project | { error: string }> {
+  const projectId = input.projectId?.trim();
+
+  // AC-10: Validate projectId — must be a non-empty UUID
+  if (!projectId) {
+    return { error: "projectId darf nicht leer sein" };
+  }
+  const UUID_REGEX =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_REGEX.test(projectId)) {
+    return { error: "projectId ist keine gueltige UUID" };
+  }
+
+  let project: Project;
+  try {
+    project = await getProjectQuery(projectId);
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("not found")) {
+      return { error: "Projekt nicht gefunden" };
+    }
+    console.error("generateThumbnail getProject error:", err);
+    return { error: "Datenbankfehler" };
+  }
+
+  // AC-9: Fire-and-forget — do NOT await refreshForProject
+  refreshForProject(projectId).catch((err) => {
+    console.error(`generateThumbnail refreshForProject(${projectId}) error:`, err);
+  });
+
+  // AC-9: Revalidate root path so updated thumbnail_status is reflected
+  revalidatePath("/");
+
+  return project;
 }
