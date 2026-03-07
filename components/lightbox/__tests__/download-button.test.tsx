@@ -35,6 +35,8 @@ vi.mock("lucide-react", () => ({
   Copy: (props: Record<string, unknown>) => (
     <svg data-testid="copy-icon" {...props} />
   ),
+  Maximize2: () => null,
+  Minimize2: () => null,
 }));
 
 // Mock lib/models
