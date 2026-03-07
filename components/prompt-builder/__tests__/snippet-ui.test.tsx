@@ -4,7 +4,7 @@ import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 
-import { BuilderDrawer, STYLE_OPTIONS, COLOR_OPTIONS } from "@/components/prompt-builder/builder-drawer";
+import { BuilderDrawer } from "@/components/prompt-builder/builder-drawer";
 import { CategoryTabs } from "@/components/prompt-builder/category-tabs";
 import { SnippetForm } from "@/components/prompt-builder/snippet-form";
 import type { Snippet } from "@/lib/services/snippet-service";
@@ -98,10 +98,8 @@ function renderCategoryTabs(
   const props: React.ComponentProps<typeof CategoryTabs> = {
     activeTab: "snippets",
     onTabChange: vi.fn(),
-    styleOptions: [...STYLE_OPTIONS],
-    colorOptions: [...COLOR_OPTIONS],
-    selectedOptions: new Set<string>(),
-    onToggleOption: vi.fn(),
+    selectedFragments: new Set<string>(),
+    onToggleFragment: vi.fn(),
     selectedSnippets: new Set<string>(),
     onToggleSnippet: vi.fn(),
     ...overrides,
