@@ -34,7 +34,7 @@ describe("WorkspaceState", () => {
     const { result } = renderHook(() => useWorkspaceVariation(), { wrapper });
 
     const variationData: WorkspaceVariationState = {
-      prompt: "A fox in oil painting style",
+      promptMotiv: "A fox in oil painting style",
       modelId: "black-forest-labs/flux-2-pro",
       modelParams: { aspect_ratio: "1:1", num_inference_steps: 28 },
     };
@@ -44,7 +44,7 @@ describe("WorkspaceState", () => {
     });
 
     expect(result.current.variationData).not.toBeNull();
-    expect(result.current.variationData!.prompt).toBe(
+    expect(result.current.variationData!.promptMotiv).toBe(
       "A fox in oil painting style"
     );
     expect(result.current.variationData!.modelId).toBe(
@@ -68,7 +68,7 @@ describe("WorkspaceState", () => {
     const { result } = renderHook(() => useWorkspaceVariation(), { wrapper });
 
     const variationData: WorkspaceVariationState = {
-      prompt: "A landscape",
+      promptMotiv: "A landscape",
       negativePrompt: "blurry, low quality",
       modelId: "black-forest-labs/flux-2-pro",
       modelParams: {},
@@ -97,7 +97,7 @@ describe("WorkspaceState", () => {
 
     // Simulate what the LightboxModal does: generation.negativePrompt ?? undefined
     const variationData: WorkspaceVariationState = {
-      prompt: "A landscape",
+      promptMotiv: "A landscape",
       negativePrompt: undefined,
       modelId: "black-forest-labs/flux-2-pro",
       modelParams: {},
@@ -128,7 +128,7 @@ describe("WorkspaceState", () => {
     // First set some variation data
     act(() => {
       result.current.setVariation({
-        prompt: "Test prompt",
+        promptMotiv: "Test prompt",
         modelId: "black-forest-labs/flux-2-pro",
         modelParams: { aspect_ratio: "1:1" },
       });
