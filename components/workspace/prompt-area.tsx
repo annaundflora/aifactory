@@ -9,7 +9,7 @@ import {
   type KeyboardEvent,
   type ChangeEvent,
 } from "react";
-import { MODELS } from "@/lib/models";
+import { MODELS, getModelById } from "@/lib/models";
 import { getModelSchema } from "@/app/actions/models";
 import { generateImages } from "@/app/actions/generations";
 import { useWorkspaceVariation } from "@/lib/workspace-state";
@@ -253,6 +253,8 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
       {showImprove && (
         <LLMComparison
           prompt={prompt}
+          modelId={selectedModelId}
+          modelDisplayName={getModelById(selectedModelId)?.displayName ?? selectedModelId}
           onAdopt={(improved) => {
             setPrompt(improved);
             setShowImprove(false);
