@@ -149,17 +149,20 @@ export async function getPromptHistoryQuery(
 ): Promise<PromptHistoryRow[]> {
   const rows = await db.execute(
     sql`
-      SELECT DISTINCT ON (prompt_motiv, prompt_style, negative_prompt, model_id)
-        id,
-        prompt_motiv AS "promptMotiv",
-        prompt_style AS "promptStyle",
-        negative_prompt AS "negativePrompt",
-        model_id AS "modelId",
-        model_params AS "modelParams",
-        is_favorite AS "isFavorite",
-        created_at AS "createdAt"
-      FROM generations
-      ORDER BY prompt_motiv, prompt_style, negative_prompt, model_id, created_at DESC
+      SELECT * FROM (
+        SELECT DISTINCT ON (prompt_motiv, prompt_style, negative_prompt, model_id)
+          id,
+          prompt_motiv AS "promptMotiv",
+          prompt_style AS "promptStyle",
+          negative_prompt AS "negativePrompt",
+          model_id AS "modelId",
+          model_params AS "modelParams",
+          is_favorite AS "isFavorite",
+          created_at AS "createdAt"
+        FROM generations
+        ORDER BY prompt_motiv, prompt_style, negative_prompt, model_id, created_at DESC
+      ) sub
+      ORDER BY sub."createdAt" DESC
       LIMIT ${limit}
       OFFSET ${offset}
     `
