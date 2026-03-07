@@ -15,18 +15,26 @@ import { sql } from "drizzle-orm";
 // -----------------------------------------------
 // projects
 // -----------------------------------------------
-export const projects = pgTable("projects", {
-  id: uuid("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  name: varchar("name", { length: 255 }).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const projects = pgTable(
+  "projects",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    name: varchar("name", { length: 255 }).notNull(),
+    thumbnailUrl: text("thumbnail_url"),
+    thumbnailStatus: varchar("thumbnail_status", { length: 20 })
+      .notNull()
+      .default("none"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("projects_thumbnail_status_idx").on(table.thumbnailStatus)]
+);
 
 // -----------------------------------------------
 // generations
