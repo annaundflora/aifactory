@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -127,7 +127,7 @@ export function ParameterPanel({
           );
         }
 
-        // Integer / number property -> Slider
+        // Integer / number property -> Input
         if (prop.type === "integer" || prop.type === "number") {
           const min = prop.minimum ?? 0;
           const max = prop.maximum ?? 100;
@@ -141,19 +141,22 @@ export function ParameterPanel({
 
           return (
             <div key={key} className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor={`param-${key}`}>{label}</Label>
-                <span className="text-sm text-muted-foreground tabular-nums">
-                  {currentValue}
-                </span>
-              </div>
-              <Slider
+              <Label htmlFor={`param-${key}`}>{label}</Label>
+              <Input
                 id={`param-${key}`}
+                type="number"
                 min={min}
                 max={max}
                 step={step}
-                value={[currentValue]}
-                onValueChange={([v]) => handleChange(key, v)}
+                value={currentValue}
+                onChange={(e) => {
+                  const val =
+                    prop.type === "integer"
+                      ? parseInt(e.target.value, 10)
+                      : parseFloat(e.target.value);
+                  if (!isNaN(val)) handleChange(key, val);
+                }}
+                className="w-full"
               />
             </div>
           );

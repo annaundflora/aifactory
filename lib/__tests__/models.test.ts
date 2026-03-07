@@ -5,16 +5,19 @@ describe('Model Registry', () => {
   // AC-1: GIVEN lib/models.ts existiert
   //       WHEN die Model-Registry importiert wird
   //       THEN enthaelt sie exakt 6 Modelle mit den IDs aus architecture.md
-  it('AC-1: should contain exactly 6 models with IDs matching architecture spec', () => {
-    expect(MODELS).toHaveLength(6)
+  it('AC-1: should contain exactly 9 models with IDs matching architecture spec', () => {
+    expect(MODELS).toHaveLength(9)
 
     const expectedIds = [
       'black-forest-labs/flux-2-pro',
-      'google/nano-banana-2',
+      'openai/gpt-image-1.5',
+      'google/nano-banana-pro',
       'recraft-ai/recraft-v4',
       'bytedance/seedream-5-lite',
       'bytedance/seedream-4.5',
+      'google/imagen-4-fast',
       'google/gemini-2.5-flash-image',
+      'ideogram-ai/ideogram-v3-turbo',
     ]
 
     const actualIds = MODELS.map((m) => m.id)

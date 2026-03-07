@@ -9,7 +9,7 @@ Rules:
 - Keep the improved prompt concise but effective (not overly long)
 - Output ONLY the improved prompt text, nothing else — no explanations, no preamble`;
 
-const MODEL = "openai/gpt-oss-120b:exacto";
+const MODEL = "google/gemini-3.1-pro-preview";
 
 export interface ImproveResult {
   original: string;

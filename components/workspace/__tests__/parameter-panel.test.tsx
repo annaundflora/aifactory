@@ -147,7 +147,7 @@ describe("ParameterPanel", () => {
    * WHEN das Parameter-Panel gerendert wird
    * THEN wird fuer enum-Properties ein Dropdown/Select, fuer integer/number-Properties ein Slider mit Min/Max/Default gerendert
    */
-  it("AC-4: should render select for enum properties and slider for integer/number properties with min/max/default", () => {
+  it("AC-4: should render select for enum properties and input for integer/number properties with min/max/default", () => {
     render(
       <ParameterPanel
         schema={schemaWithMixedProperties}
@@ -166,21 +166,19 @@ describe("ParameterPanel", () => {
     const aspectSelect = document.getElementById("param-aspect_ratio");
     expect(aspectSelect).toBeInTheDocument();
 
-    // Integer property: num_inference_steps should have a Slider
+    // Integer property: num_inference_steps should have an Input
     expect(screen.getByText("Num Inference Steps")).toBeInTheDocument();
-    const stepsSlider = document.getElementById("param-num_inference_steps");
-    expect(stepsSlider).toBeInTheDocument();
+    const stepsInput = document.getElementById("param-num_inference_steps") as HTMLInputElement;
+    expect(stepsInput).toBeInTheDocument();
+    expect(stepsInput.type).toBe("number");
+    expect(stepsInput.value).toBe("28");
 
-    // The default value should be displayed (28 for num_inference_steps)
-    expect(screen.getByText("28")).toBeInTheDocument();
-
-    // Number property: guidance_scale should have a Slider
+    // Number property: guidance_scale should have an Input
     expect(screen.getByText("Guidance Scale")).toBeInTheDocument();
-    const guidanceSlider = document.getElementById("param-guidance_scale");
-    expect(guidanceSlider).toBeInTheDocument();
-
-    // The default value should be displayed (3.5 for guidance_scale)
-    expect(screen.getByText("3.5")).toBeInTheDocument();
+    const guidanceInput = document.getElementById("param-guidance_scale") as HTMLInputElement;
+    expect(guidanceInput).toBeInTheDocument();
+    expect(guidanceInput.type).toBe("number");
+    expect(guidanceInput.value).toBe("3.5");
   });
 
   /**

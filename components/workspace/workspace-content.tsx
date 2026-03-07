@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { type Generation } from "@/lib/db/queries";
 import { fetchGenerations } from "@/app/actions/generations";
 import { PromptArea } from "@/components/workspace/prompt-area";
@@ -65,6 +66,25 @@ export function WorkspaceContent({
     };
   }, [hasPending, projectId]);
 
+  // ----- Toast for newly failed generations -----
+  const prevGenerationsRef = useRef<Generation[]>(initialGenerations);
+  useEffect(() => {
+    const prevMap = new Map(prevGenerationsRef.current.map((g) => [g.id, g.status]));
+    for (const gen of generations) {
+      if (gen.status === "failed" && prevMap.get(gen.id) !== "failed") {
+        const msg = gen.errorMessage?.toLowerCase() ?? "";
+        if (msg.includes("429") || msg.includes("rate limit") || msg.includes("zu viele")) {
+          toast.error("Zu viele Anfragen. Bitte kurz warten.");
+        } else if (msg.includes("r2") || msg.includes("upload")) {
+          toast.error("Bild konnte nicht gespeichert werden.");
+        } else {
+          toast.error(gen.errorMessage || "Generation fehlgeschlagen.");
+        }
+      }
+    }
+    prevGenerationsRef.current = generations;
+  }, [generations]);
+
   // ----- Handle new generations from PromptArea -----
   const handleGenerationsCreated = useCallback((newGens: Generation[]) => {
     setGenerations((prev) => [...newGens, ...prev]);
@@ -83,7 +103,7 @@ export function WorkspaceContent({
   );
 
   const pendingGenerations = useMemo(
-    () => generations.filter((g) => g.status === "pending" || g.status === "failed"),
+    () => generations.filter((g) => g.status === "pending"),
     [generations]
   );
 
@@ -127,7 +147,7 @@ export function WorkspaceContent({
 
       {/* Right: Gallery */}
       <div className="flex-1 overflow-y-auto p-6">
-        {/* Pending/Failed Placeholders */}
+        {/* Pending Placeholders (failed → only toast, no card) */}
         {pendingGenerations.length > 0 && (
           <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {pendingGenerations.map((gen) => (

@@ -131,8 +131,8 @@ function buildReplicateInput(
 // ---------------------------------------------------------------------------
 
 /**
- * Generate N images: create pending DB records, then process them in parallel.
- * Returns the initial pending generations immediately-ish.
+ * Generate N images: create pending DB records, then process them sequentially.
+ * Returns the initial pending generations immediately for optimistic UI.
  * Each generation is processed independently (AC-5).
  */
 async function generate(
@@ -167,11 +167,17 @@ async function generate(
     pendingGenerations.push(gen);
   }
 
-  // AC-5: Process all in parallel (fire-and-forget from caller perspective,
-  // but we use allSettled so failures don't abort others)
-  Promise.allSettled(
-    pendingGenerations.map((gen) => processGeneration(gen))
-  ).catch((err) => {
+  // AC-5: Process sequentially to respect Replicate rate limits.
+  // Each generation is independent — failures don't abort the queue.
+  (async () => {
+    for (const gen of pendingGenerations) {
+      try {
+        await processGeneration(gen);
+      } catch (err) {
+        console.error(`Generation ${gen.id} unexpected error:`, err);
+      }
+    }
+  })().catch((err) => {
     console.error("Unexpected error in generation batch:", err);
   });
 

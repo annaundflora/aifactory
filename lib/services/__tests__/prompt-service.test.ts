@@ -18,11 +18,11 @@ describe('PromptService', () => {
   /**
    * AC-2: GIVEN ein gueltiger Prompt-String
    *       WHEN PromptService.improve(prompt) aufgerufen wird
-   *       THEN ruft der Service den OpenRouter-Client mit Model openai/gpt-oss-120b:exacto,
+   *       THEN ruft der Service den OpenRouter-Client mit Model google/gemini-3.1-pro-preview,
    *            einem System-Prompt (Anweisung zur Prompt-Verbesserung) und dem User-Prompt auf
    *            und gibt { original: string, improved: string } zurueck
    */
-  it('AC-2: should call openRouterClient with model openai/gpt-oss-120b:exacto and return original plus improved', async () => {
+  it('AC-2: should call openRouterClient with model google/gemini-3.1-pro-preview and return original plus improved', async () => {
     mockChat.mockResolvedValueOnce('A beautifully detailed cat sitting on a sunlit roof')
 
     const result = await PromptService.improve('A cat on a roof')
@@ -35,7 +35,7 @@ describe('PromptService', () => {
     expect(mockChat).toHaveBeenCalledOnce()
     expect(mockChat).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: 'openai/gpt-oss-120b:exacto',
+        model: 'google/gemini-3.1-pro-preview',
         messages: expect.arrayContaining([
           expect.objectContaining({ role: 'system', content: expect.any(String) }),
           expect.objectContaining({ role: 'user', content: 'A cat on a roof' }),

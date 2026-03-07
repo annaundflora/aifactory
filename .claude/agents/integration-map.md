@@ -97,12 +97,25 @@ Für jeden Output:
 Für JEDE Connection im Dependency Graph prüfen, ob BEIDE Seiten als Deliverables existieren:
 
 ```
-FOR each connection (Slice-A provides Resource → Slice-B consumes):
-  1. Prüfe: Ist die Output-Datei in Slice-A Deliverables?
-  2. Prüfe: Ist die Consumer-Datei (Page/Component die das Resource mountet) in Slice-B Deliverables?
-  3. WENN Consumer eine BESTEHENDE Page ist (z.B. app/jobs/[id]/page.tsx):
-     - MUSS als "EXISTING file - Modify" in irgendeinem Slice Deliverables stehen
-     - IF not found → ❌ GAP: "Component {name} from Slice-A has no mount point - {consumer-file} not in any slice deliverables"
+# Schritt 1: Alle bekannten Dateien sammeln (Codebase + Slice-Deliverables)
+known_files = SET(alle Dateien im Codebase via Glob)
+FOR each slice IN slices:
+  FOR each deliverable IN slice.deliverables:
+    known_files.ADD(deliverable.path)
+
+# Schritt 2: Mount-Point-Pruefung fuer JEDE "Provides To" Verbindung
+FOR each connection (Slice-A provides Component/Function X → Consumer-Datei Y):
+  1. Prüfe: Ist X in Slice-A Deliverables?
+  2. Finde Consumer-Datei Y (die Page/Component die X mounten/importieren muss)
+  3. WENN Y in known_files (existiert im Codebase ODER wird von einem frueheren Slice erstellt):
+     - Y MUSS als Deliverable in irgendeinem Slice stehen
+     - WENN Y bereits von einem frueheren Slice ERSTELLT wird (neue Datei):
+       → Ein spaeterer Slice MUSS Y als "EXISTING file - Modify" in seinen Deliverables haben
+       → ODER der erstellende Slice selbst muss X bereits importieren (pruefe dessen ACs)
+     - IF kein Slice Y modifiziert um X einzubinden:
+       → ❌ GAP: "Component {X} from {Slice-A} has no mount point — {Y} is never modified to import it"
+  4. WENN Y NICHT in known_files:
+     → ❌ GAP: "Component {X} from {Slice-A} references unknown consumer file {Y}"
 ```
 
 #### E) Discovery Traceability
