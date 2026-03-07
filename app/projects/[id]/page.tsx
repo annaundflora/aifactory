@@ -4,6 +4,11 @@ import { fetchGenerations } from "@/app/actions/generations";
 import { Sidebar } from "@/components/sidebar";
 import { WorkspaceStateProvider } from "@/lib/workspace-state";
 import { WorkspaceContent } from "@/components/workspace/workspace-content";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 
 interface WorkspacePageProps {
   params: Promise<{ id: string }>;
@@ -27,23 +32,25 @@ export default async function WorkspacePage({ params }: WorkspacePageProps) {
   const projects = Array.isArray(projectsResult) ? projectsResult : [];
 
   return (
-    <WorkspaceStateProvider>
-      <div className="flex h-screen">
+    <SidebarProvider>
+      <WorkspaceStateProvider>
         {/* Sidebar */}
         <Sidebar projects={projects} />
 
-        {/* Main content */}
-        <main className="flex flex-1 flex-col overflow-hidden">
-          <header className="border-b px-6 py-4">
-            <h1 className="text-2xl font-bold">{project.name}</h1>
+        {/* Main content: SidebarInset handles dynamic width adjustment */}
+        <SidebarInset>
+          <header className="flex h-14 items-center border-b px-4 gap-2">
+            {/* SidebarTrigger: hamburger on mobile, collapse toggle on desktop */}
+            <SidebarTrigger className="shrink-0" />
+            <h1 className="text-xl font-bold truncate">{project.name}</h1>
           </header>
 
           <WorkspaceContent
             projectId={id}
             initialGenerations={generations}
           />
-        </main>
-      </div>
-    </WorkspaceStateProvider>
+        </SidebarInset>
+      </WorkspaceStateProvider>
+    </SidebarProvider>
   );
 }
