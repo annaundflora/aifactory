@@ -9,6 +9,7 @@ import {
   type KeyboardEvent,
   type ChangeEvent,
 } from "react";
+import { PromptTabs, type PromptTab } from "@/components/workspace/prompt-tabs";
 import { MODELS, getModelById } from "@/lib/models";
 import { getModelSchema } from "@/app/actions/models";
 import { generateImages } from "@/app/actions/generations";
@@ -85,6 +86,9 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
   // ----- Generation state -----
   const [isGenerating, startGeneration] = useTransition();
+
+  // ----- Tab state -----
+  const [activeTab, setActiveTab] = useState<PromptTab>("prompt");
 
   // ----- Builder drawer + LLM comparison -----
   const [builderOpen, setBuilderOpen] = useState(false);
@@ -220,170 +224,174 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
   return (
     <div className="space-y-4" data-testid="prompt-area">
-      {/* Model Dropdown */}
-      <div className="space-y-2">
-        <Label htmlFor="model-select">Model</Label>
-        <Select value={selectedModelId} onValueChange={handleModelChange}>
-          <SelectTrigger id="model-select" data-testid="model-select">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {MODELS.map((model) => (
-              <SelectItem key={model.id} value={model.id}>
-                {model.displayName} -- {formatPrice(model.pricePerImage)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <PromptTabs activeTab={activeTab} onTabChange={setActiveTab}>
+        <div className="space-y-4 pt-2">
+          {/* Model Dropdown */}
+          <div className="space-y-2">
+            <Label htmlFor="model-select">Model</Label>
+            <Select value={selectedModelId} onValueChange={handleModelChange}>
+              <SelectTrigger id="model-select" data-testid="model-select">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MODELS.map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    {model.displayName} -- {formatPrice(model.pricePerImage)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-      {/* Motiv Textarea (required) */}
-      <div className="space-y-2">
-        <Label htmlFor="prompt-motiv-textarea">
-          Motiv <span aria-hidden="true" className="text-destructive">*</span>
-        </Label>
-        <textarea
-          id="prompt-motiv-textarea"
-          data-testid="prompt-motiv-textarea"
-          ref={motivRef}
-          value={promptMotiv}
-          onChange={handleMotivChange}
-          onKeyDown={handleMotivKeyDown}
-          placeholder="Describe the main subject of your image..."
-          rows={3}
-          className={textareaClass}
-        />
-        {/* Prompt Helper Buttons */}
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setBuilderOpen(true)}
-            data-testid="builder-btn"
-          >
-            <Wand2 className="mr-1 size-3" />
-            Builder
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setShowImprove(true)}
-            disabled={!promptMotiv.trim() || showImprove}
-            data-testid="improve-btn"
-          >
-            <Sparkles className="mr-1 size-3" />
-            Improve
-          </Button>
-        </div>
-      </div>
-
-      {/* Style / Modifier Textarea (optional) */}
-      <div className="space-y-2">
-        <Label htmlFor="prompt-style-textarea">Style / Modifier</Label>
-        <textarea
-          id="prompt-style-textarea"
-          data-testid="prompt-style-textarea"
-          value={promptStyle}
-          onChange={handleStyleChange}
-          placeholder="Add style, mood, or modifier keywords..."
-          rows={2}
-          className={textareaClass}
-        />
-      </div>
-
-      {/* LLM Prompt Improvement */}
-      {showImprove && (
-        <LLMComparison
-          prompt={promptMotiv}
-          modelId={selectedModelId}
-          modelDisplayName={getModelById(selectedModelId)?.displayName ?? selectedModelId}
-          onAdopt={(improved) => {
-            setPromptMotiv(improved);
-            setShowImprove(false);
-          }}
-          onDiscard={() => setShowImprove(false)}
-        />
-      )}
-
-      {/* Prompt Builder Drawer — output goes to Style/Modifier field */}
-      <BuilderDrawer
-        open={builderOpen}
-        onClose={(composedPrompt) => {
-          setBuilderOpen(false);
-          if (composedPrompt) {
-            setPromptStyle(composedPrompt);
-          }
-        }}
-        basePrompt={promptStyle}
-      />
-
-      {/* Negative Prompt (conditionally visible based on model schema) */}
-      {hasNegativePrompt && (
-        <div className="space-y-2">
-          <Label htmlFor="negative-prompt-textarea">Negative Prompt</Label>
-          <textarea
-            id="negative-prompt-textarea"
-            data-testid="negative-prompt-textarea"
-            value={negativePrompt}
-            onChange={handleNegativePromptChange}
-            placeholder="What to avoid in the image..."
-            rows={2}
-            className={textareaClass}
-          />
-        </div>
-      )}
-
-      {/* Parameter Panel */}
-      <ParameterPanel
-        schema={schema}
-        isLoading={schemaLoading}
-        values={paramValues}
-        onChange={setParamValues}
-      />
-
-      {/* Bottom row: Variant Count + Generate Button */}
-      <div className="flex items-center gap-3">
-        {/* Variant Count Selector */}
-        <div className="flex items-center gap-2">
-          <Label htmlFor="variant-count" className="text-sm whitespace-nowrap">
-            Variants
-          </Label>
-          <div className="flex gap-1" data-testid="variant-count-selector">
-            {VARIANT_OPTIONS.map((count) => (
+          {/* Motiv Textarea (required) */}
+          <div className="space-y-2">
+            <Label htmlFor="prompt-motiv-textarea">
+              Motiv <span aria-hidden="true" className="text-destructive">*</span>
+            </Label>
+            <textarea
+              id="prompt-motiv-textarea"
+              data-testid="prompt-motiv-textarea"
+              ref={motivRef}
+              value={promptMotiv}
+              onChange={handleMotivChange}
+              onKeyDown={handleMotivKeyDown}
+              placeholder="Describe the main subject of your image..."
+              rows={3}
+              className={textareaClass}
+            />
+            {/* Prompt Helper Buttons */}
+            <div className="flex gap-2">
               <Button
-                key={count}
                 type="button"
+                variant="outline"
                 size="sm"
-                variant={variantCount === count ? "default" : "outline"}
-                onClick={() => setVariantCount(count)}
-                data-testid={`variant-count-${count}`}
+                onClick={() => setBuilderOpen(true)}
+                data-testid="builder-btn"
               >
-                {count}
+                <Wand2 className="mr-1 size-3" />
+                Builder
               </Button>
-            ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowImprove(true)}
+                disabled={!promptMotiv.trim() || showImprove}
+                data-testid="improve-btn"
+              >
+                <Sparkles className="mr-1 size-3" />
+                Improve
+              </Button>
+            </div>
+          </div>
+
+          {/* Style / Modifier Textarea (optional) */}
+          <div className="space-y-2">
+            <Label htmlFor="prompt-style-textarea">Style / Modifier</Label>
+            <textarea
+              id="prompt-style-textarea"
+              data-testid="prompt-style-textarea"
+              value={promptStyle}
+              onChange={handleStyleChange}
+              placeholder="Add style, mood, or modifier keywords..."
+              rows={2}
+              className={textareaClass}
+            />
+          </div>
+
+          {/* LLM Prompt Improvement */}
+          {showImprove && (
+            <LLMComparison
+              prompt={promptMotiv}
+              modelId={selectedModelId}
+              modelDisplayName={getModelById(selectedModelId)?.displayName ?? selectedModelId}
+              onAdopt={(improved) => {
+                setPromptMotiv(improved);
+                setShowImprove(false);
+              }}
+              onDiscard={() => setShowImprove(false)}
+            />
+          )}
+
+          {/* Prompt Builder Drawer — output goes to Style/Modifier field */}
+          <BuilderDrawer
+            open={builderOpen}
+            onClose={(composedPrompt) => {
+              setBuilderOpen(false);
+              if (composedPrompt) {
+                setPromptStyle(composedPrompt);
+              }
+            }}
+            basePrompt={promptStyle}
+          />
+
+          {/* Negative Prompt (conditionally visible based on model schema) */}
+          {hasNegativePrompt && (
+            <div className="space-y-2">
+              <Label htmlFor="negative-prompt-textarea">Negative Prompt</Label>
+              <textarea
+                id="negative-prompt-textarea"
+                data-testid="negative-prompt-textarea"
+                value={negativePrompt}
+                onChange={handleNegativePromptChange}
+                placeholder="What to avoid in the image..."
+                rows={2}
+                className={textareaClass}
+              />
+            </div>
+          )}
+
+          {/* Parameter Panel */}
+          <ParameterPanel
+            schema={schema}
+            isLoading={schemaLoading}
+            values={paramValues}
+            onChange={setParamValues}
+          />
+
+          {/* Bottom row: Variant Count + Generate Button */}
+          <div className="flex items-center gap-3">
+            {/* Variant Count Selector */}
+            <div className="flex items-center gap-2">
+              <Label htmlFor="variant-count" className="text-sm whitespace-nowrap">
+                Variants
+              </Label>
+              <div className="flex gap-1" data-testid="variant-count-selector">
+                {VARIANT_OPTIONS.map((count) => (
+                  <Button
+                    key={count}
+                    type="button"
+                    size="sm"
+                    variant={variantCount === count ? "default" : "outline"}
+                    onClick={() => setVariantCount(count)}
+                    data-testid={`variant-count-${count}`}
+                  >
+                    {count}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Generate Button */}
+            <Button
+              type="button"
+              onClick={handleGenerate}
+              disabled={isGenerating || !promptMotiv.trim()}
+              className="ml-auto"
+              data-testid="generate-button"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                "Generate"
+              )}
+            </Button>
           </div>
         </div>
-
-        {/* Generate Button */}
-        <Button
-          type="button"
-          onClick={handleGenerate}
-          disabled={isGenerating || !promptMotiv.trim()}
-          className="ml-auto"
-          data-testid="generate-button"
-        >
-          {isGenerating ? (
-            <>
-              <Loader2 className="size-4 animate-spin" />
-              Generating...
-            </>
-          ) : (
-            "Generate"
-          )}
-        </Button>
-      </div>
+      </PromptTabs>
     </div>
   );
 }
