@@ -12,14 +12,13 @@ import { OptionChip } from "@/components/prompt-builder/option-chip";
 import { SnippetForm } from "@/components/prompt-builder/snippet-form";
 import { Pencil, Trash2, Plus } from "lucide-react";
 import type { Snippet } from "@/lib/services/snippet-service";
+import { BUILDER_CATEGORIES, type BuilderFragment } from "@/lib/builder-fragments";
 
 interface CategoryTabsProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
-  styleOptions: string[];
-  colorOptions: string[];
-  selectedOptions: Set<string>;
-  onToggleOption: (option: string) => void;
+  selectedFragments: Set<string>;
+  onToggleFragment: (fragment: BuilderFragment) => void;
   selectedSnippets?: Set<string>;
   onToggleSnippet?: (snippetId: string, snippetText: string) => void;
 }
@@ -27,10 +26,8 @@ interface CategoryTabsProps {
 export function CategoryTabs({
   activeTab,
   onTabChange,
-  styleOptions,
-  colorOptions,
-  selectedOptions,
-  onToggleOption,
+  selectedFragments,
+  onToggleFragment,
   selectedSnippets,
   onToggleSnippet,
 }: CategoryTabsProps) {
@@ -65,14 +62,11 @@ export function CategoryTabs({
     }
   }, [activeTab, loadSnippets]);
 
-  const handleSnippetSaved = useCallback(
-    () => {
-      setShowForm(false);
-      setEditingSnippet(undefined);
-      loadSnippets();
-    },
-    [loadSnippets]
-  );
+  const handleSnippetSaved = useCallback(() => {
+    setShowForm(false);
+    setEditingSnippet(undefined);
+    loadSnippets();
+  }, [loadSnippets]);
 
   const handleCancelForm = useCallback(() => {
     setShowForm(false);
@@ -103,44 +97,39 @@ export function CategoryTabs({
 
   return (
     <Tabs value={activeTab} onValueChange={onTabChange}>
-      <TabsList className="w-full">
-        <TabsTrigger value="style" data-testid="tab-style">
-          Style
-        </TabsTrigger>
-        <TabsTrigger value="colors" data-testid="tab-colors">
-          Colors
-        </TabsTrigger>
+      {/* Two-row tab layout: 3 tabs per row */}
+      <TabsList className="grid grid-cols-3 h-auto gap-1 p-1" data-testid="category-tabs-list">
+        {BUILDER_CATEGORIES.map((cat) => (
+          <TabsTrigger
+            key={cat.id}
+            value={cat.id}
+            data-testid={`tab-${cat.id}`}
+          >
+            {cat.label}
+          </TabsTrigger>
+        ))}
         <TabsTrigger value="snippets" data-testid="tab-snippets">
           My Snippets
         </TabsTrigger>
       </TabsList>
 
-      <TabsContent value="style">
-        <div className="grid grid-cols-3 gap-2" data-testid="style-grid">
-          {styleOptions.map((option) => (
-            <OptionChip
-              key={option}
-              label={option}
-              selected={selectedOptions.has(option.toLowerCase())}
-              onToggle={() => onToggleOption(option)}
-            />
-          ))}
-        </div>
-      </TabsContent>
+      {/* Fragment tabs for each category */}
+      {BUILDER_CATEGORIES.map((cat) => (
+        <TabsContent key={cat.id} value={cat.id}>
+          <div className="grid grid-cols-2 gap-2" data-testid={`${cat.id}-grid`}>
+            {cat.fragments.map((fragment) => (
+              <OptionChip
+                key={fragment.id}
+                label={fragment.label}
+                selected={selectedFragments.has(fragment.id)}
+                onToggle={() => onToggleFragment(fragment)}
+              />
+            ))}
+          </div>
+        </TabsContent>
+      ))}
 
-      <TabsContent value="colors">
-        <div className="grid grid-cols-3 gap-2" data-testid="colors-grid">
-          {colorOptions.map((option) => (
-            <OptionChip
-              key={option}
-              label={option}
-              selected={selectedOptions.has(option.toLowerCase())}
-              onToggle={() => onToggleOption(option)}
-            />
-          ))}
-        </div>
-      </TabsContent>
-
+      {/* My Snippets tab */}
       <TabsContent value="snippets">
         <div className="space-y-4" data-testid="snippets-tab-content">
           {/* New Snippet Button */}

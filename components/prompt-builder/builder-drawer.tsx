@@ -11,39 +11,7 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { CategoryTabs } from "@/components/prompt-builder/category-tabs";
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const STYLE_OPTIONS = [
-  "Oil Painting",
-  "Flat Vector",
-  "Anime",
-  "Watercolor",
-  "3D Render",
-  "Pixel Art",
-  "Photography",
-  "Pencil",
-  "Pop Art",
-] as const;
-
-const COLOR_OPTIONS = [
-  "Warm Tones",
-  "Pastel",
-  "Monochrome",
-  "Cool Tones",
-  "Earth Tones",
-  "Neon",
-  "Black & White",
-  "Sunset",
-  "Vintage",
-] as const;
-
-const ALL_OPTIONS = [
-  ...STYLE_OPTIONS.map((o) => o.toLowerCase()),
-  ...COLOR_OPTIONS.map((o) => o.toLowerCase()),
-];
+import { type BuilderFragment } from "@/lib/builder-fragments";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -52,55 +20,21 @@ const ALL_OPTIONS = [
 interface BuilderDrawerProps {
   open: boolean;
   onClose: (prompt: string) => void;
-  basePrompt: string;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Parse a prompt string to find which builder options are present.
- * Compares lowercased comma-separated segments against known options.
- */
-function parseSelectionsFromPrompt(prompt: string): Set<string> {
-  const segments = prompt
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-
-  const found = new Set<string>();
-  for (const segment of segments) {
-    if (ALL_OPTIONS.includes(segment)) {
-      found.add(segment);
-    }
-  }
-  return found;
-}
-
-/**
- * Extract the base prompt (everything that is NOT a known builder option)
- * from a full prompt string.
- */
-function extractBasePrompt(prompt: string): string {
-  const segments = prompt.split(",").map((s) => s.trim());
-  const nonOption = segments.filter(
-    (s) => s && !ALL_OPTIONS.includes(s.toLowerCase())
-  );
-  return nonOption.join(", ");
+  basePrompt?: string;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function BuilderDrawer({
-  open,
-  onClose,
-  basePrompt,
-}: BuilderDrawerProps) {
-  const [selectedOptions, setSelectedOptions] = useState<Set<string>>(
+export function BuilderDrawer({ open, onClose }: BuilderDrawerProps) {
+  // selectedFragments: Set of fragment IDs
+  const [selectedFragments, setSelectedFragments] = useState<Set<string>>(
     new Set()
+  );
+  // fragmentTexts: Map from fragment ID to full fragment text
+  const [fragmentTexts, setFragmentTexts] = useState<Map<string, string>>(
+    new Map()
   );
   const [activeTab, setActiveTab] = useState("style");
   const [selectedSnippets, setSelectedSnippets] = useState<Set<string>>(
@@ -110,23 +44,31 @@ export function BuilderDrawer({
     new Map()
   );
 
-  // AC-11: When drawer opens, parse the current prompt to restore selections
+  // AC-10: Reset all selections when drawer opens
   useEffect(() => {
     if (open) {
-      const restored = parseSelectionsFromPrompt(basePrompt);
-      setSelectedOptions(restored);
+      setSelectedFragments(new Set());
+      setFragmentTexts(new Map());
+      setSelectedSnippets(new Set());
+      setSnippetTexts(new Map());
+      setActiveTab("style");
     }
-  }, [open, basePrompt]);
+  }, [open]);
 
-  const handleToggleOption = useCallback((option: string) => {
-    const key = option.toLowerCase();
-    setSelectedOptions((prev) => {
+  const handleToggleFragment = useCallback((fragment: BuilderFragment) => {
+    setSelectedFragments((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
+      if (next.has(fragment.id)) {
+        next.delete(fragment.id);
       } else {
-        next.add(key);
+        next.add(fragment.id);
       }
+      return next;
+    });
+    setFragmentTexts((prev) => {
+      const next = new Map(prev);
+      // Always keep fragment text in map for compose (removal tracked by selectedFragments)
+      next.set(fragment.id, fragment.fragment);
       return next;
     });
   }, []);
@@ -151,31 +93,32 @@ export function BuilderDrawer({
     []
   );
 
-  // Build the composed prompt: base (without builder options) + selections + snippets
-  const composedPrompt = useMemo(() => {
-    const base = extractBasePrompt(basePrompt);
-    const optionSelections = Array.from(selectedOptions);
-    const snippetSelections = Array.from(selectedSnippets)
+  // Build the composed text: fragment texts + snippet texts, joined by ", "
+  const composedText = useMemo(() => {
+    const fragmentParts = Array.from(selectedFragments)
+      .map((id) => fragmentTexts.get(id))
+      .filter((t): t is string => Boolean(t));
+
+    const snippetParts = Array.from(selectedSnippets)
       .map((id) => snippetTexts.get(id))
-      .filter(Boolean);
-    const allSelections = [...optionSelections, ...snippetSelections];
-    if (allSelections.length === 0) return base;
-    if (!base) return allSelections.join(", ");
-    return base + ", " + allSelections.join(", ");
-  }, [basePrompt, selectedOptions, selectedSnippets, snippetTexts]);
+      .filter((t): t is string => Boolean(t));
+
+    const all = [...fragmentParts, ...snippetParts];
+    return all.join(", ");
+  }, [selectedFragments, fragmentTexts, selectedSnippets, snippetTexts]);
 
   const handleDone = useCallback(() => {
-    onClose(composedPrompt);
-  }, [onClose, composedPrompt]);
+    onClose(composedText);
+  }, [onClose, composedText]);
 
   // Sheet's onOpenChange fires on overlay click or X button
   const handleOpenChange = useCallback(
     (isOpen: boolean) => {
       if (!isOpen) {
-        onClose(composedPrompt);
+        onClose(composedText);
       }
     },
-    [onClose, composedPrompt]
+    [onClose, composedText]
   );
 
   return (
@@ -184,7 +127,7 @@ export function BuilderDrawer({
         <SheetHeader>
           <SheetTitle>Prompt Builder</SheetTitle>
           <SheetDescription>
-            Select style and color options to enhance your prompt.
+            Select style options to build your prompt modifier.
           </SheetDescription>
         </SheetHeader>
 
@@ -192,10 +135,8 @@ export function BuilderDrawer({
           <CategoryTabs
             activeTab={activeTab}
             onTabChange={setActiveTab}
-            styleOptions={[...STYLE_OPTIONS]}
-            colorOptions={[...COLOR_OPTIONS]}
-            selectedOptions={selectedOptions}
-            onToggleOption={handleToggleOption}
+            selectedFragments={selectedFragments}
+            onToggleFragment={handleToggleFragment}
             selectedSnippets={selectedSnippets}
             onToggleSnippet={handleToggleSnippet}
           />
@@ -206,9 +147,11 @@ export function BuilderDrawer({
               Preview
             </p>
             <p className="rounded-md border bg-muted/50 p-2 text-sm break-words">
-              {composedPrompt || (
+              {composedText ? (
+                composedText
+              ) : (
                 <span className="text-muted-foreground italic">
-                  Your prompt will appear here...
+                  Select options to build your style
                 </span>
               )}
             </p>
@@ -229,5 +172,3 @@ export function BuilderDrawer({
     </Sheet>
   );
 }
-
-export { STYLE_OPTIONS, COLOR_OPTIONS };
