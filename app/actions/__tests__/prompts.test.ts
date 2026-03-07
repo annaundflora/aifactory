@@ -31,24 +31,14 @@ describe('Snippet Server Actions - Validation', () => {
     vi.clearAllMocks()
   })
 
-  /**
-   * AC-6: GIVEN ein createSnippet-Aufruf mit text: "" (leerer String)
-   *       WHEN die Validierung durchlaeuft
-   *       THEN wird ein Fehler zurueckgegeben mit Message "Snippet-Text darf nicht leer sein"
-   */
-  it('AC-6: should reject empty text with "Snippet-Text darf nicht leer sein"', async () => {
+  it('should reject empty text with "Snippet-Text darf nicht leer sein"', async () => {
     const result = await createSnippet({ text: '', category: 'POD Basics' })
 
     expect(result).toEqual({ error: 'Snippet-Text darf nicht leer sein' })
     expect(mockCreate).not.toHaveBeenCalled()
   })
 
-  /**
-   * AC-7: GIVEN ein createSnippet-Aufruf mit text laenger als 500 Zeichen
-   *       WHEN die Validierung durchlaeuft
-   *       THEN wird ein Fehler zurueckgegeben mit Message "Snippet-Text darf maximal 500 Zeichen lang sein"
-   */
-  it('AC-7: should reject text longer than 500 chars with max-length error', async () => {
+  it('should reject text longer than 500 chars with max-length error', async () => {
     const longText = 'a'.repeat(501)
     const result = await createSnippet({ text: longText, category: 'POD Basics' })
 
@@ -56,24 +46,14 @@ describe('Snippet Server Actions - Validation', () => {
     expect(mockCreate).not.toHaveBeenCalled()
   })
 
-  /**
-   * AC-8: GIVEN ein createSnippet-Aufruf mit category: "" (leerer String)
-   *       WHEN die Validierung durchlaeuft
-   *       THEN wird ein Fehler zurueckgegeben mit Message "Kategorie darf nicht leer sein"
-   */
-  it('AC-8: should reject empty category with "Kategorie darf nicht leer sein"', async () => {
+  it('should reject empty category with "Kategorie darf nicht leer sein"', async () => {
     const result = await createSnippet({ text: 'valid text', category: '' })
 
     expect(result).toEqual({ error: 'Kategorie darf nicht leer sein' })
     expect(mockCreate).not.toHaveBeenCalled()
   })
 
-  /**
-   * AC-9: GIVEN ein createSnippet-Aufruf mit category laenger als 100 Zeichen
-   *       WHEN die Validierung durchlaeuft
-   *       THEN wird ein Fehler zurueckgegeben mit Message "Kategorie darf maximal 100 Zeichen lang sein"
-   */
-  it('AC-9: should reject category longer than 100 chars with max-length error', async () => {
+  it('should reject category longer than 100 chars with max-length error', async () => {
     const longCategory = 'b'.repeat(101)
     const result = await createSnippet({ text: 'valid text', category: longCategory })
 
@@ -81,12 +61,7 @@ describe('Snippet Server Actions - Validation', () => {
     expect(mockCreate).not.toHaveBeenCalled()
   })
 
-  /**
-   * AC-10: GIVEN ein createSnippet-Aufruf mit text: "  hello  " und category: "  POD  "
-   *        WHEN die Validierung und Speicherung durchlaeuft
-   *        THEN werden Text und Kategorie getrimmt gespeichert: text="hello", category="POD"
-   */
-  it('AC-10: should trim text and category before saving', async () => {
+  it('should trim text and category before saving', async () => {
     const now = new Date()
     mockCreate.mockResolvedValueOnce({
       id: 'some-uuid',
@@ -106,17 +81,10 @@ describe('Snippet Server Actions - Validation', () => {
     })
   })
 
-  /**
-   * AC-12: GIVEN ein updateSnippet-Aufruf mit text: "" (leerer String)
-   *        WHEN die Validierung durchlaeuft
-   *        THEN wird derselbe Validierungsfehler wie bei createSnippet zurueckgegeben
-   */
-  it('AC-12: should apply same validation rules on updateSnippet as on createSnippet', async () => {
-    // Empty text
+  it('should apply same validation rules on updateSnippet as on createSnippet', async () => {
     const result1 = await updateSnippet({ id: 'some-id', text: '', category: 'POD' })
     expect(result1).toEqual({ error: 'Snippet-Text darf nicht leer sein' })
 
-    // Text too long
     const result2 = await updateSnippet({
       id: 'some-id',
       text: 'a'.repeat(501),
@@ -124,11 +92,9 @@ describe('Snippet Server Actions - Validation', () => {
     })
     expect(result2).toEqual({ error: 'Snippet-Text darf maximal 500 Zeichen lang sein' })
 
-    // Empty category
     const result3 = await updateSnippet({ id: 'some-id', text: 'valid', category: '' })
     expect(result3).toEqual({ error: 'Kategorie darf nicht leer sein' })
 
-    // Category too long
     const result4 = await updateSnippet({
       id: 'some-id',
       text: 'valid',
@@ -136,7 +102,6 @@ describe('Snippet Server Actions - Validation', () => {
     })
     expect(result4).toEqual({ error: 'Kategorie darf maximal 100 Zeichen lang sein' })
 
-    // None of these should have called the service
     expect(mockUpdate).not.toHaveBeenCalled()
   })
 })
@@ -180,50 +145,78 @@ describe('Snippet Server Actions - CRUD via Service', () => {
   })
 })
 
-describe('improvePrompt Server Action', () => {
+describe('improvePrompt Server Action - modelId Parameter', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   /**
-   * AC-4: GIVEN ein leerer Prompt-String
-   *       WHEN die Server Action improvePrompt({ prompt: "" }) aufgerufen wird
-   *       THEN gibt die Action { error: "Prompt darf nicht leer sein" } zurueck
-   *            ohne den OpenRouter-Client aufzurufen
+   * AC-6: GIVEN die Server Action `improvePrompt` wird mit
+   *       `{ prompt: "test", modelId: "google/imagen-4-fast" }` aufgerufen
+   *       WHEN die Action den PromptService aufruft
+   *       THEN wird `PromptService.improve("test", "google/imagen-4-fast")`
+   *            mit beiden Parametern aufgerufen
    */
-  it('AC-4: should return error object when prompt is empty without calling OpenRouter', async () => {
-    const result = await improvePrompt({ prompt: '' })
-
-    expect(result).toEqual({ error: 'Prompt darf nicht leer sein' })
-    expect(mockImprove).not.toHaveBeenCalled()
-  })
-
-  it('AC-4: should return error object when prompt is only whitespace without calling OpenRouter', async () => {
-    const result = await improvePrompt({ prompt: '   ' })
-
-    expect(result).toEqual({ error: 'Prompt darf nicht leer sein' })
-    expect(mockImprove).not.toHaveBeenCalled()
-  })
-
-  it('should call PromptService.improve and return result for valid prompt', async () => {
+  it('AC-6: should pass modelId to PromptService.improve when provided', async () => {
     mockImprove.mockResolvedValueOnce({
-      original: 'A cat',
-      improved: 'A majestic cat',
+      original: 'test',
+      improved: 'an improved test prompt',
     })
 
-    const result = await improvePrompt({ prompt: 'A cat' })
+    const result = await improvePrompt({ prompt: 'test', modelId: 'google/imagen-4-fast' })
 
+    // Verify that PromptService.improve was called with BOTH parameters
+    expect(mockImprove).toHaveBeenCalledOnce()
+    expect(mockImprove).toHaveBeenCalledWith('test', 'google/imagen-4-fast')
+
+    // Verify the result is passed through correctly
     expect(result).toEqual({
-      original: 'A cat',
-      improved: 'A majestic cat',
+      original: 'test',
+      improved: 'an improved test prompt',
     })
-    expect(mockImprove).toHaveBeenCalledWith('A cat')
+  })
+
+  /**
+   * AC-7: GIVEN die Server Action `improvePrompt` wird mit leerem `modelId` aufgerufen
+   *       WHEN die Validierung laeuft
+   *       THEN gibt die Action `{ error: "..." }` zurueck (modelId ist Pflicht)
+   */
+  it('AC-7: should return error when modelId is empty', async () => {
+    const result = await improvePrompt({ prompt: 'test', modelId: '' })
+
+    expect(result).toHaveProperty('error')
+    expect((result as { error: string }).error).toBeTruthy()
+    expect(mockImprove).not.toHaveBeenCalled()
+  })
+
+  it('AC-7: should return error when modelId is only whitespace', async () => {
+    const result = await improvePrompt({ prompt: 'test', modelId: '   ' })
+
+    expect(result).toHaveProperty('error')
+    expect((result as { error: string }).error).toBeTruthy()
+    expect(mockImprove).not.toHaveBeenCalled()
+  })
+
+  // --- Regression: empty prompt validation still works ---
+
+  it('should return error object when prompt is empty without calling service', async () => {
+    const result = await improvePrompt({ prompt: '', modelId: 'google/imagen-4-fast' })
+
+    expect(result).toEqual({ error: 'Prompt darf nicht leer sein' })
+    expect(mockImprove).not.toHaveBeenCalled()
+  })
+
+  it('should return error object when prompt is only whitespace', async () => {
+    const result = await improvePrompt({ prompt: '   ', modelId: 'google/imagen-4-fast' })
+
+    expect(result).toEqual({ error: 'Prompt darf nicht leer sein' })
+    expect(mockImprove).not.toHaveBeenCalled()
   })
 
   it('should return error object when PromptService.improve throws', async () => {
     mockImprove.mockRejectedValueOnce(new Error('API error'))
 
-    const result = await improvePrompt({ prompt: 'A cat' })
+    const result = await improvePrompt({ prompt: 'A cat', modelId: 'google/imagen-4-fast' })
 
     expect(result).toHaveProperty('error')
   })
