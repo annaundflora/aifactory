@@ -12,6 +12,16 @@ import type { ReactNode } from "react";
 // Mock db/queries to prevent DATABASE_URL crash (type-only import chain)
 vi.mock("@/lib/db/queries", () => ({}));
 
+// Mock snippet-service to prevent DATABASE_URL crash (imports lib/db directly)
+vi.mock("@/lib/services/snippet-service", () => ({
+  SnippetService: {
+    create: vi.fn().mockResolvedValue({}),
+    update: vi.fn().mockResolvedValue(null),
+    delete: vi.fn().mockResolvedValue(false),
+    getAll: vi.fn().mockResolvedValue([]),
+  },
+}));
+
 // Mock next/image to render a plain <img>
 vi.mock("next/image", () => ({
   default: (props: Record<string, unknown>) =>
@@ -24,6 +34,8 @@ vi.mock("next/image", () => ({
 
 // Mock lucide-react icons as simple spans
 vi.mock("lucide-react", () => ({
+  ChevronDown: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-chevron-down", className: props.className }),
   Copy: (props: Record<string, unknown>) =>
     createElement("span", { "data-testid": "icon-copy", className: props.className }),
   Download: (props: Record<string, unknown>) =>

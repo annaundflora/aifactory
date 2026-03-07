@@ -7,6 +7,21 @@ import "@testing-library/jest-dom/vitest";
 // Mocks
 // ---------------------------------------------------------------------------
 
+// Mock window.matchMedia (used by use-mobile hook inside SidebarProvider)
+Object.defineProperty(window, "matchMedia", {
+  writable: true,
+  value: (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  }),
+});
+
 // Mock next/link
 vi.mock("next/link", () => ({
   default: ({
@@ -78,13 +93,16 @@ describe("ProjectList", () => {
     expect(links[1]).toHaveAttribute("href", "/projects/proj-b");
     expect(links[2]).toHaveAttribute("href", "/projects/proj-c");
 
-    // Active project (Beta) should have visual highlight (font-bold)
+    // Active project (Beta) should have visual highlight via data-active="true" on the link
     const betaLink = screen.getByText("Project Beta");
-    expect(betaLink).toHaveClass("font-bold");
+    const betaAnchor = betaLink.closest("a");
+    expect(betaAnchor).toHaveAttribute("data-active", "true");
 
-    // Inactive projects should NOT be bold
-    expect(screen.getByText("Project Alpha")).not.toHaveClass("font-bold");
-    expect(screen.getByText("Project Gamma")).not.toHaveClass("font-bold");
+    // Inactive projects should NOT have data-active="true"
+    const alphaAnchor = screen.getByText("Project Alpha").closest("a");
+    const gammaAnchor = screen.getByText("Project Gamma").closest("a");
+    expect(alphaAnchor).not.toHaveAttribute("data-active", "true");
+    expect(gammaAnchor).not.toHaveAttribute("data-active", "true");
   });
 
   /**

@@ -79,8 +79,11 @@ vi.mock("@/app/actions/generations", () => ({
   generateImages: (...args: unknown[]) => mockGenerateImages(...args),
 }));
 
-// Mock lucide-react icons (Select uses ChevronDownIcon, ChevronUpIcon, CheckIcon; PromptArea uses Loader2, Wand2, Sparkles)
+// Mock lucide-react icons (Select uses ChevronDownIcon, ChevronUpIcon, CheckIcon; PromptArea uses Loader2, Wand2, Sparkles; TemplateSelector uses ChevronDown)
 vi.mock("lucide-react", () => ({
+  ChevronDown: (props: Record<string, unknown>) => (
+    <span data-testid="chevron-down" {...props} />
+  ),
   ChevronDownIcon: (props: Record<string, unknown>) => (
     <span data-testid="chevron-down-icon" {...props} />
   ),

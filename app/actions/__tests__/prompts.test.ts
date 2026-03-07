@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+// Mock lib/db/queries to prevent DATABASE_URL crash (imported transitively)
+vi.mock('@/lib/db/queries', () => ({}))
+
 // Mock SnippetService
 const mockCreate = vi.fn()
 const mockUpdate = vi.fn()

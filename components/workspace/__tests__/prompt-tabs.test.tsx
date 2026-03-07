@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import { createElement, useState } from "react";
@@ -33,6 +33,9 @@ beforeAll(() => {
 // Mocks
 // ---------------------------------------------------------------------------
 
+// Mock lib/db/queries to prevent DATABASE_URL crash (imported by history-service chain)
+vi.mock("@/lib/db/queries", () => ({}));
+
 // Mock snippet-service to prevent DATABASE_URL crash (imports lib/db transitively)
 vi.mock("@/lib/services/snippet-service", () => ({
   SnippetService: {
@@ -43,9 +46,30 @@ vi.mock("@/lib/services/snippet-service", () => ({
   },
 }));
 
+// Mock server actions from app/actions/prompts (called by HistoryList/FavoritesList on mount)
+vi.mock("@/app/actions/prompts", () => ({
+  getPromptHistory: vi.fn().mockResolvedValue([]),
+  getFavoritePrompts: vi.fn().mockResolvedValue([]),
+  toggleFavorite: vi.fn().mockResolvedValue({}),
+  createSnippet: vi.fn().mockResolvedValue({}),
+  updateSnippet: vi.fn().mockResolvedValue(null),
+  deleteSnippet: vi.fn().mockResolvedValue(false),
+  getSnippets: vi.fn().mockResolvedValue([]),
+  improvePrompt: vi.fn().mockResolvedValue({ improved: "" }),
+}));
+
+// Mock lucide-react icons used by HistoryList and FavoritesList
+vi.mock("lucide-react", () => ({
+  Star: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-star", ...props }),
+  ChevronDown: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-chevron-down", ...props }),
+  Loader2: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-loader", ...props }),
+}));
+
 // ---------------------------------------------------------------------------
-// Import PromptTabs (no external mocks needed -- it only depends on
-// shadcn Tabs which uses Radix UI, fully supported in jsdom with polyfills)
+// Import PromptTabs (HistoryList and FavoritesList are rendered inside tabs)
 // ---------------------------------------------------------------------------
 
 import { PromptTabs, type PromptTab } from "@/components/workspace/prompt-tabs";
@@ -169,8 +193,10 @@ describe("Prompt Tabs Container", () => {
     const historyTab = screen.getByTestId("tab-history");
     await user.click(historyTab);
 
-    // History content should now be visible
-    expect(screen.getByText("Prompt history will appear here.")).toBeInTheDocument();
+    // History content should now be visible (empty state from HistoryList)
+    await waitFor(() =>
+      expect(screen.getByText("No prompts generated yet. Start your first generation!")).toBeInTheDocument()
+    );
 
     // Prompt content should be hidden (Radix unmounts inactive TabsContent by default)
     expect(screen.queryByTestId("prompt-content")).not.toBeInTheDocument();
@@ -195,8 +221,10 @@ describe("Prompt Tabs Container", () => {
     const favoritesTab = screen.getByTestId("tab-favorites");
     await user.click(favoritesTab);
 
-    // Favorites content should now be visible
-    expect(screen.getByText("Favorite prompts will appear here.")).toBeInTheDocument();
+    // Favorites content should now be visible (empty state from FavoritesList)
+    await waitFor(() =>
+      expect(screen.getByText("No favorites yet. Star prompts in History to save them here.")).toBeInTheDocument()
+    );
 
     // Prompt content should be hidden
     expect(screen.queryByTestId("prompt-content")).not.toBeInTheDocument();
@@ -218,8 +246,8 @@ describe("Prompt Tabs Container", () => {
     const historyTab = screen.getByTestId("tab-history");
     await user.click(historyTab);
 
-    // Check exact placeholder text
-    const placeholder = screen.getByText("Prompt history will appear here.");
+    // Check actual empty state text from HistoryList
+    const placeholder = await screen.findByText("No prompts generated yet. Start your first generation!");
     expect(placeholder).toBeInTheDocument();
     expect(placeholder).toBeVisible();
   });
@@ -240,8 +268,8 @@ describe("Prompt Tabs Container", () => {
     const favoritesTab = screen.getByTestId("tab-favorites");
     await user.click(favoritesTab);
 
-    // Check exact placeholder text
-    const placeholder = screen.getByText("Favorite prompts will appear here.");
+    // Check actual empty state text from FavoritesList
+    const placeholder = await screen.findByText("No favorites yet. Star prompts in History to save them here.");
     expect(placeholder).toBeInTheDocument();
     expect(placeholder).toBeVisible();
   });

@@ -1,0 +1,23 @@
+{
+  "spec_path": "specs/phase-1/2026-03-07-quality-improvements",
+  "feature_name": "quality-improvements",
+  "status": "in_progress",
+  "current_state": "final_validation",
+  "current_slice_id": null,
+  "retry_count": 0,
+  "failed_stage": null,
+  "detected_stack": "TypeScript",
+  "baseline_ts_errors": "pre-existing errors in test files only (project-card.test.tsx, lightbox-navigation.test.tsx, variation-flow.test.tsx, prompt-area.test.tsx vitest mock types)",
+  "waves": [
+    {"wave": 1, "slices": ["01", "02", "03", "09", "14", "18", "19", "20"]},
+    {"wave": 2, "slices": ["04", "06", "11", "16", "21"]},
+    {"wave": 3, "slices": ["05", "07", "17"]},
+    {"wave": 4, "slices": ["08", "10"]},
+    {"wave": 5, "slices": ["12", "15"]},
+    {"wave": 6, "slices": ["13"]}
+  ],
+  "completed_slices": ["01", "02", "03", "09", "14", "18", "19", "20", "06", "04", "11", "16", "21", "05", "07", "17", "08", "10", "12", "15", "13"],
+  "evidence_files": [],
+  "started_at": "2026-03-07T10:15:00Z",
+  "last_updated": "2026-03-07T14:45:00Z"
+}
