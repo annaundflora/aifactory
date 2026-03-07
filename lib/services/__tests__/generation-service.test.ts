@@ -57,6 +57,9 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
     id: "gen-001",
     projectId: "proj-001",
     prompt: "A fox",
+    promptMotiv: "",
+    promptStyle: "",
+    isFavorite: false,
     negativePrompt: null,
     modelId: "black-forest-labs/flux-2-pro",
     modelParams: {},
@@ -128,6 +131,7 @@ describe("GenerationService", () => {
     const result = await GenerationService.generate(
       "proj-001",
       "A fox",
+      "",
       undefined,
       "black-forest-labs/flux-2-pro",
       {},
@@ -178,6 +182,7 @@ describe("GenerationService", () => {
     await GenerationService.generate(
       "proj-001",
       "A fox",
+      "",
       undefined,
       "black-forest-labs/flux-2-pro",
       {},
@@ -235,6 +240,7 @@ describe("GenerationService", () => {
     await GenerationService.generate(
       "proj-001",
       "A fox",
+      "",
       undefined,
       "black-forest-labs/flux-2-pro",
       {},
@@ -276,6 +282,7 @@ describe("GenerationService", () => {
     await GenerationService.generate(
       "proj-001",
       "A fox",
+      "",
       undefined,
       "black-forest-labs/flux-2-pro",
       {},
@@ -328,6 +335,7 @@ describe("GenerationService", () => {
     await GenerationService.generate(
       "proj-001",
       "A fox",
+      "",
       undefined,
       "black-forest-labs/flux-2-pro",
       {},
@@ -384,6 +392,7 @@ describe("GenerationService", () => {
     await GenerationService.generate(
       "proj-001",
       "A fox",
+      "",
       undefined,
       "black-forest-labs/flux-2-pro",
       {},
