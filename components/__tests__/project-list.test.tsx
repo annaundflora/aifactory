@@ -36,6 +36,8 @@ const makeProject = (id: string, name: string) => ({
   name,
   createdAt: new Date("2026-01-15"),
   updatedAt: new Date("2026-01-15"),
+  thumbnailUrl: null,
+  thumbnailStatus: "none",
 });
 
 // ---------------------------------------------------------------------------

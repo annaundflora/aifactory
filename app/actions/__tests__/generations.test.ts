@@ -79,7 +79,7 @@ describe("generateImages Server Action", () => {
   it('AC-9: should return error object for empty prompt', async () => {
     const result = await generateImages({
       projectId: "proj-001",
-      prompt: "",
+      promptMotiv: "",
       modelId: "black-forest-labs/flux-2-pro",
       params: {},
       count: 1,
@@ -92,7 +92,7 @@ describe("generateImages Server Action", () => {
   it('AC-9: should return error object for whitespace-only prompt', async () => {
     const result = await generateImages({
       projectId: "proj-001",
-      prompt: "   ",
+      promptMotiv: "   ",
       modelId: "black-forest-labs/flux-2-pro",
       params: {},
       count: 1,
@@ -108,7 +108,7 @@ describe("generateImages Server Action", () => {
   it('AC-10: should return error object for unknown model ID', async () => {
     const result = await generateImages({
       projectId: "proj-001",
-      prompt: "A fox",
+      promptMotiv: "A fox",
       modelId: "unknown/nonexistent-model",
       params: {},
       count: 1,
@@ -124,7 +124,7 @@ describe("generateImages Server Action", () => {
   it('AC-11: should return error object for count outside 1-4 range (count=5)', async () => {
     const result = await generateImages({
       projectId: "proj-001",
-      prompt: "A fox",
+      promptMotiv: "A fox",
       modelId: "black-forest-labs/flux-2-pro",
       params: {},
       count: 5,
@@ -137,7 +137,7 @@ describe("generateImages Server Action", () => {
   it('AC-11: should return error object for count=0', async () => {
     const result = await generateImages({
       projectId: "proj-001",
-      prompt: "A fox",
+      promptMotiv: "A fox",
       modelId: "black-forest-labs/flux-2-pro",
       params: {},
       count: 0,
