@@ -99,9 +99,14 @@ async function renderHistoryList(props: Partial<React.ComponentProps<typeof Hist
       negativePrompt={props.negativePrompt ?? ""}
     />
   );
-  // Wait for initial load to complete
+  // Wait for initial load to complete (mockGetPromptHistory called + useTransition flushed)
   await waitFor(() => {
     expect(mockGetPromptHistory).toHaveBeenCalled();
+  });
+  // useTransition in jsdom does not flush synchronously; wait until the
+  // loading indicator disappears before returning control to the test.
+  await waitFor(() => {
+    expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
   });
   return { ...result, onLoadEntry };
 }
