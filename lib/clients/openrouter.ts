@@ -6,6 +6,7 @@ export interface ChatMessage {
 interface ChatParams {
   model: string;
   messages: ChatMessage[];
+  timeout?: number;
 }
 
 interface OpenRouterResponse {
@@ -24,36 +25,55 @@ async function chat(params: ChatParams): Promise<string> {
     );
   }
 
-  const response = await fetch(
-    "https://openrouter.ai/api/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: params.model,
-        messages: params.messages,
-      }),
-    }
-  );
+  const controller = new AbortController();
+  const timeoutMs = params.timeout ?? 30000;
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
 
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => "");
-    throw new Error(
-      `OpenRouter API Fehler (${response.status}): ${errorText || response.statusText}`
+  try {
+    const response = await fetch(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: params.model,
+          messages: params.messages,
+        }),
+        signal: controller.signal,
+      }
     );
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      throw new Error(
+        `OpenRouter API Fehler (${response.status}): ${errorText || response.statusText}`
+      );
+    }
+
+    const data: OpenRouterResponse = await response.json();
+
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new Error("OpenRouter lieferte keine Antwort.");
+    }
+
+    return content;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(
+        `OpenRouter request timed out after ${timeoutMs / 1000} seconds`
+      );
+    }
+    throw error;
   }
-
-  const data: OpenRouterResponse = await response.json();
-
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) {
-    throw new Error("OpenRouter lieferte keine Antwort.");
-  }
-
-  return content;
 }
 
 export const openRouterClient = {
