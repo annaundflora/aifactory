@@ -35,6 +35,9 @@ beforeAll(() => {
 // Mocks (mock_external strategy per slice spec)
 // ---------------------------------------------------------------------------
 
+// Mock db/queries to prevent DATABASE_URL crash (type-only import in source)
+vi.mock("@/lib/db/queries", () => ({}));
+
 // Mock MODELS registry
 vi.mock("@/lib/models", () => ({
   MODELS: [
@@ -45,6 +48,13 @@ vi.mock("@/lib/models", () => ({
     { id: "model-5", displayName: "Seedream 4.5", pricePerImage: 0 },
     { id: "model-6", displayName: "Gemini 2.5 Flash Image", pricePerImage: 0 },
   ],
+  getModelById: (id: string) => {
+    const models: Record<string, { id: string; displayName: string; pricePerImage: number }> = {
+      "model-1": { id: "model-1", displayName: "FLUX 2 Pro", pricePerImage: 0.055 },
+      "model-2": { id: "model-2", displayName: "Nano Banana 2", pricePerImage: 0 },
+    };
+    return models[id] ?? undefined;
+  },
 }));
 
 // Mock getModelSchema server action
@@ -59,7 +69,7 @@ vi.mock("@/app/actions/generations", () => ({
   generateImages: (...args: unknown[]) => mockGenerateImages(...args),
 }));
 
-// Mock lucide-react icons (Select uses ChevronDownIcon, ChevronUpIcon, CheckIcon; PromptArea uses Loader2)
+// Mock lucide-react icons (Select uses ChevronDownIcon, ChevronUpIcon, CheckIcon; PromptArea uses Loader2, Wand2, Sparkles)
 vi.mock("lucide-react", () => ({
   ChevronDownIcon: (props: Record<string, unknown>) => (
     <span data-testid="chevron-down-icon" {...props} />
@@ -73,6 +83,22 @@ vi.mock("lucide-react", () => ({
   Loader2: (props: Record<string, unknown>) => (
     <span data-testid="loader-icon" {...props} />
   ),
+  Wand2: (props: Record<string, unknown>) => (
+    <span data-testid="wand-icon" {...props} />
+  ),
+  Sparkles: (props: Record<string, unknown>) => (
+    <span data-testid="sparkles-icon" {...props} />
+  ),
+}));
+
+// Mock BuilderDrawer (external component, not under test here)
+vi.mock("@/components/prompt-builder/builder-drawer", () => ({
+  BuilderDrawer: () => null,
+}));
+
+// Mock LLMComparison (external component, not under test here)
+vi.mock("@/components/prompt-improve/llm-comparison", () => ({
+  LLMComparison: () => null,
 }));
 
 // Mock workspace-state (PromptArea uses useWorkspaceVariation internally;
@@ -266,7 +292,7 @@ describe("PromptArea", () => {
     await renderPromptArea();
 
     const textarea = screen.getByTestId(
-      "prompt-textarea"
+      "prompt-motiv-textarea"
     ) as HTMLTextAreaElement;
 
     // Type multi-line text
@@ -291,7 +317,7 @@ describe("PromptArea", () => {
     const user = userEvent.setup();
     await renderPromptArea();
 
-    const textarea = screen.getByTestId("prompt-textarea");
+    const textarea = screen.getByTestId("prompt-motiv-textarea");
 
     // Type a prompt
     await user.type(textarea, "A beautiful sunset");
@@ -299,12 +325,12 @@ describe("PromptArea", () => {
     // Press Ctrl+Enter
     await user.keyboard("{Control>}{Enter}{/Control}");
 
-    // generateImages should be called with the correct arguments
+    // generateImages should be called with the correct arguments (structured fields)
     await waitFor(() => {
       expect(mockGenerateImages).toHaveBeenCalledWith(
         expect.objectContaining({
           projectId: "proj-1",
-          prompt: "A beautiful sunset",
+          promptMotiv: "A beautiful sunset",
           modelId: "model-1",
           count: 1,
         })
@@ -330,18 +356,18 @@ describe("PromptArea", () => {
     const user = userEvent.setup();
     await renderPromptArea();
 
-    const textarea = screen.getByTestId("prompt-textarea");
+    const textarea = screen.getByTestId("prompt-motiv-textarea");
     await user.type(textarea, "A cat in space");
 
     const generateBtn = screen.getByTestId("generate-button");
     await user.click(generateBtn);
 
-    // generateImages should be called
+    // generateImages should be called with structured fields
     await waitFor(() => {
       expect(mockGenerateImages).toHaveBeenCalledWith(
         expect.objectContaining({
           projectId: "proj-1",
-          prompt: "A cat in space",
+          promptMotiv: "A cat in space",
           modelId: "model-1",
           count: 1,
         })
@@ -374,7 +400,7 @@ describe("PromptArea", () => {
     const user = userEvent.setup();
     await renderPromptArea();
 
-    const textarea = screen.getByTestId("prompt-textarea");
+    const textarea = screen.getByTestId("prompt-motiv-textarea");
     await user.type(textarea, "Initial prompt");
 
     const generateBtn = screen.getByTestId("generate-button");
@@ -407,7 +433,7 @@ describe("PromptArea", () => {
     await user.click(variant3Btn);
 
     // Type a prompt and generate
-    const textarea = screen.getByTestId("prompt-textarea");
+    const textarea = screen.getByTestId("prompt-motiv-textarea");
     await user.type(textarea, "A landscape");
 
     const generateBtn = screen.getByTestId("generate-button");
@@ -451,13 +477,13 @@ describe("PromptArea", () => {
 
     const generateBtn = screen.getByTestId("generate-button");
 
-    // Click generate with empty prompt
+    // Button should be disabled when motiv field is empty
+    expect(generateBtn).toBeDisabled();
+
+    // Click generate with empty prompt (disabled buttons won't fire click, but verify no call)
     await user.click(generateBtn);
 
     // generateImages should NOT be called
     expect(mockGenerateImages).not.toHaveBeenCalled();
-
-    // Button should still be enabled
-    expect(generateBtn).not.toBeDisabled();
   });
 });

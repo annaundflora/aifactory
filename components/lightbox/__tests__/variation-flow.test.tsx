@@ -9,6 +9,9 @@ import type { ReactNode } from "react";
 // Mocks (mock_external strategy: external deps, server actions, heavy libs)
 // ---------------------------------------------------------------------------
 
+// Mock db/queries to prevent DATABASE_URL crash (type-only import chain)
+vi.mock("@/lib/db/queries", () => ({}));
+
 // Mock next/image to render a plain <img>
 vi.mock("next/image", () => ({
   default: (props: Record<string, unknown>) =>
@@ -29,6 +32,24 @@ vi.mock("lucide-react", () => ({
     createElement("span", { "data-testid": "icon-loader", className: props.className }),
   X: (props: Record<string, unknown>) =>
     createElement("span", { "data-testid": "icon-x", className: props.className }),
+  Wand2: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-wand", className: props.className }),
+  Sparkles: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-sparkles", className: props.className }),
+  Maximize2: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-maximize", className: props.className }),
+  Minimize2: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-minimize", className: props.className }),
+}));
+
+// Mock BuilderDrawer (PromptArea dependency)
+vi.mock("@/components/prompt-builder/builder-drawer", () => ({
+  BuilderDrawer: () => null,
+}));
+
+// Mock LLMComparison (PromptArea dependency)
+vi.mock("@/components/prompt-improve/llm-comparison", () => ({
+  LLMComparison: () => null,
 }));
 
 // Mock sonner toast
@@ -266,7 +287,7 @@ describe("Variation Flow", () => {
     expect(variationJson).not.toBe("null");
 
     const variation = JSON.parse(variationJson!);
-    expect(variation.prompt).toBe("A fox in oil painting style");
+    expect(variation.promptMotiv).toBe("A fox in oil painting style");
     expect(variation.modelId).toBe("black-forest-labs/flux-2-pro");
     expect(variation.modelParams).toEqual({
       aspect_ratio: "1:1",
@@ -337,7 +358,7 @@ describe("Variation Flow", () => {
 
     // Wait for effects to propagate - PromptArea consumes variationData via useEffect
     // The prompt textarea should be populated
-    const promptTextarea = screen.getByTestId("prompt-textarea") as HTMLTextAreaElement;
+    const promptTextarea = screen.getByTestId("prompt-motiv-textarea") as HTMLTextAreaElement;
     expect(promptTextarea.value).toBe("A fox in oil painting style");
 
     // The model select trigger should show the correct model value
@@ -381,7 +402,7 @@ describe("Variation Flow", () => {
     await user.click(variationBtn);
 
     // Modify the prompt
-    const promptTextarea = screen.getByTestId("prompt-textarea") as HTMLTextAreaElement;
+    const promptTextarea = screen.getByTestId("prompt-motiv-textarea") as HTMLTextAreaElement;
     await user.clear(promptTextarea);
     await user.type(promptTextarea, "A modified fox painting");
 
@@ -395,7 +416,7 @@ describe("Variation Flow", () => {
 
     expect(mockGenerateImages).toHaveBeenCalledTimes(1);
     const callArgs = mockGenerateImages.mock.calls[0][0];
-    expect(callArgs.prompt).toBe("A modified fox painting");
+    expect(callArgs.promptMotiv).toBe("A modified fox painting");
     expect(callArgs.modelId).toBe("black-forest-labs/flux-2-pro");
     expect(callArgs.count).toBe(3);
     expect(callArgs.projectId).toBe("proj-1");
