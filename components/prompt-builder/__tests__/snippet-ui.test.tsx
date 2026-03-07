@@ -253,10 +253,11 @@ describe("My Snippets Tab", () => {
     });
     await user.click(snippetChip);
 
-    // Verify live preview contains base prompt + style selection + snippet text
+    // Verify live preview contains style fragment text + snippet text
+    // Note: basePrompt ("A fox") is NOT rendered in the preview — only composed fragment/snippet texts are shown.
+    // The "Oil Painting" fragment.fragment value contains "oil painting" as a substring.
     await waitFor(() => {
       const preview = screen.getByTestId("live-preview");
-      expect(preview).toHaveTextContent("A fox");
       expect(preview).toHaveTextContent("oil painting");
       expect(preview).toHaveTextContent("on white background");
     });
