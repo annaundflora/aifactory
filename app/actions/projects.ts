@@ -10,6 +10,7 @@ import {
   type Project,
 } from "@/lib/db/queries";
 import {
+  generateForProject,
   refreshForProject,
 } from "@/lib/services/thumbnail-service";
 
@@ -41,6 +42,8 @@ export async function createProject(input: {
 
   try {
     const project = await createProjectQuery({ name: validation.trimmed });
+    // AC-7: Fire-and-forget thumbnail generation — do NOT await
+    generateForProject(project.id).catch(console.error);
     revalidatePath("/");
     return { id: project.id, name: project.name, createdAt: project.createdAt };
   } catch (err) {

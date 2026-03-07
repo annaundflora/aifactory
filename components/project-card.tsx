@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Pencil, Trash2, ImageIcon } from "lucide-react";
+import Image from "next/image";
+import { Pencil, Trash2, ImageIcon, RefreshCw } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,8 @@ interface ProjectCardProject {
   name: string;
   createdAt: Date;
   updatedAt: Date;
+  thumbnailUrl?: string | null;
+  thumbnailStatus?: string;
 }
 
 interface ProjectCardProps {
@@ -20,6 +23,7 @@ interface ProjectCardProps {
   generationCount?: number;
   onRename: (id: string, name: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onRefreshThumbnail?: (id: string) => Promise<void>;
 }
 
 export function ProjectCard({
@@ -27,10 +31,12 @@ export function ProjectCard({
   generationCount = 0,
   onRename,
   onDelete,
+  onRefreshThumbnail,
 }: ProjectCardProps) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(project.name);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -63,6 +69,18 @@ export function ProjectCard({
     setIsDeleteDialogOpen(false);
   };
 
+  const handleRefreshThumbnail = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!onRefreshThumbnail || isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await onRefreshThumbnail(project.id);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const formattedDate = new Date(project.createdAt).toLocaleDateString(
     "de-DE",
     {
@@ -82,7 +100,7 @@ export function ProjectCard({
             // Prevent navigation when clicking action buttons
             if (
               (e.target as HTMLElement).closest(
-                '[data-action="rename"], [data-action="delete"]'
+                '[data-action="rename"], [data-action="delete"], [data-action="refresh-thumbnail"]'
               )
             ) {
               e.preventDefault();
@@ -90,9 +108,24 @@ export function ProjectCard({
           }}
         >
           {/* Thumbnail area */}
-          <div className="flex h-40 items-center justify-center bg-muted">
-            <ImageIcon className="size-12 text-muted-foreground/40" />
-          </div>
+          {project.thumbnailStatus === "completed" && project.thumbnailUrl ? (
+            <div className="relative h-40 w-full overflow-hidden bg-muted">
+              <Image
+                src={project.thumbnailUrl}
+                alt={`${project.name} thumbnail`}
+                fill
+                className="object-cover"
+              />
+            </div>
+          ) : project.thumbnailStatus === "pending" ? (
+            <div className="flex h-40 animate-pulse items-center justify-center bg-muted">
+              <ImageIcon className="size-12 text-muted-foreground/40" />
+            </div>
+          ) : (
+            <div className="flex h-40 items-center justify-center bg-muted">
+              <ImageIcon className="size-12 text-muted-foreground/40" />
+            </div>
+          )}
         </Link>
 
         {/* Card content */}
@@ -112,6 +145,21 @@ export function ProjectCard({
             )}
 
             <div className="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+              {onRefreshThumbnail && (
+                <Button
+                  data-action="refresh-thumbnail"
+                  variant="ghost"
+                  size="icon"
+                  className="size-7"
+                  disabled={isRefreshing}
+                  onClick={handleRefreshThumbnail}
+                >
+                  <RefreshCw
+                    className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+                  />
+                  <span className="sr-only">Refresh thumbnail</span>
+                </Button>
+              )}
               <Button
                 data-action="rename"
                 variant="ghost"
