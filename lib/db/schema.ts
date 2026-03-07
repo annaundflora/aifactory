@@ -7,6 +7,7 @@ import {
   jsonb,
   integer,
   bigint,
+  boolean,
   index,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
@@ -50,6 +51,9 @@ export const generations = pgTable(
     width: integer("width"),
     height: integer("height"),
     seed: bigint("seed", { mode: "number" }),
+    promptMotiv: text("prompt_motiv").notNull().default(""),
+    promptStyle: text("prompt_style").default(""),
+    isFavorite: boolean("is_favorite").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -58,6 +62,7 @@ export const generations = pgTable(
     index("generations_project_id_idx").on(table.projectId),
     index("generations_status_idx").on(table.status),
     index("generations_created_at_idx").on(table.createdAt),
+    index("generations_is_favorite_idx").on(table.isFavorite),
   ]
 );
 
