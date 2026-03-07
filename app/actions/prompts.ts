@@ -93,15 +93,21 @@ export async function getSnippets(): Promise<Record<string, Snippet[]>> {
 
 export async function improvePrompt(input: {
   prompt: string;
+  modelId: string;
 }): Promise<ImproveResult | { error: string }> {
   const prompt = input.prompt.trim();
+  const modelId = (input.modelId ?? "").trim();
 
   if (!prompt) {
     return { error: "Prompt darf nicht leer sein" };
   }
 
+  if (!modelId) {
+    return { error: "modelId darf nicht leer sein" };
+  }
+
   try {
-    return await PromptService.improve(prompt);
+    return await PromptService.improve(prompt, modelId);
   } catch (error) {
     console.error("Prompt improvement failed:", error);
     return {
