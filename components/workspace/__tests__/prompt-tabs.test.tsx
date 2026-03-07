@@ -30,6 +30,20 @@ beforeAll(() => {
 });
 
 // ---------------------------------------------------------------------------
+// Mocks
+// ---------------------------------------------------------------------------
+
+// Mock snippet-service to prevent DATABASE_URL crash (imports lib/db transitively)
+vi.mock("@/lib/services/snippet-service", () => ({
+  SnippetService: {
+    create: vi.fn().mockResolvedValue({}),
+    update: vi.fn().mockResolvedValue(null),
+    delete: vi.fn().mockResolvedValue(false),
+    getAll: vi.fn().mockResolvedValue({}),
+  },
+}));
+
+// ---------------------------------------------------------------------------
 // Import PromptTabs (no external mocks needed -- it only depends on
 // shadcn Tabs which uses Radix UI, fully supported in jsdom with polyfills)
 // ---------------------------------------------------------------------------

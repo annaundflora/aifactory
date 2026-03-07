@@ -38,6 +38,16 @@ beforeAll(() => {
 // Mock db/queries to prevent DATABASE_URL crash (type-only import in source)
 vi.mock("@/lib/db/queries", () => ({}));
 
+// Mock snippet-service to prevent DATABASE_URL crash (imports lib/db transitively)
+vi.mock("@/lib/services/snippet-service", () => ({
+  SnippetService: {
+    create: vi.fn().mockResolvedValue({}),
+    update: vi.fn().mockResolvedValue(null),
+    delete: vi.fn().mockResolvedValue(false),
+    getAll: vi.fn().mockResolvedValue({}),
+  },
+}));
+
 // Mock MODELS registry
 vi.mock("@/lib/models", () => ({
   MODELS: [
