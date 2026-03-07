@@ -145,22 +145,22 @@ export async function generateForProject(projectId: string): Promise<void> {
  * AC-6, AC-7
  */
 export async function refreshForProject(projectId: string): Promise<void> {
-  // AC-6: Load last 10 prompts for the project
-  const generationRows = await getGenerations(projectId);
-
-  if (generationRows.length === 0) {
-    // AC-7: No generations — fall back to project-name based generation
-    return generateForProject(projectId);
-  }
-
-  // AC-1 (same as generateForProject): Set status to pending before external calls
-  await updateProjectThumbnail({
-    projectId,
-    thumbnailUrl: null,
-    thumbnailStatus: "pending",
-  });
-
   try {
+    // AC-6: Load last 10 prompts for the project (inside try so DB errors are caught)
+    const generationRows = await getGenerations(projectId);
+
+    if (generationRows.length === 0) {
+      // AC-7: No generations — fall back to project-name based generation
+      return generateForProject(projectId);
+    }
+
+    // AC-1 (same as generateForProject): Set status to pending before external calls
+    await updateProjectThumbnail({
+      projectId,
+      thumbnailUrl: null,
+      thumbnailStatus: "pending",
+    });
+
     // Take the latest MAX_PROMPTS_FOR_REFRESH prompts
     const recentPrompts = generationRows
       .slice(0, MAX_PROMPTS_FOR_REFRESH)
@@ -183,7 +183,7 @@ export async function refreshForProject(projectId: string): Promise<void> {
       thumbnailStatus: "completed",
     });
   } catch (error) {
-    // AC-5: On any error, set status to failed and log — do NOT throw
+    // AC-5: On any error (incl. getGenerations DB errors), set status to failed and log — do NOT throw
     console.error(`[ThumbnailService] refreshForProject(${projectId}) failed:`, error);
     try {
       await updateProjectThumbnail({
