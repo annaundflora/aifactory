@@ -14,8 +14,16 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ProjectList } from "@/components/project-list";
 import { createProject } from "@/app/actions/projects";
 import type { Project } from "@/lib/db/queries";
@@ -59,6 +67,7 @@ export function Sidebar({ projects }: SidebarProps) {
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Projects</SidebarGroupLabel>
+          {/* Visible in expanded mode: positioned action button */}
           <SidebarGroupAction
             onClick={handleNewProject}
             disabled={isPending}
@@ -69,6 +78,19 @@ export function Sidebar({ projects }: SidebarProps) {
             <span className="sr-only">New Project</span>
           </SidebarGroupAction>
           <SidebarGroupContent>
+            {/* Fallback for icon mode: "+" as a menu button, hidden in expanded mode */}
+            <SidebarMenu className="hidden group-data-[collapsible=icon]:flex">
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={handleNewProject}
+                  disabled={isPending}
+                  tooltip="New Project"
+                >
+                  <Plus className="size-4" />
+                  <span className="sr-only">New Project</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
             <ProjectList
               projects={projects}
               activeProjectId={activeProjectId}
@@ -81,16 +103,23 @@ export function Sidebar({ projects }: SidebarProps) {
       <SidebarFooter>
         <SidebarGroup>
           <SidebarGroupContent>
-            <Link
-              href="/"
-              className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center"
-              data-testid="sidebar-back-to-overview"
-            >
-              <ArrowLeft className="size-4 shrink-0" />
-              <span className="group-data-[collapsible=icon]:hidden">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link
+                  href="/"
+                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center"
+                  data-testid="sidebar-back-to-overview"
+                >
+                  <ArrowLeft className="size-4 shrink-0" />
+                  <span className="group-data-[collapsible=icon]:hidden">
+                    Back to Overview
+                  </span>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right" align="center">
                 Back to Overview
-              </span>
-            </Link>
+              </TooltipContent>
+            </Tooltip>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarFooter>
