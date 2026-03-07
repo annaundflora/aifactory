@@ -1,7 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import {
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+} from "@/components/ui/sidebar";
 import type { Project } from "@/lib/db/queries";
 
 interface ProjectListProps {
@@ -9,30 +13,30 @@ interface ProjectListProps {
   activeProjectId?: string;
 }
 
-export function ProjectList({
-  projects,
-  activeProjectId,
-}: ProjectListProps) {
+export function ProjectList({ projects, activeProjectId }: ProjectListProps) {
   return (
-    <ul className="flex flex-col gap-0.5" data-testid="sidebar-project-list">
+    <SidebarMenu data-testid="sidebar-project-list">
       {projects.map((project) => {
         const isActive = project.id === activeProjectId;
+        const initial = project.name.charAt(0).toUpperCase();
+
         return (
-          <li key={project.id}>
-            <Link
-              href={`/projects/${project.id}`}
-              className={cn(
-                "block truncate rounded-md px-3 py-1.5 text-sm transition-colors",
-                isActive
-                  ? "bg-accent font-bold text-accent-foreground"
-                  : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground"
-              )}
+          <SidebarMenuItem key={project.id}>
+            <SidebarMenuButton
+              asChild
+              isActive={isActive}
+              tooltip={project.name}
             >
-              {project.name}
-            </Link>
-          </li>
+              <Link href={`/projects/${project.id}`}>
+                <span className="flex size-4 shrink-0 items-center justify-center rounded text-xs font-semibold">
+                  {initial}
+                </span>
+                <span>{project.name}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
         );
       })}
-    </ul>
+    </SidebarMenu>
   );
 }
