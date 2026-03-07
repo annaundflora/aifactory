@@ -57,7 +57,7 @@ export function LightboxModal({
 
   const handleVariation = useCallback(() => {
     setVariation({
-      prompt: generation.prompt,
+      promptMotiv: generation.prompt,
       negativePrompt: generation.negativePrompt ?? undefined,
       modelId: generation.modelId,
       modelParams: (generation.modelParams ?? {}) as Record<string, unknown>,

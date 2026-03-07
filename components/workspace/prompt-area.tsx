@@ -53,6 +53,12 @@ function formatPrice(price: number): string {
   return `$${price.toFixed(3)}`;
 }
 
+/** Auto-resize a textarea to fit its content. */
+function autoResize(el: HTMLTextAreaElement) {
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight}px`;
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -65,10 +71,11 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   const [schema, setSchema] = useState<SchemaProperties | null>(null);
   const [schemaLoading, setSchemaLoading] = useState(true);
 
-  // ----- Prompt state -----
-  const [prompt, setPrompt] = useState("");
+  // ----- Structured prompt state -----
+  const [promptMotiv, setPromptMotiv] = useState("");
+  const [promptStyle, setPromptStyle] = useState("");
   const [negativePrompt, setNegativePrompt] = useState("");
-  const promptRef = useRef<HTMLTextAreaElement>(null);
+  const motivRef = useRef<HTMLTextAreaElement>(null);
 
   // ----- Parameter state -----
   const [paramValues, setParamValues] = useState<Record<string, unknown>>({});
@@ -90,7 +97,8 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   useEffect(() => {
     if (!variationData) return;
 
-    setPrompt(variationData.prompt);
+    setPromptMotiv(variationData.promptMotiv);
+    setPromptStyle(variationData.promptStyle ?? "");
     setNegativePrompt(variationData.negativePrompt ?? "");
 
     if (variationData.modelId !== selectedModelId) {
@@ -136,25 +144,40 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     ? "negative_prompt" in schema
     : false;
 
-  // ----- Auto-resize textarea -----
-  const handlePromptChange = useCallback(
+  // ----- Auto-resize handlers -----
+  const handleMotivChange = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>) => {
-      setPrompt(e.target.value);
-      const el = e.target;
-      el.style.height = "auto";
-      el.style.height = `${el.scrollHeight}px`;
+      setPromptMotiv(e.target.value);
+      autoResize(e.target);
+    },
+    []
+  );
+
+  const handleStyleChange = useCallback(
+    (e: ChangeEvent<HTMLTextAreaElement>) => {
+      setPromptStyle(e.target.value);
+      autoResize(e.target);
+    },
+    []
+  );
+
+  const handleNegativePromptChange = useCallback(
+    (e: ChangeEvent<HTMLTextAreaElement>) => {
+      setNegativePrompt(e.target.value);
+      autoResize(e.target);
     },
     []
   );
 
   // ----- Generate handler -----
   const handleGenerate = useCallback(() => {
-    if (!prompt.trim()) return;
+    if (!promptMotiv.trim()) return;
 
     startGeneration(async () => {
       const result = await generateImages({
         projectId,
-        prompt: prompt.trim(),
+        promptMotiv: promptMotiv.trim(),
+        promptStyle: promptStyle.trim() || undefined,
         negativePrompt: negativePrompt.trim() || undefined,
         modelId: selectedModelId,
         params: paramValues,
@@ -165,7 +188,8 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
       }
     });
   }, [
-    prompt,
+    promptMotiv,
+    promptStyle,
     negativePrompt,
     selectedModelId,
     paramValues,
@@ -174,8 +198,8 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     onGenerationsCreated,
   ]);
 
-  // ----- Keyboard shortcut (Cmd/Ctrl+Enter) -----
-  const handleKeyDown = useCallback(
+  // ----- Keyboard shortcut (Cmd/Ctrl+Enter) on Motiv field -----
+  const handleMotivKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
@@ -189,6 +213,10 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   const handleModelChange = useCallback((modelId: string) => {
     setSelectedModelId(modelId);
   }, []);
+
+  // Shared textarea class
+  const textareaClass =
+    "flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm resize-none overflow-hidden";
 
   return (
     <div className="space-y-4" data-testid="prompt-area">
@@ -209,19 +237,21 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
         </Select>
       </div>
 
-      {/* Prompt Textarea */}
+      {/* Motiv Textarea (required) */}
       <div className="space-y-2">
-        <Label htmlFor="prompt-textarea">Prompt</Label>
+        <Label htmlFor="prompt-motiv-textarea">
+          Motiv <span aria-hidden="true" className="text-destructive">*</span>
+        </Label>
         <textarea
-          id="prompt-textarea"
-          data-testid="prompt-textarea"
-          ref={promptRef}
-          value={prompt}
-          onChange={handlePromptChange}
-          onKeyDown={handleKeyDown}
-          placeholder="Describe the image you want to generate..."
+          id="prompt-motiv-textarea"
+          data-testid="prompt-motiv-textarea"
+          ref={motivRef}
+          value={promptMotiv}
+          onChange={handleMotivChange}
+          onKeyDown={handleMotivKeyDown}
+          placeholder="Describe the main subject of your image..."
           rows={3}
-          className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm resize-none overflow-hidden"
+          className={textareaClass}
         />
         {/* Prompt Helper Buttons */}
         <div className="flex gap-2">
@@ -240,7 +270,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
             variant="outline"
             size="sm"
             onClick={() => setShowImprove(true)}
-            disabled={!prompt.trim() || showImprove}
+            disabled={!promptMotiv.trim() || showImprove}
             data-testid="improve-btn"
           >
             <Sparkles className="mr-1 size-3" />
@@ -249,33 +279,47 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
         </div>
       </div>
 
+      {/* Style / Modifier Textarea (optional) */}
+      <div className="space-y-2">
+        <Label htmlFor="prompt-style-textarea">Style / Modifier</Label>
+        <textarea
+          id="prompt-style-textarea"
+          data-testid="prompt-style-textarea"
+          value={promptStyle}
+          onChange={handleStyleChange}
+          placeholder="Add style, mood, or modifier keywords..."
+          rows={2}
+          className={textareaClass}
+        />
+      </div>
+
       {/* LLM Prompt Improvement */}
       {showImprove && (
         <LLMComparison
-          prompt={prompt}
+          prompt={promptMotiv}
           modelId={selectedModelId}
           modelDisplayName={getModelById(selectedModelId)?.displayName ?? selectedModelId}
           onAdopt={(improved) => {
-            setPrompt(improved);
+            setPromptMotiv(improved);
             setShowImprove(false);
           }}
           onDiscard={() => setShowImprove(false)}
         />
       )}
 
-      {/* Prompt Builder Drawer */}
+      {/* Prompt Builder Drawer — output goes to Style/Modifier field */}
       <BuilderDrawer
         open={builderOpen}
         onClose={(composedPrompt) => {
           setBuilderOpen(false);
           if (composedPrompt) {
-            setPrompt(composedPrompt);
+            setPromptStyle(composedPrompt);
           }
         }}
-        basePrompt={prompt}
+        basePrompt={promptStyle}
       />
 
-      {/* Negative Prompt (conditionally visible) */}
+      {/* Negative Prompt (conditionally visible based on model schema) */}
       {hasNegativePrompt && (
         <div className="space-y-2">
           <Label htmlFor="negative-prompt-textarea">Negative Prompt</Label>
@@ -283,10 +327,10 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
             id="negative-prompt-textarea"
             data-testid="negative-prompt-textarea"
             value={negativePrompt}
-            onChange={(e) => setNegativePrompt(e.target.value)}
+            onChange={handleNegativePromptChange}
             placeholder="What to avoid in the image..."
             rows={2}
-            className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm resize-none"
+            className={textareaClass}
           />
         </div>
       )}
@@ -326,7 +370,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
         <Button
           type="button"
           onClick={handleGenerate}
-          disabled={isGenerating}
+          disabled={isGenerating || !promptMotiv.trim()}
           className="ml-auto"
           data-testid="generate-button"
         >

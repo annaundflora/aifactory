@@ -8,7 +8,8 @@ import type { ReactNode } from "react";
 // ---------------------------------------------------------------------------
 
 export interface WorkspaceVariationState {
-  prompt: string;
+  promptMotiv: string;
+  promptStyle?: string;
   negativePrompt?: string;
   modelId: string;
   modelParams: Record<string, unknown>;
