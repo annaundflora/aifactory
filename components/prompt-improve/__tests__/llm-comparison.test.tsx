@@ -1,8 +1,26 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom/vitest'
+
+// ---------------------------------------------------------------------------
+// Polyfills for jsdom (Radix UI Dialog needs these)
+// ---------------------------------------------------------------------------
+
+beforeAll(() => {
+  if (typeof globalThis.ResizeObserver === 'undefined') {
+    globalThis.ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Mocks (mock_external strategy per slice spec)
+// ---------------------------------------------------------------------------
 
 // Mock sonner toast
 const mockToast = vi.fn()
@@ -24,201 +42,326 @@ vi.mock('react', async (importOriginal) => {
     ...actual,
     useTransition: () => {
       const [isPending, setIsPending] = actual.useState(false)
-      const startTransition = actual.useCallback((fn: () => void | Promise<void>) => {
-        setIsPending(true)
-        const result = fn()
-        if (result && typeof result === 'object' && 'then' in result) {
-          (result as Promise<void>).then(
-            () => setIsPending(false),
-            () => setIsPending(false)
-          )
-        } else {
-          setIsPending(false)
-        }
-      }, [])
+      const startTransition = actual.useCallback(
+        (fn: () => void | Promise<void>) => {
+          setIsPending(true)
+          const result = fn()
+          if (result && typeof result === 'object' && 'then' in result) {
+            ;(result as Promise<void>).then(
+              () => setIsPending(false),
+              () => setIsPending(false)
+            )
+          } else {
+            setIsPending(false)
+          }
+        },
+        []
+      )
       return [isPending, startTransition] as [boolean, typeof startTransition]
     },
   }
 })
 
+// Mock lucide-react XIcon used by Dialog close button
+vi.mock('lucide-react', () => ({
+  XIcon: (props: Record<string, unknown>) => (
+    <svg data-testid="x-icon" {...props} />
+  ),
+}))
+
+// Import AFTER mocks
 import { LLMComparison } from '@/components/prompt-improve/llm-comparison'
 
-describe('LLMComparison', () => {
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const defaultProps = {
+  prompt: 'A cat on a roof',
+  modelId: 'flux-2-pro',
+  modelDisplayName: 'FLUX 2 Pro',
+  onAdopt: vi.fn(),
+  onDiscard: vi.fn(),
+}
+
+function renderModal(overrides: Partial<typeof defaultProps> = {}) {
+  const props = { ...defaultProps, ...overrides }
+  // Reset callback mocks for each render
+  props.onAdopt = overrides.onAdopt ?? vi.fn()
+  props.onDiscard = overrides.onDiscard ?? vi.fn()
+  const result = render(<LLMComparison {...props} />)
+  return { ...result, props }
+}
+
+// ---------------------------------------------------------------------------
+// Tests: LLMComparison Modal (Slice 18)
+// ---------------------------------------------------------------------------
+
+describe('LLMComparison Modal', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
+  // -------------------------------------------------------------------------
+  // AC-1: Dialog oeffnet sich mit Titel und Close-Button
+  // -------------------------------------------------------------------------
+
   /**
-   * AC-5: GIVEN ein gueltiger Prompt im Eingabefeld
-   *       WHEN der User auf "Improve Prompt" klickt
-   *       THEN zeigt das LLM-Comparison-Panel einen Loading-State mit Skeleton/Spinner
-   *            und dem Text "Improving prompt..."
+   * AC-1: GIVEN der User hat einen Prompt im Motiv-Feld eingegeben und ein Modell ausgewaehlt
+   *       WHEN der User auf "Improve" klickt
+   *       THEN oeffnet sich ein shadcn Dialog (Modal) mit dem Titel "Improve Prompt"
+   *            und einem Close-Button (X)
    */
-  it('AC-5: should show skeleton/spinner with text "Improving prompt..." while loading', () => {
+  it('AC-1: should render as a shadcn Dialog with title "Improve Prompt" and close button', () => {
+    mockImprovePrompt.mockReturnValue(new Promise(() => {}))
+
+    renderModal()
+
+    // Dialog role should be present (Radix Dialog renders role="dialog")
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    // Title "Improve Prompt" should be visible
+    expect(screen.getByText('Improve Prompt')).toBeInTheDocument()
+
+    // Close button (X) should be present -- shadcn DialogContent renders
+    // a close button with sr-only text "Close"
+    expect(screen.getByRole('button', { name: /close/i })).toBeInTheDocument()
+  })
+
+  // -------------------------------------------------------------------------
+  // AC-2: Loading-State mit Original links und Skeleton rechts
+  // -------------------------------------------------------------------------
+
+  /**
+   * AC-2: GIVEN das Improve-Modal ist geoeffnet und der LLM-Call laeuft
+   *       WHEN der User wartet
+   *       THEN zeigt die linke Spalte den Original-Prompt-Text und die rechte Spalte
+   *            Skeleton-Platzhalter, dazu ein Spinner mit Text "Improving prompt..."
+   */
+  it('AC-2: should show original prompt on left and skeleton placeholders on right during loading', () => {
     // Never resolve to keep loading state
     mockImprovePrompt.mockReturnValue(new Promise(() => {}))
 
-    render(
-      <LLMComparison
-        prompt="A cat on a roof"
-        onAdopt={vi.fn()}
-        onDiscard={vi.fn()}
-      />
-    )
+    renderModal({ prompt: 'A cat on a roof' })
 
+    // Original prompt text should be visible in left column
+    expect(screen.getByText('A cat on a roof')).toBeInTheDocument()
+    expect(screen.getByText('Original')).toBeInTheDocument()
+
+    // Skeleton placeholders should be present (rendered via shadcn Skeleton)
+    const dialog = screen.getByRole('dialog')
+    const skeletons = dialog.querySelectorAll('[data-slot="skeleton"]')
+    expect(skeletons.length).toBeGreaterThanOrEqual(1)
+
+    // Spinner text "Improving prompt..." should be visible
     expect(screen.getByText('Improving prompt...')).toBeInTheDocument()
+
+    // Adopt/Discard buttons should NOT be visible during loading
+    expect(screen.queryByRole('button', { name: /adopt/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /discard/i })).not.toBeInTheDocument()
   })
 
+  // -------------------------------------------------------------------------
+  // AC-3: Side-by-Side mit Modell-Badge nach erfolgreichem LLM-Call
+  // -------------------------------------------------------------------------
+
   /**
-   * AC-6: GIVEN die improvePrompt Action gibt { original, improved } zurueck
-   *       WHEN das LLM-Comparison-Panel gerendert wird
-   *       THEN zeigt es zwei nebeneinanderliegende Panels: links "Original" mit dem
-   *            Original-Prompt (readonly), rechts "Improved" mit dem verbesserten Prompt (readonly),
-   *            und darunter die Buttons "Adopt" und "Discard"
+   * AC-3: GIVEN der LLM-Call ist erfolgreich abgeschlossen
+   *       WHEN das Ergebnis angezeigt wird
+   *       THEN zeigt das Modal Side-by-Side: links "Original" (read-only), rechts "Improved"
+   *            (read-only), darunter ein Badge "Optimized for: {Modell-DisplayName}"
+   *            (z.B. "Optimized for: FLUX 2 Pro")
    */
-  it('AC-6: should render original and improved prompt in two readonly side-by-side panels with adopt and discard buttons', async () => {
+  it('AC-3: should display side-by-side comparison with "Optimized for: {modelName}" badge after success', async () => {
     mockImprovePrompt.mockResolvedValueOnce({
       original: 'A cat on a roof',
-      improved: 'A majestic cat perched on a sunlit rooftop',
+      improved: 'A majestic feline perched atop a sunlit rooftop at golden hour',
     })
 
-    render(
-      <LLMComparison
-        prompt="A cat on a roof"
-        onAdopt={vi.fn()}
-        onDiscard={vi.fn()}
-      />
-    )
+    renderModal({
+      prompt: 'A cat on a roof',
+      modelDisplayName: 'FLUX 2 Pro',
+    })
 
+    // Wait for result to render
     await waitFor(() => {
-      expect(screen.getByText('Original')).toBeInTheDocument()
+      expect(screen.getByText('Improved')).toBeInTheDocument()
     })
 
+    // Left column: "Original" label + original text
+    expect(screen.getByText('Original')).toBeInTheDocument()
     expect(screen.getByText('A cat on a roof')).toBeInTheDocument()
-    expect(screen.getByText('Improved')).toBeInTheDocument()
-    expect(screen.getByText('A majestic cat perched on a sunlit rooftop')).toBeInTheDocument()
 
-    expect(screen.getByRole('button', { name: /adopt/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /discard/i })).toBeInTheDocument()
+    // Right column: "Improved" label + improved text
+    expect(screen.getByText('Improved')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'A majestic feline perched atop a sunlit rooftop at golden hour'
+      )
+    ).toBeInTheDocument()
+
+    // Badge with model display name
+    expect(
+      screen.getByText('Optimized for: FLUX 2 Pro')
+    ).toBeInTheDocument()
   })
 
+  // -------------------------------------------------------------------------
+  // AC-4: Adopt uebernimmt improved Prompt und schliesst Modal
+  // -------------------------------------------------------------------------
+
   /**
-   * AC-7: GIVEN das LLM-Comparison-Panel zeigt Original und Improved
+   * AC-4: GIVEN das Modal zeigt den Side-by-Side Vergleich
    *       WHEN der User auf "Adopt" klickt
-   *       THEN wird der verbesserte Prompt uebernommen und das Panel schliesst sich
+   *       THEN wird der improved Prompt ins Prompt-Feld uebernommen und das Modal schliesst sich
    */
-  it('AC-7: should call onAdopt with improved prompt when adopt is clicked', async () => {
+  it('AC-4: should call onAdopt with improved text and close modal when Adopt is clicked', async () => {
     const user = userEvent.setup()
     const onAdopt = vi.fn()
     const onDiscard = vi.fn()
 
     mockImprovePrompt.mockResolvedValueOnce({
       original: 'A cat on a roof',
-      improved: 'A majestic cat perched on a sunlit rooftop',
+      improved: 'A majestic feline perched atop a sunlit rooftop',
     })
 
-    render(
-      <LLMComparison
-        prompt="A cat on a roof"
-        onAdopt={onAdopt}
-        onDiscard={onDiscard}
-      />
-    )
+    renderModal({ onAdopt, onDiscard })
 
+    // Wait for Adopt button to appear (result state)
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /adopt/i })).toBeInTheDocument()
     })
 
+    // Click Adopt
     await user.click(screen.getByRole('button', { name: /adopt/i }))
 
-    expect(onAdopt).toHaveBeenCalledWith('A majestic cat perched on a sunlit rooftop')
+    // onAdopt should be called with the improved text
+    expect(onAdopt).toHaveBeenCalledWith(
+      'A majestic feline perched atop a sunlit rooftop'
+    )
+
+    // onDiscard should NOT have been called
     expect(onDiscard).not.toHaveBeenCalled()
   })
 
+  // -------------------------------------------------------------------------
+  // AC-5: Discard schliesst Modal ohne Aenderung
+  // -------------------------------------------------------------------------
+
   /**
-   * AC-8: GIVEN das LLM-Comparison-Panel zeigt Original und Improved
+   * AC-5: GIVEN das Modal zeigt den Side-by-Side Vergleich
    *       WHEN der User auf "Discard" klickt
-   *       THEN schliesst sich das Panel und der Original-Prompt im Eingabefeld bleibt unveraendert
+   *       THEN schliesst sich das Modal ohne Aenderungen am Prompt-Feld
    */
-  it('AC-8: should call onDiscard and close panel without changing prompt when discard is clicked', async () => {
+  it('AC-5: should call onDiscard and close modal when Discard is clicked', async () => {
     const user = userEvent.setup()
     const onAdopt = vi.fn()
     const onDiscard = vi.fn()
 
     mockImprovePrompt.mockResolvedValueOnce({
       original: 'A cat on a roof',
-      improved: 'A majestic cat perched on a sunlit rooftop',
+      improved: 'A majestic feline perched atop a sunlit rooftop',
     })
 
-    render(
-      <LLMComparison
-        prompt="A cat on a roof"
-        onAdopt={onAdopt}
-        onDiscard={onDiscard}
-      />
-    )
+    renderModal({ onAdopt, onDiscard })
 
+    // Wait for Discard button to appear (result state)
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /discard/i })).toBeInTheDocument()
+      expect(
+        screen.getByRole('button', { name: /discard/i })
+      ).toBeInTheDocument()
     })
 
+    // Click Discard
     await user.click(screen.getByRole('button', { name: /discard/i }))
 
+    // onDiscard should be called
     expect(onDiscard).toHaveBeenCalled()
+
+    // onAdopt should NOT have been called
     expect(onAdopt).not.toHaveBeenCalled()
   })
 
+  // -------------------------------------------------------------------------
+  // AC-6: Fehler zeigt Toast und schliesst Modal
+  // -------------------------------------------------------------------------
+
   /**
-   * AC-9: GIVEN die improvePrompt Action gibt einen Fehler zurueck
-   *       WHEN das LLM-Comparison-Panel den Fehler empfaengt
-   *       THEN wird eine Toast-Notification "Prompt-Verbesserung fehlgeschlagen" angezeigt
-   *            und das Panel schliesst sich automatisch
+   * AC-6: GIVEN der LLM-Call schlaegt fehl
+   *       WHEN ein Fehler auftritt
+   *       THEN wird ein Toast "Prompt-Verbesserung fehlgeschlagen" angezeigt und das Modal
+   *            schliesst automatisch
    */
-  it('AC-9: should show error toast and close panel automatically on error', async () => {
+  it('AC-6: should show error toast and close modal when LLM call fails', async () => {
     const onDiscard = vi.fn()
 
     mockImprovePrompt.mockResolvedValueOnce({
       error: 'Something went wrong',
     })
 
-    render(
-      <LLMComparison
-        prompt="A cat on a roof"
-        onAdopt={vi.fn()}
-        onDiscard={onDiscard}
-      />
-    )
+    renderModal({ onDiscard })
 
+    // Toast should be called with error message
     await waitFor(() => {
-      expect(mockToast).toHaveBeenCalledWith('Prompt-Verbesserung fehlgeschlagen')
+      expect(mockToast).toHaveBeenCalledWith(
+        'Prompt-Verbesserung fehlgeschlagen'
+      )
     })
 
+    // Modal should close automatically via onDiscard
     expect(onDiscard).toHaveBeenCalled()
   })
 
+  // -------------------------------------------------------------------------
+  // AC-7: modelId wird an improvePrompt Action uebergeben
+  // -------------------------------------------------------------------------
+
   /**
-   * AC-10: GIVEN das LLM-Comparison-Panel ist im Loading-State
-   *        WHEN der User wartet
-   *        THEN bleibt der "Improve Prompt"-Button disabled (kein doppelter Request)
+   * AC-7: GIVEN der Improve-Button in prompt-area.tsx
+   *       WHEN der User auf "Improve" klickt
+   *       THEN wird die aktuell ausgewaehlte modelId (aus dem Model-Dropdown) an die
+   *            LLMComparison-Komponente uebergeben
    */
-  it('AC-10: should keep improve button disabled while loading to prevent duplicate requests', () => {
-    // Never resolve to keep loading state
+  it('AC-7: should receive modelId prop and pass it to improvePrompt action', async () => {
+    mockImprovePrompt.mockResolvedValueOnce({
+      original: 'A cat on a roof',
+      improved: 'A majestic feline perched atop a sunlit rooftop',
+    })
+
+    renderModal({
+      prompt: 'A cat on a roof',
+      modelId: 'flux-2-pro',
+    })
+
+    // Wait for the improvePrompt call to happen (on mount)
+    await waitFor(() => {
+      expect(mockImprovePrompt).toHaveBeenCalledTimes(1)
+    })
+
+    // Verify modelId was passed to the action
+    expect(mockImprovePrompt).toHaveBeenCalledWith({
+      prompt: 'A cat on a roof',
+      modelId: 'flux-2-pro',
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // Additional: Close button (X) triggers onDiscard
+  // -------------------------------------------------------------------------
+
+  it('should call onDiscard when Dialog close button (X) is clicked', async () => {
+    const user = userEvent.setup()
+    const onDiscard = vi.fn()
+
     mockImprovePrompt.mockReturnValue(new Promise(() => {}))
 
-    render(
-      <LLMComparison
-        prompt="A cat on a roof"
-        onAdopt={vi.fn()}
-        onDiscard={vi.fn()}
-      />
-    )
+    renderModal({ onDiscard })
 
-    // In loading state, no Adopt/Discard buttons should be clickable --
-    // the component renders a loading skeleton instead of action buttons
-    expect(screen.queryByRole('button', { name: /adopt/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /discard/i })).not.toBeInTheDocument()
+    // Click the X close button
+    const closeButton = screen.getByRole('button', { name: /close/i })
+    await user.click(closeButton)
 
-    // Loading indicator is shown
-    expect(screen.getByText('Improving prompt...')).toBeInTheDocument()
+    // onDiscard should be called via onOpenChange(false)
+    expect(onDiscard).toHaveBeenCalled()
   })
 })
