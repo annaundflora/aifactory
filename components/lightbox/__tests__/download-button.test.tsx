@@ -100,6 +100,9 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
     height: overrides.height ?? 512,
     seed: overrides.seed ?? null,
     createdAt: overrides.createdAt ?? new Date("2026-03-02T14:32:00Z"),
+    promptMotiv: overrides.promptMotiv ?? "",
+    promptStyle: overrides.promptStyle ?? "",
+    isFavorite: overrides.isFavorite ?? false,
   };
 }
 
