@@ -26,6 +26,7 @@ vi.mock("next/link", () => ({
 
 // Import AFTER mocks
 import { ProjectList } from "@/components/project-list";
+import { SidebarProvider } from "@/components/ui/sidebar";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -58,7 +59,9 @@ describe("ProjectList", () => {
     ];
 
     render(
-      <ProjectList projects={projects} activeProjectId="proj-b" />
+      <SidebarProvider>
+        <ProjectList projects={projects} activeProjectId="proj-b" />
+      </SidebarProvider>
     );
 
     // All projects should be rendered
@@ -88,7 +91,11 @@ describe("ProjectList", () => {
    * AC-9 edge case: Empty project list should render empty list container
    */
   it("AC-9: should render empty list when no projects provided", () => {
-    render(<ProjectList projects={[]} />);
+    render(
+      <SidebarProvider>
+        <ProjectList projects={[]} />
+      </SidebarProvider>
+    );
 
     const list = screen.getByTestId("sidebar-project-list");
     expect(list).toBeInTheDocument();
@@ -104,7 +111,11 @@ describe("ProjectList", () => {
       makeProject("proj-b", "Project Beta"),
     ];
 
-    render(<ProjectList projects={projects} />);
+    render(
+      <SidebarProvider>
+        <ProjectList projects={projects} />
+      </SidebarProvider>
+    );
 
     // No project should be bold
     expect(screen.getByText("Project Alpha")).not.toHaveClass("font-bold");
