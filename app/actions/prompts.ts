@@ -5,6 +5,14 @@ import {
   PromptService,
   type ImproveResult,
 } from "@/lib/services/prompt-service";
+import {
+  promptHistoryService,
+  type PromptHistoryEntry,
+} from "@/lib/services/prompt-history-service";
+
+// UUID v4 format validation
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function validateSnippetInput(input: {
   text: string;
@@ -88,6 +96,56 @@ export async function getSnippets(): Promise<Record<string, Snippet[]>> {
     return await SnippetService.getAll();
   } catch {
     return {};
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Prompt History Actions (Slice 11)
+// ---------------------------------------------------------------------------
+
+export async function getPromptHistory(input: {
+  offset?: number;
+  limit?: number;
+}): Promise<PromptHistoryEntry[] | { error: string }> {
+  const offset = input.offset ?? 0;
+  const limit = input.limit ?? 50;
+
+  try {
+    return await promptHistoryService.getHistory(offset, limit);
+  } catch {
+    return { error: "Fehler beim Laden der Prompt-History" };
+  }
+}
+
+export async function getFavoritePrompts(input: {
+  offset?: number;
+  limit?: number;
+}): Promise<PromptHistoryEntry[] | { error: string }> {
+  const offset = input.offset ?? 0;
+  const limit = input.limit ?? 50;
+
+  try {
+    return await promptHistoryService.getFavorites(offset, limit);
+  } catch {
+    return { error: "Fehler beim Laden der Favoriten" };
+  }
+}
+
+export async function toggleFavorite(input: {
+  generationId: string;
+}): Promise<{ isFavorite: boolean } | { error: string }> {
+  const generationId = (input.generationId ?? "").trim();
+
+  if (!UUID_REGEX.test(generationId)) {
+    return { error: "Ungueltige generationId: muss ein gueltiges UUID-Format haben" };
+  }
+
+  try {
+    return await promptHistoryService.toggleFavorite(generationId);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Fehler beim Toggling des Favoriten";
+    return { error: message };
   }
 }
 
