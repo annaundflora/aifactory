@@ -17,7 +17,8 @@ import { StorageService } from "@/lib/clients/storage";
 
 interface GenerateImagesInput {
   projectId: string;
-  prompt: string;
+  promptMotiv: string;
+  promptStyle?: string;
   negativePrompt?: string;
   modelId: string;
   params: Record<string, unknown>;
@@ -40,7 +41,7 @@ export async function generateImages(
   input: GenerateImagesInput
 ): Promise<Generation[] | { error: string }> {
   // AC-9: Empty prompt validation
-  if (!input.prompt || input.prompt.trim().length === 0) {
+  if (!input.promptMotiv || input.promptMotiv.trim().length === 0) {
     return { error: "Prompt darf nicht leer sein" };
   }
 
@@ -61,7 +62,8 @@ export async function generateImages(
   try {
     const generations = await GenerationService.generate(
       input.projectId,
-      input.prompt,
+      input.promptMotiv,
+      input.promptStyle ?? '',
       input.negativePrompt,
       input.modelId,
       input.params,

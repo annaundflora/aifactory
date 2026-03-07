@@ -137,14 +137,15 @@ function buildReplicateInput(
  */
 async function generate(
   projectId: string,
-  prompt: string,
+  promptMotiv: string,
+  promptStyle: string,
   negativePrompt: string | undefined,
   modelId: string,
   params: Record<string, unknown>,
   count: number
 ): Promise<Generation[]> {
   // Validate
-  if (!prompt || prompt.trim().length === 0) {
+  if (!promptMotiv || promptMotiv.trim().length === 0) {
     throw new Error("Prompt darf nicht leer sein");
   }
   if (!getModelById(modelId)) {
@@ -154,15 +155,22 @@ async function generate(
     throw new Error("Anzahl muss zwischen 1 und 4 liegen");
   }
 
+  // Compose prompt from motiv + style
+  const motivTrimmed = promptMotiv.trim();
+  const styleTrimmed = promptStyle.trim();
+  const prompt = styleTrimmed ? `${motivTrimmed}. ${styleTrimmed}` : motivTrimmed;
+
   // AC-1: Create N pending records
   const pendingGenerations: Generation[] = [];
   for (let i = 0; i < count; i++) {
     const gen = await createGeneration({
       projectId,
-      prompt: prompt.trim(),
+      prompt,
       negativePrompt: negativePrompt?.trim() || undefined,
       modelId,
       modelParams: params,
+      promptMotiv: motivTrimmed,
+      promptStyle: styleTrimmed,
     });
     pendingGenerations.push(gen);
   }

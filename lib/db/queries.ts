@@ -66,6 +66,8 @@ export async function createGeneration(input: {
   negativePrompt?: string;
   modelId: string;
   modelParams?: Record<string, unknown>;
+  promptMotiv?: string;
+  promptStyle?: string;
 }): Promise<Generation> {
   const [generation] = await db
     .insert(generations)
@@ -75,6 +77,8 @@ export async function createGeneration(input: {
       negativePrompt: input.negativePrompt ?? null,
       modelId: input.modelId,
       modelParams: input.modelParams ?? {},
+      promptMotiv: input.promptMotiv ?? '',
+      promptStyle: input.promptStyle ?? '',
     })
     .returning();
   return generation;
