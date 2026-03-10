@@ -355,8 +355,39 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     async (targetMode: GenerationMode) => {
       if (targetMode === currentMode) return;
 
-      // 1. Save current state
-      saveCurrentModeState();
+      // 1. Compute a local snapshot of the saved state BEFORE calling setModeStates.
+      //    This avoids a race condition where setModeStates (async React batch)
+      //    hasn't updated modeStates yet when we try to read it below.
+      const snapshot: ModeStates = { ...modeStates };
+      if (currentMode === "txt2img") {
+        snapshot.txt2img = {
+          promptMotiv,
+          promptStyle,
+          negativePrompt,
+          modelId: selectedModelId,
+          paramValues,
+          variantCount,
+        };
+      } else if (currentMode === "img2img") {
+        snapshot.img2img = {
+          promptMotiv,
+          promptStyle,
+          negativePrompt,
+          modelId: selectedModelId,
+          paramValues,
+          variantCount,
+          sourceImageUrl,
+          strength,
+        };
+      } else if (currentMode === "upscale") {
+        snapshot.upscale = {
+          sourceImageUrl: upscaleSourceImageUrl,
+          scale: upscaleScale,
+        };
+      }
+
+      // Persist the snapshot into React state
+      setModeStates(snapshot);
 
       // 2. Determine which fields to restore vs carry over
       //    Per State Persistence Matrix:
@@ -367,34 +398,58 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
       if (targetMode === "upscale") {
         // Switching TO upscale: restore upscale-specific state only
-        setUpscaleSourceImageUrl(modeStates.upscale.sourceImageUrl);
-        setUpscaleScale(modeStates.upscale.scale);
+        setUpscaleSourceImageUrl(snapshot.upscale.sourceImageUrl);
+        setUpscaleScale(snapshot.upscale.scale);
       } else if (targetMode === "img2img") {
         if (fromHasPrompt) {
           // txt2img -> img2img: "Keep" prompt, model, params; restore img2img-specific fields
-          setSourceImageUrl(modeStates.img2img.sourceImageUrl);
-          setStrength(modeStates.img2img.strength);
+          setSourceImageUrl(snapshot.img2img.sourceImageUrl);
+          setStrength(snapshot.img2img.strength);
           // Prompt, model, params, variantCount stay as-is (Keep)
         } else {
-          // upscale -> img2img: "Restore" all from img2img state
-          restoreModeState(targetMode);
+          // upscale -> img2img: "Restore" all from snapshot
+          const s = snapshot.img2img;
+          setPromptMotiv(s.promptMotiv);
+          setPromptStyle(s.promptStyle);
+          setNegativePrompt(s.negativePrompt);
+          setSelectedModelId(s.modelId);
+          setParamValues(s.paramValues);
+          setVariantCount(s.variantCount);
+          setSourceImageUrl(s.sourceImageUrl);
+          setStrength(s.strength);
         }
       } else if (targetMode === "txt2img") {
         if (fromHasPrompt) {
           // img2img -> txt2img: "Keep" prompt, model, params
           // Prompt, model, params, variantCount stay as-is (Keep)
         } else {
-          // upscale -> txt2img: "Restore" all from txt2img state
-          restoreModeState(targetMode);
+          // upscale -> txt2img: "Restore" all from snapshot
+          const s = snapshot.txt2img;
+          setPromptMotiv(s.promptMotiv);
+          setPromptStyle(s.promptStyle);
+          setNegativePrompt(s.negativePrompt);
+          setSelectedModelId(s.modelId);
+          setParamValues(s.paramValues);
+          setVariantCount(s.variantCount);
         }
       }
 
       // 3. Transfer source image if moving between img2img and upscale
-      transferSourceImage(currentMode, targetMode);
+      //    Only transfer when the target mode's stored sourceImageUrl is null/undefined
+      //    (restore wins over transfer — avoids overwriting a previously stored image)
+      if (currentMode === "img2img" && targetMode === "upscale") {
+        if (!snapshot.upscale.sourceImageUrl) {
+          setUpscaleSourceImageUrl(sourceImageUrl);
+        }
+      } else if (currentMode === "upscale" && targetMode === "img2img") {
+        if (!snapshot.img2img.sourceImageUrl) {
+          setSourceImageUrl(upscaleSourceImageUrl);
+        }
+      }
 
       // 4. If switching to img2img, check model compatibility (AC-12)
       if (targetMode === "img2img") {
-        const activeModelId = fromHasPrompt ? selectedModelId : modeStates.img2img.modelId;
+        const activeModelId = fromHasPrompt ? selectedModelId : snapshot.img2img.modelId;
         const compatibleModelId = await checkAndAutoSwitchModel(activeModelId);
         if (compatibleModelId !== activeModelId) {
           setSelectedModelId(compatibleModelId);
@@ -412,9 +467,15 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     [
       currentMode,
       selectedModelId,
-      saveCurrentModeState,
-      restoreModeState,
-      transferSourceImage,
+      promptMotiv,
+      promptStyle,
+      negativePrompt,
+      paramValues,
+      variantCount,
+      sourceImageUrl,
+      strength,
+      upscaleSourceImageUrl,
+      upscaleScale,
       checkAndAutoSwitchModel,
       modeStates,
     ]
@@ -450,6 +511,8 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
         } else {
           setParamValues(variationData.modelParams);
         }
+      } else if (targetMode === "upscale") {
+        setUpscaleSourceImageUrl(variationData.sourceImageUrl ?? null);
       }
 
       setCurrentMode(targetMode);

@@ -64,6 +64,7 @@ export function LightboxModal({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isUpscaling, setIsUpscaling] = useState(false);
   const [upscalePopoverOpen, setUpscalePopoverOpen] = useState(false);
   const { setVariation } = useWorkspaceVariation();
 
@@ -100,20 +101,28 @@ export function LightboxModal({
   // AC-6, AC-7: Upscale handler — calls upscaleImage action with selected scale
   const handleUpscale = useCallback(
     async (scale: 2 | 4) => {
+      if (!generation.imageUrl || isUpscaling) return;
       setUpscalePopoverOpen(false);
-      toast("Upscaling...");
-      const result = await upscaleImage({
-        projectId: generation.projectId,
-        sourceImageUrl: generation.imageUrl!,
-        scale,
-        sourceGenerationId: generation.id,
-      });
-      // AC-8: Show error toast if upscaleImage returns error
-      if ("error" in result) {
-        toast.error(result.error);
+      setIsUpscaling(true);
+      try {
+        toast("Upscaling...");
+        const result = await upscaleImage({
+          projectId: generation.projectId,
+          sourceImageUrl: generation.imageUrl,
+          scale,
+          sourceGenerationId: generation.id,
+        });
+        // AC-8: Show error toast if upscaleImage returns error
+        if ("error" in result) {
+          toast.error(result.error);
+        }
+      } catch {
+        toast.error("Upscale fehlgeschlagen");
+      } finally {
+        setIsUpscaling(false);
       }
     },
-    [generation]
+    [generation, isUpscaling]
   );
 
   const handleDownload = useCallback(async () => {
@@ -357,10 +366,15 @@ export function LightboxModal({
                   <Popover open={upscalePopoverOpen} onOpenChange={setUpscalePopoverOpen}>
                     <PopoverTrigger asChild>
                       <button
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:pointer-events-none disabled:opacity-50"
+                        disabled={isUpscaling}
                         data-testid="upscale-btn"
                       >
-                        <ZoomIn className="size-4" />
+                        {isUpscaling ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <ZoomIn className="size-4" />
+                        )}
                         Upscale
                       </button>
                     </PopoverTrigger>
