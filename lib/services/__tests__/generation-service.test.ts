@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
+import fs from "fs";
+import path from "path";
 
 // ---------------------------------------------------------------------------
 // Mocks (mock_external strategy per slice spec)
@@ -464,5 +466,76 @@ describe("GenerationService", () => {
     await expect(GenerationService.retry("gen-nofail")).rejects.toThrow(
       "Nur fehlgeschlagene Generierungen koennen wiederholt werden"
     );
+  });
+
+  // =========================================================================
+  // Slice-04 ACs: Remove Whitelist from generation-service
+  // =========================================================================
+
+  // AC-2: GIVEN generation-service.ts nach dem Refactoring
+  //       WHEN die Datei inspiziert wird
+  //       THEN existiert KEIN Import von @/lib/models (kein getModelById)
+  it("Slice04-AC-2: should not import from lib/models", () => {
+    const filePath = path.resolve(__dirname, "..", "generation-service.ts");
+    const source = fs.readFileSync(filePath, "utf-8");
+
+    expect(source).not.toMatch(/from\s+['"]@\/lib\/models['"]/);
+    expect(source).not.toMatch(/require\s*\(\s*['"]@\/lib\/models['"]\s*\)/);
+    expect(source).not.toContain("getModelById");
+  });
+
+  // AC-8 (slice-04): GIVEN generation-service.ts nach dem Refactoring
+  //       WHEN generate() mit modelId: "newowner/new-model" aufgerufen wird (bisher nicht in der Whitelist)
+  //       THEN wird die Generation normal erstellt (kein Whitelist-Reject)
+  it("Slice04-AC-8: should accept any valid owner/name model ID and create generation without whitelist reject", async () => {
+    const gen = makeGeneration({ id: "gen-new", modelId: "newowner/new-model" });
+    (createGeneration as Mock).mockResolvedValue(gen);
+
+    (ReplicateClient.run as Mock).mockResolvedValue({
+      output: bufferToStream(PNG_BUFFER),
+      predictionId: "pred-new",
+      seed: 100,
+    });
+    (StorageService.upload as Mock).mockResolvedValue("https://r2.example.com/img.png");
+    (updateGeneration as Mock).mockResolvedValue(
+      makeGeneration({ id: "gen-new", status: "completed" })
+    );
+
+    const result = await GenerationService.generate(
+      "proj-001",
+      "A cat",
+      "",
+      undefined,
+      "newowner/new-model",
+      {},
+      1
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].status).toBe("pending");
+    expect(createGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelId: "newowner/new-model",
+      })
+    );
+  });
+
+  // AC-9: GIVEN generation-service.ts nach dem Refactoring
+  //       WHEN generate() mit modelId: "invalid" aufgerufen wird (ohne /)
+  //       THEN wird ein Error geworfen mit Message "Unbekanntes Modell"
+  it('Slice04-AC-9: should throw "Unbekanntes Modell" for model ID without slash', async () => {
+    await expect(
+      GenerationService.generate(
+        "proj-001",
+        "A cat",
+        "",
+        undefined,
+        "invalid",
+        {},
+        1
+      )
+    ).rejects.toThrow("Unbekanntes Modell");
+
+    expect(createGeneration).not.toHaveBeenCalled();
   });
 });
