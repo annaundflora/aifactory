@@ -2,14 +2,19 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
-import { Copy, Download, Loader2, Maximize2, Minimize2, Trash2, X } from "lucide-react";
+import { ArrowRightLeft, Copy, Download, Loader2, Maximize2, Minimize2, Trash2, X, ZoomIn } from "lucide-react";
 import { toast } from "sonner";
 import { type Generation } from "@/lib/db/queries";
 import { getModelById } from "@/lib/models";
 import { downloadImage, generateDownloadFilename } from "@/lib/utils";
 import { useWorkspaceVariation } from "@/lib/workspace-state";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { deleteGeneration } from "@/app/actions/generations";
+import { deleteGeneration, upscaleImage } from "@/app/actions/generations";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -59,7 +64,11 @@ export function LightboxModal({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [upscalePopoverOpen, setUpscalePopoverOpen] = useState(false);
   const { setVariation } = useWorkspaceVariation();
+
+  const isUpscaleMode = generation.generationMode === "upscale";
+  const isImg2ImgMode = generation.generationMode === "img2img";
 
   const handleVariation = useCallback(() => {
     setVariation({
@@ -67,9 +76,45 @@ export function LightboxModal({
       negativePrompt: generation.negativePrompt ?? undefined,
       modelId: generation.modelId,
       modelParams: (generation.modelParams ?? {}) as Record<string, unknown>,
+      // AC-9: For img2img, use the generation's sourceImageUrl (the original source), not imageUrl
+      ...(isImg2ImgMode
+        ? { targetMode: "img2img", sourceImageUrl: generation.sourceImageUrl ?? undefined }
+        : {}),
+    });
+    onClose();
+  }, [generation, setVariation, onClose, isImg2ImgMode]);
+
+  // AC-4: img2img button handler — sets variation with targetMode img2img and closes lightbox
+  const handleImg2Img = useCallback(() => {
+    setVariation({
+      promptMotiv: generation.prompt,
+      negativePrompt: generation.negativePrompt ?? undefined,
+      modelId: generation.modelId,
+      modelParams: (generation.modelParams ?? {}) as Record<string, unknown>,
+      targetMode: "img2img",
+      sourceImageUrl: generation.imageUrl ?? undefined,
     });
     onClose();
   }, [generation, setVariation, onClose]);
+
+  // AC-6, AC-7: Upscale handler — calls upscaleImage action with selected scale
+  const handleUpscale = useCallback(
+    async (scale: 2 | 4) => {
+      setUpscalePopoverOpen(false);
+      toast("Upscaling...");
+      const result = await upscaleImage({
+        projectId: generation.projectId,
+        sourceImageUrl: generation.imageUrl!,
+        scale,
+        sourceGenerationId: generation.id,
+      });
+      // AC-8: Show error toast if upscaleImage returns error
+      if ("error" in result) {
+        toast.error(result.error);
+      }
+    },
+    [generation]
+  );
 
   const handleDownload = useCallback(async () => {
     if (!generation.imageUrl || isDownloading) return;
@@ -287,14 +332,58 @@ export function LightboxModal({
             {/* Actions */}
             {generation.imageUrl && (
               <div className="flex flex-col gap-2 pt-2">
+                {/* AC-1/2/3: Variation — hidden for upscale mode */}
+                {!isUpscaleMode && (
+                  <button
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
+                    onClick={handleVariation}
+                    data-testid="variation-btn"
+                  >
+                    <Copy className="size-4" />
+                    Variation
+                  </button>
+                )}
+                {/* AC-1/2/3/4: img2img button — visible for all modes */}
                 <button
                   className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
-                  onClick={handleVariation}
-                  data-testid="variation-btn"
+                  onClick={handleImg2Img}
+                  data-testid="img2img-btn"
                 >
-                  <Copy className="size-4" />
-                  Variation
+                  <ArrowRightLeft className="size-4" />
+                  img2img
                 </button>
+                {/* AC-1/2/3/5/6/7: Upscale popover — hidden for upscale mode */}
+                {!isUpscaleMode && (
+                  <Popover open={upscalePopoverOpen} onOpenChange={setUpscalePopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <button
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
+                        data-testid="upscale-btn"
+                      >
+                        <ZoomIn className="size-4" />
+                        Upscale
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-40 p-2" align="start">
+                      <div className="flex flex-col gap-1">
+                        <button
+                          className="w-full rounded-md px-3 py-2 text-sm font-medium text-left transition-colors hover:bg-muted"
+                          onClick={() => handleUpscale(2)}
+                          data-testid="upscale-2x-btn"
+                        >
+                          2x
+                        </button>
+                        <button
+                          className="w-full rounded-md px-3 py-2 text-sm font-medium text-left transition-colors hover:bg-muted"
+                          onClick={() => handleUpscale(4)}
+                          data-testid="upscale-4x-btn"
+                        >
+                          4x
+                        </button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                )}
                 <button
                   className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
                   onClick={handleDownload}
