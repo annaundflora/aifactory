@@ -10,6 +10,7 @@ vi.mock("@/lib/services/generation-service", () => ({
   GenerationService: {
     generate: vi.fn(),
     retry: vi.fn(),
+    upscale: vi.fn(),
   },
 }));
 
@@ -35,7 +36,7 @@ vi.mock("@/lib/clients/storage", () => ({
   },
 }));
 
-import { generateImages, retryGeneration, deleteGeneration, uploadSourceImage } from "@/app/actions/generations";
+import { generateImages, retryGeneration, deleteGeneration, uploadSourceImage, upscaleImage } from "@/app/actions/generations";
 import { GenerationService } from "@/lib/services/generation-service";
 import { getGeneration, deleteGeneration as deleteGenerationFromDb, type Generation } from "@/lib/db/queries";
 import { StorageService } from "@/lib/clients/storage";
@@ -452,5 +453,281 @@ describe("uploadSourceImage Server Action", () => {
       `sources/${PROJECT_ID}/test-uuid-1234.jpg`,
       "image/jpeg"
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: generateImages img2img extensions (Slice 09, AC 1-5)
+// ---------------------------------------------------------------------------
+
+describe("generateImages img2img extensions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /**
+   * AC-1: GIVEN generateImages wird mit generationMode: "img2img" aber ohne sourceImageUrl aufgerufen
+   * WHEN die Action die Eingaben validiert
+   * THEN gibt sie { error: "Source-Image ist erforderlich fuer img2img" } zurueck
+   *      und ruft GenerationService.generate() nicht auf
+   */
+  it('AC-1: should return error when generationMode is img2img and sourceImageUrl is missing', async () => {
+    const result = await generateImages({
+      projectId: "proj-001",
+      promptMotiv: "A fox",
+      modelId: "black-forest-labs/flux-2-pro",
+      params: {},
+      count: 1,
+      generationMode: "img2img",
+      // sourceImageUrl intentionally omitted
+    });
+
+    expect(result).toEqual({ error: "Source-Image ist erforderlich fuer img2img" });
+    expect(GenerationService.generate).not.toHaveBeenCalled();
+  });
+
+  /**
+   * AC-2: GIVEN generateImages wird mit generationMode: "img2img", einer gueltigen sourceImageUrl
+   *       und strength: 1.5 aufgerufen
+   * WHEN die Action die Eingaben validiert
+   * THEN gibt sie { error: "Strength muss zwischen 0 und 1 liegen" } zurueck
+   *      und ruft GenerationService.generate() nicht auf
+   */
+  it('AC-2: should return error when strength is greater than 1', async () => {
+    const result = await generateImages({
+      projectId: "proj-001",
+      promptMotiv: "A fox",
+      modelId: "black-forest-labs/flux-2-pro",
+      params: {},
+      count: 1,
+      generationMode: "img2img",
+      sourceImageUrl: "https://r2.example.com/sources/p1/abc.png",
+      strength: 1.5,
+    });
+
+    expect(result).toEqual({ error: "Strength muss zwischen 0 und 1 liegen" });
+    expect(GenerationService.generate).not.toHaveBeenCalled();
+  });
+
+  /**
+   * AC-3: GIVEN generateImages wird mit generationMode: "img2img", einer gueltigen sourceImageUrl
+   *       und strength: -0.1 aufgerufen
+   * WHEN die Action die Eingaben validiert
+   * THEN gibt sie { error: "Strength muss zwischen 0 und 1 liegen" } zurueck
+   *      und ruft GenerationService.generate() nicht auf
+   */
+  it('AC-3: should return error when strength is less than 0', async () => {
+    const result = await generateImages({
+      projectId: "proj-001",
+      promptMotiv: "A fox",
+      modelId: "black-forest-labs/flux-2-pro",
+      params: {},
+      count: 1,
+      generationMode: "img2img",
+      sourceImageUrl: "https://r2.example.com/sources/p1/abc.png",
+      strength: -0.1,
+    });
+
+    expect(result).toEqual({ error: "Strength muss zwischen 0 und 1 liegen" });
+    expect(GenerationService.generate).not.toHaveBeenCalled();
+  });
+
+  /**
+   * AC-4: GIVEN generateImages wird mit generationMode: "img2img",
+   *       sourceImageUrl: "https://r2.example.com/sources/p1/abc.png" und strength: 0.6 aufgerufen
+   * WHEN die Validierung erfolgreich ist
+   * THEN delegiert die Action an GenerationService.generate() mit den Feldern
+   *      generationMode, sourceImageUrl und strength und gibt das Ergebnis (Generation[]) zurueck
+   */
+  it('AC-4: should call GenerationService.generate with generationMode, sourceImageUrl and strength for img2img', async () => {
+    const mockGenerations = [makeGeneration({ id: "gen-img2img-001" })];
+    (GenerationService.generate as Mock).mockResolvedValue(mockGenerations);
+
+    const result = await generateImages({
+      projectId: "proj-001",
+      promptMotiv: "A fox",
+      modelId: "black-forest-labs/flux-2-pro",
+      params: {},
+      count: 1,
+      generationMode: "img2img",
+      sourceImageUrl: "https://r2.example.com/sources/p1/abc.png",
+      strength: 0.6,
+    });
+
+    expect(GenerationService.generate).toHaveBeenCalledWith(
+      "proj-001",          // projectId
+      "A fox",             // promptMotiv
+      "",                  // promptStyle (defaults to '')
+      undefined,           // negativePrompt
+      "black-forest-labs/flux-2-pro", // modelId
+      {},                  // params
+      1,                   // count
+      "img2img",           // generationMode
+      "https://r2.example.com/sources/p1/abc.png", // sourceImageUrl
+      0.6                  // strength
+    );
+    expect(result).toEqual(mockGenerations);
+  });
+
+  /**
+   * AC-5: GIVEN generateImages wird ohne generationMode aufgerufen (bestehender txt2img-Call)
+   * WHEN die Action delegiert
+   * THEN ruft sie GenerationService.generate() auf ohne Validierungsfehler;
+   *      bestehende Tests bleiben gruen
+   */
+  it('AC-5: should delegate to GenerationService.generate without error when generationMode is absent', async () => {
+    const mockGenerations = [makeGeneration({ id: "gen-txt2img-001" })];
+    (GenerationService.generate as Mock).mockResolvedValue(mockGenerations);
+
+    const result = await generateImages({
+      projectId: "proj-001",
+      promptMotiv: "A fox",
+      modelId: "black-forest-labs/flux-2-pro",
+      params: {},
+      count: 1,
+      // generationMode intentionally omitted (txt2img path)
+    });
+
+    expect(GenerationService.generate).toHaveBeenCalledTimes(1);
+    // Should pass undefined for the new optional fields
+    expect(GenerationService.generate).toHaveBeenCalledWith(
+      "proj-001",
+      "A fox",
+      "",
+      undefined,
+      "black-forest-labs/flux-2-pro",
+      {},
+      1,
+      undefined,  // generationMode
+      undefined,  // sourceImageUrl
+      undefined   // strength
+    );
+    expect(result).toEqual(mockGenerations);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: upscaleImage Server Action (Slice 09, AC 6-10)
+// ---------------------------------------------------------------------------
+
+describe("upscaleImage Server Action", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /**
+   * AC-6: GIVEN upscaleImage wird mit scale: 3 (ungueltig) aufgerufen
+   * WHEN die Action die Eingaben validiert
+   * THEN gibt sie { error: "Scale muss 2 oder 4 sein" } zurueck
+   *      und ruft GenerationService.upscale() nicht auf
+   */
+  it('AC-6: should return error when scale is not 2 or 4', async () => {
+    const result = await upscaleImage({
+      projectId: "proj-001",
+      sourceImageUrl: "https://r2.example.com/img.png",
+      scale: 3 as 2 | 4,  // intentionally invalid
+    });
+
+    expect(result).toEqual({ error: "Scale muss 2 oder 4 sein" });
+    expect(GenerationService.upscale).not.toHaveBeenCalled();
+  });
+
+  /**
+   * AC-7: GIVEN upscaleImage wird ohne sourceImageUrl aufgerufen
+   * WHEN die Action die Eingaben validiert
+   * THEN gibt sie { error: "Source-Image ist erforderlich fuer img2img" } zurueck
+   *      und ruft GenerationService.upscale() nicht auf
+   */
+  it('AC-7: should return error when sourceImageUrl is missing in upscaleImage', async () => {
+    const result = await upscaleImage({
+      projectId: "proj-001",
+      sourceImageUrl: "",  // empty = missing
+      scale: 2,
+    });
+
+    expect(result).toEqual({ error: "Source-Image ist erforderlich fuer img2img" });
+    expect(GenerationService.upscale).not.toHaveBeenCalled();
+  });
+
+  /**
+   * AC-8: GIVEN upscaleImage wird mit { projectId, sourceImageUrl: "https://r2.example.com/img.png", scale: 2 }
+   *       aufgerufen
+   * WHEN die Validierung erfolgreich ist
+   * THEN delegiert die Action an GenerationService.upscale() mit allen uebergebenen Feldern
+   *      und gibt das zurueckgegebene Generation-Objekt zurueck
+   */
+  it('AC-8: should call GenerationService.upscale with correct args and return Generation', async () => {
+    const mockGeneration = makeGeneration({ id: "gen-upscale-001" });
+    (GenerationService.upscale as Mock).mockResolvedValue(mockGeneration);
+
+    const result = await upscaleImage({
+      projectId: "proj-001",
+      sourceImageUrl: "https://r2.example.com/img.png",
+      scale: 2,
+    });
+
+    expect(GenerationService.upscale).toHaveBeenCalledWith({
+      projectId: "proj-001",
+      sourceImageUrl: "https://r2.example.com/img.png",
+      scale: 2,
+      sourceGenerationId: undefined,
+    });
+    expect(result).toEqual(mockGeneration);
+  });
+
+  /**
+   * AC-9: GIVEN upscaleImage wird mit { projectId, sourceImageUrl, scale: 4, sourceGenerationId: "uuid-123" }
+   *       aufgerufen
+   * WHEN die Validierung erfolgreich ist
+   * THEN delegiert die Action an GenerationService.upscale() mit sourceGenerationId: "uuid-123"
+   */
+  it('AC-9: should pass sourceGenerationId to GenerationService.upscale when provided', async () => {
+    const mockGeneration = makeGeneration({ id: "gen-upscale-002" });
+    (GenerationService.upscale as Mock).mockResolvedValue(mockGeneration);
+
+    const result = await upscaleImage({
+      projectId: "proj-001",
+      sourceImageUrl: "https://r2.example.com/img.png",
+      scale: 4,
+      sourceGenerationId: "uuid-123",
+    });
+
+    expect(GenerationService.upscale).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceGenerationId: "uuid-123",
+      })
+    );
+    expect(GenerationService.upscale).toHaveBeenCalledWith({
+      projectId: "proj-001",
+      sourceImageUrl: "https://r2.example.com/img.png",
+      scale: 4,
+      sourceGenerationId: "uuid-123",
+    });
+    expect(result).toEqual(mockGeneration);
+  });
+
+  /**
+   * AC-10: GIVEN GenerationService.upscale() wirft einen Fehler waehrend eines validen upscaleImage-Aufrufs
+   * WHEN die Action den Fehler erhaelt
+   * THEN gibt sie { error: string } zurueck und loggt mit console.error -- kein Throw nach aussen
+   */
+  it('AC-10: should return error object when GenerationService.upscale throws', async () => {
+    (GenerationService.upscale as Mock).mockRejectedValue(
+      new Error("Replicate API unavailable")
+    );
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await upscaleImage({
+      projectId: "proj-001",
+      sourceImageUrl: "https://r2.example.com/img.png",
+      scale: 2,
+    });
+
+    expect(result).toEqual({ error: "Replicate API unavailable" });
+    expect(consoleSpy).toHaveBeenCalled();
+    // Verify no throw propagated — the fact that we reach this assertion proves it
+    expect(result).toHaveProperty("error");
+
+    consoleSpy.mockRestore();
   });
 });
