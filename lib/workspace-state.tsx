@@ -13,6 +13,10 @@ export interface WorkspaceVariationState {
   negativePrompt?: string;
   modelId: string;
   modelParams: Record<string, unknown>;
+  targetMode?: string;
+  sourceImageUrl?: string;
+  strength?: number;
+  sourceGenerationId?: string;
 }
 
 // ---------------------------------------------------------------------------
