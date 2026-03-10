@@ -107,6 +107,46 @@ export async function fetchGenerations(
   return getGenerations(projectId);
 }
 
+// ---------------------------------------------------------------------------
+// uploadSourceImage
+// ---------------------------------------------------------------------------
+
+const ALLOWED_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
+const MIME_TO_EXT: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+};
+
+export async function uploadSourceImage(input: {
+  projectId: string;
+  file: File;
+}): Promise<{ url: string } | { error: string }> {
+  const { projectId, file } = input;
+
+  if (!(ALLOWED_MIME_TYPES as readonly string[]).includes(file.type)) {
+    return { error: "Nur PNG, JPG, JPEG und WebP erlaubt" };
+  }
+
+  if (file.size > MAX_FILE_SIZE) {
+    return { error: "Datei darf maximal 10MB groß sein" };
+  }
+
+  try {
+    const ext = MIME_TO_EXT[file.type] ?? "png";
+    const uuid = crypto.randomUUID();
+    const key = `sources/${projectId}/${uuid}.${ext}`;
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const url = await StorageService.upload(buffer, key, file.type);
+    return { url };
+  } catch (error: unknown) {
+    console.error("uploadSourceImage error:", error);
+    return { error: "Bild konnte nicht hochgeladen werden" };
+  }
+}
+
 export async function deleteGeneration(
   input: DeleteGenerationInput
 ): Promise<{ success: boolean }> {

@@ -68,6 +68,9 @@ export async function createGeneration(input: {
   modelParams?: Record<string, unknown>;
   promptMotiv?: string;
   promptStyle?: string;
+  generationMode?: string;
+  sourceImageUrl?: string | null;
+  sourceGenerationId?: string | null;
 }): Promise<Generation> {
   const [generation] = await db
     .insert(generations)
@@ -79,6 +82,9 @@ export async function createGeneration(input: {
       modelParams: input.modelParams ?? {},
       promptMotiv: input.promptMotiv ?? '',
       promptStyle: input.promptStyle ?? '',
+      generationMode: input.generationMode ?? 'txt2img',
+      sourceImageUrl: input.sourceImageUrl ?? null,
+      sourceGenerationId: input.sourceGenerationId ?? null,
     })
     .returning();
   return generation;
