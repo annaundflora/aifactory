@@ -5,7 +5,6 @@ import Image from "next/image";
 import { Copy, Download, Loader2, Maximize2, Minimize2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { type Generation } from "@/lib/db/queries";
-import { getModelById } from "@/lib/models";
 import { downloadImage, generateDownloadFilename } from "@/lib/utils";
 import { useWorkspaceVariation } from "@/lib/workspace-state";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -138,8 +137,7 @@ export function LightboxModal({
 
   if (!isOpen) return null;
 
-  const model = getModelById(generation.modelId);
-  const modelName = model?.displayName ?? generation.modelId;
+  const modelName = generation.modelId;
   const formattedParams = formatModelParams(generation.modelParams);
 
   return (

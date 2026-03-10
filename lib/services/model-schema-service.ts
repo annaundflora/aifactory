@@ -1,16 +1,9 @@
-import { getModelById } from "@/lib/models";
-
 type SchemaProperties = Record<string, unknown>;
 
 const schemaCache = new Map<string, SchemaProperties>();
 
 export const ModelSchemaService = {
   async getSchema(modelId: string): Promise<SchemaProperties> {
-    const model = getModelById(modelId);
-    if (!model) {
-      throw new Error("Unbekanntes Modell");
-    }
-
     const cached = schemaCache.get(modelId);
     if (cached) {
       return cached;

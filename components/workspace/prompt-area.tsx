@@ -10,17 +10,9 @@ import {
   type ChangeEvent,
 } from "react";
 import { PromptTabs, type PromptTab } from "@/components/workspace/prompt-tabs";
-import { MODELS, getModelById } from "@/lib/models";
 import { getModelSchema } from "@/app/actions/models";
 import { generateImages } from "@/app/actions/generations";
 import { useWorkspaceVariation } from "@/lib/workspace-state";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -50,11 +42,6 @@ import { type Generation } from "@/lib/db/queries";
 
 const VARIANT_OPTIONS = [1, 2, 3, 4] as const;
 
-function formatPrice(price: number): string {
-  if (price === 0) return "Free";
-  return `$${price.toFixed(3)}`;
-}
-
 /** Auto-resize a textarea to fit its content. */
 function autoResize(el: HTMLTextAreaElement) {
   el.style.height = "auto";
@@ -67,7 +54,7 @@ function autoResize(el: HTMLTextAreaElement) {
 
 export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps) {
   // ----- Model state -----
-  const [selectedModelId, setSelectedModelId] = useState(MODELS[0].id);
+  const [selectedModelId, setSelectedModelId] = useState("black-forest-labs/flux-1.1-pro");
 
   // ----- Schema state -----
   const [schema, setSchema] = useState<SchemaProperties | null>(null);
@@ -214,11 +201,6 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     [handleGenerate]
   );
 
-  // ----- Model change handler -----
-  const handleModelChange = useCallback((modelId: string) => {
-    setSelectedModelId(modelId);
-  }, []);
-
   // Shared textarea class
   const textareaClass =
     "flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm resize-none overflow-hidden";
@@ -238,21 +220,18 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
         negativePrompt={negativePrompt}
       >
         <div className="space-y-4 pt-2">
-          {/* Model Dropdown */}
+          {/* Model selector placeholder — replaced in slice-10 */}
           <div className="space-y-2">
             <Label htmlFor="model-select">Model</Label>
-            <Select value={selectedModelId} onValueChange={handleModelChange}>
-              <SelectTrigger id="model-select" data-testid="model-select">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {MODELS.map((model) => (
-                  <SelectItem key={model.id} value={model.id}>
-                    {model.displayName} -- {formatPrice(model.pricePerImage)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <select
+              id="model-select"
+              data-testid="model-select"
+              value={selectedModelId}
+              onChange={(e) => setSelectedModelId(e.target.value)}
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
+            >
+              <option value={selectedModelId}>{selectedModelId}</option>
+            </select>
           </div>
 
           {/* Motiv Textarea (required) */}
@@ -329,7 +308,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
             <LLMComparison
               prompt={promptMotiv}
               modelId={selectedModelId}
-              modelDisplayName={getModelById(selectedModelId)?.displayName ?? selectedModelId}
+              modelDisplayName={selectedModelId}
               onAdopt={(improved) => {
                 setPromptMotiv(improved);
                 setShowImprove(false);

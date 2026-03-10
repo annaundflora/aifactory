@@ -7,7 +7,6 @@ import {
   updateGeneration,
   type Generation,
 } from "@/lib/db/queries";
-import { getModelById } from "@/lib/models";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -148,7 +147,7 @@ async function generate(
   if (!promptMotiv || promptMotiv.trim().length === 0) {
     throw new Error("Prompt darf nicht leer sein");
   }
-  if (!getModelById(modelId)) {
+  if (!modelId || !modelId.includes("/")) {
     throw new Error("Unbekanntes Modell");
   }
   if (!Number.isInteger(count) || count < 1 || count > 4) {

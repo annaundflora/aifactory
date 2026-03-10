@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { GenerationService } from "@/lib/services/generation-service";
-import { getModelById } from "@/lib/models";
 import {
   getGenerations,
   getGeneration,
@@ -45,8 +44,8 @@ export async function generateImages(
     return { error: "Prompt darf nicht leer sein" };
   }
 
-  // AC-10: Unknown model validation
-  if (!getModelById(input.modelId)) {
+  // AC-10: Model ID format validation (owner/name pattern)
+  if (!input.modelId || !input.modelId.includes("/")) {
     return { error: "Unbekanntes Modell" };
   }
 

@@ -1,5 +1,4 @@
 import { openRouterClient } from "@/lib/clients/openrouter";
-import { getModelById } from "@/lib/models";
 
 const MODEL = "google/gemini-3.1-pro-preview";
 
@@ -42,7 +41,7 @@ export interface ImproveResult {
 }
 
 async function improve(prompt: string, modelId: string): Promise<ImproveResult> {
-  const modelDisplayName = getModelById(modelId)?.displayName ?? modelId;
+  const modelDisplayName = modelId;
   const systemPrompt = buildSystemPrompt(modelId, modelDisplayName);
 
   const improved = await openRouterClient.chat({
