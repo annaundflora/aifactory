@@ -7,6 +7,34 @@ import "@testing-library/jest-dom/vitest";
 import type { Generation } from "@/lib/db/queries";
 
 // ---------------------------------------------------------------------------
+// Hoisted mock variables (vi.mock factories are hoisted above imports,
+// so any variable they reference must also be hoisted via vi.hoisted)
+// ---------------------------------------------------------------------------
+const {
+  mockToast,
+  mockToastError,
+  mockToastSuccess,
+  mockSetVariation,
+  mockUpscaleImage,
+  mockDeleteGeneration,
+} = vi.hoisted(() => {
+  const mockToastError = vi.fn();
+  const mockToastSuccess = vi.fn();
+  const mockToast = Object.assign(vi.fn(), {
+    error: mockToastError,
+    success: mockToastSuccess,
+  });
+  return {
+    mockToast,
+    mockToastError,
+    mockToastSuccess,
+    mockSetVariation: vi.fn(),
+    mockUpscaleImage: vi.fn().mockResolvedValue({ id: "gen-upscaled" }),
+    mockDeleteGeneration: vi.fn().mockResolvedValue({ success: true }),
+  };
+});
+
+// ---------------------------------------------------------------------------
 // Mocks (mock_external strategy per slice spec)
 // ---------------------------------------------------------------------------
 
@@ -52,12 +80,6 @@ vi.mock("lucide-react", () => ({
 }));
 
 // Mock sonner toast — supports both toast("msg") and toast.error("msg")
-const mockToastError = vi.fn();
-const mockToastSuccess = vi.fn();
-const mockToast = Object.assign(vi.fn(), {
-  error: mockToastError,
-  success: mockToastSuccess,
-});
 vi.mock("sonner", () => ({
   toast: mockToast,
 }));
@@ -79,7 +101,6 @@ vi.mock("@/lib/models", () => ({
 }));
 
 // Mock workspace-state — setVariation is a trackable spy
-const mockSetVariation = vi.fn();
 vi.mock("@/lib/workspace-state", () => ({
   useWorkspaceVariation: () => ({
     variationData: null,
@@ -89,8 +110,6 @@ vi.mock("@/lib/workspace-state", () => ({
 }));
 
 // Mock server actions (upscaleImage + deleteGeneration)
-const mockUpscaleImage = vi.fn().mockResolvedValue({ id: "gen-upscaled" });
-const mockDeleteGeneration = vi.fn().mockResolvedValue({ success: true });
 vi.mock("@/app/actions/generations", () => ({
   upscaleImage: (...args: unknown[]) => mockUpscaleImage(...args),
   deleteGeneration: (...args: unknown[]) => mockDeleteGeneration(...args),
