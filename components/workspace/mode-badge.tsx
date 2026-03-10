@@ -4,7 +4,7 @@
 // Types
 // ---------------------------------------------------------------------------
 
-type Mode = "txt2img" | "img2img" | "upscale";
+export type Mode = "txt2img" | "img2img" | "upscale";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -35,12 +35,15 @@ const MODE_TITLE: Record<Mode, string> = {
 // ---------------------------------------------------------------------------
 
 export function ModeBadge({ mode }: ModeBadgeProps) {
+  const label = MODE_LABEL[mode];
+  const title = MODE_TITLE[mode];
+  if (!label) return null;
   return (
     <span
-      title={MODE_TITLE[mode]}
+      title={title}
       className="absolute top-2 left-2 flex size-5 items-center justify-center rounded-full bg-black/60 text-[10px] font-bold text-white select-none"
     >
-      {MODE_LABEL[mode]}
+      {label}
     </span>
   );
 }

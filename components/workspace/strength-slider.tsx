@@ -39,7 +39,11 @@ export function StrengthSlider({ value, onChange }: StrengthSliderProps) {
         max="1"
         step="0.01"
         value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
+        aria-label="Strength"
+        onChange={(e) => {
+          const parsed = parseFloat(e.target.value);
+          if (!isNaN(parsed)) onChange(parsed);
+        }}
         className="w-full accent-primary"
       />
 

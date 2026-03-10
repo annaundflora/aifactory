@@ -6,14 +6,16 @@ import { cn } from "@/lib/utils";
 // Types
 // ---------------------------------------------------------------------------
 
+export type GenerationMode = "txt2img" | "img2img" | "upscale";
+
 interface ModeSelectorProps {
-  value: string;
-  onChange: (mode: string) => void;
-  disabledModes?: string[];
+  value: GenerationMode;
+  onChange: (mode: GenerationMode) => void;
+  disabledModes?: GenerationMode[];
 }
 
 interface Segment {
-  value: string;
+  value: GenerationMode;
   label: string;
 }
 
@@ -55,8 +57,8 @@ export function ModeSelector({
           <button
             key={segment.value}
             type="button"
-            disabled={isDisabled}
             aria-pressed={isActive}
+            aria-disabled={isDisabled}
             data-active={isActive}
             data-value={segment.value}
             onClick={() => {
@@ -69,7 +71,7 @@ export function ModeSelector({
               isActive
                 ? "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:bg-background hover:text-foreground",
-              isDisabled && "cursor-not-allowed opacity-50 pointer-events-none",
+              isDisabled && "cursor-not-allowed opacity-50",
             )}
           >
             {segment.label}

@@ -33,7 +33,7 @@ export interface FilterChipsProps {
 
 export function FilterChips({ value, onChange }: FilterChipsProps) {
   return (
-    <div role="group" className="flex flex-wrap gap-2">
+    <div role="group" aria-label="Filter nach Modus" className="flex flex-wrap gap-2">
       {CHIPS.map((chip) => {
         const isActive = chip.value === value;
         return (
