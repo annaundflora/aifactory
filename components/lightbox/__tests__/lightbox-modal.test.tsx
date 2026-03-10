@@ -97,6 +97,9 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
     promptStyle: overrides.promptStyle ?? "",
     isFavorite: overrides.isFavorite ?? false,
     createdAt: overrides.createdAt ?? new Date("2026-03-01T14:30:00Z"),
+    generationMode: overrides.generationMode ?? "txt2img",
+    sourceImageUrl: overrides.sourceImageUrl ?? null,
+    sourceGenerationId: overrides.sourceGenerationId ?? null,
   };
 }
 
