@@ -246,54 +246,6 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   ]);
 
   // ---------------------------------------------------------------------------
-  // Restore state from modeStates for a given target mode
-  // ---------------------------------------------------------------------------
-
-  const restoreModeState = useCallback(
-    (targetMode: GenerationMode) => {
-      if (targetMode === "txt2img") {
-        const s = modeStates.txt2img;
-        setPromptMotiv(s.promptMotiv);
-        setPromptStyle(s.promptStyle);
-        setNegativePrompt(s.negativePrompt);
-        setSelectedModelId(s.modelId);
-        setParamValues(s.paramValues);
-        setVariantCount(s.variantCount);
-      } else if (targetMode === "img2img") {
-        const s = modeStates.img2img;
-        setPromptMotiv(s.promptMotiv);
-        setPromptStyle(s.promptStyle);
-        setNegativePrompt(s.negativePrompt);
-        setSelectedModelId(s.modelId);
-        setParamValues(s.paramValues);
-        setVariantCount(s.variantCount);
-        setSourceImageUrl(s.sourceImageUrl);
-        setStrength(s.strength);
-      } else if (targetMode === "upscale") {
-        setUpscaleSourceImageUrl(modeStates.upscale.sourceImageUrl);
-        setUpscaleScale(modeStates.upscale.scale);
-      }
-    },
-    [modeStates]
-  );
-
-  // ---------------------------------------------------------------------------
-  // Source image transfer between img2img and upscale
-  // ---------------------------------------------------------------------------
-
-  const transferSourceImage = useCallback(
-    (fromMode: GenerationMode, toMode: GenerationMode) => {
-      // Per State Persistence Matrix: img2img <-> upscale transfers source image
-      if (fromMode === "img2img" && toMode === "upscale") {
-        setUpscaleSourceImageUrl(sourceImageUrl);
-      } else if (fromMode === "upscale" && toMode === "img2img") {
-        setSourceImageUrl(upscaleSourceImageUrl);
-      }
-    },
-    [sourceImageUrl, upscaleSourceImageUrl]
-  );
-
-  // ---------------------------------------------------------------------------
   // Model auto-switch for img2img compatibility (AC-12)
   // ---------------------------------------------------------------------------
 
