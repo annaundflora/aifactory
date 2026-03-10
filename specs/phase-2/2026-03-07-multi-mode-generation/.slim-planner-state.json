@@ -1,0 +1,33 @@
+{
+  "spec_path": "specs/phase-2/2026-03-07-multi-mode-generation",
+  "status": "completed",
+  "phase": "completed",
+  "started_at": "2026-03-09T00:00:00Z",
+  "detected_stack": "TypeScript",
+  "total_slices": 17,
+  "current_slice_index": 0,
+  "slices": [
+    { "number": 1, "name": "DB Schema — Neue Spalten in generations", "slug": "db-schema", "status": "approved", "retries": 0 },
+    { "number": 2, "name": "DB Queries — createGeneration für neue Felder", "slug": "db-queries", "status": "approved", "retries": 0 },
+    { "number": 3, "name": "Storage Client — dynamischer ContentType", "slug": "storage-client-contenttype", "status": "approved", "retries": 0 },
+    { "number": 4, "name": "Model Schema Service — supportsImg2Img Helper", "slug": "model-schema-service", "status": "approved", "retries": 0 },
+    { "number": 5, "name": "Models — UPSCALE_MODEL Konstante", "slug": "models-upscale-constant", "status": "approved", "retries": 0 },
+    { "number": 6, "name": "Generation Service — img2img Erweiterung", "slug": "generation-service-img2img", "status": "approved", "retries": 0 },
+    { "number": 7, "name": "Generation Service — upscale() Methode", "slug": "generation-service-upscale", "status": "approved", "retries": 0 },
+    { "number": 8, "name": "Server Action — uploadSourceImage", "slug": "action-upload-source-image", "status": "approved", "retries": 0 },
+    { "number": 9, "name": "Server Action — generateImages img2img + upscaleImage", "slug": "action-generate-upscale", "status": "approved", "retries": 0 },
+    { "number": 10, "name": "WorkspaceState Extension", "slug": "workspace-state-extension", "status": "approved", "retries": 0 },
+    { "number": 11, "name": "ModeSelector Component", "slug": "mode-selector-component", "status": "approved", "retries": 0 },
+    { "number": 12, "name": "ImageDropzone Component", "slug": "image-dropzone-component", "status": "approved", "retries": 0 },
+    { "number": 13, "name": "StrengthSlider Component", "slug": "strength-slider-component", "status": "approved", "retries": 0 },
+    { "number": 14, "name": "PromptArea Refactoring — Mode-Awareness", "slug": "prompt-area-refactoring", "status": "approved", "retries": 0 },
+    { "number": 15, "name": "FilterChips Component + ModeBadge Component", "slug": "filter-chips-mode-badge", "status": "approved", "retries": 0 },
+    { "number": 16, "name": "GalleryGrid + GenerationCard + WorkspaceContent — Filter + Badge Integration", "slug": "gallery-filter-badge-integration", "status": "approved", "retries": 0 },
+    { "number": 17, "name": "Lightbox — Cross-Mode Buttons (img2img + Upscale Popover)", "slug": "lightbox-cross-mode-buttons", "status": "approved", "retries": 0 }
+  ],
+  "approved_slices": [],
+  "failed_slices": [],
+  "gate3_retries": 0,
+  "last_action": "Slicer completed, 17 slices",
+  "last_updated": "2026-03-09T00:00:00Z"
+}

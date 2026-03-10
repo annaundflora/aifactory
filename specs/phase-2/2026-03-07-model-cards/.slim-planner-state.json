@@ -1,0 +1,31 @@
+{
+  "spec_path": "specs/phase-2/2026-03-07-model-cards",
+  "status": "completed",
+  "phase": "completed",
+  "started_at": "2026-03-09T00:00:00.000Z",
+  "detected_stack": "TypeScript",
+  "total_slices": 14,
+  "current_slice_index": 14,
+  "slices": [
+    { "number": 1, "name": "shadcn Badge installieren", "status": "approved", "retries": 1 },
+    { "number": 2, "name": "CollectionModel Type + Service", "status": "approved", "retries": 0 },
+    { "number": 3, "name": "Server Action getCollectionModels + Static Models entfernen", "status": "approved", "retries": 0 },
+    { "number": 4, "name": "Static Model Whitelist aus Schema-Service + Generation-Service entfernen", "status": "approved", "retries": 1 },
+    { "number": 5, "name": "Static Model Lookup aus Lightbox + Prompt-Service entfernen", "status": "approved", "retries": 0 },
+    { "number": 6, "name": "Model Card Component", "status": "approved", "retries": 0 },
+    { "number": 7, "name": "Model Search + Filter Logic (Hook)", "status": "approved", "retries": 0 },
+    { "number": 8, "name": "Model Browser Drawer", "status": "approved", "retries": 0 },
+    { "number": 9, "name": "Run Count Formatter Utility", "status": "approved", "retries": 0 },
+    { "number": 10, "name": "Model Trigger + Prompt Area Integration", "status": "approved", "retries": 0 },
+    { "number": 11, "name": "Parameter Panel Multi-Model Notice", "status": "approved", "retries": 0 },
+    { "number": 12, "name": "Parallel Multi-Model Generation", "status": "approved", "retries": 0 },
+    { "number": 13, "name": "Gallery Model Badge", "status": "approved", "retries": 0 },
+    { "number": 14, "name": "Cleanup + Integration Smoke Test", "status": "approved", "retries": 0 }
+  ],
+  "approved_slices": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+  "failed_slices": [],
+  "gate3_retries": 0,
+  "last_action": "Gate 3 APPROVED - Ready for Orchestration",
+  "completed_at": "2026-03-09T00:15:00.000Z",
+  "last_updated": "2026-03-09T00:15:00.000Z"
+}
