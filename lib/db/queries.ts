@@ -60,7 +60,7 @@ export async function deleteProject(id: string): Promise<void> {
 // Generation Queries
 // ---------------------------------------------------------------------------
 
-export async function createGeneration(input: {
+export interface CreateGenerationInput {
   projectId: string;
   prompt: string;
   negativePrompt?: string;
@@ -71,7 +71,9 @@ export async function createGeneration(input: {
   generationMode?: string;
   sourceImageUrl?: string | null;
   sourceGenerationId?: string | null;
-}): Promise<Generation> {
+}
+
+export async function createGeneration(input: CreateGenerationInput): Promise<Generation> {
   const [generation] = await db
     .insert(generations)
     .values({

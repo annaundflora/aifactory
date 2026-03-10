@@ -126,6 +126,10 @@ export async function uploadSourceImage(input: {
 }): Promise<{ url: string } | { error: string }> {
   const { projectId, file } = input;
 
+  if (!projectId || projectId.trim().length === 0) {
+    return { error: "Ungültige Projekt-ID" };
+  }
+
   if (!(ALLOWED_MIME_TYPES as readonly string[]).includes(file.type)) {
     return { error: "Nur PNG, JPG, JPEG und WebP erlaubt" };
   }
