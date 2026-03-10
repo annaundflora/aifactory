@@ -8,6 +8,8 @@ import {
   type Generation,
 } from "@/lib/db/queries";
 
+const MODEL_ID_REGEX = /^[a-z0-9-]+\/[a-z0-9._-]+$/;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -147,7 +149,7 @@ async function generate(
   if (!promptMotiv || promptMotiv.trim().length === 0) {
     throw new Error("Prompt darf nicht leer sein");
   }
-  if (!modelId || !modelId.includes("/")) {
+  if (!modelId || !MODEL_ID_REGEX.test(modelId)) {
     throw new Error("Unbekanntes Modell");
   }
   if (!Number.isInteger(count) || count < 1 || count > 4) {
