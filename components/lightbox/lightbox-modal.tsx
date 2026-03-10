@@ -6,6 +6,7 @@ import { Copy, Download, Loader2, Maximize2, Minimize2, Trash2, X } from "lucide
 import { toast } from "sonner";
 import { type Generation } from "@/lib/db/queries";
 import { downloadImage, generateDownloadFilename } from "@/lib/utils";
+import { modelIdToDisplayName } from "@/lib/utils/model-display-name";
 import { useWorkspaceVariation } from "@/lib/workspace-state";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { deleteGeneration } from "@/app/actions/generations";
@@ -137,7 +138,7 @@ export function LightboxModal({
 
   if (!isOpen) return null;
 
-  const modelName = generation.modelId;
+  const modelName = modelIdToDisplayName(generation.modelId);
   const formattedParams = formatModelParams(generation.modelParams);
 
   return (
