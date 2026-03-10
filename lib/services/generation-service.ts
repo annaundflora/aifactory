@@ -8,6 +8,7 @@ import {
   type Generation,
 } from "@/lib/db/queries";
 import { getModelById } from "@/lib/models";
+import { ModelSchemaService } from "@/lib/services/model-schema-service";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -66,14 +67,14 @@ async function streamToPngBuffer(
 // Core: process a single generation
 // ---------------------------------------------------------------------------
 
-async function processGeneration(generation: Generation): Promise<Generation> {
+async function processGeneration(generation: Generation, strength?: number): Promise<Generation> {
   const storageKey = `projects/${generation.projectId}/${generation.id}.png`;
 
   try {
     // 1. Call Replicate
     const result = await ReplicateClient.run(
       generation.modelId,
-      buildReplicateInput(generation)
+      await buildReplicateInput(generation, strength)
     );
 
     // 2. Convert stream to PNG buffer + get dimensions
@@ -106,9 +107,10 @@ async function processGeneration(generation: Generation): Promise<Generation> {
   }
 }
 
-function buildReplicateInput(
-  generation: Generation
-): Record<string, unknown> {
+async function buildReplicateInput(
+  generation: Generation,
+  strength?: number
+): Promise<Record<string, unknown>> {
   const params =
     typeof generation.modelParams === "object" && generation.modelParams !== null
       ? (generation.modelParams as Record<string, unknown>)
@@ -121,6 +123,20 @@ function buildReplicateInput(
 
   if (generation.negativePrompt) {
     input.negative_prompt = generation.negativePrompt;
+  }
+
+  if (generation.generationMode === "img2img" && generation.sourceImageUrl) {
+    const schema = await ModelSchemaService.getSchema(generation.modelId);
+
+    if ("image" in schema) {
+      input.image = generation.sourceImageUrl;
+    } else if ("image_prompt" in schema) {
+      input.image_prompt = generation.sourceImageUrl;
+    } else if ("init_image" in schema) {
+      input.init_image = generation.sourceImageUrl;
+    }
+
+    input.prompt_strength = strength;
   }
 
   return input;
@@ -142,7 +158,10 @@ async function generate(
   negativePrompt: string | undefined,
   modelId: string,
   params: Record<string, unknown>,
-  count: number
+  count: number,
+  generationMode?: string,
+  sourceImageUrl?: string,
+  strength?: number
 ): Promise<Generation[]> {
   // Validate
   if (!promptMotiv || promptMotiv.trim().length === 0) {
@@ -153,6 +172,19 @@ async function generate(
   }
   if (!Number.isInteger(count) || count < 1 || count > 4) {
     throw new Error("Anzahl muss zwischen 1 und 4 liegen");
+  }
+
+  // Resolve effective mode
+  const effectiveMode = generationMode ?? "txt2img";
+
+  // img2img validation
+  if (effectiveMode === "img2img") {
+    if (!sourceImageUrl) {
+      throw new Error("Source-Image ist erforderlich fuer img2img");
+    }
+    if (strength !== undefined && (strength < 0 || strength > 1)) {
+      throw new Error("Strength muss zwischen 0 und 1 liegen");
+    }
   }
 
   // Compose prompt from motiv + style
@@ -171,6 +203,8 @@ async function generate(
       modelParams: params,
       promptMotiv: motivTrimmed,
       promptStyle: styleTrimmed,
+      generationMode: effectiveMode,
+      sourceImageUrl: sourceImageUrl ?? null,
     });
     pendingGenerations.push(gen);
   }
@@ -180,7 +214,7 @@ async function generate(
   (async () => {
     for (const gen of pendingGenerations) {
       try {
-        await processGeneration(gen);
+        await processGeneration(gen, strength);
       } catch (err) {
         console.error(`Generation ${gen.id} unexpected error:`, err);
       }
