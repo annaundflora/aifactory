@@ -27,14 +27,15 @@ vi.mock("next/cache", () => ({
   revalidateTag: vi.fn(),
 }));
 
-// Mock lib/clients/storage for deleteGeneration tests
+// Mock lib/clients/storage for deleteGeneration + uploadSourceImage tests
 vi.mock("@/lib/clients/storage", () => ({
   StorageService: {
     delete: vi.fn(),
+    upload: vi.fn(),
   },
 }));
 
-import { generateImages, retryGeneration, deleteGeneration } from "@/app/actions/generations";
+import { generateImages, retryGeneration, deleteGeneration, uploadSourceImage } from "@/app/actions/generations";
 import { GenerationService } from "@/lib/services/generation-service";
 import { getGeneration, deleteGeneration as deleteGenerationFromDb, type Generation } from "@/lib/db/queries";
 import { StorageService } from "@/lib/clients/storage";
@@ -273,5 +274,183 @@ describe("deleteGeneration Server Action", () => {
     expect(deleteGenerationFromDb).not.toHaveBeenCalled();
     expect(StorageService.delete).not.toHaveBeenCalled();
     expect(result).toEqual({ success: false });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: uploadSourceImage Server Action (Slice 08)
+// ---------------------------------------------------------------------------
+
+describe("uploadSourceImage Server Action", () => {
+  const PROJECT_ID = "proj-upload-test";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(crypto, "randomUUID").mockReturnValue("test-uuid-1234" as `${string}-${string}-${string}-${string}-${string}`);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function makeFile(name: string, type: string, sizeInBytes: number): File {
+    return new File([new Uint8Array(sizeInBytes)], name, { type });
+  }
+
+  /**
+   * AC-1: GIVEN a valid PNG file (5MB) and a valid projectId
+   * WHEN uploadSourceImage is called
+   * THEN it returns { url: string } where url contains "sources/{projectId}/"
+   */
+  it('AC-1: valid PNG (5MB) returns { url } containing sources/{projectId}/', async () => {
+    const fakeUrl = `https://cdn.example.com/sources/${PROJECT_ID}/test-uuid-1234.png`;
+    (StorageService.upload as Mock).mockResolvedValue(fakeUrl);
+
+    const file = makeFile("photo.png", "image/png", 5 * 1024 * 1024);
+    const result = await uploadSourceImage({ projectId: PROJECT_ID, file });
+
+    expect(result).toHaveProperty("url");
+    expect((result as { url: string }).url).toContain(`sources/${PROJECT_ID}/`);
+  });
+
+  /**
+   * AC-2: GIVEN a valid JPEG file (2MB)
+   * WHEN uploadSourceImage is called
+   * THEN it returns { url: string } (JPEG accepted)
+   */
+  it('AC-2: valid JPEG (2MB) returns { url }', async () => {
+    const fakeUrl = `https://cdn.example.com/sources/${PROJECT_ID}/test-uuid-1234.jpg`;
+    (StorageService.upload as Mock).mockResolvedValue(fakeUrl);
+
+    const file = makeFile("photo.jpg", "image/jpeg", 2 * 1024 * 1024);
+    const result = await uploadSourceImage({ projectId: PROJECT_ID, file });
+
+    expect(result).toHaveProperty("url");
+    expect((result as { url: string }).url).toBeTruthy();
+  });
+
+  /**
+   * AC-3: GIVEN a valid WebP file (3MB)
+   * WHEN uploadSourceImage is called
+   * THEN it returns { url: string } (WebP accepted)
+   */
+  it('AC-3: valid WebP (3MB) returns { url }', async () => {
+    const fakeUrl = `https://cdn.example.com/sources/${PROJECT_ID}/test-uuid-1234.webp`;
+    (StorageService.upload as Mock).mockResolvedValue(fakeUrl);
+
+    const file = makeFile("photo.webp", "image/webp", 3 * 1024 * 1024);
+    const result = await uploadSourceImage({ projectId: PROJECT_ID, file });
+
+    expect(result).toHaveProperty("url");
+    expect((result as { url: string }).url).toBeTruthy();
+  });
+
+  /**
+   * AC-4: GIVEN a GIF file (invalid type)
+   * WHEN uploadSourceImage is called
+   * THEN it returns { error: "Nur PNG, JPG, JPEG und WebP erlaubt" } without calling R2
+   */
+  it('AC-4: GIF (invalid type) returns error and does not call StorageService', async () => {
+    const file = makeFile("animation.gif", "image/gif", 1 * 1024 * 1024);
+    const result = await uploadSourceImage({ projectId: PROJECT_ID, file });
+
+    expect(result).toEqual({ error: "Nur PNG, JPG, JPEG und WebP erlaubt" });
+    expect(StorageService.upload).not.toHaveBeenCalled();
+  });
+
+  /**
+   * AC-5: GIVEN a PDF file (invalid type)
+   * WHEN uploadSourceImage is called
+   * THEN it returns { error: "Nur PNG, JPG, JPEG und WebP erlaubt" } without calling R2
+   */
+  it('AC-5: PDF (invalid type) returns error and does not call StorageService', async () => {
+    const file = makeFile("document.pdf", "application/pdf", 1 * 1024 * 1024);
+    const result = await uploadSourceImage({ projectId: PROJECT_ID, file });
+
+    expect(result).toEqual({ error: "Nur PNG, JPG, JPEG und WebP erlaubt" });
+    expect(StorageService.upload).not.toHaveBeenCalled();
+  });
+
+  /**
+   * AC-6: GIVEN a PNG file over 10MB (11MB)
+   * WHEN uploadSourceImage is called
+   * THEN it returns { error: "Datei darf maximal 10MB groß sein" } without calling R2
+   */
+  it('AC-6: PNG over 10MB returns size error and does not call StorageService', async () => {
+    const file = makeFile("huge.png", "image/png", 11 * 1024 * 1024 + 1);
+    const result = await uploadSourceImage({ projectId: PROJECT_ID, file });
+
+    expect(result).toEqual({ error: "Datei darf maximal 10MB groß sein" });
+    expect(StorageService.upload).not.toHaveBeenCalled();
+  });
+
+  /**
+   * AC-7: GIVEN a PNG file exactly 10MB
+   * WHEN uploadSourceImage is called
+   * THEN it returns { url: string } (boundary allowed)
+   */
+  it('AC-7: PNG exactly 10MB (boundary) returns { url }', async () => {
+    const fakeUrl = `https://cdn.example.com/sources/${PROJECT_ID}/test-uuid-1234.png`;
+    (StorageService.upload as Mock).mockResolvedValue(fakeUrl);
+
+    const file = makeFile("exact10mb.png", "image/png", 10 * 1024 * 1024);
+    const result = await uploadSourceImage({ projectId: PROJECT_ID, file });
+
+    expect(result).toHaveProperty("url");
+    expect((result as { url: string }).url).toBeTruthy();
+  });
+
+  /**
+   * AC-8: GIVEN StorageService.upload throws an error
+   * WHEN uploadSourceImage is called
+   * THEN it returns { error: "Bild konnte nicht hochgeladen werden" } and calls console.error
+   */
+  it('AC-8: StorageService.upload throws returns upload error and logs to console.error', async () => {
+    (StorageService.upload as Mock).mockRejectedValue(new Error("R2 down"));
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const file = makeFile("photo.png", "image/png", 1 * 1024 * 1024);
+    const result = await uploadSourceImage({ projectId: PROJECT_ID, file });
+
+    expect(result).toEqual({ error: "Bild konnte nicht hochgeladen werden" });
+    expect(consoleSpy).toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
+  });
+
+  /**
+   * AC-9: GIVEN a valid PNG file
+   * WHEN uploadSourceImage is called
+   * THEN StorageService.upload is called with key matching sources/{projectId}/{uuid}.png and contentType "image/png"
+   */
+  it('AC-9: valid PNG calls StorageService.upload with correct key and contentType', async () => {
+    (StorageService.upload as Mock).mockResolvedValue("https://cdn.example.com/img.png");
+
+    const file = makeFile("photo.png", "image/png", 1 * 1024 * 1024);
+    await uploadSourceImage({ projectId: PROJECT_ID, file });
+
+    expect(StorageService.upload).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      `sources/${PROJECT_ID}/test-uuid-1234.png`,
+      "image/png"
+    );
+  });
+
+  /**
+   * AC-10: GIVEN a valid JPEG file
+   * WHEN uploadSourceImage is called
+   * THEN StorageService.upload is called with key matching sources/{projectId}/{uuid}.jpg and contentType "image/jpeg"
+   */
+  it('AC-10: valid JPEG calls StorageService.upload with correct key and contentType', async () => {
+    (StorageService.upload as Mock).mockResolvedValue("https://cdn.example.com/img.jpg");
+
+    const file = makeFile("photo.jpg", "image/jpeg", 1 * 1024 * 1024);
+    await uploadSourceImage({ projectId: PROJECT_ID, file });
+
+    expect(StorageService.upload).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      `sources/${PROJECT_ID}/test-uuid-1234.jpg`,
+      "image/jpeg"
+    );
   });
 });
