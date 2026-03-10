@@ -47,6 +47,11 @@ export const ModelSchemaService = {
     return properties;
   },
 
+  async supportsImg2Img(modelId: string): Promise<boolean> {
+    const properties = await this.getSchema(modelId);
+    return "image" in properties || "image_prompt" in properties || "init_image" in properties;
+  },
+
   /** Clears the in-memory cache. Useful for testing. */
   clearCache(): void {
     schemaCache.clear();
