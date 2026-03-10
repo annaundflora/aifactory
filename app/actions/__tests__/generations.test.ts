@@ -80,7 +80,7 @@ describe("generateImages Server Action", () => {
     const result = await generateImages({
       projectId: "proj-001",
       promptMotiv: "",
-      modelId: "black-forest-labs/flux-2-pro",
+      modelIds: ["black-forest-labs/flux-2-pro"],
       params: {},
       count: 1,
     });
@@ -93,7 +93,7 @@ describe("generateImages Server Action", () => {
     const result = await generateImages({
       projectId: "proj-001",
       promptMotiv: "   ",
-      modelId: "black-forest-labs/flux-2-pro",
+      modelIds: ["black-forest-labs/flux-2-pro"],
       params: {},
       count: 1,
     });
@@ -109,7 +109,7 @@ describe("generateImages Server Action", () => {
     const result = await generateImages({
       projectId: "proj-001",
       promptMotiv: "A fox",
-      modelId: "unknown/nonexistent-model",
+      modelIds: ["unknown/nonexistent-model"],
       params: {},
       count: 1,
     });
@@ -125,7 +125,7 @@ describe("generateImages Server Action", () => {
     const result = await generateImages({
       projectId: "proj-001",
       promptMotiv: "A fox",
-      modelId: "black-forest-labs/flux-2-pro",
+      modelIds: ["black-forest-labs/flux-2-pro"],
       params: {},
       count: 5,
     });
@@ -138,7 +138,7 @@ describe("generateImages Server Action", () => {
     const result = await generateImages({
       projectId: "proj-001",
       promptMotiv: "A fox",
-      modelId: "black-forest-labs/flux-2-pro",
+      modelIds: ["black-forest-labs/flux-2-pro"],
       params: {},
       count: 0,
     });

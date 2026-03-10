@@ -135,7 +135,7 @@ describe("GenerationService", () => {
       "A fox",
       "",
       undefined,
-      "black-forest-labs/flux-2-pro",
+      ["black-forest-labs/flux-2-pro"],
       {},
       2
     );
@@ -186,7 +186,7 @@ describe("GenerationService", () => {
       "A fox",
       "",
       undefined,
-      "black-forest-labs/flux-2-pro",
+      ["black-forest-labs/flux-2-pro"],
       {},
       1
     );
@@ -244,7 +244,7 @@ describe("GenerationService", () => {
       "A fox",
       "",
       undefined,
-      "black-forest-labs/flux-2-pro",
+      ["black-forest-labs/flux-2-pro"],
       {},
       1
     );
@@ -286,7 +286,7 @@ describe("GenerationService", () => {
       "A fox",
       "",
       undefined,
-      "black-forest-labs/flux-2-pro",
+      ["black-forest-labs/flux-2-pro"],
       {},
       1
     );
@@ -339,7 +339,7 @@ describe("GenerationService", () => {
       "A fox",
       "",
       undefined,
-      "black-forest-labs/flux-2-pro",
+      ["black-forest-labs/flux-2-pro"],
       {},
       3
     );
@@ -396,7 +396,7 @@ describe("GenerationService", () => {
       "A fox",
       "",
       undefined,
-      "black-forest-labs/flux-2-pro",
+      ["black-forest-labs/flux-2-pro"],
       {},
       1
     );
@@ -506,7 +506,7 @@ describe("GenerationService", () => {
       "A cat",
       "",
       undefined,
-      "newowner/new-model",
+      ["newowner/new-model"],
       {},
       1
     );
@@ -530,7 +530,7 @@ describe("GenerationService", () => {
         "A cat",
         "",
         undefined,
-        "invalid",
+        ["invalid"],
         {},
         1
       )

@@ -325,7 +325,7 @@ describe("PromptArea", () => {
         expect.objectContaining({
           projectId: "proj-1",
           promptMotiv: "A beautiful sunset",
-          modelId: "black-forest-labs/flux-schnell",
+          modelIds: ["black-forest-labs/flux-schnell"],
           count: 1,
         })
       );
@@ -362,7 +362,7 @@ describe("PromptArea", () => {
         expect.objectContaining({
           projectId: "proj-1",
           promptMotiv: "A cat in space",
-          modelId: "black-forest-labs/flux-schnell",
+          modelIds: ["black-forest-labs/flux-schnell"],
           count: 1,
         })
       );
