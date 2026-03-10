@@ -48,7 +48,7 @@ export const ModelSchemaService = {
   },
 
   async supportsImg2Img(modelId: string): Promise<boolean> {
-    const properties = await this.getSchema(modelId);
+    const properties = await ModelSchemaService.getSchema(modelId);
     return "image" in properties || "image_prompt" in properties || "init_image" in properties;
   },
 
