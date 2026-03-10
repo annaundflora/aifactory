@@ -147,20 +147,30 @@ export function ImageDropzone({ projectId, onUpload, initialUrl }: ImageDropzone
   // ---------------------------------------------------------------------------
 
   const handlePaste = useCallback(
-    (e: ClipboardEvent<HTMLInputElement>) => {
+    async (e: ClipboardEvent<HTMLInputElement>) => {
       const text = e.clipboardData.getData("text");
       if (!text.startsWith("http")) return;
 
       e.preventDefault();
       setErrorMessage("");
 
-      // Do NOT fetch the URL on the client (SSRF protection).
-      // Treat the pasted URL as the final image source directly.
-      setImageInfo({ url: text, filename: "", width: 0, height: 0 });
+      // Enter uploading state first — URL is proxied server-side through R2
+      setState("uploading");
+
+      const result = await uploadSourceImage({ projectId, url: text });
+
+      if ("error" in result) {
+        setErrorMessage(result.error);
+        setState("error");
+        return;
+      }
+
+      const { width, height } = await readImageDimensions(result.url);
+      setImageInfo({ url: result.url, filename: "", width, height });
       setState("preview");
-      onUpload(text);
+      onUpload(result.url);
     },
-    [onUpload]
+    [projectId, onUpload, readImageDimensions]
   );
 
   // ---------------------------------------------------------------------------
