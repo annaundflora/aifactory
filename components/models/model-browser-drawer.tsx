@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Search, AlertCircle } from "lucide-react";
 
 import {
@@ -62,14 +62,20 @@ export function ModelBrowserDrawer({
   const [searchQuery, setSearchQuery] = useState("");
   const [ownerFilter, setOwnerFilter] = useState<string | null>(null);
 
-  // ---- Initialize temp state when drawer opens ---------------------------
+  // ---- Track previous open value and latest selectedModels via refs ------
+  const prevOpenRef = useRef(false);
+  const selectedModelsRef = useRef(selectedModels);
+  selectedModelsRef.current = selectedModels;
+
+  // ---- Initialize temp state only on open transition (false -> true) -----
   useEffect(() => {
-    if (open) {
-      setTempSelectedModels(selectedModels);
+    if (open && !prevOpenRef.current) {
+      setTempSelectedModels(selectedModelsRef.current);
       setSearchQuery("");
       setOwnerFilter(null);
     }
-  }, [open, selectedModels]);
+    prevOpenRef.current = open;
+  }, [open]);
 
   // ---- Filtering via hook ------------------------------------------------
   const { filteredModels, owners } = useModelFilters(
