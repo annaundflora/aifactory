@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { MODELS, getModelById } from '@/lib/models'
+import { MODELS, getModelById, UPSCALE_MODEL } from '@/lib/models'
 
 describe('Model Registry', () => {
   // AC-1: GIVEN lib/models.ts existiert
@@ -53,5 +53,36 @@ describe('Model Registry', () => {
   it('getModelById returns undefined for an unknown ID', () => {
     const model = getModelById('unknown/model')
     expect(model).toBeUndefined()
+  })
+})
+
+describe('UPSCALE_MODEL Constant (Slice 05)', () => {
+  // AC-1: GIVEN die Datei `lib/models.ts` ist importiert
+  //       WHEN `UPSCALE_MODEL` exportiert wird
+  //       THEN hat die Konstante den exakten String-Wert `"nightmareai/real-esrgan"`
+  it('AC-1: should export UPSCALE_MODEL as "nightmareai/real-esrgan"', () => {
+    expect(UPSCALE_MODEL).toBe('nightmareai/real-esrgan')
+  })
+
+  // AC-2: GIVEN `UPSCALE_MODEL` wurde zur Datei hinzugefuegt
+  //       WHEN `MODELS` exportiert wird
+  //       THEN enthaelt das Array weiterhin genau 9 Eintraege (unveraendert gegenueber Ausgangszustand)
+  it('AC-2: should keep MODELS array unchanged with 9 entries', () => {
+    expect(MODELS).toHaveLength(9)
+  })
+
+  // AC-3: GIVEN `UPSCALE_MODEL` wurde zur Datei hinzugefuegt
+  //       WHEN `getModelById("nightmareai/real-esrgan")` aufgerufen wird
+  //       THEN gibt die Funktion `undefined` zurueck (`UPSCALE_MODEL` ist kein Eintrag in `MODELS`)
+  it('AC-3: should return undefined when getModelById is called with UPSCALE_MODEL id', () => {
+    const result = getModelById(UPSCALE_MODEL)
+    expect(result).toBeUndefined()
+  })
+
+  // AC-4: GIVEN `UPSCALE_MODEL` ist ein `string`-Export
+  //       WHEN der TypeScript-Compiler die Datei prueft
+  //       THEN ist der Typ von `UPSCALE_MODEL` `string`
+  it('AC-4: should have type string for UPSCALE_MODEL', () => {
+    expect(typeof UPSCALE_MODEL).toBe('string')
   })
 })
