@@ -28,6 +28,10 @@ export const CollectionModelService = {
     try {
       const apiToken = process.env.REPLICATE_API_TOKEN;
 
+      if (!apiToken) {
+        return { error: "REPLICATE_API_TOKEN ist nicht gesetzt" };
+      }
+
       const response = await fetch(API_URL, {
         headers: {
           Authorization: `Bearer ${apiToken}`,
@@ -36,6 +40,7 @@ export const CollectionModelService = {
       });
 
       if (!response.ok) {
+        console.error(`CollectionModelService: API-Fehler ${response.status} ${response.statusText}`);
         return { error: `API-Fehler: ${response.status} ${response.statusText}` };
       }
 
@@ -62,8 +67,10 @@ export const CollectionModelService = {
       return models;
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") {
+        console.error("CollectionModelService: Anfrage-Timeout nach 5 Sekunden");
         return { error: "Anfrage-Timeout: Die API hat nicht innerhalb von 5 Sekunden geantwortet" };
       }
+      console.error("CollectionModelService: Unerwarteter Fehler", err);
       return { error: err instanceof Error ? err.message : "Unbekannter Fehler" };
     } finally {
       clearTimeout(timeoutId);
