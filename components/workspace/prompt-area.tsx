@@ -467,7 +467,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
               className="text-sm text-muted-foreground"
               data-testid="multi-model-notice"
             >
-              Default parameters will be used for multi-model generation
+              Default parameters will be used for multi-model generation.
             </p>
           )}
 
