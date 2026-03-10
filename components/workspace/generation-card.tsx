@@ -1,6 +1,7 @@
 "use client";
 
 import { type Generation } from "@/lib/db/queries";
+import { ModeBadge, type Mode } from "@/components/workspace/mode-badge";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -36,6 +37,11 @@ export function GenerationCard({ generation, onSelect }: GenerationCardProps) {
           {generation.prompt}
         </p>
       </div>
+
+      {/* Mode Badge */}
+      {generation.generationMode && (
+        <ModeBadge mode={generation.generationMode as Mode} />
+      )}
     </button>
   );
 }
