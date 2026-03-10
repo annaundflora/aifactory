@@ -31,7 +31,7 @@ interface GenerateImagesInput {
 interface UpscaleImageInput {
   projectId: string;
   sourceImageUrl: string;
-  scale: number;
+  scale: 2 | 4;
   sourceGenerationId?: string;
 }
 
@@ -72,7 +72,7 @@ export async function generateImages(
   // Validate generationMode if provided
   if (
     input.generationMode !== undefined &&
-    !["txt2img", "img2img", "upscale"].includes(input.generationMode)
+    !["txt2img", "img2img"].includes(input.generationMode)
   ) {
     return { error: "Ungueltiger Generierungsmodus" };
   }
@@ -230,6 +230,11 @@ export async function uploadSourceImage(
 export async function upscaleImage(
   input: UpscaleImageInput
 ): Promise<Generation | { error: string }> {
+  // Validate projectId
+  if (!input.projectId || input.projectId.trim().length === 0) {
+    return { error: "Ungültige Projekt-ID" };
+  }
+
   // Validate sourceImageUrl
   if (!input.sourceImageUrl) {
     return { error: "Source-Image ist erforderlich fuer img2img" };
@@ -244,7 +249,7 @@ export async function upscaleImage(
     const generation = await GenerationService.upscale({
       projectId: input.projectId,
       sourceImageUrl: input.sourceImageUrl,
-      scale: input.scale as 2 | 4,
+      scale: input.scale,
       sourceGenerationId: input.sourceGenerationId,
     });
     return generation;
