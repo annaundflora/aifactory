@@ -181,6 +181,7 @@ export function WorkspaceContent({
             isOpen={lightboxOpen}
             onClose={handleLightboxClose}
             onDeleted={handleLightboxDelete}
+            onGenerationCreated={(gen) => setGenerations((prev) => [gen, ...prev])}
           />
           <LightboxNavigation
             generations={completedGenerations}

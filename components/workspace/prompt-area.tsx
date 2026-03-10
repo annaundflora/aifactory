@@ -91,8 +91,6 @@ const VARIANT_OPTIONS = [1, 2, 3, 4] as const;
 const DEFAULT_STRENGTH = 0.6;
 const DEFAULT_SCALE: 2 | 4 = 2;
 
-const IMAGE_INPUT_PARAMS = ["image", "image_prompt", "init_image"] as const;
-
 function formatPrice(price: number): string {
   if (price === 0) return "Free";
   return `$${price.toFixed(3)}`;
@@ -104,10 +102,18 @@ function autoResize(el: HTMLTextAreaElement) {
   el.style.height = `${el.scrollHeight}px`;
 }
 
-/** Check if a schema supports img2img by looking for image input params. */
+/**
+ * Check if a schema supports img2img by looking for image input params.
+ * Excludes `image` when `mask` is also present (inpainting, not img2img).
+ */
 function schemaSupportsImg2Img(schema: SchemaProperties | null): boolean {
   if (!schema) return false;
-  return IMAGE_INPUT_PARAMS.some((param) => param in schema);
+  if ("input_images" in schema) return true;
+  if ("image_input" in schema) return true;
+  if ("image_prompt" in schema) return true;
+  if ("init_image" in schema) return true;
+  if ("image" in schema && !("mask" in schema)) return true;
+  return false;
 }
 
 function createInitialModeStates(modelId: string): ModeStates {

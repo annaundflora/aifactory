@@ -8,7 +8,7 @@ import {
   type Generation,
 } from "@/lib/db/queries";
 import { getModelById, UPSCALE_MODEL } from "@/lib/models";
-import { ModelSchemaService } from "@/lib/services/model-schema-service";
+import { ModelSchemaService, getImg2ImgFieldName } from "@/lib/services/model-schema-service";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -133,18 +133,12 @@ async function buildReplicateInput(
 
   if (generation.generationMode === "img2img" && generation.sourceImageUrl) {
     const schema = await ModelSchemaService.getSchema(generation.modelId);
+    const img2imgField = getImg2ImgFieldName(schema);
 
-    let fieldName: string | undefined;
-    if ("image" in schema) {
-      fieldName = "image";
-    } else if ("image_prompt" in schema) {
-      fieldName = "image_prompt";
-    } else if ("init_image" in schema) {
-      fieldName = "init_image";
-    }
-
-    if (fieldName) {
-      input[fieldName] = generation.sourceImageUrl;
+    if (img2imgField) {
+      input[img2imgField.field] = img2imgField.isArray
+        ? [generation.sourceImageUrl]
+        : generation.sourceImageUrl;
     }
     // prompt_strength is already spread from modelParams via params above
   }

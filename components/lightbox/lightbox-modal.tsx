@@ -25,6 +25,7 @@ export interface LightboxModalProps {
   isOpen: boolean;
   onClose: () => void;
   onDeleted?: () => void;
+  onGenerationCreated?: (generation: Generation) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -59,6 +60,7 @@ export function LightboxModal({
   isOpen,
   onClose,
   onDeleted,
+  onGenerationCreated,
 }: LightboxModalProps) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -115,6 +117,9 @@ export function LightboxModal({
         // AC-8: Show error toast if upscaleImage returns error
         if ("error" in result) {
           toast.error(result.error);
+        } else {
+          // Propagate pending generation to workspace so polling picks it up
+          onGenerationCreated?.(result);
         }
       } catch {
         toast.error("Upscale fehlgeschlagen");
