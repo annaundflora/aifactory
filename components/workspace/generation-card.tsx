@@ -1,6 +1,8 @@
 "use client";
 
 import { type Generation } from "@/lib/db/queries";
+import { Badge } from "@/components/ui/badge";
+import { modelIdToDisplayName } from "@/lib/utils/model-display-name";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -36,6 +38,15 @@ export function GenerationCard({ generation, onSelect }: GenerationCardProps) {
           {generation.prompt}
         </p>
       </div>
+
+      {/* Model badge overlay */}
+      {generation.modelId && (
+        <Badge
+          className="absolute bottom-2 left-2 max-w-[calc(100%-1rem)] truncate bg-black/60 text-white border-transparent hover:bg-black/60"
+        >
+          {modelIdToDisplayName(generation.modelId)}
+        </Badge>
+      )}
     </button>
   );
 }
