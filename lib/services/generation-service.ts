@@ -132,16 +132,21 @@ function buildReplicateInput(
 // ---------------------------------------------------------------------------
 
 /**
- * Generate N images: create pending DB records, then process them sequentially.
- * Returns the initial pending generations immediately for optimistic UI.
- * Each generation is processed independently (AC-5).
+ * Generate images: create pending DB records, then process them.
+ *
+ * Single model (modelIds.length === 1): creates `count` pending records
+ * for that model and processes them sequentially (existing behavior).
+ *
+ * Multi-model (modelIds.length > 1): creates 1 pending record per model
+ * with default params ({}), processes all in parallel via Promise.allSettled.
+ * Partial failure is allowed — each rejected result marks its record as failed.
  */
 async function generate(
   projectId: string,
   promptMotiv: string,
   promptStyle: string,
   negativePrompt: string | undefined,
-  modelId: string,
+  modelIds: string[],
   params: Record<string, unknown>,
   count: number
 ): Promise<Generation[]> {
@@ -149,8 +154,17 @@ async function generate(
   if (!promptMotiv || promptMotiv.trim().length === 0) {
     throw new Error("Prompt darf nicht leer sein");
   }
-  if (!modelId || !MODEL_ID_REGEX.test(modelId)) {
-    throw new Error("Unbekanntes Modell");
+  if (
+    !Array.isArray(modelIds) ||
+    modelIds.length < 1 ||
+    modelIds.length > 3
+  ) {
+    throw new Error("1-3 Modelle muessen ausgewaehlt sein");
+  }
+  for (const id of modelIds) {
+    if (!id || !MODEL_ID_REGEX.test(id)) {
+      throw new Error("Unbekanntes Modell");
+    }
   }
   if (!Number.isInteger(count) || count < 1 || count > 4) {
     throw new Error("Anzahl muss zwischen 1 und 4 liegen");
@@ -161,7 +175,62 @@ async function generate(
   const styleTrimmed = promptStyle.trim();
   const prompt = styleTrimmed ? `${motivTrimmed}. ${styleTrimmed}` : motivTrimmed;
 
-  // AC-1: Create N pending records
+  const isMultiModel = modelIds.length > 1;
+
+  if (isMultiModel) {
+    // --- Multi-model branch: 1 record per model, default params, parallel ---
+    const pendingGenerations: Generation[] = [];
+    for (const modelId of modelIds) {
+      const gen = await createGeneration({
+        projectId,
+        prompt,
+        negativePrompt: negativePrompt?.trim() || undefined,
+        modelId,
+        modelParams: {},
+        promptMotiv: motivTrimmed,
+        promptStyle: styleTrimmed,
+      });
+      pendingGenerations.push(gen);
+    }
+
+    // Process all in parallel via Promise.allSettled (fire-and-forget).
+    // Each rejected result marks the corresponding record as failed.
+    (async () => {
+      const results = await Promise.allSettled(
+        pendingGenerations.map((gen) => processGeneration(gen))
+      );
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i];
+        if (result.status === "rejected") {
+          const errorMessage =
+            result.reason instanceof Error
+              ? result.reason.message
+              : String(result.reason);
+          console.error(
+            `Generation ${pendingGenerations[i].id} fehlgeschlagen: ${errorMessage}`
+          );
+          try {
+            await updateGeneration(pendingGenerations[i].id, {
+              status: "failed",
+              errorMessage,
+            });
+          } catch (updateErr) {
+            console.error(
+              `Failed to mark generation ${pendingGenerations[i].id} as failed:`,
+              updateErr
+            );
+          }
+        }
+      }
+    })().catch((err) => {
+      console.error("Unexpected error in multi-model generation batch:", err);
+    });
+
+    return pendingGenerations;
+  }
+
+  // --- Single-model branch: count records, sequential processing ---
+  const modelId = modelIds[0];
   const pendingGenerations: Generation[] = [];
   for (let i = 0; i < count; i++) {
     const gen = await createGeneration({
@@ -176,7 +245,7 @@ async function generate(
     pendingGenerations.push(gen);
   }
 
-  // AC-5: Process sequentially to respect Replicate rate limits.
+  // Process sequentially to respect Replicate rate limits.
   // Each generation is independent — failures don't abort the queue.
   (async () => {
     for (const gen of pendingGenerations) {

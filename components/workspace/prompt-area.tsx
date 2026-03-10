@@ -262,13 +262,12 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     startGeneration(async () => {
       // Map selectedModels to modelIds
       const modelIds = selectedModels.map((m) => `${m.owner}/${m.name}`);
-      // For now, use first modelId (slice-12 changes to modelIds[])
       const result = await generateImages({
         projectId,
         promptMotiv: promptMotiv.trim(),
         promptStyle: promptStyle.trim() || undefined,
         negativePrompt: negativePrompt.trim() || undefined,
-        modelId: modelIds[0],
+        modelIds,
         params: isSingleModel ? paramValues : {},
         count: isSingleModel ? variantCount : 1,
       });
