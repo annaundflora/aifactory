@@ -60,11 +60,11 @@ describe('getModelSchema Server Action', () => {
     }
   })
 
-  // AC-4: GIVEN eine ungueltige Model-ID "unknown/model"
-  //       WHEN getModelSchema({ modelId: "unknown/model" }) aufgerufen wird
+  // AC-4: GIVEN eine ungueltige Model-ID "invalid-no-slash" (kein "/" → besteht Format-Validation nicht)
+  //       WHEN getModelSchema({ modelId: "invalid-no-slash" }) aufgerufen wird
   //       THEN wird ein Fehler-Objekt { error: "Unbekanntes Modell" } zurueckgegeben
   it('AC-4: should return error for unknown model ID', async () => {
-    const result = await getModelSchema({ modelId: 'unknown/model' })
+    const result = await getModelSchema({ modelId: 'invalid-no-slash' })
 
     expect(result).toEqual({ error: 'Unbekanntes Modell' })
   })
