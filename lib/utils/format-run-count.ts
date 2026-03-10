@@ -20,12 +20,20 @@ export function formatRunCount(count: number): string {
   if (count >= 1_000_000) {
     const value = count / 1_000_000;
     const formatted = parseFloat(value.toFixed(1));
+    // toFixed(1) rounding can push the value to 1000 — promote to next tier
+    if (formatted >= 1000) {
+      return `1B runs`;
+    }
     return `${formatted}M runs`;
   }
 
   if (count >= 1_000) {
     const value = count / 1_000;
     const formatted = parseFloat(value.toFixed(1));
+    // toFixed(1) rounding can push the value to 1000 — promote to next tier
+    if (formatted >= 1000) {
+      return `1M runs`;
+    }
     return `${formatted}K runs`;
   }
 
