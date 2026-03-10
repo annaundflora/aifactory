@@ -102,14 +102,14 @@ describe("generateImages Server Action", () => {
     expect(GenerationService.generate).not.toHaveBeenCalled();
   });
 
-  // AC-10: GIVEN generateImages wird mit unbekanntem modelId aufgerufen
+  // AC-10: GIVEN generateImages wird mit ungueltigem modelId-Format aufgerufen
   //         WHEN die Action ausgefuehrt wird
   //         THEN wird ein Fehler-Objekt { error: "Unbekanntes Modell" } zurueckgegeben
-  it('AC-10: should return error object for unknown model ID', async () => {
+  it('AC-10: should return error object for invalid model ID format', async () => {
     const result = await generateImages({
       projectId: "proj-001",
       promptMotiv: "A fox",
-      modelIds: ["unknown/nonexistent-model"],
+      modelIds: ["INVALID/Model"],
       params: {},
       count: 1,
     });
