@@ -3,7 +3,9 @@
 import { Check } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { formatRunCount } from "@/lib/utils/format-run-count";
 import { type CollectionModel } from "@/lib/types/collection-model";
 
 // ---------------------------------------------------------------------------
@@ -29,7 +31,7 @@ export function ModelCard({ model, selected, disabled, onSelect }: ModelCardProp
   }
 
   return (
-    <div
+    <Card
       role="button"
       tabIndex={disabled ? -1 : 0}
       aria-pressed={selected}
@@ -42,7 +44,7 @@ export function ModelCard({ model, selected, disabled, onSelect }: ModelCardProp
         }
       }}
       className={cn(
-        "relative flex flex-col rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden cursor-pointer transition-all duration-200",
+        "relative flex flex-col overflow-hidden cursor-pointer transition-all duration-200",
         "hover:shadow-md",
         selected && "ring-2 ring-primary",
         disabled && "opacity-50 pointer-events-none cursor-not-allowed"
@@ -75,7 +77,7 @@ export function ModelCard({ model, selected, disabled, onSelect }: ModelCardProp
       </div>
 
       {/* Card body */}
-      <div className="flex flex-col gap-1 p-3">
+      <CardContent className="flex flex-col gap-1 p-3">
         {/* Name */}
         <p className="font-bold text-sm leading-tight truncate">{model.name}</p>
 
@@ -95,10 +97,10 @@ export function ModelCard({ model, selected, disabled, onSelect }: ModelCardProp
         {/* Run count badge */}
         <div className="mt-1">
           <Badge variant="secondary" className="text-xs">
-            {model.run_count.toLocaleString()} runs
+            {formatRunCount(model.run_count)}
           </Badge>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
