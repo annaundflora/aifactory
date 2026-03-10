@@ -23,6 +23,16 @@ interface GenerateImagesInput {
   modelId: string;
   params: Record<string, unknown>;
   count: number;
+  generationMode?: string;
+  sourceImageUrl?: string;
+  strength?: number;
+}
+
+interface UpscaleImageInput {
+  projectId: string;
+  sourceImageUrl: string;
+  scale: number;
+  sourceGenerationId?: string;
 }
 
 interface RetryGenerationInput {
@@ -59,6 +69,24 @@ export async function generateImages(
     return { error: "Anzahl muss zwischen 1 und 4 liegen" };
   }
 
+  // Validate generationMode if provided
+  if (
+    input.generationMode !== undefined &&
+    !["txt2img", "img2img", "upscale"].includes(input.generationMode)
+  ) {
+    return { error: "Ungueltiger Generierungsmodus" };
+  }
+
+  // img2img-specific validation
+  if (input.generationMode === "img2img") {
+    if (!input.sourceImageUrl) {
+      return { error: "Source-Image ist erforderlich fuer img2img" };
+    }
+    if (input.strength !== undefined && (input.strength < 0 || input.strength > 1)) {
+      return { error: "Strength muss zwischen 0 und 1 liegen" };
+    }
+  }
+
   try {
     const generations = await GenerationService.generate(
       input.projectId,
@@ -67,7 +95,10 @@ export async function generateImages(
       input.negativePrompt,
       input.modelId,
       input.params,
-      input.count
+      input.count,
+      input.generationMode,
+      input.sourceImageUrl,
+      input.strength
     );
     return generations;
   } catch (error: unknown) {
@@ -189,6 +220,40 @@ export async function uploadSourceImage(
   } catch (error: unknown) {
     console.error("uploadSourceImage error:", error);
     return { error: "Bild konnte nicht hochgeladen werden" };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// upscaleImage
+// ---------------------------------------------------------------------------
+
+export async function upscaleImage(
+  input: UpscaleImageInput
+): Promise<Generation | { error: string }> {
+  // Validate sourceImageUrl
+  if (!input.sourceImageUrl) {
+    return { error: "Source-Image ist erforderlich fuer img2img" };
+  }
+
+  // Validate scale: only 2 and 4 allowed
+  if (input.scale !== 2 && input.scale !== 4) {
+    return { error: "Scale muss 2 oder 4 sein" };
+  }
+
+  try {
+    const generation = await GenerationService.upscale({
+      projectId: input.projectId,
+      sourceImageUrl: input.sourceImageUrl,
+      scale: input.scale as 2 | 4,
+      sourceGenerationId: input.sourceGenerationId,
+    });
+    return generation;
+  } catch (error: unknown) {
+    console.error("upscaleImage error:", error);
+    return {
+      error:
+        error instanceof Error ? error.message : "Unbekannter Fehler",
+    };
   }
 }
 
