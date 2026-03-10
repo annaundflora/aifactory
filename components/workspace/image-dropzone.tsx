@@ -34,6 +34,9 @@ export function ImageDropzone({ projectId, onUpload, initialUrl }: ImageDropzone
   );
   const [errorMessage, setErrorMessage] = useState<string>("");
 
+  // Track the state before a drag enters so we can restore it on drag-leave
+  const preDragState = useRef<DropzoneState>(initialUrl ? "preview" : "empty");
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ---------------------------------------------------------------------------
@@ -90,13 +93,18 @@ export function ImageDropzone({ projectId, onUpload, initialUrl }: ImageDropzone
   const handleDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    setState("drag-over");
+    setState((current) => {
+      if (current !== "drag-over") {
+        preDragState.current = current;
+      }
+      return "drag-over";
+    });
   }, []);
 
   const handleDragLeave = useCallback((e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    setState("empty");
+    setState(preDragState.current);
   }, []);
 
   const handleDrop = useCallback(
@@ -139,33 +147,20 @@ export function ImageDropzone({ projectId, onUpload, initialUrl }: ImageDropzone
   // ---------------------------------------------------------------------------
 
   const handlePaste = useCallback(
-    async (e: ClipboardEvent<HTMLInputElement>) => {
+    (e: ClipboardEvent<HTMLInputElement>) => {
       const text = e.clipboardData.getData("text");
       if (!text.startsWith("http")) return;
 
       e.preventDefault();
-      setState("uploading");
       setErrorMessage("");
 
-      try {
-        const response = await fetch(text);
-        if (!response.ok) {
-          setErrorMessage("URL konnte nicht geladen werden");
-          setState("error");
-          return;
-        }
-        const blob = await response.blob();
-        const urlParts = text.split("/");
-        const rawFilename = urlParts[urlParts.length - 1]?.split("?")[0] ?? "image";
-        const filename = rawFilename || "image";
-        const file = new File([blob], filename, { type: blob.type });
-        await processFile(file);
-      } catch {
-        setErrorMessage("URL konnte nicht geladen werden");
-        setState("error");
-      }
+      // Do NOT fetch the URL on the client (SSRF protection).
+      // Treat the pasted URL as the final image source directly.
+      setImageInfo({ url: text, filename: "", width: 0, height: 0 });
+      setState("preview");
+      onUpload(text);
     },
-    [processFile]
+    [onUpload]
   );
 
   // ---------------------------------------------------------------------------
@@ -279,7 +274,7 @@ export function ImageDropzone({ projectId, onUpload, initialUrl }: ImageDropzone
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      onClick={state !== "error" ? handleDropzoneClick : handleDropzoneClick}
+      onClick={handleDropzoneClick}
       data-testid="image-dropzone"
       data-state={state}
       role="button"
