@@ -57,3 +57,5 @@ export const MODELS: Model[] = [
 export function getModelById(id: string): Model | undefined {
   return MODELS.find((model) => model.id === id);
 }
+
+export const UPSCALE_MODEL: string = "nightmareai/real-esrgan";

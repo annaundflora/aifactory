@@ -31,6 +31,9 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
     promptMotiv: overrides.promptMotiv ?? "",
     promptStyle: overrides.promptStyle ?? "",
     isFavorite: overrides.isFavorite ?? false,
+    generationMode: overrides.generationMode ?? "txt2img",
+    sourceImageUrl: overrides.sourceImageUrl ?? null,
+    sourceGenerationId: overrides.sourceGenerationId ?? null,
   };
 }
 

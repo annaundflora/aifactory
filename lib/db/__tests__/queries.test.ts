@@ -373,3 +373,202 @@ describe("Generation Queries", () => {
     expect(mockChain.where).toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Slice-02: createGeneration — new mode fields (generationMode, sourceImageUrl, sourceGenerationId)
+// ---------------------------------------------------------------------------
+
+describe("createGeneration — new mode fields", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /**
+   * AC-1: createGeneration without new fields → returns generationMode: "txt2img",
+   * sourceImageUrl: null, sourceGenerationId: null
+   */
+  it('AC-1: should default generationMode to "txt2img" and source fields to null when not provided', async () => {
+    const returnedGeneration = {
+      ...FAKE_GENERATION,
+      generationMode: "txt2img",
+      sourceImageUrl: null,
+      sourceGenerationId: null,
+    };
+    mockChain = createChainableMock([returnedGeneration]);
+
+    const result = await createGeneration({
+      projectId: FAKE_PROJECT.id,
+      prompt: "A fox",
+      modelId: "black-forest-labs/flux-2-pro",
+    });
+
+    expect(result.generationMode).toBe("txt2img");
+    expect(result.sourceImageUrl).toBeNull();
+    expect(result.sourceGenerationId).toBeNull();
+    expect(mockChain.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        generationMode: "txt2img",
+        sourceImageUrl: null,
+        sourceGenerationId: null,
+      })
+    );
+  });
+
+  /**
+   * AC-2: createGeneration with generationMode: "img2img" and sourceImageUrl
+   * → returns correct values
+   */
+  it('AC-2: should pass generationMode "img2img" and sourceImageUrl through to db', async () => {
+    const returnedGeneration = {
+      ...FAKE_GENERATION,
+      generationMode: "img2img",
+      sourceImageUrl: "https://r2.example.com/source.png",
+      sourceGenerationId: null,
+    };
+    mockChain = createChainableMock([returnedGeneration]);
+
+    const result = await createGeneration({
+      projectId: FAKE_PROJECT.id,
+      prompt: "A fox in watercolor",
+      modelId: "black-forest-labs/flux-2-pro",
+      generationMode: "img2img",
+      sourceImageUrl: "https://r2.example.com/source.png",
+    });
+
+    expect(result.generationMode).toBe("img2img");
+    expect(result.sourceImageUrl).toBe("https://r2.example.com/source.png");
+    expect(result.sourceGenerationId).toBeNull();
+    expect(mockChain.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        generationMode: "img2img",
+        sourceImageUrl: "https://r2.example.com/source.png",
+        sourceGenerationId: null,
+      })
+    );
+  });
+
+  /**
+   * AC-3: createGeneration with generationMode: "upscale", sourceImageUrl,
+   * and sourceGenerationId → returns all three fields
+   */
+  it('AC-3: should pass generationMode "upscale", sourceImageUrl, and sourceGenerationId through to db', async () => {
+    const sourceGenId = "99999999-8888-7777-6666-555555555555";
+    const returnedGeneration = {
+      ...FAKE_GENERATION,
+      generationMode: "upscale",
+      sourceImageUrl: "https://r2.example.com/original.png",
+      sourceGenerationId: sourceGenId,
+    };
+    mockChain = createChainableMock([returnedGeneration]);
+
+    const result = await createGeneration({
+      projectId: FAKE_PROJECT.id,
+      prompt: "Upscale this",
+      modelId: "black-forest-labs/flux-2-pro",
+      generationMode: "upscale",
+      sourceImageUrl: "https://r2.example.com/original.png",
+      sourceGenerationId: sourceGenId,
+    });
+
+    expect(result.generationMode).toBe("upscale");
+    expect(result.sourceImageUrl).toBe("https://r2.example.com/original.png");
+    expect(result.sourceGenerationId).toBe(sourceGenId);
+    expect(mockChain.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        generationMode: "upscale",
+        sourceImageUrl: "https://r2.example.com/original.png",
+        sourceGenerationId: sourceGenId,
+      })
+    );
+  });
+
+  /**
+   * AC-4: createGeneration with generationMode: "img2img" without sourceGenerationId
+   * → sourceGenerationId is null
+   */
+  it('AC-4: should default sourceGenerationId to null when img2img mode omits it', async () => {
+    const returnedGeneration = {
+      ...FAKE_GENERATION,
+      generationMode: "img2img",
+      sourceImageUrl: "https://r2.example.com/source.png",
+      sourceGenerationId: null,
+    };
+    mockChain = createChainableMock([returnedGeneration]);
+
+    const result = await createGeneration({
+      projectId: FAKE_PROJECT.id,
+      prompt: "Transform this",
+      modelId: "black-forest-labs/flux-2-pro",
+      generationMode: "img2img",
+      sourceImageUrl: "https://r2.example.com/source.png",
+      // sourceGenerationId intentionally omitted
+    });
+
+    expect(result.sourceGenerationId).toBeNull();
+    expect(mockChain.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        generationMode: "img2img",
+        sourceImageUrl: "https://r2.example.com/source.png",
+        sourceGenerationId: null,
+      })
+    );
+  });
+
+  /**
+   * AC-5: New fields (generationMode, sourceImageUrl, sourceGenerationId) are all
+   * optional TypeScript types — calling with only existing required fields
+   * (projectId, prompt, modelId) compiles and works
+   */
+  it("AC-5: should compile and work when called with only required fields (projectId, prompt, modelId)", async () => {
+    mockChain = createChainableMock([FAKE_GENERATION]);
+
+    // This call uses ONLY the required fields — if the types were wrong, TypeScript would fail
+    const result = await createGeneration({
+      projectId: FAKE_PROJECT.id,
+      prompt: "Minimal call",
+      modelId: "black-forest-labs/flux-2-pro",
+    });
+
+    expect(result).toBeDefined();
+    expect(mockChain.insert).toHaveBeenCalled();
+    expect(mockChain.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: FAKE_PROJECT.id,
+        prompt: "Minimal call",
+        modelId: "black-forest-labs/flux-2-pro",
+      })
+    );
+  });
+
+  /**
+   * AC-6: Existing tests for createGeneration, getGeneration, updateGeneration,
+   * deleteGeneration remain green (no breaking change).
+   * This test verifies that the original createGeneration signature still works
+   * with the old-style full input (including modelParams and negativePrompt).
+   */
+  it("AC-6: should remain backward-compatible with existing createGeneration call signature", async () => {
+    mockChain = createChainableMock([FAKE_GENERATION]);
+
+    // Call with the exact same signature used in the existing AC-8 test
+    const result = await createGeneration({
+      projectId: FAKE_PROJECT.id,
+      prompt: "A fox",
+      modelId: "black-forest-labs/flux-2-pro",
+      modelParams: {},
+    });
+
+    expect(result).toEqual(FAKE_GENERATION);
+    expect(result.status).toBe("pending");
+    expect(result.imageUrl).toBeNull();
+    expect(mockChain.insert).toHaveBeenCalled();
+    expect(mockChain.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: FAKE_PROJECT.id,
+        prompt: "A fox",
+        modelId: "black-forest-labs/flux-2-pro",
+        modelParams: {},
+      })
+    );
+    expect(mockChain.returning).toHaveBeenCalled();
+  });
+});

@@ -245,3 +245,140 @@ describe("StorageService", () => {
     expect(StorageService.delete).toBe(deleteObject);
   });
 });
+
+describe("Slice-03: Storage Client — Dynamischer ContentType", () => {
+  const originalEnv = process.env;
+
+  const validEnv = {
+    R2_ACCESS_KEY_ID: "test-access-key",
+    R2_SECRET_ACCESS_KEY: "test-secret-key",
+    R2_ENDPOINT: "https://r2.example.com",
+    R2_PUBLIC_URL: "https://cdn.example.com",
+    R2_BUCKET_NAME: "test-bucket",
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    putObjectCalls.length = 0;
+    deleteObjectCalls.length = 0;
+    process.env = { ...originalEnv, ...validEnv };
+    mockSend.mockResolvedValue({});
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  function createTestStream(
+    data: Uint8Array = new Uint8Array([1, 2, 3])
+  ): ReadableStream {
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(data);
+        controller.close();
+      },
+    });
+  }
+
+  /**
+   * AC-1: GIVEN ein Aufruf von upload(stream, key) ohne dritten Parameter
+   * WHEN PutObjectCommand an den S3-Client gesendet wird
+   * THEN enthaelt der Command ContentType: "image/png"
+   */
+  it('AC-1: should send PutObjectCommand with ContentType "image/png" when contentType is omitted', async () => {
+    const stream = createTestStream();
+    const key = "projects/proj-1/gen-1.png";
+
+    await upload(stream, key);
+
+    expect(putObjectCalls).toHaveLength(1);
+    expect(putObjectCalls[0]).toMatchObject({
+      ContentType: "image/png",
+    });
+  });
+
+  /**
+   * AC-2: GIVEN ein Aufruf von upload(stream, key, "image/jpeg")
+   * WHEN PutObjectCommand an den S3-Client gesendet wird
+   * THEN enthaelt der Command ContentType: "image/jpeg"
+   */
+  it('AC-2: should send PutObjectCommand with ContentType "image/jpeg" when specified', async () => {
+    const stream = createTestStream();
+    const key = "projects/proj-1/source.jpg";
+
+    await upload(stream, key, "image/jpeg");
+
+    expect(putObjectCalls).toHaveLength(1);
+    expect(putObjectCalls[0]).toMatchObject({
+      ContentType: "image/jpeg",
+    });
+  });
+
+  /**
+   * AC-3: GIVEN ein Aufruf von upload(stream, key, "image/webp")
+   * WHEN PutObjectCommand an den S3-Client gesendet wird
+   * THEN enthaelt der Command ContentType: "image/webp"
+   */
+  it('AC-3: should send PutObjectCommand with ContentType "image/webp" when specified', async () => {
+    const stream = createTestStream();
+    const key = "projects/proj-1/source.webp";
+
+    await upload(stream, key, "image/webp");
+
+    expect(putObjectCalls).toHaveLength(1);
+    expect(putObjectCalls[0]).toMatchObject({
+      ContentType: "image/webp",
+    });
+  });
+
+  /**
+   * AC-4: GIVEN die geaenderte upload()-Signatur
+   * WHEN TypeScript die Aufruf-Stellen prueft, die den dritten Parameter weglassen
+   * THEN kompilieren alle bestehenden Aufruf-Stellen ohne Fehler (kein Breaking Change)
+   *
+   * This test verifies backwards compatibility at runtime: calling upload()
+   * with only two arguments succeeds without error. The fact that this file
+   * compiles and this test passes proves TypeScript accepts the 2-arg call.
+   */
+  it("AC-4: should compile and run without error when called with only stream and key (backwards compatibility)", async () => {
+    const stream = createTestStream();
+    const key = "projects/proj-1/gen-1.png";
+
+    // Call with only 2 args — if the 3rd param were required, TS would fail to compile
+    const result = await upload(stream, key);
+
+    // Should succeed without throwing
+    expect(result).toBeDefined();
+    expect(typeof result).toBe("string");
+  });
+
+  /**
+   * AC-5: GIVEN ein Aufruf von upload(stream, key, "image/jpeg")
+   * WHEN der Upload erfolgreich ist
+   * THEN gibt die Funktion dieselbe oeffentliche URL zurueck wie bisher (${publicUrl}/${key})
+   */
+  it('AC-5: should return correct public URL regardless of contentType parameter', async () => {
+    const stream = createTestStream();
+    const key = "projects/proj-42/gen-99.jpg";
+
+    const result = await upload(stream, key, "image/jpeg");
+
+    expect(result).toBe("https://cdn.example.com/projects/proj-42/gen-99.jpg");
+  });
+
+  /**
+   * AC-5 (variant): Return value is the same for different contentTypes
+   */
+  it("AC-5 (variant): should return identical URL format for image/png, image/jpeg, and image/webp", async () => {
+    const key = "projects/proj-1/gen-1.png";
+
+    const resultPng = await upload(createTestStream(), key);
+    const resultJpeg = await upload(createTestStream(), key, "image/jpeg");
+    const resultWebp = await upload(createTestStream(), key, "image/webp");
+
+    const expectedUrl = "https://cdn.example.com/projects/proj-1/gen-1.png";
+    expect(resultPng).toBe(expectedUrl);
+    expect(resultJpeg).toBe(expectedUrl);
+    expect(resultWebp).toBe(expectedUrl);
+  });
+});

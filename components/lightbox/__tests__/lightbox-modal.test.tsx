@@ -1,11 +1,38 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 
-import { LightboxModal } from "@/components/lightbox/lightbox-modal";
-import { type Generation } from "@/lib/db/queries";
+import type { Generation } from "@/lib/db/queries";
+
+// ---------------------------------------------------------------------------
+// Hoisted mock variables (vi.mock factories are hoisted above imports,
+// so any variable they reference must also be hoisted via vi.hoisted)
+// ---------------------------------------------------------------------------
+const {
+  mockToast,
+  mockToastError,
+  mockToastSuccess,
+  mockSetVariation,
+  mockUpscaleImage,
+  mockDeleteGeneration,
+} = vi.hoisted(() => {
+  const mockToastError = vi.fn();
+  const mockToastSuccess = vi.fn();
+  const mockToast = Object.assign(vi.fn(), {
+    error: mockToastError,
+    success: mockToastSuccess,
+  });
+  return {
+    mockToast,
+    mockToastError,
+    mockToastSuccess,
+    mockSetVariation: vi.fn(),
+    mockUpscaleImage: vi.fn().mockResolvedValue({ id: "gen-upscaled" }),
+    mockDeleteGeneration: vi.fn().mockResolvedValue({ success: true }),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mocks (mock_external strategy per slice spec)
@@ -21,7 +48,7 @@ vi.mock("next/image", () => ({
   },
 }));
 
-// Mock lucide-react icons
+// Mock lucide-react icons (including slice-17 icons: ArrowRightLeft, ZoomIn, Trash2)
 vi.mock("lucide-react", () => ({
   X: (props: Record<string, unknown>) => (
     <svg data-testid="x-icon" {...props} />
@@ -41,11 +68,20 @@ vi.mock("lucide-react", () => ({
   Minimize2: (props: Record<string, unknown>) => (
     <svg data-testid="minimize2-icon" {...props} />
   ),
+  ArrowRightLeft: (props: Record<string, unknown>) => (
+    <svg data-testid="arrow-right-left-icon" {...props} />
+  ),
+  ZoomIn: (props: Record<string, unknown>) => (
+    <svg data-testid="zoom-in-icon" {...props} />
+  ),
+  Trash2: (props: Record<string, unknown>) => (
+    <svg data-testid="trash2-icon" {...props} />
+  ),
 }));
 
-// Mock sonner toast
+// Mock sonner toast — supports both toast("msg") and toast.error("msg")
 vi.mock("sonner", () => ({
-  toast: { error: vi.fn(), success: vi.fn() },
+  toast: mockToast,
 }));
 
 // Mock lib/utils download helpers
@@ -64,15 +100,63 @@ vi.mock("@/lib/models", () => ({
   },
 }));
 
-// Mock workspace-state (LightboxModal uses useWorkspaceVariation internally;
-// variation-specific behaviour is tested in variation-flow.test.tsx)
+// Mock workspace-state — setVariation is a trackable spy
 vi.mock("@/lib/workspace-state", () => ({
   useWorkspaceVariation: () => ({
     variationData: null,
-    setVariation: vi.fn(),
+    setVariation: mockSetVariation,
     clearVariation: vi.fn(),
   }),
 }));
+
+// Mock server actions (upscaleImage + deleteGeneration)
+vi.mock("@/app/actions/generations", () => ({
+  upscaleImage: (...args: unknown[]) => mockUpscaleImage(...args),
+  deleteGeneration: (...args: unknown[]) => mockDeleteGeneration(...args),
+}));
+
+// Mock Popover — renders children directly; manages open/close via data attributes
+vi.mock("@/components/ui/popover", () => {
+  let onOpenChangeFn: ((open: boolean) => void) | null = null;
+  let isOpen = false;
+
+  return {
+    Popover: ({ children, open, onOpenChange }: { children: React.ReactNode; open?: boolean; onOpenChange?: (open: boolean) => void }) => {
+      if (open !== undefined) isOpen = open;
+      if (onOpenChange) onOpenChangeFn = onOpenChange;
+      return <div data-testid="popover-root" data-open={isOpen}>{children}</div>;
+    },
+    PopoverTrigger: ({ children, asChild }: { children: React.ReactNode; asChild?: boolean }) => {
+      if (asChild) {
+        // When asChild, clicking the child should toggle the popover
+        return <div data-testid="popover-trigger" onClick={() => onOpenChangeFn?.(!isOpen)}>{children}</div>;
+      }
+      return <div data-testid="popover-trigger" onClick={() => onOpenChangeFn?.(!isOpen)}>{children}</div>;
+    },
+    PopoverContent: ({ children }: { children: React.ReactNode; className?: string; align?: string }) => {
+      if (!isOpen) return null;
+      return <div data-testid="popover-content">{children}</div>;
+    },
+  };
+});
+
+// Mock ConfirmDialog
+vi.mock("@/components/shared/confirm-dialog", () => ({
+  ConfirmDialog: ({ open, onConfirm, onCancel }: { open: boolean; title?: string; description?: string; confirmLabel?: string; cancelLabel?: string; onConfirm: () => void; onCancel: () => void }) => {
+    if (!open) return null;
+    return (
+      <div data-testid="confirm-dialog">
+        <button data-testid="confirm-dialog-confirm" onClick={onConfirm}>Confirm</button>
+        <button data-testid="confirm-dialog-cancel" onClick={onCancel}>Cancel</button>
+      </div>
+    );
+  },
+}));
+
+// ---------------------------------------------------------------------------
+// Import component AFTER mocks
+// ---------------------------------------------------------------------------
+import { LightboxModal } from "@/components/lightbox/lightbox-modal";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -97,6 +181,9 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
     promptStyle: overrides.promptStyle ?? "",
     isFavorite: overrides.isFavorite ?? false,
     createdAt: overrides.createdAt ?? new Date("2026-03-01T14:30:00Z"),
+    generationMode: overrides.generationMode ?? "txt2img",
+    sourceImageUrl: overrides.sourceImageUrl ?? null,
+    sourceGenerationId: overrides.sourceGenerationId ?? null,
   };
 }
 
@@ -104,10 +191,16 @@ const defaultOnClose = vi.fn();
 
 beforeEach(() => {
   defaultOnClose.mockClear();
+  mockSetVariation.mockClear();
+  mockUpscaleImage.mockClear();
+  mockDeleteGeneration.mockClear();
+  mockToast.mockClear();
+  mockToastError.mockClear();
+  mockToastSuccess.mockClear();
 });
 
 // ---------------------------------------------------------------------------
-// Tests
+// Tests — Original Lightbox
 // ---------------------------------------------------------------------------
 
 describe("LightboxModal", () => {
@@ -612,5 +705,374 @@ describe("LightboxModal Fullscreen", () => {
     // Assert: image has normal mode class
     const img = screen.getByTestId("lightbox-image");
     expect(img.className).toMatch(/max-h-\[70vh\]/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Slice-17: Lightbox — Cross-Mode Buttons (img2img + Upscale Popover)
+// ---------------------------------------------------------------------------
+
+describe("LightboxModal Cross-Mode Buttons (Slice-17)", () => {
+
+  // -------------------------------------------------------------------------
+  // AC-1: txt2img → img2img + Upscale + Variation sichtbar
+  // -------------------------------------------------------------------------
+  it("AC-1: should show img2img, Upscale and Variation buttons for txt2img generation", () => {
+    /**
+     * AC-1 (slice-17): GIVEN eine Lightbox ist geoeffnet mit einem Bild der generationMode: "txt2img"
+     * WHEN die Aktionsleiste gerendert wird
+     * THEN sind sowohl der "img2img"-Button als auch der "Upscale"-Button sichtbar;
+     *      der "Variation"-Button ist ebenfalls sichtbar
+     */
+    const generation = makeGeneration({ generationMode: "txt2img" });
+
+    render(
+      <LightboxModal generation={generation} isOpen={true} onClose={defaultOnClose} />
+    );
+
+    // img2img button visible
+    const img2imgBtn = screen.getByTestId("img2img-btn");
+    expect(img2imgBtn).toBeInTheDocument();
+    expect(img2imgBtn).toHaveTextContent("img2img");
+
+    // Upscale button visible
+    const upscaleBtn = screen.getByTestId("upscale-btn");
+    expect(upscaleBtn).toBeInTheDocument();
+    expect(upscaleBtn).toHaveTextContent("Upscale");
+
+    // Variation button visible
+    const variationBtn = screen.getByTestId("variation-btn");
+    expect(variationBtn).toBeInTheDocument();
+    expect(variationBtn).toHaveTextContent("Variation");
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-2: img2img → all three buttons visible
+  // -------------------------------------------------------------------------
+  it("AC-2: should show img2img, Upscale and Variation buttons for img2img generation", () => {
+    /**
+     * AC-2 (slice-17): GIVEN eine Lightbox ist geoeffnet mit einem Bild der generationMode: "img2img"
+     * WHEN die Aktionsleiste gerendert wird
+     * THEN sind "img2img"-Button, "Upscale"-Button und "Variation"-Button sichtbar
+     */
+    const generation = makeGeneration({
+      generationMode: "img2img",
+      sourceImageUrl: "https://example.com/source.png",
+    });
+
+    render(
+      <LightboxModal generation={generation} isOpen={true} onClose={defaultOnClose} />
+    );
+
+    expect(screen.getByTestId("img2img-btn")).toBeInTheDocument();
+    expect(screen.getByTestId("upscale-btn")).toBeInTheDocument();
+    expect(screen.getByTestId("variation-btn")).toBeInTheDocument();
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-3: upscale → Upscale + Variation hidden, img2img visible
+  // -------------------------------------------------------------------------
+  it("AC-3: should hide Upscale and Variation buttons for upscale generation", () => {
+    /**
+     * AC-3 (slice-17): GIVEN eine Lightbox ist geoeffnet mit einem Bild der generationMode: "upscale"
+     * WHEN die Aktionsleiste gerendert wird
+     * THEN sind "Upscale"-Button und "Variation"-Button NICHT sichtbar;
+     *      "img2img"-Button und uebrige Buttons (Download, Fav, Delete) sind sichtbar
+     */
+    const generation = makeGeneration({ generationMode: "upscale" });
+
+    render(
+      <LightboxModal generation={generation} isOpen={true} onClose={defaultOnClose} />
+    );
+
+    // Upscale and Variation should NOT be in the DOM
+    expect(screen.queryByTestId("upscale-btn")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("variation-btn")).not.toBeInTheDocument();
+
+    // img2img button IS visible
+    expect(screen.getByTestId("img2img-btn")).toBeInTheDocument();
+
+    // Download and Delete buttons are also visible
+    expect(screen.getByTestId("download-btn")).toBeInTheDocument();
+    expect(screen.getByTestId("lightbox-delete-btn")).toBeInTheDocument();
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-4: img2img button click → setVariation with targetMode img2img + onClose
+  // -------------------------------------------------------------------------
+  it("AC-4: should call setVariation with targetMode img2img and imageUrl as sourceImageUrl on img2img button click", async () => {
+    /**
+     * AC-4 (slice-17): GIVEN ein txt2img-Bild ist in der Lightbox geoeffnet und der
+     *      "img2img"-Button wird geklickt
+     * WHEN der Click-Handler ausgefuehrt wird
+     * THEN wird setVariation mit { targetMode: "img2img", sourceImageUrl: <imageUrl des Bildes>,
+     *      ...restliche Felder des Bildes } aufgerufen und die Lightbox wird geschlossen (onClose)
+     */
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const generation = makeGeneration({
+      generationMode: "txt2img",
+      imageUrl: "https://example.com/my-txt2img.png",
+      prompt: "a sunset",
+      negativePrompt: "blurry",
+      modelId: "black-forest-labs/flux-2-pro",
+      modelParams: { steps: 30 },
+    });
+
+    render(
+      <LightboxModal generation={generation} isOpen={true} onClose={onClose} />
+    );
+
+    const img2imgBtn = screen.getByTestId("img2img-btn");
+    await user.click(img2imgBtn);
+
+    // setVariation called with targetMode img2img and imageUrl as sourceImageUrl
+    expect(mockSetVariation).toHaveBeenCalledTimes(1);
+    const callArg = mockSetVariation.mock.calls[0][0];
+    expect(callArg.targetMode).toBe("img2img");
+    expect(callArg.sourceImageUrl).toBe("https://example.com/my-txt2img.png");
+    expect(callArg.promptMotiv).toBe("a sunset");
+    expect(callArg.negativePrompt).toBe("blurry");
+    expect(callArg.modelId).toBe("black-forest-labs/flux-2-pro");
+    expect(callArg.modelParams).toEqual({ steps: 30 });
+
+    // Lightbox was closed
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-5: Upscale button click → Popover with 2x and 4x
+  // -------------------------------------------------------------------------
+  it("AC-5: should show popover with 2x and 4x options when Upscale button is clicked", async () => {
+    /**
+     * AC-5 (slice-17): GIVEN der "Upscale"-Button wird geklickt
+     * WHEN der Popover oeffnet
+     * THEN zeigt er zwei Optionen: "2x" und "4x" — kein direkter Action-Aufruf beim Oeffnen
+     */
+    const user = userEvent.setup();
+    const generation = makeGeneration({ generationMode: "txt2img" });
+
+    render(
+      <LightboxModal generation={generation} isOpen={true} onClose={defaultOnClose} />
+    );
+
+    // Click the upscale button to open popover
+    const upscaleBtn = screen.getByTestId("upscale-btn");
+    await user.click(upscaleBtn);
+
+    // 2x and 4x options should be visible
+    const btn2x = screen.getByTestId("upscale-2x-btn");
+    const btn4x = screen.getByTestId("upscale-4x-btn");
+    expect(btn2x).toBeInTheDocument();
+    expect(btn2x).toHaveTextContent("2x");
+    expect(btn4x).toBeInTheDocument();
+    expect(btn4x).toHaveTextContent("4x");
+
+    // No upscaleImage call on mere popover open
+    expect(mockUpscaleImage).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-6: Popover 2x click → upscaleImage with scale 2 + Toast
+  // -------------------------------------------------------------------------
+  it("AC-6: should call upscaleImage with scale 2 and show toast when 2x is selected", async () => {
+    /**
+     * AC-6 (slice-17): GIVEN der Popover ist offen und "2x" wird geklickt
+     * WHEN der Click-Handler ausgefuehrt wird
+     * THEN wird upscaleImage mit { projectId, sourceImageUrl, scale: 2, sourceGenerationId }
+     *      aufgerufen; der Popover schliesst sich; ein Toast "Upscaling..." erscheint
+     */
+    const user = userEvent.setup();
+    mockUpscaleImage.mockResolvedValue({ id: "gen-upscaled-2x" });
+    const generation = makeGeneration({
+      generationMode: "txt2img",
+      id: "gen-source-1",
+      projectId: "project-42",
+      imageUrl: "https://example.com/source-img.png",
+    });
+
+    render(
+      <LightboxModal generation={generation} isOpen={true} onClose={defaultOnClose} />
+    );
+
+    // Open popover
+    const upscaleBtn = screen.getByTestId("upscale-btn");
+    await user.click(upscaleBtn);
+
+    // Click 2x
+    const btn2x = screen.getByTestId("upscale-2x-btn");
+    await user.click(btn2x);
+
+    // upscaleImage called with correct args
+    await waitFor(() => {
+      expect(mockUpscaleImage).toHaveBeenCalledTimes(1);
+    });
+    expect(mockUpscaleImage).toHaveBeenCalledWith({
+      projectId: "project-42",
+      sourceImageUrl: "https://example.com/source-img.png",
+      scale: 2,
+      sourceGenerationId: "gen-source-1",
+    });
+
+    // Toast "Upscaling..." was shown
+    expect(mockToast).toHaveBeenCalledWith("Upscaling...");
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-7: Popover 4x click → upscaleImage with scale 4 + Toast
+  // -------------------------------------------------------------------------
+  it("AC-7: should call upscaleImage with scale 4 and show toast when 4x is selected", async () => {
+    /**
+     * AC-7 (slice-17): GIVEN der Popover ist offen und "4x" wird geklickt
+     * WHEN der Click-Handler ausgefuehrt wird
+     * THEN wird upscaleImage mit { projectId, sourceImageUrl, scale: 4, sourceGenerationId }
+     *      aufgerufen; der Popover schliesst sich; ein Toast "Upscaling..." erscheint
+     */
+    const user = userEvent.setup();
+    mockUpscaleImage.mockResolvedValue({ id: "gen-upscaled-4x" });
+    const generation = makeGeneration({
+      generationMode: "txt2img",
+      id: "gen-source-2",
+      projectId: "project-42",
+      imageUrl: "https://example.com/source-img-4x.png",
+    });
+
+    render(
+      <LightboxModal generation={generation} isOpen={true} onClose={defaultOnClose} />
+    );
+
+    // Open popover
+    const upscaleBtn = screen.getByTestId("upscale-btn");
+    await user.click(upscaleBtn);
+
+    // Click 4x
+    const btn4x = screen.getByTestId("upscale-4x-btn");
+    await user.click(btn4x);
+
+    // upscaleImage called with correct args
+    await waitFor(() => {
+      expect(mockUpscaleImage).toHaveBeenCalledTimes(1);
+    });
+    expect(mockUpscaleImage).toHaveBeenCalledWith({
+      projectId: "project-42",
+      sourceImageUrl: "https://example.com/source-img-4x.png",
+      scale: 4,
+      sourceGenerationId: "gen-source-2",
+    });
+
+    // Toast "Upscaling..." was shown
+    expect(mockToast).toHaveBeenCalledWith("Upscaling...");
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-8: upscaleImage error → error toast, lightbox stays open
+  // -------------------------------------------------------------------------
+  it("AC-8: should show error toast and keep lightbox open when upscaleImage returns error", async () => {
+    /**
+     * AC-8 (slice-17): GIVEN upscaleImage gibt { error: "..." } zurueck
+     * WHEN der Fehler empfangen wird
+     * THEN wird ein Fehler-Toast mit dem Error-Text angezeigt; die Lightbox bleibt geoeffnet
+     */
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    mockUpscaleImage.mockResolvedValue({ error: "Scale limit exceeded" });
+    const generation = makeGeneration({ generationMode: "txt2img" });
+
+    render(
+      <LightboxModal generation={generation} isOpen={true} onClose={onClose} />
+    );
+
+    // Open popover and click 2x
+    const upscaleBtn = screen.getByTestId("upscale-btn");
+    await user.click(upscaleBtn);
+
+    const btn2x = screen.getByTestId("upscale-2x-btn");
+    await user.click(btn2x);
+
+    // Wait for the async handler to resolve
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith("Scale limit exceeded");
+    });
+
+    // Lightbox remains open — onClose was NOT called
+    expect(onClose).not.toHaveBeenCalled();
+
+    // The lightbox overlay is still in the DOM
+    expect(screen.getByTestId("lightbox-overlay")).toBeInTheDocument();
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-9: Variation on img2img → setVariation with sourceImageUrl from generation.sourceImageUrl
+  // -------------------------------------------------------------------------
+  it("AC-9: should call setVariation with sourceImageUrl from generation sourceImageUrl for img2img variation", async () => {
+    /**
+     * AC-9 (slice-17): GIVEN ein img2img-Bild ist in der Lightbox geoeffnet und der
+     *      "Variation"-Button wird geklickt
+     * WHEN der Click-Handler ausgefuehrt wird
+     * THEN wird setVariation mit sourceImageUrl aus dem sourceImageUrl-Feld des Bildes
+     *      (nicht der imageUrl) und targetMode: "img2img" aufgerufen
+     */
+    const user = userEvent.setup();
+    const generation = makeGeneration({
+      generationMode: "img2img",
+      imageUrl: "https://example.com/result-img2img.png",
+      sourceImageUrl: "https://example.com/original-source.png",
+      prompt: "an enhanced sunset",
+      modelId: "black-forest-labs/flux-2-pro",
+      modelParams: { steps: 25 },
+    });
+
+    render(
+      <LightboxModal generation={generation} isOpen={true} onClose={defaultOnClose} />
+    );
+
+    const variationBtn = screen.getByTestId("variation-btn");
+    await user.click(variationBtn);
+
+    expect(mockSetVariation).toHaveBeenCalledTimes(1);
+    const callArg = mockSetVariation.mock.calls[0][0];
+
+    // sourceImageUrl should come from generation.sourceImageUrl (the original source), NOT imageUrl
+    expect(callArg.sourceImageUrl).toBe("https://example.com/original-source.png");
+    expect(callArg.targetMode).toBe("img2img");
+    expect(callArg.promptMotiv).toBe("an enhanced sunset");
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-10: Variation on txt2img → existing behavior, no sourceImageUrl
+  // -------------------------------------------------------------------------
+  it("AC-10: should call setVariation without sourceImageUrl for txt2img variation", async () => {
+    /**
+     * AC-10 (slice-17): GIVEN ein txt2img-Bild ist in der Lightbox geoeffnet und der
+     *      "Variation"-Button wird geklickt
+     * WHEN der Click-Handler ausgefuehrt wird
+     * THEN wird setVariation mit dem bestehenden Verhalten aufgerufen —
+     *      sourceImageUrl bleibt undefined (unveraendertes Verhalten)
+     */
+    const user = userEvent.setup();
+    const generation = makeGeneration({
+      generationMode: "txt2img",
+      imageUrl: "https://example.com/txt2img-result.png",
+      sourceImageUrl: null,
+      prompt: "a basic sunset",
+      modelId: "black-forest-labs/flux-2-pro",
+      modelParams: { steps: 30 },
+    });
+
+    render(
+      <LightboxModal generation={generation} isOpen={true} onClose={defaultOnClose} />
+    );
+
+    const variationBtn = screen.getByTestId("variation-btn");
+    await user.click(variationBtn);
+
+    expect(mockSetVariation).toHaveBeenCalledTimes(1);
+    const callArg = mockSetVariation.mock.calls[0][0];
+
+    // For txt2img: no targetMode, no sourceImageUrl (unchanged behavior)
+    expect(callArg.sourceImageUrl).toBeUndefined();
+    expect(callArg.targetMode).toBeUndefined();
+    expect(callArg.promptMotiv).toBe("a basic sunset");
+    expect(callArg.modelId).toBe("black-forest-labs/flux-2-pro");
   });
 });

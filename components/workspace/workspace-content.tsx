@@ -7,6 +7,7 @@ import { fetchGenerations } from "@/app/actions/generations";
 import { PromptArea } from "@/components/workspace/prompt-area";
 import { GalleryGrid } from "@/components/workspace/gallery-grid";
 import { GenerationPlaceholder } from "@/components/workspace/generation-placeholder";
+import { FilterChips, type FilterValue } from "@/components/workspace/filter-chips";
 import { LightboxModal } from "@/components/lightbox/lightbox-modal";
 import { LightboxNavigation } from "@/components/lightbox/lightbox-navigation";
 
@@ -23,6 +24,9 @@ export function WorkspaceContent({
 }: WorkspaceContentProps) {
   // ----- All generations state (single source of truth) -----
   const [generations, setGenerations] = useState<Generation[]>(initialGenerations);
+
+  // ----- Filter state -----
+  const [modeFilter, setModeFilter] = useState<FilterValue>("all");
 
   // ----- Lightbox state -----
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -156,10 +160,16 @@ export function WorkspaceContent({
           </div>
         )}
 
+        {/* Filter Chips */}
+        <div className="mb-4">
+          <FilterChips value={modeFilter} onChange={setModeFilter} />
+        </div>
+
         {/* Completed Gallery */}
         <GalleryGrid
           generations={generations}
           onSelectGeneration={handleSelectGeneration}
+          modeFilter={modeFilter}
         />
       </div>
 
@@ -171,6 +181,7 @@ export function WorkspaceContent({
             isOpen={lightboxOpen}
             onClose={handleLightboxClose}
             onDeleted={handleLightboxDelete}
+            onGenerationCreated={(gen) => setGenerations((prev) => [gen, ...prev])}
           />
           <LightboxNavigation
             generations={completedGenerations}
