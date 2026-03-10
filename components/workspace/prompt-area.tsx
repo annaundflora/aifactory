@@ -10,7 +10,7 @@ import {
   type ChangeEvent,
 } from "react";
 import { PromptTabs, type PromptTab } from "@/components/workspace/prompt-tabs";
-import { getModelSchema } from "@/app/actions/models";
+import { getModelSchema, getCollectionModels } from "@/app/actions/models";
 import { generateImages } from "@/app/actions/generations";
 import { useWorkspaceVariation } from "@/lib/workspace-state";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,12 @@ import { Loader2, Wand2, Sparkles } from "lucide-react";
 import { BuilderDrawer } from "@/components/prompt-builder/builder-drawer";
 import { LLMComparison } from "@/components/prompt-improve/llm-comparison";
 import { TemplateSelector } from "@/components/workspace/template-selector";
+import { type CollectionModel } from "@/lib/types/collection-model";
+import { ModelTrigger } from "@/components/models/model-trigger";
+import { ModelBrowserDrawer } from "@/components/models/model-browser-drawer";
+
+// Re-export Generation type for callback
+import { type Generation } from "@/lib/db/queries";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -32,9 +38,6 @@ interface PromptAreaProps {
   projectId: string;
   onGenerationsCreated?: (generations: Generation[]) => void;
 }
-
-// Re-export Generation type for callback
-import { type Generation } from "@/lib/db/queries";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -53,8 +56,14 @@ function autoResize(el: HTMLTextAreaElement) {
 // ---------------------------------------------------------------------------
 
 export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps) {
-  // ----- Model state -----
-  const [selectedModelId, setSelectedModelId] = useState("black-forest-labs/flux-1.1-pro");
+  // ----- Model state (multi-model) -----
+  const [selectedModels, setSelectedModels] = useState<CollectionModel[]>([]);
+
+  // ----- Collection state (for drawer) -----
+  const [collectionModels, setCollectionModels] = useState<CollectionModel[]>([]);
+  const [collectionError, setCollectionError] = useState<string | undefined>(undefined);
+  const [collectionLoading, setCollectionLoading] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // ----- Schema state -----
   const [schema, setSchema] = useState<SchemaProperties | null>(null);
@@ -86,6 +95,47 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   const { variationData, clearVariation } = useWorkspaceVariation();
   const pendingVariationParamsRef = useRef<Record<string, unknown> | null>(null);
 
+  // ----- Derived: current model ID (for schema, LLM comparison, generate) -----
+  const selectedModelId =
+    selectedModels.length > 0
+      ? `${selectedModels[0].owner}/${selectedModels[0].name}`
+      : "";
+  const selectedModelIdRef = useRef(selectedModelId);
+  selectedModelIdRef.current = selectedModelId;
+
+  // ----- Derived: single model mode -----
+  const isSingleModel = selectedModels.length === 1;
+
+  // ----- Fetch collection models on mount -----
+  const fetchCollectionModels = useCallback(async () => {
+    setCollectionLoading(true);
+    setCollectionError(undefined);
+    try {
+      const result = await getCollectionModels();
+      if (Array.isArray(result)) {
+        setCollectionModels(result);
+        // Initialize selectedModels with first model if currently empty
+        setSelectedModels((prev) => {
+          if (prev.length === 0 && result.length > 0) {
+            return [result[0]];
+          }
+          return prev;
+        });
+      } else {
+        setCollectionError(result.error);
+      }
+    } catch {
+      setCollectionError("Failed to load models");
+    } finally {
+      setCollectionLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCollectionModels();
+  }, [fetchCollectionModels]);
+
+  // ----- Variation handling -----
   useEffect(() => {
     if (!variationData) return;
 
@@ -93,19 +143,43 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     setPromptStyle(variationData.promptStyle ?? "");
     setNegativePrompt(variationData.negativePrompt ?? "");
 
-    if (variationData.modelId !== selectedModelId) {
+    if (variationData.modelId !== selectedModelIdRef.current) {
       // Store params to restore after schema load clears them
       pendingVariationParamsRef.current = variationData.modelParams;
-      setSelectedModelId(variationData.modelId);
+      // Find the matching CollectionModel in the collection, or create a minimal one
+      const matchingModel = collectionModels.find(
+        (m) => `${m.owner}/${m.name}` === variationData.modelId,
+      );
+      if (matchingModel) {
+        setSelectedModels([matchingModel]);
+      } else {
+        // Fallback: create a minimal CollectionModel from the modelId
+        const [owner, name] = variationData.modelId.split("/");
+        setSelectedModels([
+          {
+            url: "",
+            owner: owner ?? "",
+            name: name ?? "",
+            description: null,
+            cover_image_url: null,
+            run_count: 0,
+          },
+        ]);
+      }
     } else {
       setParamValues(variationData.modelParams);
     }
 
     clearVariation();
-  }, [variationData, clearVariation, selectedModelId]);
+  }, [variationData, clearVariation, collectionModels]);
 
   // ----- Load schema on model change -----
   const loadSchema = useCallback(async (modelId: string) => {
+    if (!modelId) {
+      setSchema(null);
+      setSchemaLoading(false);
+      return;
+    }
     setSchemaLoading(true);
     setParamValues({});
     try {
@@ -161,19 +235,42 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     []
   );
 
+  // ----- Model trigger handlers -----
+  const handleModelRemove = useCallback((model: CollectionModel) => {
+    setSelectedModels((prev) =>
+      prev.filter((m) => !(m.owner === model.owner && m.name === model.name)),
+    );
+  }, []);
+
+  const handleBrowse = useCallback(() => {
+    setDrawerOpen(true);
+  }, []);
+
+  const handleDrawerConfirm = useCallback((models: CollectionModel[]) => {
+    setSelectedModels(models);
+  }, []);
+
+  const handleDrawerClose = useCallback(() => {
+    setDrawerOpen(false);
+  }, []);
+
   // ----- Generate handler -----
   const handleGenerate = useCallback(() => {
     if (!promptMotiv.trim()) return;
+    if (selectedModels.length === 0) return;
 
     startGeneration(async () => {
+      // Map selectedModels to modelIds
+      const modelIds = selectedModels.map((m) => `${m.owner}/${m.name}`);
+      // For now, use first modelId (slice-12 changes to modelIds[])
       const result = await generateImages({
         projectId,
         promptMotiv: promptMotiv.trim(),
         promptStyle: promptStyle.trim() || undefined,
         negativePrompt: negativePrompt.trim() || undefined,
-        modelId: selectedModelId,
-        params: paramValues,
-        count: variantCount,
+        modelId: modelIds[0],
+        params: isSingleModel ? paramValues : {},
+        count: isSingleModel ? variantCount : 1,
       });
       if (Array.isArray(result)) {
         onGenerationsCreated?.(result);
@@ -183,7 +280,8 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     promptMotiv,
     promptStyle,
     negativePrompt,
-    selectedModelId,
+    selectedModels,
+    isSingleModel,
     paramValues,
     variantCount,
     projectId,
@@ -220,19 +318,27 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
         negativePrompt={negativePrompt}
       >
         <div className="space-y-4 pt-2">
-          {/* Model selector placeholder — replaced in slice-10 */}
+          {/* Model Trigger (replaces Select dropdown) */}
           <div className="space-y-2">
-            <Label htmlFor="model-select">Model</Label>
-            <select
-              id="model-select"
-              data-testid="model-select"
-              value={selectedModelId}
-              onChange={(e) => setSelectedModelId(e.target.value)}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
-            >
-              <option value={selectedModelId}>{selectedModelId}</option>
-            </select>
+            <Label>Model</Label>
+            <ModelTrigger
+              models={selectedModels}
+              onRemove={handleModelRemove}
+              onBrowse={handleBrowse}
+            />
           </div>
+
+          {/* Model Browser Drawer */}
+          <ModelBrowserDrawer
+            open={drawerOpen}
+            models={collectionModels}
+            selectedModels={selectedModels}
+            isLoading={collectionLoading}
+            error={collectionError}
+            onConfirm={handleDrawerConfirm}
+            onClose={handleDrawerClose}
+            onRetry={fetchCollectionModels}
+          />
 
           {/* Motiv Textarea (required) */}
           <div className="space-y-2">
@@ -345,42 +451,56 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
             </div>
           )}
 
-          {/* Parameter Panel */}
-          <ParameterPanel
-            schema={schema}
-            isLoading={schemaLoading}
-            values={paramValues}
-            onChange={setParamValues}
-          />
+          {/* Parameter Panel — only shown when exactly 1 model selected */}
+          {isSingleModel && (
+            <ParameterPanel
+              schema={schema}
+              isLoading={schemaLoading}
+              values={paramValues}
+              onChange={setParamValues}
+            />
+          )}
+
+          {/* Multi-model notice */}
+          {selectedModels.length > 1 && (
+            <p
+              className="text-sm text-muted-foreground"
+              data-testid="multi-model-notice"
+            >
+              Default parameters will be used for multi-model generation
+            </p>
+          )}
 
           {/* Bottom row: Variant Count + Generate Button */}
           <div className="flex items-center gap-3">
-            {/* Variant Count Selector */}
-            <div className="flex items-center gap-2">
-              <Label htmlFor="variant-count" className="text-sm whitespace-nowrap">
-                Variants
-              </Label>
-              <div className="flex gap-1" data-testid="variant-count-selector">
-                {VARIANT_OPTIONS.map((count) => (
-                  <Button
-                    key={count}
-                    type="button"
-                    size="sm"
-                    variant={variantCount === count ? "default" : "outline"}
-                    onClick={() => setVariantCount(count)}
-                    data-testid={`variant-count-${count}`}
-                  >
-                    {count}
-                  </Button>
-                ))}
+            {/* Variant Count Selector — only shown when exactly 1 model selected */}
+            {isSingleModel && (
+              <div className="flex items-center gap-2">
+                <Label htmlFor="variant-count" className="text-sm whitespace-nowrap">
+                  Variants
+                </Label>
+                <div className="flex gap-1" data-testid="variant-count-selector">
+                  {VARIANT_OPTIONS.map((count) => (
+                    <Button
+                      key={count}
+                      type="button"
+                      size="sm"
+                      variant={variantCount === count ? "default" : "outline"}
+                      onClick={() => setVariantCount(count)}
+                      data-testid={`variant-count-${count}`}
+                    >
+                      {count}
+                    </Button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Generate Button */}
             <Button
               type="button"
               onClick={handleGenerate}
-              disabled={isGenerating || !promptMotiv.trim()}
+              disabled={isGenerating || !promptMotiv.trim() || selectedModels.length === 0}
               className="ml-auto"
               data-testid="generate-button"
             >
