@@ -7,12 +7,19 @@ import {
   updateGeneration,
   type Generation,
 } from "@/lib/db/queries";
-import { getModelById } from "@/lib/models";
+import { getModelById, UPSCALE_MODEL } from "@/lib/models";
 import { ModelSchemaService } from "@/lib/services/model-schema-service";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+export interface UpscaleInput {
+  projectId: string;
+  sourceImageUrl: string;
+  scale: 2 | 4;
+  sourceGenerationId?: string;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -268,7 +275,85 @@ async function retry(generationId: string): Promise<Generation> {
   return resetGeneration;
 }
 
+/**
+ * Upscale a single image using the fixed UPSCALE_MODEL.
+ * Creates 1 pending Generation record with generationMode "upscale",
+ * then processes it fire-and-forget.
+ * Returns the pending generation immediately for optimistic UI.
+ */
+async function upscale(input: UpscaleInput): Promise<Generation> {
+  const { projectId, sourceImageUrl, scale, sourceGenerationId } = input;
+
+  // Validate scale: only 2 and 4 allowed
+  if (scale !== 2 && scale !== 4) {
+    throw new Error("Scale muss 2 oder 4 sein");
+  }
+
+  // Compose prompt
+  let prompt = `Upscale ${scale}x`;
+  if (sourceGenerationId) {
+    const sourceGeneration = await getGeneration(sourceGenerationId);
+    prompt = `${sourceGeneration.prompt} (Upscale ${scale}x)`;
+  }
+
+  // Create a single pending generation record
+  const generation = await createGeneration({
+    projectId,
+    prompt,
+    modelId: UPSCALE_MODEL,
+    generationMode: "upscale",
+    sourceImageUrl,
+    sourceGenerationId: sourceGenerationId ?? null,
+  });
+
+  // Fire-and-forget: process the upscale asynchronously
+  (async () => {
+    const storageKey = `projects/${generation.projectId}/${generation.id}.png`;
+
+    try {
+      // Call Replicate with upscale-specific input (image + scale, no prompt)
+      const result = await ReplicateClient.run(UPSCALE_MODEL, {
+        image: sourceImageUrl,
+        scale,
+      });
+
+      // Convert stream to PNG buffer + get dimensions
+      const { buffer, width, height } = await streamToPngBuffer(result.output);
+
+      // Upload to R2
+      const imageUrl = await StorageService.upload(buffer as unknown as Buffer, storageKey);
+
+      // Update DB to completed
+      await updateGeneration(generation.id, {
+        status: "completed",
+        imageUrl,
+        width,
+        height,
+        seed: result.seed,
+        replicatePredictionId: result.predictionId,
+      });
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error(
+        `Upscale ${generation.id} fehlgeschlagen: ${errorMessage}`
+      );
+
+      await updateGeneration(generation.id, {
+        status: "failed",
+        errorMessage,
+      });
+    }
+  })().catch((err) => {
+    console.error("Unexpected error in upscale processing:", err);
+  });
+
+  // Return the pending generation immediately
+  return generation;
+}
+
 export const GenerationService = {
   generate,
   retry,
+  upscale,
 };
