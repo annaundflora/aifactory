@@ -67,14 +67,14 @@ async function streamToPngBuffer(
 // Core: process a single generation
 // ---------------------------------------------------------------------------
 
-async function processGeneration(generation: Generation, strength?: number): Promise<Generation> {
+async function processGeneration(generation: Generation): Promise<Generation> {
   const storageKey = `projects/${generation.projectId}/${generation.id}.png`;
 
   try {
     // 1. Call Replicate
     const result = await ReplicateClient.run(
       generation.modelId,
-      await buildReplicateInput(generation, strength)
+      await buildReplicateInput(generation)
     );
 
     // 2. Convert stream to PNG buffer + get dimensions
@@ -108,8 +108,7 @@ async function processGeneration(generation: Generation, strength?: number): Pro
 }
 
 async function buildReplicateInput(
-  generation: Generation,
-  strength?: number
+  generation: Generation
 ): Promise<Record<string, unknown>> {
   const params =
     typeof generation.modelParams === "object" && generation.modelParams !== null
@@ -128,15 +127,19 @@ async function buildReplicateInput(
   if (generation.generationMode === "img2img" && generation.sourceImageUrl) {
     const schema = await ModelSchemaService.getSchema(generation.modelId);
 
+    let fieldName: string | undefined;
     if ("image" in schema) {
-      input.image = generation.sourceImageUrl;
+      fieldName = "image";
     } else if ("image_prompt" in schema) {
-      input.image_prompt = generation.sourceImageUrl;
+      fieldName = "image_prompt";
     } else if ("init_image" in schema) {
-      input.init_image = generation.sourceImageUrl;
+      fieldName = "init_image";
     }
 
-    input.prompt_strength = strength;
+    if (fieldName) {
+      input[fieldName] = generation.sourceImageUrl;
+    }
+    // prompt_strength is already spread from modelParams via params above
   }
 
   return input;
@@ -174,6 +177,11 @@ async function generate(
     throw new Error("Anzahl muss zwischen 1 und 4 liegen");
   }
 
+  // Validate generationMode value
+  if (generationMode !== undefined && !["txt2img", "img2img"].includes(generationMode)) {
+    throw new Error("Ungueltiger Generierungsmodus");
+  }
+
   // Resolve effective mode
   const effectiveMode = generationMode ?? "txt2img";
 
@@ -192,6 +200,12 @@ async function generate(
   const styleTrimmed = promptStyle.trim();
   const prompt = styleTrimmed ? `${motivTrimmed}. ${styleTrimmed}` : motivTrimmed;
 
+  // For img2img: embed prompt_strength in stored modelParams so retry works
+  const storedParams =
+    effectiveMode === "img2img"
+      ? { ...params, prompt_strength: strength ?? 0.6 }
+      : params;
+
   // AC-1: Create N pending records
   const pendingGenerations: Generation[] = [];
   for (let i = 0; i < count; i++) {
@@ -200,7 +214,7 @@ async function generate(
       prompt,
       negativePrompt: negativePrompt?.trim() || undefined,
       modelId,
-      modelParams: params,
+      modelParams: storedParams,
       promptMotiv: motivTrimmed,
       promptStyle: styleTrimmed,
       generationMode: effectiveMode,
@@ -214,7 +228,7 @@ async function generate(
   (async () => {
     for (const gen of pendingGenerations) {
       try {
-        await processGeneration(gen, strength);
+        await processGeneration(gen);
       } catch (err) {
         console.error(`Generation ${gen.id} unexpected error:`, err);
       }
