@@ -9,6 +9,7 @@ import {
   bigint,
   boolean,
   index,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -70,7 +71,7 @@ export const generations = pgTable(
       .default("txt2img"),
     sourceImageUrl: text("source_image_url"),
     sourceGenerationId: uuid("source_generation_id").references(
-      () => generations.id,
+      (): AnyPgColumn => generations.id,
       { onDelete: "set null" }
     ),
   },

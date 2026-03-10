@@ -168,7 +168,7 @@ const schemaWithNeg = {
   },
 };
 
-async function renderPromptArea(schema = schemaWithoutNeg) {
+async function renderPromptArea(schema: unknown = schemaWithoutNeg) {
   mockGetModelSchema.mockResolvedValue(schema);
   const result = render(<PromptArea projectId="proj-1" />);
   // Wait for initial schema load to complete

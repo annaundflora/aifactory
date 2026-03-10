@@ -171,7 +171,7 @@ vi.mock("@/components/ui/button", () => ({
       disabled,
       "data-testid": rest["data-testid"],
       type: rest.type ?? "button",
-    }, children),
+    }, children as React.ReactNode),
 }));
 
 vi.mock("@/components/ui/label", () => ({
