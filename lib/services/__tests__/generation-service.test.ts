@@ -56,6 +56,7 @@ import {
 } from "@/lib/db/queries";
 import type { Generation } from "@/lib/db/queries";
 import { ModelSchemaService } from "@/lib/services/model-schema-service";
+import { UPSCALE_MODEL } from "@/lib/models";
 import sharp from "sharp";
 
 // ---------------------------------------------------------------------------
@@ -826,6 +827,323 @@ describe("GenerationService", () => {
           })
         );
       }
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Slice-07: upscale() Methode
+  // -------------------------------------------------------------------------
+
+  describe("upscale (slice-07)", () => {
+    const SOURCE_IMAGE_URL = "https://r2.example.com/source/upscale-input.png";
+
+    /** Helper: set up standard mocks for upscale fire-and-forget processing */
+    function setupUpscaleProcessingMocks() {
+      (ReplicateClient.run as Mock).mockResolvedValue({
+        output: bufferToStream(PNG_BUFFER),
+        predictionId: "pred-upscale",
+        seed: 100,
+      });
+      (StorageService.upload as Mock).mockResolvedValue("https://r2.example.com/upscaled.png");
+      (updateGeneration as Mock).mockResolvedValue(makeGeneration({ status: "completed" }));
+    }
+
+    // AC-1: GIVEN upscale({ projectId, sourceImageUrl, scale: 2 }) ohne sourceGenerationId
+    //       WHEN die Methode aufgerufen wird
+    //       THEN ruft ReplicateClient.run mit dem Modell-String "nightmareai/real-esrgan" auf,
+    //       und der erstellte DB-Record hat prompt: "Upscale 2x"
+    it('AC-1: should call ReplicateClient.run with nightmareai/real-esrgan and prompt "Upscale 2x" when scale is 2', async () => {
+      const gen = makeGeneration({
+        id: "gen-up-1",
+        generationMode: "upscale",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        prompt: "Upscale 2x",
+        modelId: UPSCALE_MODEL,
+      });
+      (createGeneration as Mock).mockResolvedValue(gen);
+      setupUpscaleProcessingMocks();
+
+      const result = await GenerationService.upscale({
+        projectId: "proj-001",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        scale: 2,
+      });
+
+      // Verify createGeneration was called with correct prompt
+      expect(createGeneration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: "Upscale 2x",
+          modelId: UPSCALE_MODEL,
+        })
+      );
+
+      // Verify ReplicateClient.run is called with UPSCALE_MODEL
+      await vi.waitFor(() => {
+        expect(ReplicateClient.run).toHaveBeenCalledTimes(1);
+      });
+      expect(ReplicateClient.run).toHaveBeenCalledWith(
+        UPSCALE_MODEL,
+        expect.any(Object)
+      );
+
+      // Also confirm UPSCALE_MODEL equals the expected string
+      expect(UPSCALE_MODEL).toBe("nightmareai/real-esrgan");
+    });
+
+    // AC-2: GIVEN upscale({ projectId, sourceImageUrl, scale: 4 }) ohne sourceGenerationId
+    //       WHEN die Methode aufgerufen wird
+    //       THEN hat der erstellte DB-Record prompt: "Upscale 4x"
+    it('AC-2: should set prompt to "Upscale 4x" when scale is 4', async () => {
+      const gen = makeGeneration({
+        id: "gen-up-2",
+        generationMode: "upscale",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        prompt: "Upscale 4x",
+        modelId: UPSCALE_MODEL,
+      });
+      (createGeneration as Mock).mockResolvedValue(gen);
+      setupUpscaleProcessingMocks();
+
+      await GenerationService.upscale({
+        projectId: "proj-001",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        scale: 4,
+      });
+
+      expect(createGeneration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: "Upscale 4x",
+        })
+      );
+    });
+
+    // AC-3: GIVEN upscale({ projectId, sourceImageUrl, scale: 2, sourceGenerationId })
+    //       und die Quell-Generation hat prompt: "a red fox"
+    //       WHEN die Methode aufgerufen wird
+    //       THEN hat der erstellte DB-Record prompt: "a red fox (Upscale 2x)"
+    it('AC-3: should compose prompt from source generation prompt when sourceGenerationId is provided', async () => {
+      const sourceGen = makeGeneration({
+        id: "gen-source",
+        prompt: "a red fox",
+      });
+      (getGeneration as Mock).mockResolvedValue(sourceGen);
+
+      const gen = makeGeneration({
+        id: "gen-up-3",
+        generationMode: "upscale",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        sourceGenerationId: "gen-source",
+        prompt: "a red fox (Upscale 2x)",
+        modelId: UPSCALE_MODEL,
+      });
+      (createGeneration as Mock).mockResolvedValue(gen);
+      setupUpscaleProcessingMocks();
+
+      await GenerationService.upscale({
+        projectId: "proj-001",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        scale: 2,
+        sourceGenerationId: "gen-source",
+      });
+
+      // Verify getGeneration was called with sourceGenerationId
+      expect(getGeneration).toHaveBeenCalledWith("gen-source");
+
+      // Verify createGeneration was called with the composed prompt
+      expect(createGeneration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: "a red fox (Upscale 2x)",
+        })
+      );
+    });
+
+    // AC-4: GIVEN ein valider upscale()-Aufruf mit beliebigen Parametern
+    //       WHEN die Methode aufgerufen wird
+    //       THEN enthaelt der zurueckgegebene Record genau generationMode: "upscale",
+    //       sourceImageUrl mit dem uebergebenen Wert und sourceGenerationId (null oder uebergebener Wert)
+    it('AC-4: should create record with generationMode upscale, sourceImageUrl and sourceGenerationId', async () => {
+      const gen = makeGeneration({
+        id: "gen-up-4",
+        generationMode: "upscale",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        sourceGenerationId: "gen-source-4",
+        modelId: UPSCALE_MODEL,
+        prompt: "some prompt (Upscale 2x)",
+      });
+      const sourceGen = makeGeneration({ id: "gen-source-4", prompt: "some prompt" });
+      (getGeneration as Mock).mockResolvedValue(sourceGen);
+      (createGeneration as Mock).mockResolvedValue(gen);
+      setupUpscaleProcessingMocks();
+
+      const result = await GenerationService.upscale({
+        projectId: "proj-001",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        scale: 2,
+        sourceGenerationId: "gen-source-4",
+      });
+
+      // Verify createGeneration received correct fields
+      expect(createGeneration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          generationMode: "upscale",
+          sourceImageUrl: SOURCE_IMAGE_URL,
+          sourceGenerationId: "gen-source-4",
+        })
+      );
+
+      // Verify the returned record
+      expect(result.generationMode).toBe("upscale");
+      expect(result.sourceImageUrl).toBe(SOURCE_IMAGE_URL);
+      expect(result.sourceGenerationId).toBe("gen-source-4");
+
+      // Also test with null sourceGenerationId
+      vi.clearAllMocks();
+      const genNoSource = makeGeneration({
+        id: "gen-up-4b",
+        generationMode: "upscale",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        sourceGenerationId: null,
+        modelId: UPSCALE_MODEL,
+        prompt: "Upscale 2x",
+      });
+      (createGeneration as Mock).mockResolvedValue(genNoSource);
+      setupUpscaleProcessingMocks();
+
+      const result2 = await GenerationService.upscale({
+        projectId: "proj-001",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        scale: 2,
+      });
+
+      expect(createGeneration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          generationMode: "upscale",
+          sourceImageUrl: SOURCE_IMAGE_URL,
+          sourceGenerationId: null,
+        })
+      );
+      expect(result2.generationMode).toBe("upscale");
+      expect(result2.sourceImageUrl).toBe(SOURCE_IMAGE_URL);
+      expect(result2.sourceGenerationId).toBeNull();
+    });
+
+    // AC-5: GIVEN ein valider upscale()-Aufruf
+    //       WHEN die Methode aufgerufen wird
+    //       THEN gibt sie genau 1 Generation-Objekt mit status: "pending" zurueck (kein Array)
+    it('AC-5: should return exactly 1 pending Generation object (not an array)', async () => {
+      const gen = makeGeneration({
+        id: "gen-up-5",
+        generationMode: "upscale",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        status: "pending",
+        modelId: UPSCALE_MODEL,
+        prompt: "Upscale 2x",
+      });
+      (createGeneration as Mock).mockResolvedValue(gen);
+      setupUpscaleProcessingMocks();
+
+      const result = await GenerationService.upscale({
+        projectId: "proj-001",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        scale: 2,
+      });
+
+      // Must be a single object, not an array
+      expect(Array.isArray(result)).toBe(false);
+      expect(result).toBeDefined();
+      expect(result.status).toBe("pending");
+      expect(result.id).toBe("gen-up-5");
+    });
+
+    // AC-6: GIVEN ReplicateClient.run gibt ein output-Stream-Objekt zurueck
+    //       WHEN upscale() die Verarbeitung fire-and-forget startet
+    //       THEN wird ReplicateClient.run mit { image: sourceImageUrl, scale } als Input aufgerufen
+    //       (kein prompt-Feld im Replicate-Input)
+    it('AC-6: should call ReplicateClient.run with { image, scale } input without prompt field', async () => {
+      const gen = makeGeneration({
+        id: "gen-up-6",
+        generationMode: "upscale",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        modelId: UPSCALE_MODEL,
+        prompt: "Upscale 2x",
+      });
+      (createGeneration as Mock).mockResolvedValue(gen);
+      setupUpscaleProcessingMocks();
+
+      await GenerationService.upscale({
+        projectId: "proj-001",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        scale: 2,
+      });
+
+      // Wait for fire-and-forget to call ReplicateClient.run
+      await vi.waitFor(() => {
+        expect(ReplicateClient.run).toHaveBeenCalledTimes(1);
+      });
+
+      const [model, input] = (ReplicateClient.run as Mock).mock.calls[0];
+      expect(model).toBe(UPSCALE_MODEL);
+      expect(input).toEqual({ image: SOURCE_IMAGE_URL, scale: 2 });
+      // Explicitly verify no prompt field in the Replicate input
+      expect(input).not.toHaveProperty("prompt");
+    });
+
+    // AC-7: GIVEN ReplicateClient.run wirft einen Fehler waehrend der Verarbeitung
+    //       WHEN der fire-and-forget Prozess den Fehler erhaelt
+    //       THEN wird updateGeneration mit status: "failed" aufgerufen und die Methode upscale()
+    //       selbst wirft keinen Fehler (Fire-and-forget bleibt isoliert)
+    it('AC-7: should mark generation as failed when ReplicateClient throws, without propagating the error', async () => {
+      const gen = makeGeneration({
+        id: "gen-up-7",
+        generationMode: "upscale",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        modelId: UPSCALE_MODEL,
+        prompt: "Upscale 2x",
+      });
+      (createGeneration as Mock).mockResolvedValue(gen);
+      (ReplicateClient.run as Mock).mockRejectedValue(new Error("Replicate upscale error"));
+      (updateGeneration as Mock).mockResolvedValue(
+        makeGeneration({ id: "gen-up-7", status: "failed", errorMessage: "Replicate upscale error" })
+      );
+
+      // upscale() itself should NOT throw despite the background error
+      const result = await GenerationService.upscale({
+        projectId: "proj-001",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        scale: 2,
+      });
+
+      // The returned record is still pending (returned before fire-and-forget completes)
+      expect(result).toBeDefined();
+      expect(result.status).toBe("pending");
+
+      // Wait for fire-and-forget to complete and verify the generation was marked as failed
+      await vi.waitFor(() => {
+        expect(updateGeneration).toHaveBeenCalledWith(
+          "gen-up-7",
+          expect.objectContaining({
+            status: "failed",
+            errorMessage: expect.stringContaining("Replicate upscale error"),
+          })
+        );
+      });
+    });
+
+    // AC-8: GIVEN upscale() wird mit scale: 3 (ungueltiger Wert) aufgerufen
+    //       WHEN die Methode aufgerufen wird
+    //       THEN wirft sie einen Error (keine DB-Record-Erstellung, kein Replicate-Call)
+    it('AC-8: should throw an error when scale is not 2 or 4', async () => {
+      await expect(
+        GenerationService.upscale({
+          projectId: "proj-001",
+          sourceImageUrl: SOURCE_IMAGE_URL,
+          scale: 3 as unknown as 2 | 4,
+        })
+      ).rejects.toThrow();
+
+      // Verify no DB record was created and no Replicate call was made
+      expect(createGeneration).not.toHaveBeenCalled();
+      expect(ReplicateClient.run).not.toHaveBeenCalled();
     });
   });
 });
