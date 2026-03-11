@@ -78,7 +78,8 @@ async function streamToBuffer(
 
 export async function upload(
   stream: ReadableStream | Buffer,
-  key: string
+  key: string,
+  contentType: string = "image/png"
 ): Promise<string> {
   const config = getConfig();
   const client = createS3Client(config);
@@ -99,7 +100,7 @@ export async function upload(
         Bucket: config.bucket,
         Key: key,
         Body: body,
-        ContentType: "image/png",
+        ContentType: contentType,
       })
     );
   } catch (error: unknown) {

@@ -9,6 +9,7 @@ import {
   bigint,
   boolean,
   index,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -65,12 +66,24 @@ export const generations = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    generationMode: varchar("generation_mode", { length: 20 })
+      .notNull()
+      .default("txt2img"),
+    sourceImageUrl: text("source_image_url"),
+    sourceGenerationId: uuid("source_generation_id").references(
+      (): AnyPgColumn => generations.id,
+      { onDelete: "set null" }
+    ),
   },
   (table) => [
     index("generations_project_id_idx").on(table.projectId),
     index("generations_status_idx").on(table.status),
     index("generations_created_at_idx").on(table.createdAt),
     index("generations_is_favorite_idx").on(table.isFavorite),
+    index("generations_project_mode_idx").on(
+      table.projectId,
+      table.generationMode
+    ),
   ]
 );
 

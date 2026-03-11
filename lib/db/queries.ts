@@ -60,7 +60,7 @@ export async function deleteProject(id: string): Promise<void> {
 // Generation Queries
 // ---------------------------------------------------------------------------
 
-export async function createGeneration(input: {
+export interface CreateGenerationInput {
   projectId: string;
   prompt: string;
   negativePrompt?: string;
@@ -68,7 +68,12 @@ export async function createGeneration(input: {
   modelParams?: Record<string, unknown>;
   promptMotiv?: string;
   promptStyle?: string;
-}): Promise<Generation> {
+  generationMode?: string;
+  sourceImageUrl?: string | null;
+  sourceGenerationId?: string | null;
+}
+
+export async function createGeneration(input: CreateGenerationInput): Promise<Generation> {
   const [generation] = await db
     .insert(generations)
     .values({
@@ -79,6 +84,9 @@ export async function createGeneration(input: {
       modelParams: input.modelParams ?? {},
       promptMotiv: input.promptMotiv ?? '',
       promptStyle: input.promptStyle ?? '',
+      generationMode: input.generationMode ?? 'txt2img',
+      sourceImageUrl: input.sourceImageUrl ?? null,
+      sourceGenerationId: input.sourceGenerationId ?? null,
     })
     .returning();
   return generation;

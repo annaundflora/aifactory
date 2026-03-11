@@ -28,6 +28,19 @@ vi.mock("@/lib/db/queries", () => ({
   getGenerations: vi.fn(),
 }));
 
+// Mock ModelSchemaService — keep real getImg2ImgFieldName (pure function used by buildReplicateInput)
+vi.mock("@/lib/services/model-schema-service", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/services/model-schema-service")>();
+  return {
+    ...actual,
+    ModelSchemaService: {
+      getSchema: vi.fn(),
+      supportsImg2Img: vi.fn(),
+      clearCache: vi.fn(),
+    },
+  };
+});
+
 // Mock sharp
 vi.mock("sharp", () => {
   const sharpInstance = {
@@ -48,6 +61,8 @@ import {
   updateGeneration,
 } from "@/lib/db/queries";
 import type { Generation } from "@/lib/db/queries";
+import { ModelSchemaService } from "@/lib/services/model-schema-service";
+import { UPSCALE_MODEL } from "@/lib/models";
 import sharp from "sharp";
 
 // ---------------------------------------------------------------------------
@@ -73,6 +88,9 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
     height: null,
     seed: null,
     createdAt: new Date(),
+    generationMode: "txt2img",
+    sourceImageUrl: null,
+    sourceGenerationId: null,
     ...overrides,
   } as Generation;
 }
@@ -475,12 +493,11 @@ describe("GenerationService", () => {
   // AC-2: GIVEN generation-service.ts nach dem Refactoring
   //       WHEN die Datei inspiziert wird
   //       THEN existiert KEIN Import von @/lib/models (kein getModelById)
-  it("Slice04-AC-2: should not import from lib/models", () => {
+  it("Slice04-AC-2: should not import getModelById from lib/models (UPSCALE_MODEL import is allowed)", () => {
     const filePath = path.resolve(__dirname, "..", "generation-service.ts");
     const source = fs.readFileSync(filePath, "utf-8");
 
-    expect(source).not.toMatch(/from\s+['"]@\/lib\/models['"]/);
-    expect(source).not.toMatch(/require\s*\(\s*['"]@\/lib\/models['"]\s*\)/);
+    // getModelById whitelist check must be removed, but UPSCALE_MODEL import is allowed
     expect(source).not.toContain("getModelById");
   });
 
@@ -863,6 +880,673 @@ describe("GenerationService", () => {
       for (const call of (createGeneration as Mock).mock.calls) {
         expect(call[0].modelParams).toEqual({});
       }
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Slice-06: img2img Generation Service Extension
+  // -------------------------------------------------------------------------
+
+  describe("img2img extension (slice-06)", () => {
+    const SOURCE_IMAGE_URL = "https://r2.example.com/source/image.png";
+
+    /** Helper: set up standard mocks for fire-and-forget processing */
+    function setupProcessingMocks() {
+      (ReplicateClient.run as Mock).mockResolvedValue({
+        output: bufferToStream(PNG_BUFFER),
+        predictionId: "pred-img2img",
+        seed: 42,
+      });
+      (StorageService.upload as Mock).mockResolvedValue("https://r2.example.com/result.png");
+      (updateGeneration as Mock).mockResolvedValue(makeGeneration({ status: "completed" }));
+    }
+
+    // AC-1: GIVEN ein generate()-Aufruf ohne generationMode, sourceImageUrl oder strength
+    //       WHEN createGeneration innerhalb des Service aufgerufen wird
+    //       THEN enthaelt der uebergebene Input generationMode: "txt2img", sourceImageUrl: null
+    it('AC-1 (img2img): should pass generationMode txt2img to createGeneration when called without mode', async () => {
+      const gen = makeGeneration({ id: "gen-txt-default" });
+      (createGeneration as Mock).mockResolvedValue(gen);
+      setupProcessingMocks();
+
+      await GenerationService.generate(
+        "proj-001",
+        "A fox",
+        "",
+        undefined,
+        ["black-forest-labs/flux-2-pro"],
+        {},
+        1
+      );
+
+      expect(createGeneration).toHaveBeenCalledTimes(1);
+      expect(createGeneration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          generationMode: "txt2img",
+          sourceImageUrl: null,
+        })
+      );
+    });
+
+    // AC-2: GIVEN ein generate()-Aufruf mit generationMode: "img2img", einer validen sourceImageUrl und strength: 0.6
+    //       WHEN createGeneration innerhalb des Service aufgerufen wird
+    //       THEN enthaelt der uebergebene Input generationMode: "img2img" und die uebergebene sourceImageUrl
+    it('AC-2 (img2img): should pass generationMode img2img and sourceImageUrl to createGeneration', async () => {
+      const gen = makeGeneration({
+        id: "gen-img2img",
+        generationMode: "img2img",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        modelParams: { prompt_strength: 0.6 },
+      });
+      (createGeneration as Mock).mockResolvedValue(gen);
+      setupProcessingMocks();
+      (ModelSchemaService.getSchema as Mock).mockResolvedValue({ image: {} });
+
+      await GenerationService.generate(
+        "proj-001",
+        "A fox",
+        "",
+        undefined,
+        ["black-forest-labs/flux-2-pro"],
+        {},
+        1,
+        "img2img",
+        SOURCE_IMAGE_URL,
+        0.6
+      );
+
+      expect(createGeneration).toHaveBeenCalledTimes(1);
+      expect(createGeneration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          generationMode: "img2img",
+          sourceImageUrl: SOURCE_IMAGE_URL,
+        })
+      );
+    });
+
+    // AC-3: GIVEN ein generate()-Aufruf mit generationMode: "img2img", sourceImageUrl und strength: 0.6,
+    //       und das Modell-Schema enthaelt den Parameter "image"
+    //       WHEN buildReplicateInput den Replicate-Input aufbaut
+    //       THEN enthaelt der Input image: <sourceImageUrl> und prompt_strength: 0.6; prompt und negative_prompt bleiben erhalten
+    it('AC-3 (img2img): should set image and prompt_strength in replicate input when schema has image parameter', async () => {
+      const gen = makeGeneration({
+        id: "gen-schema-image",
+        generationMode: "img2img",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        modelParams: { prompt_strength: 0.6 },
+        negativePrompt: "blurry",
+      });
+      (createGeneration as Mock).mockResolvedValue(gen);
+      (ModelSchemaService.getSchema as Mock).mockResolvedValue({
+        image: { type: "string", format: "uri" },
+        prompt: { type: "string" },
+      });
+
+      (ReplicateClient.run as Mock).mockResolvedValue({
+        output: bufferToStream(PNG_BUFFER),
+        predictionId: "pred-schema-img",
+        seed: 10,
+      });
+      (StorageService.upload as Mock).mockResolvedValue("https://r2.example.com/result.png");
+      (updateGeneration as Mock).mockResolvedValue(makeGeneration({ status: "completed" }));
+
+      await GenerationService.generate(
+        "proj-001",
+        "A fox",
+        "",
+        "blurry",
+        ["black-forest-labs/flux-2-pro"],
+        {},
+        1,
+        "img2img",
+        SOURCE_IMAGE_URL,
+        0.6
+      );
+
+      await vi.waitFor(() => {
+        expect(ReplicateClient.run).toHaveBeenCalledTimes(1);
+      });
+
+      const replicateInput = (ReplicateClient.run as Mock).mock.calls[0][1];
+      expect(replicateInput.image).toBe(SOURCE_IMAGE_URL);
+      expect(replicateInput.prompt_strength).toBe(0.6);
+      expect(replicateInput.prompt).toBeDefined();
+      expect(replicateInput.negative_prompt).toBe("blurry");
+    });
+
+    // AC-4: GIVEN ein generate()-Aufruf mit generationMode: "img2img", sourceImageUrl und strength: 0.4,
+    //       und das Modell-Schema enthaelt den Parameter "image_prompt" (nicht "image")
+    //       WHEN buildReplicateInput den Replicate-Input aufbaut
+    //       THEN enthaelt der Input image_prompt: <sourceImageUrl> und prompt_strength: 0.4 (nicht image:)
+    it('AC-4 (img2img): should set image_prompt and prompt_strength when schema has image_prompt parameter', async () => {
+      const gen = makeGeneration({
+        id: "gen-schema-imgprompt",
+        generationMode: "img2img",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        modelParams: { prompt_strength: 0.4 },
+      });
+      (createGeneration as Mock).mockResolvedValue(gen);
+      (ModelSchemaService.getSchema as Mock).mockResolvedValue({
+        image_prompt: { type: "string", format: "uri" },
+        prompt: { type: "string" },
+      });
+
+      (ReplicateClient.run as Mock).mockResolvedValue({
+        output: bufferToStream(PNG_BUFFER),
+        predictionId: "pred-schema-imgp",
+        seed: 20,
+      });
+      (StorageService.upload as Mock).mockResolvedValue("https://r2.example.com/result.png");
+      (updateGeneration as Mock).mockResolvedValue(makeGeneration({ status: "completed" }));
+
+      await GenerationService.generate(
+        "proj-001",
+        "A fox",
+        "",
+        undefined,
+        ["black-forest-labs/flux-2-pro"],
+        {},
+        1,
+        "img2img",
+        SOURCE_IMAGE_URL,
+        0.4
+      );
+
+      await vi.waitFor(() => {
+        expect(ReplicateClient.run).toHaveBeenCalledTimes(1);
+      });
+
+      const replicateInput = (ReplicateClient.run as Mock).mock.calls[0][1];
+      expect(replicateInput.image_prompt).toBe(SOURCE_IMAGE_URL);
+      expect(replicateInput.prompt_strength).toBe(0.4);
+      expect(replicateInput).not.toHaveProperty("image");
+    });
+
+    // AC-5: GIVEN ein generate()-Aufruf mit generationMode: "img2img", sourceImageUrl und strength: 0.85,
+    //       und das Modell-Schema enthaelt den Parameter "init_image" (weder "image" noch "image_prompt")
+    //       WHEN buildReplicateInput den Replicate-Input aufbaut
+    //       THEN enthaelt der Input init_image: <sourceImageUrl> und prompt_strength: 0.85
+    it('AC-5 (img2img): should set init_image and prompt_strength when schema has init_image parameter', async () => {
+      const gen = makeGeneration({
+        id: "gen-schema-initimg",
+        generationMode: "img2img",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        modelParams: { prompt_strength: 0.85 },
+      });
+      (createGeneration as Mock).mockResolvedValue(gen);
+      (ModelSchemaService.getSchema as Mock).mockResolvedValue({
+        init_image: { type: "string", format: "uri" },
+        prompt: { type: "string" },
+      });
+
+      (ReplicateClient.run as Mock).mockResolvedValue({
+        output: bufferToStream(PNG_BUFFER),
+        predictionId: "pred-schema-init",
+        seed: 30,
+      });
+      (StorageService.upload as Mock).mockResolvedValue("https://r2.example.com/result.png");
+      (updateGeneration as Mock).mockResolvedValue(makeGeneration({ status: "completed" }));
+
+      await GenerationService.generate(
+        "proj-001",
+        "A fox",
+        "",
+        undefined,
+        ["black-forest-labs/flux-2-pro"],
+        {},
+        1,
+        "img2img",
+        SOURCE_IMAGE_URL,
+        0.85
+      );
+
+      await vi.waitFor(() => {
+        expect(ReplicateClient.run).toHaveBeenCalledTimes(1);
+      });
+
+      const replicateInput = (ReplicateClient.run as Mock).mock.calls[0][1];
+      expect(replicateInput.init_image).toBe(SOURCE_IMAGE_URL);
+      expect(replicateInput.prompt_strength).toBe(0.85);
+      expect(replicateInput).not.toHaveProperty("image");
+      expect(replicateInput).not.toHaveProperty("image_prompt");
+    });
+
+    // AC-6: GIVEN ein generate()-Aufruf mit generationMode: "img2img" aber ohne sourceImageUrl
+    //       WHEN die Validierung in generate() greift
+    //       THEN wirft die Funktion einen Error mit der Meldung "Source-Image ist erforderlich fuer img2img"
+    it('AC-6 (img2img): should throw "Source-Image ist erforderlich fuer img2img" when sourceImageUrl is missing', async () => {
+      await expect(
+        GenerationService.generate(
+          "proj-001",
+          "A fox",
+          "",
+          undefined,
+          ["black-forest-labs/flux-2-pro"],
+          {},
+          1,
+          "img2img",
+          undefined, // no sourceImageUrl
+          0.6
+        )
+      ).rejects.toThrow("Source-Image ist erforderlich fuer img2img");
+    });
+
+    // AC-7: GIVEN ein generate()-Aufruf mit generationMode: "img2img", sourceImageUrl und strength: 1.5 (ausserhalb 0.0-1.0)
+    //       WHEN die Validierung in generate() greift
+    //       THEN wirft die Funktion einen Error mit der Meldung "Strength muss zwischen 0 und 1 liegen"
+    it('AC-7 (img2img): should throw "Strength muss zwischen 0 und 1 liegen" when strength is out of range', async () => {
+      await expect(
+        GenerationService.generate(
+          "proj-001",
+          "A fox",
+          "",
+          undefined,
+          ["black-forest-labs/flux-2-pro"],
+          {},
+          1,
+          "img2img",
+          SOURCE_IMAGE_URL,
+          1.5
+        )
+      ).rejects.toThrow("Strength muss zwischen 0 und 1 liegen");
+    });
+
+    // AC-8: GIVEN ein generate()-Aufruf mit generationMode: "txt2img" (oder ohne generationMode) und einem Prompt
+    //       WHEN buildReplicateInput den Replicate-Input aufbaut
+    //       THEN enthaelt der Input weder image noch image_prompt noch init_image noch prompt_strength
+    it('AC-8 (img2img): should not include image, image_prompt, init_image or prompt_strength in txt2img replicate input', async () => {
+      const gen = makeGeneration({ id: "gen-txt2img-clean" });
+      (createGeneration as Mock).mockResolvedValue(gen);
+
+      (ReplicateClient.run as Mock).mockResolvedValue({
+        output: bufferToStream(PNG_BUFFER),
+        predictionId: "pred-txt2img",
+        seed: 50,
+      });
+      (StorageService.upload as Mock).mockResolvedValue("https://r2.example.com/result.png");
+      (updateGeneration as Mock).mockResolvedValue(makeGeneration({ status: "completed" }));
+
+      await GenerationService.generate(
+        "proj-001",
+        "A fox",
+        "",
+        undefined,
+        ["black-forest-labs/flux-2-pro"],
+        {},
+        1
+        // no generationMode, no sourceImageUrl, no strength
+      );
+
+      await vi.waitFor(() => {
+        expect(ReplicateClient.run).toHaveBeenCalledTimes(1);
+      });
+
+      const replicateInput = (ReplicateClient.run as Mock).mock.calls[0][1];
+      expect(replicateInput).not.toHaveProperty("image");
+      expect(replicateInput).not.toHaveProperty("image_prompt");
+      expect(replicateInput).not.toHaveProperty("init_image");
+      expect(replicateInput).not.toHaveProperty("prompt_strength");
+    });
+
+    // AC-9: GIVEN ein generate()-Aufruf mit generationMode: "img2img", sourceImageUrl, strength: 0.6 und count: 3
+    //       WHEN createGeneration intern aufgerufen wird
+    //       THEN wird createGeneration genau 3 Mal mit identischer generationMode und sourceImageUrl aufgerufen
+    it('AC-9 (img2img): should call createGeneration N times each with the same generationMode and sourceImageUrl', async () => {
+      const gen1 = makeGeneration({ id: "gen-batch-1", generationMode: "img2img", sourceImageUrl: SOURCE_IMAGE_URL });
+      const gen2 = makeGeneration({ id: "gen-batch-2", generationMode: "img2img", sourceImageUrl: SOURCE_IMAGE_URL });
+      const gen3 = makeGeneration({ id: "gen-batch-3", generationMode: "img2img", sourceImageUrl: SOURCE_IMAGE_URL });
+
+      (createGeneration as Mock)
+        .mockResolvedValueOnce(gen1)
+        .mockResolvedValueOnce(gen2)
+        .mockResolvedValueOnce(gen3);
+
+      setupProcessingMocks();
+      (ModelSchemaService.getSchema as Mock).mockResolvedValue({ image: {} });
+
+      const result = await GenerationService.generate(
+        "proj-001",
+        "A fox",
+        "",
+        undefined,
+        ["black-forest-labs/flux-2-pro"],
+        {},
+        3,
+        "img2img",
+        SOURCE_IMAGE_URL,
+        0.6
+      );
+
+      expect(result).toHaveLength(3);
+      expect(createGeneration).toHaveBeenCalledTimes(3);
+
+      // All 3 calls should have the same generationMode and sourceImageUrl
+      for (let i = 0; i < 3; i++) {
+        expect(createGeneration).toHaveBeenNthCalledWith(
+          i + 1,
+          expect.objectContaining({
+            generationMode: "img2img",
+            sourceImageUrl: SOURCE_IMAGE_URL,
+          })
+        );
+      }
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Slice-07: upscale() Methode
+  // -------------------------------------------------------------------------
+
+  describe("upscale (slice-07)", () => {
+    const SOURCE_IMAGE_URL = "https://r2.example.com/source/upscale-input.png";
+
+    /** Helper: set up standard mocks for upscale fire-and-forget processing */
+    function setupUpscaleProcessingMocks() {
+      (ReplicateClient.run as Mock).mockResolvedValue({
+        output: bufferToStream(PNG_BUFFER),
+        predictionId: "pred-upscale",
+        seed: 100,
+      });
+      (StorageService.upload as Mock).mockResolvedValue("https://r2.example.com/upscaled.png");
+      (updateGeneration as Mock).mockResolvedValue(makeGeneration({ status: "completed" }));
+    }
+
+    // AC-1: GIVEN upscale({ projectId, sourceImageUrl, scale: 2 }) ohne sourceGenerationId
+    //       WHEN die Methode aufgerufen wird
+    //       THEN ruft ReplicateClient.run mit dem Modell-String "nightmareai/real-esrgan" auf,
+    //       und der erstellte DB-Record hat prompt: "Upscale 2x"
+    it('AC-1: should call ReplicateClient.run with nightmareai/real-esrgan and prompt "Upscale 2x" when scale is 2', async () => {
+      const gen = makeGeneration({
+        id: "gen-up-1",
+        generationMode: "upscale",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        prompt: "Upscale 2x",
+        modelId: UPSCALE_MODEL,
+      });
+      (createGeneration as Mock).mockResolvedValue(gen);
+      setupUpscaleProcessingMocks();
+
+      const result = await GenerationService.upscale({
+        projectId: "proj-001",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        scale: 2,
+      });
+
+      // Verify createGeneration was called with correct prompt
+      expect(createGeneration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: "Upscale 2x",
+          modelId: UPSCALE_MODEL,
+        })
+      );
+
+      // Verify ReplicateClient.run is called with UPSCALE_MODEL
+      await vi.waitFor(() => {
+        expect(ReplicateClient.run).toHaveBeenCalledTimes(1);
+      });
+      expect(ReplicateClient.run).toHaveBeenCalledWith(
+        UPSCALE_MODEL,
+        expect.any(Object)
+      );
+
+      // Also confirm UPSCALE_MODEL equals the expected string
+      expect(UPSCALE_MODEL).toBe("nightmareai/real-esrgan");
+    });
+
+    // AC-2: GIVEN upscale({ projectId, sourceImageUrl, scale: 4 }) ohne sourceGenerationId
+    //       WHEN die Methode aufgerufen wird
+    //       THEN hat der erstellte DB-Record prompt: "Upscale 4x"
+    it('AC-2: should set prompt to "Upscale 4x" when scale is 4', async () => {
+      const gen = makeGeneration({
+        id: "gen-up-2",
+        generationMode: "upscale",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        prompt: "Upscale 4x",
+        modelId: UPSCALE_MODEL,
+      });
+      (createGeneration as Mock).mockResolvedValue(gen);
+      setupUpscaleProcessingMocks();
+
+      await GenerationService.upscale({
+        projectId: "proj-001",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        scale: 4,
+      });
+
+      expect(createGeneration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: "Upscale 4x",
+        })
+      );
+    });
+
+    // AC-3: GIVEN upscale({ projectId, sourceImageUrl, scale: 2, sourceGenerationId })
+    //       und die Quell-Generation hat prompt: "a red fox"
+    //       WHEN die Methode aufgerufen wird
+    //       THEN hat der erstellte DB-Record prompt: "a red fox (Upscale 2x)"
+    it('AC-3: should compose prompt from source generation prompt when sourceGenerationId is provided', async () => {
+      const sourceGen = makeGeneration({
+        id: "gen-source",
+        prompt: "a red fox",
+      });
+      (getGeneration as Mock).mockResolvedValue(sourceGen);
+
+      const gen = makeGeneration({
+        id: "gen-up-3",
+        generationMode: "upscale",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        sourceGenerationId: "gen-source",
+        prompt: "a red fox (Upscale 2x)",
+        modelId: UPSCALE_MODEL,
+      });
+      (createGeneration as Mock).mockResolvedValue(gen);
+      setupUpscaleProcessingMocks();
+
+      await GenerationService.upscale({
+        projectId: "proj-001",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        scale: 2,
+        sourceGenerationId: "gen-source",
+      });
+
+      // Verify getGeneration was called with sourceGenerationId
+      expect(getGeneration).toHaveBeenCalledWith("gen-source");
+
+      // Verify createGeneration was called with the composed prompt
+      expect(createGeneration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: "a red fox (Upscale 2x)",
+        })
+      );
+    });
+
+    // AC-4: GIVEN ein valider upscale()-Aufruf mit beliebigen Parametern
+    //       WHEN die Methode aufgerufen wird
+    //       THEN enthaelt der zurueckgegebene Record genau generationMode: "upscale",
+    //       sourceImageUrl mit dem uebergebenen Wert und sourceGenerationId (null oder uebergebener Wert)
+    it('AC-4: should create record with generationMode upscale, sourceImageUrl and sourceGenerationId', async () => {
+      const gen = makeGeneration({
+        id: "gen-up-4",
+        generationMode: "upscale",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        sourceGenerationId: "gen-source-4",
+        modelId: UPSCALE_MODEL,
+        prompt: "some prompt (Upscale 2x)",
+      });
+      const sourceGen = makeGeneration({ id: "gen-source-4", prompt: "some prompt" });
+      (getGeneration as Mock).mockResolvedValue(sourceGen);
+      (createGeneration as Mock).mockResolvedValue(gen);
+      setupUpscaleProcessingMocks();
+
+      const result = await GenerationService.upscale({
+        projectId: "proj-001",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        scale: 2,
+        sourceGenerationId: "gen-source-4",
+      });
+
+      // Verify createGeneration received correct fields
+      expect(createGeneration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          generationMode: "upscale",
+          sourceImageUrl: SOURCE_IMAGE_URL,
+          sourceGenerationId: "gen-source-4",
+        })
+      );
+
+      // Verify the returned record
+      expect(result.generationMode).toBe("upscale");
+      expect(result.sourceImageUrl).toBe(SOURCE_IMAGE_URL);
+      expect(result.sourceGenerationId).toBe("gen-source-4");
+
+      // Also test with null sourceGenerationId
+      vi.clearAllMocks();
+      const genNoSource = makeGeneration({
+        id: "gen-up-4b",
+        generationMode: "upscale",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        sourceGenerationId: null,
+        modelId: UPSCALE_MODEL,
+        prompt: "Upscale 2x",
+      });
+      (createGeneration as Mock).mockResolvedValue(genNoSource);
+      setupUpscaleProcessingMocks();
+
+      const result2 = await GenerationService.upscale({
+        projectId: "proj-001",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        scale: 2,
+      });
+
+      expect(createGeneration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          generationMode: "upscale",
+          sourceImageUrl: SOURCE_IMAGE_URL,
+          sourceGenerationId: null,
+        })
+      );
+      expect(result2.generationMode).toBe("upscale");
+      expect(result2.sourceImageUrl).toBe(SOURCE_IMAGE_URL);
+      expect(result2.sourceGenerationId).toBeNull();
+    });
+
+    // AC-5: GIVEN ein valider upscale()-Aufruf
+    //       WHEN die Methode aufgerufen wird
+    //       THEN gibt sie genau 1 Generation-Objekt mit status: "pending" zurueck (kein Array)
+    it('AC-5: should return exactly 1 pending Generation object (not an array)', async () => {
+      const gen = makeGeneration({
+        id: "gen-up-5",
+        generationMode: "upscale",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        status: "pending",
+        modelId: UPSCALE_MODEL,
+        prompt: "Upscale 2x",
+      });
+      (createGeneration as Mock).mockResolvedValue(gen);
+      setupUpscaleProcessingMocks();
+
+      const result = await GenerationService.upscale({
+        projectId: "proj-001",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        scale: 2,
+      });
+
+      // Must be a single object, not an array
+      expect(Array.isArray(result)).toBe(false);
+      expect(result).toBeDefined();
+      expect(result.status).toBe("pending");
+      expect(result.id).toBe("gen-up-5");
+    });
+
+    // AC-6: GIVEN ReplicateClient.run gibt ein output-Stream-Objekt zurueck
+    //       WHEN upscale() die Verarbeitung fire-and-forget startet
+    //       THEN wird ReplicateClient.run mit { image: sourceImageUrl, scale } als Input aufgerufen
+    //       (kein prompt-Feld im Replicate-Input)
+    it('AC-6: should call ReplicateClient.run with { image, scale } input without prompt field', async () => {
+      const gen = makeGeneration({
+        id: "gen-up-6",
+        generationMode: "upscale",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        modelId: UPSCALE_MODEL,
+        prompt: "Upscale 2x",
+      });
+      (createGeneration as Mock).mockResolvedValue(gen);
+      setupUpscaleProcessingMocks();
+
+      await GenerationService.upscale({
+        projectId: "proj-001",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        scale: 2,
+      });
+
+      // Wait for fire-and-forget to call ReplicateClient.run
+      await vi.waitFor(() => {
+        expect(ReplicateClient.run).toHaveBeenCalledTimes(1);
+      });
+
+      const [model, input] = (ReplicateClient.run as Mock).mock.calls[0];
+      expect(model).toBe(UPSCALE_MODEL);
+      expect(input).toEqual({ image: SOURCE_IMAGE_URL, scale: 2 });
+      // Explicitly verify no prompt field in the Replicate input
+      expect(input).not.toHaveProperty("prompt");
+    });
+
+    // AC-7: GIVEN ReplicateClient.run wirft einen Fehler waehrend der Verarbeitung
+    //       WHEN der fire-and-forget Prozess den Fehler erhaelt
+    //       THEN wird updateGeneration mit status: "failed" aufgerufen und die Methode upscale()
+    //       selbst wirft keinen Fehler (Fire-and-forget bleibt isoliert)
+    it('AC-7: should mark generation as failed when ReplicateClient throws, without propagating the error', async () => {
+      const gen = makeGeneration({
+        id: "gen-up-7",
+        generationMode: "upscale",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        modelId: UPSCALE_MODEL,
+        prompt: "Upscale 2x",
+      });
+      (createGeneration as Mock).mockResolvedValue(gen);
+      (ReplicateClient.run as Mock).mockRejectedValue(new Error("Replicate upscale error"));
+      (updateGeneration as Mock).mockResolvedValue(
+        makeGeneration({ id: "gen-up-7", status: "failed", errorMessage: "Replicate upscale error" })
+      );
+
+      // upscale() itself should NOT throw despite the background error
+      const result = await GenerationService.upscale({
+        projectId: "proj-001",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        scale: 2,
+      });
+
+      // The returned record is still pending (returned before fire-and-forget completes)
+      expect(result).toBeDefined();
+      expect(result.status).toBe("pending");
+
+      // Wait for fire-and-forget to complete and verify the generation was marked as failed
+      await vi.waitFor(() => {
+        expect(updateGeneration).toHaveBeenCalledWith(
+          "gen-up-7",
+          expect.objectContaining({
+            status: "failed",
+            errorMessage: expect.stringContaining("Replicate upscale error"),
+          })
+        );
+      });
+    });
+
+    // AC-8: GIVEN upscale() wird mit scale: 3 (ungueltiger Wert) aufgerufen
+    //       WHEN die Methode aufgerufen wird
+    //       THEN wirft sie einen Error (keine DB-Record-Erstellung, kein Replicate-Call)
+    it('AC-8: should throw an error when scale is not 2 or 4', async () => {
+      await expect(
+        GenerationService.upscale({
+          projectId: "proj-001",
+          sourceImageUrl: SOURCE_IMAGE_URL,
+          scale: 3 as unknown as 2 | 4,
+        })
+      ).rejects.toThrow();
+
+      // Verify no DB record was created and no Replicate call was made
+      expect(createGeneration).not.toHaveBeenCalled();
+      expect(ReplicateClient.run).not.toHaveBeenCalled();
     });
   });
 });

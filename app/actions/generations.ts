@@ -22,6 +22,16 @@ interface GenerateImagesInput {
   modelIds: string[];
   params: Record<string, unknown>;
   count: number;
+  generationMode?: string;
+  sourceImageUrl?: string;
+  strength?: number;
+}
+
+interface UpscaleImageInput {
+  projectId: string;
+  sourceImageUrl: string;
+  scale: 2 | 4;
+  sourceGenerationId?: string;
 }
 
 interface RetryGenerationInput {
@@ -70,6 +80,24 @@ export async function generateImages(
     return { error: "Anzahl muss zwischen 1 und 4 liegen" };
   }
 
+  // Validate generationMode if provided
+  if (
+    input.generationMode !== undefined &&
+    !["txt2img", "img2img"].includes(input.generationMode)
+  ) {
+    return { error: "Ungueltiger Generierungsmodus" };
+  }
+
+  // img2img-specific validation
+  if (input.generationMode === "img2img") {
+    if (!input.sourceImageUrl) {
+      return { error: "Source-Image ist erforderlich fuer img2img" };
+    }
+    if (input.strength !== undefined && (input.strength < 0 || input.strength > 1)) {
+      return { error: "Strength muss zwischen 0 und 1 liegen" };
+    }
+  }
+
   try {
     const generations = await GenerationService.generate(
       input.projectId,
@@ -78,7 +106,10 @@ export async function generateImages(
       input.negativePrompt,
       input.modelIds,
       input.params,
-      input.count
+      input.count,
+      input.generationMode,
+      input.sourceImageUrl,
+      input.strength
     );
     return generations;
   } catch (error: unknown) {
@@ -116,6 +147,130 @@ export async function fetchGenerations(
   projectId: string
 ): Promise<Generation[]> {
   return getGenerations(projectId);
+}
+
+// ---------------------------------------------------------------------------
+// uploadSourceImage
+// ---------------------------------------------------------------------------
+
+const ALLOWED_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
+const MIME_TO_EXT: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+};
+
+export async function uploadSourceImage(
+  input:
+    | { projectId: string; file: File }
+    | { projectId: string; url: string }
+): Promise<{ url: string } | { error: string }> {
+  const { projectId } = input;
+
+  if (!projectId || projectId.trim().length === 0) {
+    return { error: "Ungültige Projekt-ID" };
+  }
+
+  if ("url" in input) {
+    // URL path: server-side fetch and proxy through R2
+    let response: Response;
+    try {
+      response = await fetch(input.url);
+    } catch {
+      return { error: "Bild konnte nicht geladen werden" };
+    }
+
+    if (!response.ok) {
+      return { error: "Bild konnte nicht geladen werden" };
+    }
+
+    const mimeType = response.headers.get("content-type")?.split(";")[0] ?? "";
+
+    if (!(ALLOWED_MIME_TYPES as readonly string[]).includes(mimeType)) {
+      return { error: "Nur PNG, JPG, JPEG und WebP erlaubt" };
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+
+    if (buffer.byteLength > MAX_FILE_SIZE) {
+      return { error: "Datei darf maximal 10MB groß sein" };
+    }
+
+    try {
+      const ext = MIME_TO_EXT[mimeType] ?? "png";
+      const uuid = crypto.randomUUID();
+      const key = `sources/${projectId}/${uuid}.${ext}`;
+      const url = await StorageService.upload(buffer, key, mimeType);
+      return { url };
+    } catch (error: unknown) {
+      console.error("uploadSourceImage (url) error:", error);
+      return { error: "Bild konnte nicht hochgeladen werden" };
+    }
+  }
+
+  // File path: existing logic
+  const { file } = input;
+
+  if (!(ALLOWED_MIME_TYPES as readonly string[]).includes(file.type)) {
+    return { error: "Nur PNG, JPG, JPEG und WebP erlaubt" };
+  }
+
+  if (file.size > MAX_FILE_SIZE) {
+    return { error: "Datei darf maximal 10MB groß sein" };
+  }
+
+  try {
+    const ext = MIME_TO_EXT[file.type] ?? "png";
+    const uuid = crypto.randomUUID();
+    const key = `sources/${projectId}/${uuid}.${ext}`;
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const url = await StorageService.upload(buffer, key, file.type);
+    return { url };
+  } catch (error: unknown) {
+    console.error("uploadSourceImage error:", error);
+    return { error: "Bild konnte nicht hochgeladen werden" };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// upscaleImage
+// ---------------------------------------------------------------------------
+
+export async function upscaleImage(
+  input: UpscaleImageInput
+): Promise<Generation | { error: string }> {
+  // Validate projectId
+  if (!input.projectId || input.projectId.trim().length === 0) {
+    return { error: "Ungültige Projekt-ID" };
+  }
+
+  // Validate sourceImageUrl
+  if (!input.sourceImageUrl) {
+    return { error: "Source-Image ist erforderlich fuer img2img" };
+  }
+
+  // Validate scale: only 2 and 4 allowed
+  if (input.scale !== 2 && input.scale !== 4) {
+    return { error: "Scale muss 2 oder 4 sein" };
+  }
+
+  try {
+    const generation = await GenerationService.upscale({
+      projectId: input.projectId,
+      sourceImageUrl: input.sourceImageUrl,
+      scale: input.scale,
+      sourceGenerationId: input.sourceGenerationId,
+    });
+    return generation;
+  } catch (error: unknown) {
+    console.error("upscaleImage error:", error);
+    return {
+      error:
+        error instanceof Error ? error.message : "Unbekannter Fehler",
+    };
+  }
 }
 
 export async function deleteGeneration(

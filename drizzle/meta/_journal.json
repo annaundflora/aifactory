@@ -15,6 +15,13 @@
       "when": 1772875385671,
       "tag": "0001_opposite_kabuki",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1773164678114,
+      "tag": "0002_dry_vance_astro",
+      "breakpoints": true
     }
   ]
 }

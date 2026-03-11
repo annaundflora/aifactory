@@ -7,12 +7,21 @@ import {
   updateGeneration,
   type Generation,
 } from "@/lib/db/queries";
+import { UPSCALE_MODEL } from "@/lib/models";
+import { ModelSchemaService, getImg2ImgFieldName } from "@/lib/services/model-schema-service";
 
 const MODEL_ID_REGEX = /^[a-z0-9-]+\/[a-z0-9._-]+$/;
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+export interface UpscaleInput {
+  projectId: string;
+  sourceImageUrl: string;
+  scale: 2 | 4;
+  sourceGenerationId?: string;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -74,7 +83,7 @@ async function processGeneration(generation: Generation): Promise<Generation> {
     // 1. Call Replicate
     const result = await ReplicateClient.run(
       generation.modelId,
-      buildReplicateInput(generation)
+      await buildReplicateInput(generation)
     );
 
     // 2. Convert stream to PNG buffer + get dimensions
@@ -107,9 +116,9 @@ async function processGeneration(generation: Generation): Promise<Generation> {
   }
 }
 
-function buildReplicateInput(
+async function buildReplicateInput(
   generation: Generation
-): Record<string, unknown> {
+): Promise<Record<string, unknown>> {
   const params =
     typeof generation.modelParams === "object" && generation.modelParams !== null
       ? (generation.modelParams as Record<string, unknown>)
@@ -122,6 +131,18 @@ function buildReplicateInput(
 
   if (generation.negativePrompt) {
     input.negative_prompt = generation.negativePrompt;
+  }
+
+  if (generation.generationMode === "img2img" && generation.sourceImageUrl) {
+    const schema = await ModelSchemaService.getSchema(generation.modelId);
+    const img2imgField = getImg2ImgFieldName(schema);
+
+    if (img2imgField) {
+      input[img2imgField.field] = img2imgField.isArray
+        ? [generation.sourceImageUrl]
+        : generation.sourceImageUrl;
+    }
+    // prompt_strength is already spread from modelParams via params above
   }
 
   return input;
@@ -148,7 +169,10 @@ async function generate(
   negativePrompt: string | undefined,
   modelIds: string[],
   params: Record<string, unknown>,
-  count: number
+  count: number,
+  generationMode?: string,
+  sourceImageUrl?: string,
+  strength?: number
 ): Promise<Generation[]> {
   // Validate
   if (!promptMotiv || promptMotiv.trim().length === 0) {
@@ -170,15 +194,39 @@ async function generate(
     throw new Error("Anzahl muss zwischen 1 und 4 liegen");
   }
 
+  // Validate generationMode value
+  if (generationMode !== undefined && !["txt2img", "img2img"].includes(generationMode)) {
+    throw new Error("Ungueltiger Generierungsmodus");
+  }
+
+  // Resolve effective mode
+  const effectiveMode = generationMode ?? "txt2img";
+
+  // img2img validation
+  if (effectiveMode === "img2img") {
+    if (!sourceImageUrl) {
+      throw new Error("Source-Image ist erforderlich fuer img2img");
+    }
+    if (strength !== undefined && (strength < 0 || strength > 1)) {
+      throw new Error("Strength muss zwischen 0 und 1 liegen");
+    }
+  }
+
   // Compose prompt from motiv + style
   const motivTrimmed = promptMotiv.trim();
   const styleTrimmed = promptStyle.trim();
   const prompt = styleTrimmed ? `${motivTrimmed}. ${styleTrimmed}` : motivTrimmed;
 
+  // For img2img: embed prompt_strength in stored modelParams so retry works
+  const storedParams =
+    effectiveMode === "img2img"
+      ? { ...params, prompt_strength: strength ?? 0.6 }
+      : params;
+
   const isMultiModel = modelIds.length > 1;
 
   if (isMultiModel) {
-    // --- Multi-model branch: 1 record per model, default params, parallel ---
+    // --- Multi-model branch: 1 record per model, default params, sequential ---
     const pendingGenerations: Generation[] = [];
     for (const modelId of modelIds) {
       const gen = await createGeneration({
@@ -189,6 +237,8 @@ async function generate(
         modelParams: {},
         promptMotiv: motivTrimmed,
         promptStyle: styleTrimmed,
+        generationMode: effectiveMode,
+        sourceImageUrl: sourceImageUrl ?? null,
       });
       pendingGenerations.push(gen);
     }
@@ -219,9 +269,11 @@ async function generate(
       prompt,
       negativePrompt: negativePrompt?.trim() || undefined,
       modelId,
-      modelParams: params,
+      modelParams: storedParams,
       promptMotiv: motivTrimmed,
       promptStyle: styleTrimmed,
+      generationMode: effectiveMode,
+      sourceImageUrl: sourceImageUrl ?? null,
     });
     pendingGenerations.push(gen);
   }
@@ -271,7 +323,85 @@ async function retry(generationId: string): Promise<Generation> {
   return resetGeneration;
 }
 
+/**
+ * Upscale a single image using the fixed UPSCALE_MODEL.
+ * Creates 1 pending Generation record with generationMode "upscale",
+ * then processes it fire-and-forget.
+ * Returns the pending generation immediately for optimistic UI.
+ */
+async function upscale(input: UpscaleInput): Promise<Generation> {
+  const { projectId, sourceImageUrl, scale, sourceGenerationId } = input;
+
+  // Validate scale: only 2 and 4 allowed
+  if (scale !== 2 && scale !== 4) {
+    throw new Error("Scale muss 2 oder 4 sein");
+  }
+
+  // Compose prompt
+  let prompt = `Upscale ${scale}x`;
+  if (sourceGenerationId) {
+    const sourceGeneration = await getGeneration(sourceGenerationId);
+    prompt = `${sourceGeneration.prompt} (Upscale ${scale}x)`;
+  }
+
+  // Create a single pending generation record
+  const generation = await createGeneration({
+    projectId,
+    prompt,
+    modelId: UPSCALE_MODEL,
+    generationMode: "upscale",
+    sourceImageUrl,
+    sourceGenerationId: sourceGenerationId ?? null,
+  });
+
+  // Fire-and-forget: process the upscale asynchronously
+  (async () => {
+    const storageKey = `projects/${generation.projectId}/${generation.id}.png`;
+
+    try {
+      // Call Replicate with upscale-specific input (image + scale, no prompt)
+      const result = await ReplicateClient.run(UPSCALE_MODEL, {
+        image: sourceImageUrl,
+        scale,
+      });
+
+      // Convert stream to PNG buffer + get dimensions
+      const { buffer, width, height } = await streamToPngBuffer(result.output);
+
+      // Upload to R2
+      const imageUrl = await StorageService.upload(buffer as unknown as Buffer, storageKey);
+
+      // Update DB to completed
+      await updateGeneration(generation.id, {
+        status: "completed",
+        imageUrl,
+        width,
+        height,
+        seed: result.seed,
+        replicatePredictionId: result.predictionId,
+      });
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error(
+        `Upscale ${generation.id} fehlgeschlagen: ${errorMessage}`
+      );
+
+      await updateGeneration(generation.id, {
+        status: "failed",
+        errorMessage,
+      });
+    }
+  })().catch((err) => {
+    console.error("Unexpected error in upscale processing:", err);
+  });
+
+  // Return the pending generation immediately
+  return generation;
+}
+
 export const GenerationService = {
   generate,
   retry,
+  upscale,
 };
