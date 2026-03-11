@@ -7,8 +7,10 @@ import {
   updateGeneration,
   type Generation,
 } from "@/lib/db/queries";
-import { getModelById, UPSCALE_MODEL } from "@/lib/models";
+import { UPSCALE_MODEL } from "@/lib/models";
 import { ModelSchemaService, getImg2ImgFieldName } from "@/lib/services/model-schema-service";
+
+const MODEL_ID_REGEX = /^[a-z0-9-]+\/[a-z0-9._-]+$/;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -151,16 +153,21 @@ async function buildReplicateInput(
 // ---------------------------------------------------------------------------
 
 /**
- * Generate N images: create pending DB records, then process them sequentially.
- * Returns the initial pending generations immediately for optimistic UI.
- * Each generation is processed independently (AC-5).
+ * Generate images: create pending DB records, then process them.
+ *
+ * Single model (modelIds.length === 1): creates `count` pending records
+ * for that model and processes them sequentially (existing behavior).
+ *
+ * Multi-model (modelIds.length > 1): creates 1 pending record per model
+ * with default params ({}), processes sequentially to avoid Replicate rate limits.
+ * Partial failure is allowed — each failed generation is marked independently.
  */
 async function generate(
   projectId: string,
   promptMotiv: string,
   promptStyle: string,
   negativePrompt: string | undefined,
-  modelId: string,
+  modelIds: string[],
   params: Record<string, unknown>,
   count: number,
   generationMode?: string,
@@ -171,8 +178,17 @@ async function generate(
   if (!promptMotiv || promptMotiv.trim().length === 0) {
     throw new Error("Prompt darf nicht leer sein");
   }
-  if (!getModelById(modelId)) {
-    throw new Error("Unbekanntes Modell");
+  if (
+    !Array.isArray(modelIds) ||
+    modelIds.length < 1 ||
+    modelIds.length > 3
+  ) {
+    throw new Error("1-3 Modelle muessen ausgewaehlt sein");
+  }
+  for (const id of modelIds) {
+    if (!id || !MODEL_ID_REGEX.test(id)) {
+      throw new Error("Unbekanntes Modell");
+    }
   }
   if (!Number.isInteger(count) || count < 1 || count > 4) {
     throw new Error("Anzahl muss zwischen 1 und 4 liegen");
@@ -207,7 +223,45 @@ async function generate(
       ? { ...params, prompt_strength: strength ?? 0.6 }
       : params;
 
-  // AC-1: Create N pending records
+  const isMultiModel = modelIds.length > 1;
+
+  if (isMultiModel) {
+    // --- Multi-model branch: 1 record per model, default params, sequential ---
+    const pendingGenerations: Generation[] = [];
+    for (const modelId of modelIds) {
+      const gen = await createGeneration({
+        projectId,
+        prompt,
+        negativePrompt: negativePrompt?.trim() || undefined,
+        modelId,
+        modelParams: {},
+        promptMotiv: motivTrimmed,
+        promptStyle: styleTrimmed,
+        generationMode: effectiveMode,
+        sourceImageUrl: sourceImageUrl ?? null,
+      });
+      pendingGenerations.push(gen);
+    }
+
+    // Process sequentially to avoid Replicate rate limits.
+    // Each generation is independent — failures don't abort the queue.
+    (async () => {
+      for (const gen of pendingGenerations) {
+        try {
+          await processGeneration(gen);
+        } catch (err) {
+          console.error(`Generation ${gen.id} unexpected error:`, err);
+        }
+      }
+    })().catch((err) => {
+      console.error("Unexpected error in multi-model generation batch:", err);
+    });
+
+    return pendingGenerations;
+  }
+
+  // --- Single-model branch: count records, sequential processing ---
+  const modelId = modelIds[0];
   const pendingGenerations: Generation[] = [];
   for (let i = 0; i < count; i++) {
     const gen = await createGeneration({
@@ -224,7 +278,7 @@ async function generate(
     pendingGenerations.push(gen);
   }
 
-  // AC-5: Process sequentially to respect Replicate rate limits.
+  // Process sequentially to respect Replicate rate limits.
   // Each generation is independent — failures don't abort the queue.
   (async () => {
     for (const gen of pendingGenerations) {

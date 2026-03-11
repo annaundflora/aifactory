@@ -153,7 +153,7 @@ describe("Generation Service -- Structured Prompt", () => {
       "A red fox in a forest",
       "watercolor painting with soft edges",
       undefined,
-      "black-forest-labs/flux-2-pro",
+      ["black-forest-labs/flux-2-pro"],
       {},
       1
     );
@@ -186,7 +186,7 @@ describe("Generation Service -- Structured Prompt", () => {
       "A red fox in a forest",
       "",
       undefined,
-      "black-forest-labs/flux-2-pro",
+      ["black-forest-labs/flux-2-pro"],
       {},
       1
     );
@@ -224,7 +224,7 @@ describe("Generation Service -- Structured Prompt", () => {
       "  A red fox  ",
       "  oil painting  ",
       undefined,
-      "black-forest-labs/flux-2-pro",
+      ["black-forest-labs/flux-2-pro"],
       {},
       1
     );
@@ -259,7 +259,7 @@ describe("Generation Service -- Structured Prompt", () => {
       projectId: "proj-001",
       promptMotiv: "Eagle",
       promptStyle: "digital art",
-      modelId: "black-forest-labs/flux-2-pro",
+      modelIds: ["black-forest-labs/flux-2-pro"],
       params: {},
       count: 1,
     });
@@ -289,7 +289,7 @@ describe("Generation Service -- Structured Prompt", () => {
       projectId: "proj-001",
       promptMotiv: "",
       promptStyle: "digital art",
-      modelId: "black-forest-labs/flux-2-pro",
+      modelIds: ["black-forest-labs/flux-2-pro"],
       params: {},
       count: 1,
     });
@@ -322,7 +322,7 @@ describe("Generation Service -- Structured Prompt", () => {
       projectId: "proj-001",
       promptMotiv: "A mountain",
       promptStyle: "watercolor",
-      modelId: "black-forest-labs/flux-2-pro",
+      modelIds: ["black-forest-labs/flux-2-pro"],
       params: {},
       count: 1,
     });
@@ -336,7 +336,7 @@ describe("Generation Service -- Structured Prompt", () => {
     const resultWithoutStyle = await generateImages({
       projectId: "proj-001",
       promptMotiv: "A mountain",
-      modelId: "black-forest-labs/flux-2-pro",
+      modelIds: ["black-forest-labs/flux-2-pro"],
       params: {},
       count: 1,
     });
@@ -361,7 +361,7 @@ describe("Generation Service -- Structured Prompt", () => {
       "Eagle",
       "digital art",
       undefined,
-      "black-forest-labs/flux-2-pro",
+      ["black-forest-labs/flux-2-pro"],
       {},
       1
     );
@@ -402,7 +402,7 @@ describe("Generation Service -- Structured Prompt", () => {
       "A fox",
       "",
       undefined,
-      "black-forest-labs/flux-2-pro",
+      ["black-forest-labs/flux-2-pro"],
       {},
       2
     );
@@ -437,7 +437,7 @@ describe("Generation Service -- Structured Prompt", () => {
       "A fox",
       "   ",
       undefined,
-      "black-forest-labs/flux-2-pro",
+      ["black-forest-labs/flux-2-pro"],
       {},
       1
     );
@@ -461,7 +461,7 @@ describe("Generation Service -- Structured Prompt", () => {
         "   ",
         "watercolor",
         undefined,
-        "black-forest-labs/flux-2-pro",
+        ["black-forest-labs/flux-2-pro"],
         {},
         1
       )
@@ -483,7 +483,7 @@ describe("Generation Service -- Structured Prompt", () => {
       "A fox",
       "watercolor",
       "  blurry  ",
-      "black-forest-labs/flux-2-pro",
+      ["black-forest-labs/flux-2-pro"],
       {},
       1
     );

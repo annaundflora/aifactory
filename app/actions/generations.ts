@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { GenerationService } from "@/lib/services/generation-service";
-import { getModelById } from "@/lib/models";
 import {
   getGenerations,
   getGeneration,
@@ -20,7 +19,7 @@ interface GenerateImagesInput {
   promptMotiv: string;
   promptStyle?: string;
   negativePrompt?: string;
-  modelId: string;
+  modelIds: string[];
   params: Record<string, unknown>;
   count: number;
   generationMode?: string;
@@ -55,9 +54,21 @@ export async function generateImages(
     return { error: "Prompt darf nicht leer sein" };
   }
 
-  // AC-10: Unknown model validation
-  if (!getModelById(input.modelId)) {
-    return { error: "Unbekanntes Modell" };
+  // Slice-12: modelIds array validation (1-3 models)
+  const MODEL_ID_REGEX = /^[a-z0-9-]+\/[a-z0-9._-]+$/;
+  if (
+    !Array.isArray(input.modelIds) ||
+    input.modelIds.length < 1 ||
+    input.modelIds.length > 3
+  ) {
+    return { error: "1-3 Modelle muessen ausgewaehlt sein" };
+  }
+
+  // Slice-12: Each model ID must match owner/name pattern
+  for (const id of input.modelIds) {
+    if (!MODEL_ID_REGEX.test(id)) {
+      return { error: "Unbekanntes Modell" };
+    }
   }
 
   // AC-11: Count validation (1-4)
@@ -93,7 +104,7 @@ export async function generateImages(
       input.promptMotiv,
       input.promptStyle ?? '',
       input.negativePrompt,
-      input.modelId,
+      input.modelIds,
       input.params,
       input.count,
       input.generationMode,

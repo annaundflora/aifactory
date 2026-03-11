@@ -1,8 +1,9 @@
-import { getModelById } from "@/lib/models";
-
 type SchemaProperties = Record<string, unknown>;
 
 const schemaCache = new Map<string, SchemaProperties>();
+
+const MODEL_ID_REGEX = /^[a-z0-9-]+\/[a-z0-9._-]+$/;
+const FETCH_TIMEOUT_MS = 5000;
 
 /**
  * Detect the correct img2img image field name from a model's schema.
@@ -38,9 +39,8 @@ export function getImg2ImgFieldName(
 
 export const ModelSchemaService = {
   async getSchema(modelId: string): Promise<SchemaProperties> {
-    const model = getModelById(modelId);
-    if (!model) {
-      throw new Error("Unbekanntes Modell");
+    if (!MODEL_ID_REGEX.test(modelId)) {
+      throw new Error("Ungueltiges Model-ID-Format");
     }
 
     const cached = schemaCache.get(modelId);
@@ -51,14 +51,18 @@ export const ModelSchemaService = {
     const [owner, name] = modelId.split("/");
     const apiToken = process.env.REPLICATE_API_TOKEN;
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
     const response = await fetch(
       `https://api.replicate.com/v1/models/${owner}/${name}`,
       {
         headers: {
           Authorization: `Bearer ${apiToken}`,
         },
+        signal: controller.signal,
       }
-    );
+    ).finally(() => clearTimeout(timeoutId));
 
     if (!response.ok) {
       throw new Error("Schema konnte nicht geladen werden");
