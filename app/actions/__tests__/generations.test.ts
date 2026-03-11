@@ -82,7 +82,7 @@ describe("generateImages Server Action", () => {
     const result = await generateImages({
       projectId: "proj-001",
       promptMotiv: "",
-      modelId: "black-forest-labs/flux-2-pro",
+      modelIds: ["black-forest-labs/flux-2-pro"],
       params: {},
       count: 1,
     });
@@ -95,7 +95,7 @@ describe("generateImages Server Action", () => {
     const result = await generateImages({
       projectId: "proj-001",
       promptMotiv: "   ",
-      modelId: "black-forest-labs/flux-2-pro",
+      modelIds: ["black-forest-labs/flux-2-pro"],
       params: {},
       count: 1,
     });
@@ -104,14 +104,14 @@ describe("generateImages Server Action", () => {
     expect(GenerationService.generate).not.toHaveBeenCalled();
   });
 
-  // AC-10: GIVEN generateImages wird mit unbekanntem modelId aufgerufen
+  // AC-10: GIVEN generateImages wird mit ungueltigem modelId-Format aufgerufen
   //         WHEN die Action ausgefuehrt wird
   //         THEN wird ein Fehler-Objekt { error: "Unbekanntes Modell" } zurueckgegeben
-  it('AC-10: should return error object for unknown model ID', async () => {
+  it('AC-10: should return error object for invalid model ID format', async () => {
     const result = await generateImages({
       projectId: "proj-001",
       promptMotiv: "A fox",
-      modelId: "unknown/nonexistent-model",
+      modelIds: ["INVALID/Model"],
       params: {},
       count: 1,
     });
@@ -127,7 +127,7 @@ describe("generateImages Server Action", () => {
     const result = await generateImages({
       projectId: "proj-001",
       promptMotiv: "A fox",
-      modelId: "black-forest-labs/flux-2-pro",
+      modelIds: ["black-forest-labs/flux-2-pro"],
       params: {},
       count: 5,
     });
@@ -140,7 +140,7 @@ describe("generateImages Server Action", () => {
     const result = await generateImages({
       projectId: "proj-001",
       promptMotiv: "A fox",
-      modelId: "black-forest-labs/flux-2-pro",
+      modelIds: ["black-forest-labs/flux-2-pro"],
       params: {},
       count: 0,
     });
@@ -158,6 +158,67 @@ describe("generateImages Server Action", () => {
     const firstLine = content.split("\n")[0].trim();
 
     expect(firstLine).toBe('"use server";');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: Slice-12 modelIds validation in generateImages Server Action
+// ---------------------------------------------------------------------------
+
+describe("generateImages Server Action — Slice-12 modelIds validation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // AC-5: GIVEN generateImages wird mit modelIds: [] (leeres Array) aufgerufen
+  //        WHEN die Validierung in der Server Action ausgefuehrt wird
+  //        THEN wird ein Validierungsfehler { error: "1-3 Modelle muessen ausgewaehlt sein" } zurueckgegeben
+  //        AND KEIN Generation-Record wird erstellt
+  it('Slice12-AC-5: should return validation error for empty modelIds array', async () => {
+    const result = await generateImages({
+      projectId: "proj-001",
+      promptMotiv: "A fox",
+      modelIds: [],
+      params: {},
+      count: 1,
+    });
+
+    expect(result).toEqual({ error: "1-3 Modelle muessen ausgewaehlt sein" });
+    expect(GenerationService.generate).not.toHaveBeenCalled();
+  });
+
+  // AC-6: GIVEN generateImages wird mit modelIds: ["m1", "m2", "m3", "m4"] (4 IDs) aufgerufen
+  //        WHEN die Validierung in der Server Action ausgefuehrt wird
+  //        THEN wird ein Validierungsfehler { error: "1-3 Modelle muessen ausgewaehlt sein" } zurueckgegeben
+  //        AND KEIN Generation-Record wird erstellt
+  it('Slice12-AC-6: should return validation error when more than three model IDs are provided', async () => {
+    const result = await generateImages({
+      projectId: "proj-001",
+      promptMotiv: "A fox",
+      modelIds: ["owner/m1", "owner/m2", "owner/m3", "owner/m4"],
+      params: {},
+      count: 1,
+    });
+
+    expect(result).toEqual({ error: "1-3 Modelle muessen ausgewaehlt sein" });
+    expect(GenerationService.generate).not.toHaveBeenCalled();
+  });
+
+  // AC-7: GIVEN generateImages wird mit modelIds: ["UPPER/Case"] aufgerufen (ungueltige Format)
+  //        WHEN die Validierung in der Server Action ausgefuehrt wird
+  //        THEN wird ein Validierungsfehler zurueckgegeben (ID entspricht nicht ^[a-z0-9-]+/[a-z0-9._-]+$)
+  //        AND KEIN Generation-Record wird erstellt
+  it('Slice12-AC-7: should return validation error for model ID not matching owner/name regex', async () => {
+    const result = await generateImages({
+      projectId: "proj-001",
+      promptMotiv: "A fox",
+      modelIds: ["UPPER/Case"],
+      params: {},
+      count: 1,
+    });
+
+    expect(result).toEqual({ error: "Unbekanntes Modell" });
+    expect(GenerationService.generate).not.toHaveBeenCalled();
   });
 });
 

@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
+import fs from "fs";
+import path from "path";
 
 // ---------------------------------------------------------------------------
 // Mocks (mock_external strategy per slice spec)
@@ -26,14 +28,18 @@ vi.mock("@/lib/db/queries", () => ({
   getGenerations: vi.fn(),
 }));
 
-// Mock ModelSchemaService
-vi.mock("@/lib/services/model-schema-service", () => ({
-  ModelSchemaService: {
-    getSchema: vi.fn(),
-    supportsImg2Img: vi.fn(),
-    clearCache: vi.fn(),
-  },
-}));
+// Mock ModelSchemaService — keep real getImg2ImgFieldName (pure function used by buildReplicateInput)
+vi.mock("@/lib/services/model-schema-service", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/services/model-schema-service")>();
+  return {
+    ...actual,
+    ModelSchemaService: {
+      getSchema: vi.fn(),
+      supportsImg2Img: vi.fn(),
+      clearCache: vi.fn(),
+    },
+  };
+});
 
 // Mock sharp
 vi.mock("sharp", () => {
@@ -147,7 +153,7 @@ describe("GenerationService", () => {
       "A fox",
       "",
       undefined,
-      "black-forest-labs/flux-2-pro",
+      ["black-forest-labs/flux-2-pro"],
       {},
       2
     );
@@ -198,7 +204,7 @@ describe("GenerationService", () => {
       "A fox",
       "",
       undefined,
-      "black-forest-labs/flux-2-pro",
+      ["black-forest-labs/flux-2-pro"],
       {},
       1
     );
@@ -256,7 +262,7 @@ describe("GenerationService", () => {
       "A fox",
       "",
       undefined,
-      "black-forest-labs/flux-2-pro",
+      ["black-forest-labs/flux-2-pro"],
       {},
       1
     );
@@ -298,7 +304,7 @@ describe("GenerationService", () => {
       "A fox",
       "",
       undefined,
-      "black-forest-labs/flux-2-pro",
+      ["black-forest-labs/flux-2-pro"],
       {},
       1
     );
@@ -351,7 +357,7 @@ describe("GenerationService", () => {
       "A fox",
       "",
       undefined,
-      "black-forest-labs/flux-2-pro",
+      ["black-forest-labs/flux-2-pro"],
       {},
       3
     );
@@ -408,7 +414,7 @@ describe("GenerationService", () => {
       "A fox",
       "",
       undefined,
-      "black-forest-labs/flux-2-pro",
+      ["black-forest-labs/flux-2-pro"],
       {},
       1
     );
@@ -480,6 +486,403 @@ describe("GenerationService", () => {
     );
   });
 
+  // =========================================================================
+  // Slice-04 ACs: Remove Whitelist from generation-service
+  // =========================================================================
+
+  // AC-2: GIVEN generation-service.ts nach dem Refactoring
+  //       WHEN die Datei inspiziert wird
+  //       THEN existiert KEIN Import von @/lib/models (kein getModelById)
+  it("Slice04-AC-2: should not import getModelById from lib/models (UPSCALE_MODEL import is allowed)", () => {
+    const filePath = path.resolve(__dirname, "..", "generation-service.ts");
+    const source = fs.readFileSync(filePath, "utf-8");
+
+    // getModelById whitelist check must be removed, but UPSCALE_MODEL import is allowed
+    expect(source).not.toContain("getModelById");
+  });
+
+  // AC-8 (slice-04): GIVEN generation-service.ts nach dem Refactoring
+  //       WHEN generate() mit modelId: "newowner/new-model" aufgerufen wird (bisher nicht in der Whitelist)
+  //       THEN wird die Generation normal erstellt (kein Whitelist-Reject)
+  it("Slice04-AC-8: should accept any valid owner/name model ID and create generation without whitelist reject", async () => {
+    const gen = makeGeneration({ id: "gen-new", modelId: "newowner/new-model" });
+    (createGeneration as Mock).mockResolvedValue(gen);
+
+    (ReplicateClient.run as Mock).mockResolvedValue({
+      output: bufferToStream(PNG_BUFFER),
+      predictionId: "pred-new",
+      seed: 100,
+    });
+    (StorageService.upload as Mock).mockResolvedValue("https://r2.example.com/img.png");
+    (updateGeneration as Mock).mockResolvedValue(
+      makeGeneration({ id: "gen-new", status: "completed" })
+    );
+
+    const result = await GenerationService.generate(
+      "proj-001",
+      "A cat",
+      "",
+      undefined,
+      ["newowner/new-model"],
+      {},
+      1
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].status).toBe("pending");
+    expect(createGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelId: "newowner/new-model",
+      })
+    );
+  });
+
+  // AC-9: GIVEN generation-service.ts nach dem Refactoring
+  //       WHEN generate() mit modelId: "invalid" aufgerufen wird (ohne /)
+  //       THEN wird ein Error geworfen mit Message "Unbekanntes Modell"
+  it('Slice04-AC-9: should throw "Unbekanntes Modell" for model ID without slash', async () => {
+    await expect(
+      GenerationService.generate(
+        "proj-001",
+        "A cat",
+        "",
+        undefined,
+        ["invalid"],
+        {},
+        1
+      )
+    ).rejects.toThrow("Unbekanntes Modell");
+
+    expect(createGeneration).not.toHaveBeenCalled();
+  });
+
+  // =========================================================================
+  // Slice-12 ACs: Parallel Multi-Model Generation
+  // =========================================================================
+
+  describe("Slice-12: Parallel Multi-Model Generation", () => {
+
+    // AC-1: GIVEN generateImages wird mit modelIds: ["owner/model-a"] und count: 3 aufgerufen
+    //        WHEN die Server Action ausgefuehrt wird
+    //        THEN werden genau 3 Generation-Records erstellt (alle mit model_id = "owner/model-a")
+    //        AND die Verarbeitung erfolgt sequenziell (bestehende Logik unveraendert)
+    it("AC-1: should create count records for single model and process sequentially", async () => {
+      const gen1 = makeGeneration({ id: "gen-s1", modelId: "owner/model-a" });
+      const gen2 = makeGeneration({ id: "gen-s2", modelId: "owner/model-a" });
+      const gen3 = makeGeneration({ id: "gen-s3", modelId: "owner/model-a" });
+
+      (createGeneration as Mock)
+        .mockResolvedValueOnce(gen1)
+        .mockResolvedValueOnce(gen2)
+        .mockResolvedValueOnce(gen3);
+
+      // Mock replicate + storage for background processing
+      (ReplicateClient.run as Mock).mockResolvedValue({
+        output: bufferToStream(PNG_BUFFER),
+        predictionId: "pred-seq",
+        seed: 42,
+      });
+      (StorageService.upload as Mock).mockResolvedValue("https://r2.example.com/img.png");
+      (updateGeneration as Mock).mockResolvedValue(makeGeneration({ status: "completed" }));
+
+      const result = await GenerationService.generate(
+        "proj-001",
+        "A fox",
+        "",
+        undefined,
+        ["owner/model-a"],
+        { width: 1024 },
+        3
+      );
+
+      // THEN: exactly 3 records created, all with model_id = "owner/model-a"
+      expect(result).toHaveLength(3);
+      expect(createGeneration).toHaveBeenCalledTimes(3);
+      for (const call of (createGeneration as Mock).mock.calls) {
+        expect(call[0]).toEqual(
+          expect.objectContaining({ modelId: "owner/model-a" })
+        );
+      }
+
+      // AND: sequential processing — wait for fire-and-forget to finish
+      await vi.waitFor(() => {
+        expect(ReplicateClient.run).toHaveBeenCalledTimes(3);
+      });
+
+      // Verify all calls used the same model
+      for (const call of (ReplicateClient.run as Mock).mock.calls) {
+        expect(call[0]).toBe("owner/model-a");
+      }
+    });
+
+    // AC-2: GIVEN generateImages wird mit modelIds: ["owner/model-a", "owner/model-b"] und count: 1 aufgerufen
+    //        WHEN die Server Action ausgefuehrt wird
+    //        THEN werden genau 2 Generation-Records erstellt (je einer pro Model-ID)
+    //        AND beide Predictions werden sequentiell gestartet
+    it("AC-2: should create one record per model and start predictions sequentially for two models", async () => {
+      const genA = makeGeneration({ id: "gen-ma", modelId: "owner/model-a" });
+      const genB = makeGeneration({ id: "gen-mb", modelId: "owner/model-b" });
+
+      (createGeneration as Mock)
+        .mockResolvedValueOnce(genA)
+        .mockResolvedValueOnce(genB);
+
+      (ReplicateClient.run as Mock).mockResolvedValue({
+        output: bufferToStream(PNG_BUFFER),
+        predictionId: "pred-multi",
+        seed: 10,
+      });
+      (StorageService.upload as Mock).mockResolvedValue("https://r2.example.com/img.png");
+      (updateGeneration as Mock).mockResolvedValue(makeGeneration({ status: "completed" }));
+
+      const result = await GenerationService.generate(
+        "proj-001",
+        "A fox",
+        "",
+        undefined,
+        ["owner/model-a", "owner/model-b"],
+        {},
+        1
+      );
+
+      // THEN: exactly 2 records created
+      expect(result).toHaveLength(2);
+      expect(createGeneration).toHaveBeenCalledTimes(2);
+
+      // First record for model-a, second for model-b
+      expect((createGeneration as Mock).mock.calls[0][0]).toEqual(
+        expect.objectContaining({ modelId: "owner/model-a" })
+      );
+      expect((createGeneration as Mock).mock.calls[1][0]).toEqual(
+        expect.objectContaining({ modelId: "owner/model-b" })
+      );
+
+      // AND: both predictions should be called sequentially
+      await vi.waitFor(() => {
+        expect(ReplicateClient.run).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    // AC-3: GIVEN generateImages wird mit modelIds: ["owner/m1", "owner/m2", "owner/m3"] aufgerufen
+    //        WHEN die Server Action ausgefuehrt wird
+    //        THEN werden genau 3 Generation-Records erstellt
+    //        AND alle 3 Predictions werden sequentiell gestartet
+    it("AC-3: should create one record per model and start predictions sequentially for three models", async () => {
+      const gen1 = makeGeneration({ id: "gen-m1", modelId: "owner/m1" });
+      const gen2 = makeGeneration({ id: "gen-m2", modelId: "owner/m2" });
+      const gen3 = makeGeneration({ id: "gen-m3", modelId: "owner/m3" });
+
+      (createGeneration as Mock)
+        .mockResolvedValueOnce(gen1)
+        .mockResolvedValueOnce(gen2)
+        .mockResolvedValueOnce(gen3);
+
+      (ReplicateClient.run as Mock).mockResolvedValue({
+        output: bufferToStream(PNG_BUFFER),
+        predictionId: "pred-tri",
+        seed: 20,
+      });
+      (StorageService.upload as Mock).mockResolvedValue("https://r2.example.com/img.png");
+      (updateGeneration as Mock).mockResolvedValue(makeGeneration({ status: "completed" }));
+
+      const result = await GenerationService.generate(
+        "proj-001",
+        "A fox",
+        "",
+        undefined,
+        ["owner/m1", "owner/m2", "owner/m3"],
+        {},
+        1
+      );
+
+      // THEN: exactly 3 records created
+      expect(result).toHaveLength(3);
+      expect(createGeneration).toHaveBeenCalledTimes(3);
+
+      // Each record has the correct model ID
+      expect((createGeneration as Mock).mock.calls[0][0]).toEqual(
+        expect.objectContaining({ modelId: "owner/m1" })
+      );
+      expect((createGeneration as Mock).mock.calls[1][0]).toEqual(
+        expect.objectContaining({ modelId: "owner/m2" })
+      );
+      expect((createGeneration as Mock).mock.calls[2][0]).toEqual(
+        expect.objectContaining({ modelId: "owner/m3" })
+      );
+
+      // AND: all 3 predictions started sequentially
+      await vi.waitFor(() => {
+        expect(ReplicateClient.run).toHaveBeenCalledTimes(3);
+      });
+    });
+
+    // AC-4: GIVEN Multi-Model mit 2 Models: owner/model-a schlaegt fehl, owner/model-b wird erfolgreich
+    //        WHEN die sequentielle Verarbeitung abgeschlossen ist
+    //        THEN wird der Record fuer owner/model-a als fehlgeschlagen markiert
+    //        AND der Record fuer owner/model-b enthaelt das Ergebnis-Bild
+    //        AND KEIN unbehandelter Error wird geworfen (Partial Failure ist erlaubt)
+    it("AC-4: should mark failed model record as failed without affecting successful model record", async () => {
+      const genA = makeGeneration({ id: "gen-fail-a", modelId: "owner/model-a" });
+      const genB = makeGeneration({ id: "gen-ok-b", modelId: "owner/model-b" });
+
+      (createGeneration as Mock)
+        .mockResolvedValueOnce(genA)
+        .mockResolvedValueOnce(genB);
+
+      // model-a fails, model-b succeeds
+      (ReplicateClient.run as Mock)
+        .mockRejectedValueOnce(new Error("Replicate error for model-a"))
+        .mockResolvedValueOnce({
+          output: bufferToStream(PNG_BUFFER),
+          predictionId: "pred-b",
+          seed: 55,
+        });
+
+      (StorageService.upload as Mock).mockResolvedValue("https://r2.example.com/ok.png");
+      (updateGeneration as Mock).mockImplementation((id: string, data: Record<string, unknown>) => {
+        return Promise.resolve(makeGeneration({ id, ...data } as Partial<Generation>));
+      });
+
+      // WHEN: should NOT throw — partial failure is allowed
+      const result = await GenerationService.generate(
+        "proj-001",
+        "A fox",
+        "",
+        undefined,
+        ["owner/model-a", "owner/model-b"],
+        {},
+        1
+      );
+
+      // Returns pending records immediately (fire-and-forget processing)
+      expect(result).toHaveLength(2);
+
+      // Wait for background sequential processing to complete
+      await vi.waitFor(() => {
+        // model-a: processGeneration catches error internally and marks as failed
+        // model-b: processGeneration succeeds and marks as completed
+        // The sequential loop processes each generation independently
+        const updateCalls = (updateGeneration as Mock).mock.calls;
+        expect(updateCalls.length).toBeGreaterThanOrEqual(2);
+      });
+
+      // Verify model-b was completed successfully
+      expect(updateGeneration).toHaveBeenCalledWith(
+        "gen-ok-b",
+        expect.objectContaining({ status: "completed" })
+      );
+
+      // Verify model-a was marked as failed
+      expect(updateGeneration).toHaveBeenCalledWith(
+        "gen-fail-a",
+        expect.objectContaining({
+          status: "failed",
+          errorMessage: expect.stringContaining("Replicate error for model-a"),
+        })
+      );
+    });
+
+    // AC-5: GIVEN generateImages wird mit modelIds: [] (leeres Array) aufgerufen
+    //        WHEN die Validierung in der Server Action ausgefuehrt wird
+    //        THEN wird ein Validierungsfehler "1-3 Modelle muessen ausgewaehlt sein" zurueckgegeben
+    //        AND KEIN Generation-Record wird erstellt
+    it('AC-5: should throw validation error for empty modelIds array', async () => {
+      await expect(
+        GenerationService.generate(
+          "proj-001",
+          "A fox",
+          "",
+          undefined,
+          [],
+          {},
+          1
+        )
+      ).rejects.toThrow("1-3 Modelle muessen ausgewaehlt sein");
+
+      expect(createGeneration).not.toHaveBeenCalled();
+    });
+
+    // AC-6: GIVEN generateImages wird mit modelIds: ["m1", "m2", "m3", "m4"] (4 IDs) aufgerufen
+    //        WHEN die Validierung in der Server Action ausgefuehrt wird
+    //        THEN wird ein Validierungsfehler "1-3 Modelle muessen ausgewaehlt sein" zurueckgegeben
+    //        AND KEIN Generation-Record wird erstellt
+    it('AC-6: should throw validation error when more than three model IDs are provided', async () => {
+      await expect(
+        GenerationService.generate(
+          "proj-001",
+          "A fox",
+          "",
+          undefined,
+          ["owner/m1", "owner/m2", "owner/m3", "owner/m4"],
+          {},
+          1
+        )
+      ).rejects.toThrow("1-3 Modelle muessen ausgewaehlt sein");
+
+      expect(createGeneration).not.toHaveBeenCalled();
+    });
+
+    // AC-7: GIVEN generateImages wird mit modelIds: ["UPPER/Case"] aufgerufen (ungueltige Format)
+    //        WHEN die Validierung in der Server Action ausgefuehrt wird
+    //        THEN wird ein Validierungsfehler zurueckgegeben (ID entspricht nicht ^[a-z0-9-]+/[a-z0-9._-]+$)
+    //        AND KEIN Generation-Record wird erstellt
+    it('AC-7: should throw validation error for model ID not matching owner/name regex', async () => {
+      await expect(
+        GenerationService.generate(
+          "proj-001",
+          "A fox",
+          "",
+          undefined,
+          ["UPPER/Case"],
+          {},
+          1
+        )
+      ).rejects.toThrow("Unbekanntes Modell");
+
+      expect(createGeneration).not.toHaveBeenCalled();
+    });
+
+    // AC-8: GIVEN generateImages wird mit modelIds: ["owner/model-a", "owner/model-b"] aufgerufen
+    //        WHEN die Multi-Model-Verarbeitung startet
+    //        THEN wird jeder Generation-Record mit params: {} (leeres Objekt als Default-Params) erstellt
+    //        AND count wird ignoriert (jedes Model erhaelt genau 1 Record)
+    it("AC-8: should use empty params object and create exactly one record per model in multi-model mode", async () => {
+      const genA = makeGeneration({ id: "gen-pa", modelId: "owner/model-a", modelParams: {} });
+      const genB = makeGeneration({ id: "gen-pb", modelId: "owner/model-b", modelParams: {} });
+
+      (createGeneration as Mock)
+        .mockResolvedValueOnce(genA)
+        .mockResolvedValueOnce(genB);
+
+      (ReplicateClient.run as Mock).mockResolvedValue({
+        output: bufferToStream(PNG_BUFFER),
+        predictionId: "pred-p",
+        seed: 30,
+      });
+      (StorageService.upload as Mock).mockResolvedValue("https://r2.example.com/img.png");
+      (updateGeneration as Mock).mockResolvedValue(makeGeneration({ status: "completed" }));
+
+      const result = await GenerationService.generate(
+        "proj-001",
+        "A fox",
+        "",
+        undefined,
+        ["owner/model-a", "owner/model-b"],
+        { width: 1024, height: 768 },  // custom params passed — should be IGNORED in multi-model
+        4  // count=4 passed — should be IGNORED in multi-model
+      );
+
+      // THEN: exactly 2 records (one per model), NOT 4
+      expect(result).toHaveLength(2);
+      expect(createGeneration).toHaveBeenCalledTimes(2);
+
+      // Each record created with params: {} (empty default), not the custom params
+      for (const call of (createGeneration as Mock).mock.calls) {
+        expect(call[0].modelParams).toEqual({});
+      }
+    });
+  });
+
   // -------------------------------------------------------------------------
   // Slice-06: img2img Generation Service Extension
   // -------------------------------------------------------------------------
@@ -511,7 +914,7 @@ describe("GenerationService", () => {
         "A fox",
         "",
         undefined,
-        "black-forest-labs/flux-2-pro",
+        ["black-forest-labs/flux-2-pro"],
         {},
         1
       );
@@ -544,7 +947,7 @@ describe("GenerationService", () => {
         "A fox",
         "",
         undefined,
-        "black-forest-labs/flux-2-pro",
+        ["black-forest-labs/flux-2-pro"],
         {},
         1,
         "img2img",
@@ -592,7 +995,7 @@ describe("GenerationService", () => {
         "A fox",
         "",
         "blurry",
-        "black-forest-labs/flux-2-pro",
+        ["black-forest-labs/flux-2-pro"],
         {},
         1,
         "img2img",
@@ -641,7 +1044,7 @@ describe("GenerationService", () => {
         "A fox",
         "",
         undefined,
-        "black-forest-labs/flux-2-pro",
+        ["black-forest-labs/flux-2-pro"],
         {},
         1,
         "img2img",
@@ -689,7 +1092,7 @@ describe("GenerationService", () => {
         "A fox",
         "",
         undefined,
-        "black-forest-labs/flux-2-pro",
+        ["black-forest-labs/flux-2-pro"],
         {},
         1,
         "img2img",
@@ -718,7 +1121,7 @@ describe("GenerationService", () => {
           "A fox",
           "",
           undefined,
-          "black-forest-labs/flux-2-pro",
+          ["black-forest-labs/flux-2-pro"],
           {},
           1,
           "img2img",
@@ -738,7 +1141,7 @@ describe("GenerationService", () => {
           "A fox",
           "",
           undefined,
-          "black-forest-labs/flux-2-pro",
+          ["black-forest-labs/flux-2-pro"],
           {},
           1,
           "img2img",
@@ -768,7 +1171,7 @@ describe("GenerationService", () => {
         "A fox",
         "",
         undefined,
-        "black-forest-labs/flux-2-pro",
+        ["black-forest-labs/flux-2-pro"],
         {},
         1
         // no generationMode, no sourceImageUrl, no strength
@@ -806,7 +1209,7 @@ describe("GenerationService", () => {
         "A fox",
         "",
         undefined,
-        "black-forest-labs/flux-2-pro",
+        ["black-forest-labs/flux-2-pro"],
         {},
         3,
         "img2img",

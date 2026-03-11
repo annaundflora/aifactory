@@ -123,4 +123,137 @@ describe("GenerationCard", () => {
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onSelect).toHaveBeenCalledWith("gen-click-img");
   });
+
+  // -------------------------------------------------------------------------
+  // Slice 13: Gallery Model Badge
+  // -------------------------------------------------------------------------
+
+  describe("Model Badge (Slice 13)", () => {
+    /**
+     * AC-1: GIVEN eine GenerationCard mit generation.modelId = "black-forest-labs/flux-1.1-pro"
+     * WHEN die Komponente gerendert wird
+     * THEN ist ein Badge-Element mit dem Text "Flux 1.1 Pro" sichtbar (nicht erst bei Hover)
+     */
+    it('AC-1: should render badge with display name "Flux 1.1 Pro" for modelId "black-forest-labs/flux-1.1-pro"', () => {
+      const generation = makeGeneration({
+        modelId: "black-forest-labs/flux-1.1-pro",
+      });
+
+      render(<GenerationCard generation={generation} onSelect={vi.fn()} />);
+
+      const badge = screen.getByText("Flux 1.1 Pro");
+      expect(badge).toBeInTheDocument();
+      // Badge uses data-slot="badge" from the Badge component
+      expect(badge).toHaveAttribute("data-slot", "badge");
+    });
+
+    /**
+     * AC-2: GIVEN eine GenerationCard mit generation.modelId = "recraft-ai/recraft-v4"
+     * WHEN die Komponente gerendert wird
+     * THEN zeigt der Badge den Text "Recraft V4" (korrekte modelIdToDisplayName-Transformation)
+     */
+    it('AC-2: should render badge with display name "Recraft V4" for modelId "recraft-ai/recraft-v4"', () => {
+      const generation = makeGeneration({
+        modelId: "recraft-ai/recraft-v4",
+      });
+
+      render(<GenerationCard generation={generation} onSelect={vi.fn()} />);
+
+      const badge = screen.getByText("Recraft V4");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveAttribute("data-slot", "badge");
+    });
+
+    /**
+     * AC-3: GIVEN eine GenerationCard mit einem Model-ID-String ohne "/" (z.B. "flux-dev")
+     * WHEN die Komponente gerendert wird
+     * THEN zeigt der Badge den Text "Flux Dev" (Fallback: gesamter String wird als Name behandelt)
+     */
+    it('AC-3: should render badge with display name "Flux Dev" for modelId "flux-dev"', () => {
+      const generation = makeGeneration({
+        modelId: "flux-dev",
+      });
+
+      render(<GenerationCard generation={generation} onSelect={vi.fn()} />);
+
+      const badge = screen.getByText("Flux Dev");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveAttribute("data-slot", "badge");
+    });
+
+    /**
+     * AC-4: GIVEN eine GenerationCard mit einem sehr langen Model-Namen (> Badge-Breite)
+     * WHEN die Komponente gerendert wird
+     * THEN wird der Text mit text-overflow: ellipsis (CSS truncate) abgeschnitten
+     * und laeuft nicht aus dem Badge heraus
+     */
+    it("AC-4: should truncate long model name with ellipsis", () => {
+      const generation = makeGeneration({
+        modelId: "some-vendor/extremely-long-model-name-that-should-definitely-be-truncated-via-css",
+      });
+
+      render(<GenerationCard generation={generation} onSelect={vi.fn()} />);
+
+      // The badge should exist and contain the transformed text
+      const badge = screen.getByText(
+        "Extremely Long Model Name That Should Definitely Be Truncated Via Css"
+      );
+      expect(badge).toBeInTheDocument();
+
+      // The badge element must have the `truncate` CSS class for text-overflow: ellipsis
+      expect(badge.className).toContain("truncate");
+
+      // It must also have a max-width constraint to enable truncation
+      expect(badge.className).toMatch(/max-w-/);
+    });
+
+    /**
+     * AC-5: GIVEN eine GenerationCard
+     * WHEN die Komponente gerendert wird
+     * THEN ist der Badge absolut positioniert (bottom-left), besitzt einen
+     * semi-transparenten dunklen Hintergrund und weissen Text, und ist
+     * unabhaengig vom Hover-Zustand sichtbar
+     */
+    it("AC-5: should always render badge with correct positioning and styling regardless of hover state", () => {
+      const generation = makeGeneration({
+        modelId: "black-forest-labs/flux-1.1-pro",
+      });
+
+      render(<GenerationCard generation={generation} onSelect={vi.fn()} />);
+
+      const badge = screen.getByText("Flux 1.1 Pro");
+
+      // Badge is absolutely positioned at bottom-left
+      expect(badge.className).toContain("absolute");
+      expect(badge.className).toContain("bottom-2");
+      expect(badge.className).toContain("left-2");
+
+      // Semi-transparent dark background
+      expect(badge.className).toMatch(/bg-black\/\d+/);
+
+      // White text
+      expect(badge.className).toContain("text-white");
+
+      // Badge must NOT have opacity-0 or group-hover:opacity classes (always visible)
+      expect(badge.className).not.toContain("opacity-0");
+      expect(badge.className).not.toContain("group-hover:opacity");
+    });
+
+    /**
+     * AC-6: GIVEN eine GenerationCard mit generation.modelId = ""
+     * WHEN die Komponente gerendert wird
+     * THEN wird kein Badge-Element gerendert (leerer modelId = kein Badge)
+     */
+    it("AC-6: should not render badge when modelId is empty string", () => {
+      const generation = makeGeneration({
+        modelId: "",
+      });
+
+      render(<GenerationCard generation={generation} onSelect={vi.fn()} />);
+
+      // No badge element should be present in the DOM at all
+      const badges = screen.getByRole("button").querySelectorAll('[data-slot="badge"]');
+      expect(badges).toHaveLength(0);
+    });
+  });
 });

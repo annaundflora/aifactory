@@ -1,6 +1,8 @@
 "use client";
 
 import { type Generation } from "@/lib/db/queries";
+import { Badge } from "@/components/ui/badge";
+import { modelIdToDisplayName } from "@/lib/utils/model-display-name";
 import { ModeBadge, type Mode } from "@/components/workspace/mode-badge";
 
 // ---------------------------------------------------------------------------
@@ -38,9 +40,18 @@ export function GenerationCard({ generation, onSelect }: GenerationCardProps) {
         </p>
       </div>
 
-      {/* Mode Badge */}
+      {/* Mode Badge (top-left: img2img / upscale indicator) */}
       {generation.generationMode && (
         <ModeBadge mode={generation.generationMode as Mode} />
+      )}
+
+      {/* Model badge overlay (bottom-left: model display name) */}
+      {generation.modelId && (
+        <Badge
+          className="absolute bottom-2 left-2 max-w-[calc(100%-1rem)] truncate bg-black/60 text-white border-transparent hover:bg-black/60"
+        >
+          {modelIdToDisplayName(generation.modelId)}
+        </Badge>
       )}
     </button>
   );

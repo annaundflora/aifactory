@@ -10,20 +10,12 @@ import {
   type ChangeEvent,
 } from "react";
 import { PromptTabs, type PromptTab } from "@/components/workspace/prompt-tabs";
-import { MODELS, getModelById } from "@/lib/models";
-import { getModelSchema } from "@/app/actions/models";
+import { getModelSchema, getCollectionModels } from "@/app/actions/models";
 import { generateImages, upscaleImage } from "@/app/actions/generations";
 import { useWorkspaceVariation } from "@/lib/workspace-state";
 import { ModeSelector, type GenerationMode } from "@/components/workspace/mode-selector";
 import { ImageDropzone } from "@/components/workspace/image-dropzone";
 import { StrengthSlider } from "@/components/workspace/strength-slider";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -34,7 +26,13 @@ import { Loader2, Wand2, Sparkles } from "lucide-react";
 import { BuilderDrawer } from "@/components/prompt-builder/builder-drawer";
 import { LLMComparison } from "@/components/prompt-improve/llm-comparison";
 import { TemplateSelector } from "@/components/workspace/template-selector";
+import { type CollectionModel } from "@/lib/types/collection-model";
+import { ModelTrigger } from "@/components/models/model-trigger";
+import { ModelBrowserDrawer } from "@/components/models/model-browser-drawer";
 import { toast } from "sonner";
+
+// Re-export Generation type for callback
+import { type Generation } from "@/lib/db/queries";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -44,9 +42,6 @@ interface PromptAreaProps {
   projectId: string;
   onGenerationsCreated?: (generations: Generation[]) => void;
 }
-
-// Re-export Generation type for callback
-import { type Generation } from "@/lib/db/queries";
 
 // ---------------------------------------------------------------------------
 // Per-Mode State Types (State Persistence Matrix)
@@ -90,11 +85,6 @@ interface ModeStates {
 const VARIANT_OPTIONS = [1, 2, 3, 4] as const;
 const DEFAULT_STRENGTH = 0.6;
 const DEFAULT_SCALE: 2 | 4 = 2;
-
-function formatPrice(price: number): string {
-  if (price === 0) return "Free";
-  return `$${price.toFixed(3)}`;
-}
 
 /** Auto-resize a textarea to fit its content. */
 function autoResize(el: HTMLTextAreaElement) {
@@ -153,13 +143,17 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
   // ----- Per-mode state (State Persistence Matrix) -----
   const [modeStates, setModeStates] = useState<ModeStates>(() =>
-    createInitialModeStates(MODELS[0].id)
+    createInitialModeStates("")
   );
 
-  // ----- Active state derived from current mode -----
-  // For txt2img and img2img, we use these common fields directly.
-  // For upscale, we only use sourceImageUrl and scale from upscale state.
-  const [selectedModelId, setSelectedModelId] = useState(MODELS[0].id);
+  // ----- Model state (multi-model from model-cards) -----
+  const [selectedModels, setSelectedModels] = useState<CollectionModel[]>([]);
+
+  // ----- Collection state (for drawer) -----
+  const [collectionModels, setCollectionModels] = useState<CollectionModel[]>([]);
+  const [collectionError, setCollectionError] = useState<string | undefined>(undefined);
+  const [collectionLoading, setCollectionLoading] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // ----- Schema state -----
   const [schema, setSchema] = useState<SchemaProperties | null>(null);
@@ -199,8 +193,48 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   const { variationData, clearVariation } = useWorkspaceVariation();
   const pendingVariationParamsRef = useRef<Record<string, unknown> | null>(null);
 
+  // ----- Derived: current model ID (for schema, LLM comparison, generate) -----
+  const selectedModelId =
+    selectedModels.length > 0
+      ? `${selectedModels[0].owner}/${selectedModels[0].name}`
+      : "";
+  const selectedModelIdRef = useRef(selectedModelId);
+  selectedModelIdRef.current = selectedModelId;
+
+  // ----- Derived: single model mode -----
+  const isSingleModel = selectedModels.length === 1;
+
   // ----- Schema cache for img2img compatibility checks -----
   const schemaCacheRef = useRef<Map<string, SchemaProperties>>(new Map());
+
+  // ----- Fetch collection models on mount -----
+  const fetchCollectionModels = useCallback(async () => {
+    setCollectionLoading(true);
+    setCollectionError(undefined);
+    try {
+      const result = await getCollectionModels();
+      if (Array.isArray(result)) {
+        setCollectionModels(result);
+        // Initialize selectedModels with first model if currently empty
+        setSelectedModels((prev) => {
+          if (prev.length === 0 && result.length > 0) {
+            return [result[0]];
+          }
+          return prev;
+        });
+      } else {
+        setCollectionError(result.error);
+      }
+    } catch {
+      setCollectionError("Failed to load models");
+    } finally {
+      setCollectionLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCollectionModels();
+  }, [fetchCollectionModels]);
 
   // ---------------------------------------------------------------------------
   // Save current state into modeStates
@@ -275,17 +309,18 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
         return modelId; // Current model is compatible
       }
 
-      // Find first compatible model
-      for (const model of MODELS) {
-        if (model.id === modelId) continue;
+      // Find first compatible model from collection
+      for (const model of collectionModels) {
+        const candidateId = `${model.owner}/${model.name}`;
+        if (candidateId === modelId) continue;
 
-        let candidateSchema = schemaCacheRef.current.get(model.id);
+        let candidateSchema = schemaCacheRef.current.get(candidateId);
         if (!candidateSchema) {
           try {
-            const result = await getModelSchema({ modelId: model.id });
+            const result = await getModelSchema({ modelId: candidateId });
             if ("properties" in result) {
               candidateSchema = result.properties as SchemaProperties;
-              schemaCacheRef.current.set(model.id, candidateSchema);
+              schemaCacheRef.current.set(candidateId, candidateSchema);
             }
           } catch {
             continue;
@@ -293,16 +328,46 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
         }
 
         if (candidateSchema && schemaSupportsImg2Img(candidateSchema)) {
-          const display = getModelById(model.id)?.displayName ?? model.id;
-          toast(`Model switched to ${display} (supports img2img)`);
-          return model.id;
+          toast(`Model switched to ${model.name} (supports img2img)`);
+          // Update selectedModels to the compatible model
+          setSelectedModels([model]);
+          return candidateId;
         }
       }
 
       // No compatible model found (edge case)
       return modelId;
     },
-    []
+    [collectionModels]
+  );
+
+  // ---------------------------------------------------------------------------
+  // Helper: set selectedModels from a modelId string
+  // ---------------------------------------------------------------------------
+
+  const setSelectedModelFromId = useCallback(
+    (modelId: string) => {
+      const matchingModel = collectionModels.find(
+        (m) => `${m.owner}/${m.name}` === modelId,
+      );
+      if (matchingModel) {
+        setSelectedModels([matchingModel]);
+      } else {
+        // Fallback: create a minimal CollectionModel from the modelId
+        const [owner, name] = modelId.split("/");
+        setSelectedModels([
+          {
+            url: "",
+            owner: owner ?? "",
+            name: name ?? "",
+            description: null,
+            cover_image_url: null,
+            run_count: 0,
+          },
+        ]);
+      }
+    },
+    [collectionModels]
   );
 
   // ---------------------------------------------------------------------------
@@ -370,7 +435,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
           setPromptMotiv(s.promptMotiv);
           setPromptStyle(s.promptStyle);
           setNegativePrompt(s.negativePrompt);
-          setSelectedModelId(s.modelId);
+          setSelectedModelFromId(s.modelId);
           setParamValues(s.paramValues);
           setVariantCount(s.variantCount);
           setSourceImageUrl(s.sourceImageUrl);
@@ -386,7 +451,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
           setPromptMotiv(s.promptMotiv);
           setPromptStyle(s.promptStyle);
           setNegativePrompt(s.negativePrompt);
-          setSelectedModelId(s.modelId);
+          setSelectedModelFromId(s.modelId);
           setParamValues(s.paramValues);
           setVariantCount(s.variantCount);
         }
@@ -410,7 +475,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
         const activeModelId = fromHasPrompt ? selectedModelId : snapshot.img2img.modelId;
         const compatibleModelId = await checkAndAutoSwitchModel(activeModelId);
         if (compatibleModelId !== activeModelId) {
-          setSelectedModelId(compatibleModelId);
+          setSelectedModelFromId(compatibleModelId);
           // Also update the modeStates for img2img
           setModeStates((prev) => ({
             ...prev,
@@ -436,6 +501,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
       upscaleScale,
       checkAndAutoSwitchModel,
       modeStates,
+      setSelectedModelFromId,
     ]
   );
 
@@ -463,9 +529,27 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
           setStrength(variationData.strength);
         }
 
-        if (variationData.modelId !== selectedModelId) {
+        if (variationData.modelId !== selectedModelIdRef.current) {
           pendingVariationParamsRef.current = variationData.modelParams;
-          setSelectedModelId(variationData.modelId);
+          // Find the matching CollectionModel in the collection, or create a minimal one
+          const matchingModel = collectionModels.find(
+            (m) => `${m.owner}/${m.name}` === variationData.modelId,
+          );
+          if (matchingModel) {
+            setSelectedModels([matchingModel]);
+          } else {
+            const [owner, name] = variationData.modelId.split("/");
+            setSelectedModels([
+              {
+                url: "",
+                owner: owner ?? "",
+                name: name ?? "",
+                description: null,
+                cover_image_url: null,
+                run_count: 0,
+              },
+            ]);
+          }
         } else {
           setParamValues(variationData.modelParams);
         }
@@ -480,19 +564,43 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
       setPromptStyle(variationData.promptStyle ?? "");
       setNegativePrompt(variationData.negativePrompt ?? "");
 
-      if (variationData.modelId !== selectedModelId) {
+      if (variationData.modelId !== selectedModelIdRef.current) {
+        // Store params to restore after schema load clears them
         pendingVariationParamsRef.current = variationData.modelParams;
-        setSelectedModelId(variationData.modelId);
+        // Find the matching CollectionModel in the collection, or create a minimal one
+        const matchingModel = collectionModels.find(
+          (m) => `${m.owner}/${m.name}` === variationData.modelId,
+        );
+        if (matchingModel) {
+          setSelectedModels([matchingModel]);
+        } else {
+          const [owner, name] = variationData.modelId.split("/");
+          setSelectedModels([
+            {
+              url: "",
+              owner: owner ?? "",
+              name: name ?? "",
+              description: null,
+              cover_image_url: null,
+              run_count: 0,
+            },
+          ]);
+        }
       } else {
         setParamValues(variationData.modelParams);
       }
     }
 
     clearVariation();
-  }, [variationData, clearVariation, selectedModelId, saveCurrentModeState]);
+  }, [variationData, clearVariation, collectionModels, saveCurrentModeState]);
 
   // ----- Load schema on model change -----
   const loadSchema = useCallback(async (modelId: string) => {
+    if (!modelId) {
+      setSchema(null);
+      setSchemaLoading(false);
+      return;
+    }
     setSchemaLoading(true);
     setParamValues({});
     try {
@@ -550,6 +658,25 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     []
   );
 
+  // ----- Model trigger handlers -----
+  const handleModelRemove = useCallback((model: CollectionModel) => {
+    setSelectedModels((prev) =>
+      prev.filter((m) => !(m.owner === model.owner && m.name === model.name)),
+    );
+  }, []);
+
+  const handleBrowse = useCallback(() => {
+    setDrawerOpen(true);
+  }, []);
+
+  const handleDrawerConfirm = useCallback((models: CollectionModel[]) => {
+    setSelectedModels(models);
+  }, []);
+
+  const handleDrawerClose = useCallback(() => {
+    setDrawerOpen(false);
+  }, []);
+
   // ---------------------------------------------------------------------------
   // Image upload handlers
   // ---------------------------------------------------------------------------
@@ -569,16 +696,18 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   const handleGenerate = useCallback(() => {
     if (currentMode === "txt2img") {
       if (!promptMotiv.trim()) return;
+      if (selectedModels.length === 0) return;
 
       startGeneration(async () => {
+        const modelIds = selectedModels.map((m) => `${m.owner}/${m.name}`);
         const result = await generateImages({
           projectId,
           promptMotiv: promptMotiv.trim(),
           promptStyle: promptStyle.trim() || undefined,
           negativePrompt: negativePrompt.trim() || undefined,
-          modelId: selectedModelId,
-          params: paramValues,
-          count: variantCount,
+          modelIds,
+          params: isSingleModel ? paramValues : {},
+          count: isSingleModel ? variantCount : 1,
           generationMode: "txt2img",
         });
         if (Array.isArray(result)) {
@@ -589,16 +718,18 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
       // AC-8: Don't generate without source image
       if (!sourceImageUrl) return;
       if (!promptMotiv.trim()) return;
+      if (selectedModels.length === 0) return;
 
       startGeneration(async () => {
+        const modelIds = selectedModels.map((m) => `${m.owner}/${m.name}`);
         const result = await generateImages({
           projectId,
           promptMotiv: promptMotiv.trim(),
           promptStyle: promptStyle.trim() || undefined,
           negativePrompt: negativePrompt.trim() || undefined,
-          modelId: selectedModelId,
-          params: paramValues,
-          count: variantCount,
+          modelIds,
+          params: isSingleModel ? paramValues : {},
+          count: isSingleModel ? variantCount : 1,
           generationMode: "img2img",
           sourceImageUrl,
           strength,
@@ -627,7 +758,8 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     promptMotiv,
     promptStyle,
     negativePrompt,
-    selectedModelId,
+    selectedModels,
+    isSingleModel,
     paramValues,
     variantCount,
     sourceImageUrl,
@@ -649,19 +781,14 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     [handleGenerate]
   );
 
-  // ----- Model change handler -----
-  const handleModelChange = useCallback((modelId: string) => {
-    setSelectedModelId(modelId);
-  }, []);
-
   // ---------------------------------------------------------------------------
   // Button disabled logic
   // ---------------------------------------------------------------------------
 
   const isButtonDisabled = (() => {
     if (isGenerating) return true;
-    if (currentMode === "txt2img") return !promptMotiv.trim();
-    if (currentMode === "img2img") return !sourceImageUrl || !promptMotiv.trim();
+    if (currentMode === "txt2img") return !promptMotiv.trim() || selectedModels.length === 0;
+    if (currentMode === "img2img") return !sourceImageUrl || !promptMotiv.trim() || selectedModels.length === 0;
     if (currentMode === "upscale") return !upscaleSourceImageUrl;
     return true;
   })();
@@ -701,24 +828,29 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
         negativePrompt={negativePrompt}
       >
         <div className="space-y-4 pt-2">
-          {/* Model Dropdown — hidden in upscale mode */}
+          {/* Model Trigger (replaces Select dropdown) — hidden in upscale mode */}
           {showModelSelector && (
             <div className="space-y-2">
-              <Label htmlFor="model-select">Model</Label>
-              <Select value={selectedModelId} onValueChange={handleModelChange}>
-                <SelectTrigger id="model-select" data-testid="model-select">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MODELS.map((model) => (
-                    <SelectItem key={model.id} value={model.id}>
-                      {model.displayName} -- {formatPrice(model.pricePerImage)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Model</Label>
+              <ModelTrigger
+                models={selectedModels}
+                onRemove={handleModelRemove}
+                onBrowse={handleBrowse}
+              />
             </div>
           )}
+
+          {/* Model Browser Drawer */}
+          <ModelBrowserDrawer
+            open={drawerOpen}
+            models={collectionModels}
+            selectedModels={selectedModels}
+            isLoading={collectionLoading}
+            error={collectionError}
+            onConfirm={handleDrawerConfirm}
+            onClose={handleDrawerClose}
+            onRetry={fetchCollectionModels}
+          />
 
           {/* ImageDropzone — visible in img2img and upscale modes */}
           {showImageDropzone && (
@@ -816,7 +948,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
                 <LLMComparison
                   prompt={promptMotiv}
                   modelId={selectedModelId}
-                  modelDisplayName={getModelById(selectedModelId)?.displayName ?? selectedModelId}
+                  modelDisplayName={selectedModelId}
                   onAdopt={(improved) => {
                     setPromptMotiv(improved);
                     setShowImprove(false);
@@ -853,13 +985,25 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
                 </div>
               )}
 
-              {/* Parameter Panel */}
-              <ParameterPanel
-                schema={schema}
-                isLoading={schemaLoading}
-                values={paramValues}
-                onChange={setParamValues}
-              />
+              {/* Parameter Panel — only shown when exactly 1 model selected */}
+              {isSingleModel && (
+                <ParameterPanel
+                  schema={schema}
+                  isLoading={schemaLoading}
+                  values={paramValues}
+                  onChange={setParamValues}
+                />
+              )}
+
+              {/* Multi-model notice */}
+              {selectedModels.length > 1 && (
+                <p
+                  className="text-sm text-muted-foreground"
+                  data-testid="multi-model-notice"
+                >
+                  Default parameters will be used for multi-model generation.
+                </p>
+              )}
             </>
           )}
 
@@ -886,8 +1030,8 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
           {/* Bottom row: Variant Count + Generate/Upscale Button */}
           <div className="flex items-center gap-3">
-            {/* Variant Count Selector — hidden in upscale mode */}
-            {showVariants && (
+            {/* Variant Count Selector — hidden in upscale mode, only when single model */}
+            {showVariants && isSingleModel && (
               <div className="flex items-center gap-2">
                 <Label htmlFor="variant-count" className="text-sm whitespace-nowrap">
                   Variants

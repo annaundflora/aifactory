@@ -1,14 +1,21 @@
 "use server";
 
-import { getModelById } from "@/lib/models";
 import { ModelSchemaService } from "@/lib/services/model-schema-service";
+import { CollectionModelService } from "@/lib/services/collection-model-service";
+import type { CollectionModel } from "@/lib/types/collection-model";
+
+export async function getCollectionModels(): Promise<
+  CollectionModel[] | { error: string }
+> {
+  return CollectionModelService.getCollectionModels();
+}
 
 export async function getModelSchema(input: {
   modelId: string;
 }): Promise<{ properties: Record<string, unknown> } | { error: string }> {
   const { modelId } = input;
 
-  if (!modelId || !getModelById(modelId)) {
+  if (!modelId || !modelId.includes("/")) {
     return { error: "Unbekanntes Modell" };
   }
 
