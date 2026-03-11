@@ -92,7 +92,7 @@ export function ProjectCard({
 
   return (
     <>
-      <Card className="group relative overflow-hidden transition-shadow hover:shadow-md">
+      <Card className="group relative overflow-hidden transition-all duration-200 hover:shadow-lg hover:shadow-primary/10 hover:border-primary/30">
         <Link
           href={`/projects/${project.id}`}
           className="block"

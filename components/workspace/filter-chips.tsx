@@ -48,8 +48,8 @@ export function FilterChips({ value, onChange }: FilterChipsProps) {
             }}
             className={
               isActive
-                ? "inline-flex items-center rounded-full px-3 py-1 text-sm font-medium transition-colors bg-primary text-primary-foreground border border-primary"
-                : "inline-flex items-center rounded-full px-3 py-1 text-sm font-medium transition-colors bg-background text-muted-foreground border border-border hover:border-primary hover:text-primary"
+                ? "inline-flex items-center rounded-full px-3 py-1 text-sm font-medium transition-all duration-150 bg-primary text-primary-foreground border border-primary shadow-md shadow-primary/25"
+                : "inline-flex items-center rounded-full px-3 py-1 text-sm font-medium transition-all duration-150 bg-background text-muted-foreground border border-border hover:border-primary/40 hover:text-primary hover:shadow-sm"
             }
           >
             {chip.label}

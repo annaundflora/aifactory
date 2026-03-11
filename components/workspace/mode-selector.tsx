@@ -67,9 +67,9 @@ export function ModeSelector({
               }
             }}
             className={cn(
-              "flex-1 rounded-sm px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+              "flex-1 rounded-sm px-3 py-1.5 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
               isActive
-                ? "bg-primary text-primary-foreground shadow-sm"
+                ? "bg-primary text-primary-foreground shadow-md shadow-primary/25"
                 : "text-muted-foreground hover:bg-background hover:text-foreground",
               isDisabled && "cursor-not-allowed opacity-50",
             )}
