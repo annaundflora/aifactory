@@ -1,0 +1,24 @@
+{
+  "spec_path": "specs/phase-2/2026-03-07-model-cards",
+  "feature_name": "model-cards",
+  "status": "in_progress",
+  "current_state": "implementing",
+  "current_slice_id": "slice-14",
+  "retry_count": 0,
+  "failed_stage": null,
+  "worktree_path": "worktrees/model-cards",
+  "branch": "feature/model-cards",
+  "waves": [
+    {"wave": 1, "slices": ["slice-01", "slice-02", "slice-09"]},
+    {"wave": 2, "slices": ["slice-03"]},
+    {"wave": 3, "slices": ["slice-04", "slice-05"]},
+    {"wave": 4, "slices": ["slice-06", "slice-07"]},
+    {"wave": 5, "slices": ["slice-08"]},
+    {"wave": 6, "slices": ["slice-10"]},
+    {"wave": 7, "slices": ["slice-11", "slice-12"]},
+    {"wave": 8, "slices": ["slice-13"]},
+    {"wave": 9, "slices": ["slice-14"]}
+  ],
+  "completed_slices": ["slice-01", "slice-02", "slice-09", "slice-03", "slice-04", "slice-05", "slice-06", "slice-07", "slice-08", "slice-10", "slice-11", "slice-12", "slice-13"],
+  "evidence_files": []
+}

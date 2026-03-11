@@ -1,0 +1,518 @@
+{
+  "session_id": "29a8902b-9ca0-4bf5-a7f7-8631ba0710fc",
+  "feature": "multi-mode-generation",
+  "branch": "feature/multi-mode-generation",
+  "scan_timestamp": "2026-03-10T20:46:19.768Z",
+  "entities_changed": [
+    {
+      "file": "app/actions/__tests__/generations.test.ts",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        1,
+        1
+      ],
+      "diff_summary": "+1 -1"
+    },
+    {
+      "file": "app/actions/__tests__/generations.test.ts",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        13,
+        13
+      ],
+      "diff_summary": "+1 -0"
+    },
+    {
+      "file": "app/actions/__tests__/generations.test.ts",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        31,
+        31
+      ],
+      "diff_summary": "+1 -1"
+    },
+    {
+      "file": "app/actions/__tests__/generations.test.ts",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        35,
+        35
+      ],
+      "diff_summary": "+1 -0"
+    },
+    {
+      "file": "app/actions/__tests__/generations.test.ts",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        39,
+        39
+      ],
+      "diff_summary": "+1 -1"
+    },
+    {
+      "file": "app/actions/__tests__/generations.test.ts",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        280,
+        733
+      ],
+      "diff_summary": "+454 -0"
+    },
+    {
+      "file": "app/actions/generations.ts",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        26,
+        35
+      ],
+      "diff_summary": "+10 -0"
+    },
+    {
+      "file": "app/actions/generations.ts",
+      "entity": "generateImages",
+      "entity_type": "function",
+      "lines": [
+        72,
+        89
+      ],
+      "diff_summary": "+18 -0"
+    },
+    {
+      "file": "app/actions/generations.ts",
+      "entity": "generateImages",
+      "entity_type": "function",
+      "lines": [
+        98,
+        101
+      ],
+      "diff_summary": "+4 -1"
+    },
+    {
+      "file": "app/actions/generations.ts",
+      "entity": "fetchGenerations",
+      "entity_type": "function",
+      "lines": [
+        141,
+        264
+      ],
+      "diff_summary": "+124 -0"
+    },
+    {
+      "file": "components/lightbox/__tests__/download-button.test.tsx",
+      "entity": "makeGeneration",
+      "entity_type": "function",
+      "lines": [
+        108,
+        110
+      ],
+      "diff_summary": "+3 -0"
+    },
+    {
+      "file": "components/lightbox/__tests__/lightbox-modal.test.tsx",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        3,
+        3
+      ],
+      "diff_summary": "+1 -1"
+    },
+    {
+      "file": "components/lightbox/__tests__/lightbox-modal.test.tsx",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        7,
+        35
+      ],
+      "diff_summary": "+29 -2"
+    },
+    {
+      "file": "components/lightbox/__tests__/lightbox-modal.test.tsx",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        51,
+        51
+      ],
+      "diff_summary": "+1 -1"
+    },
+    {
+      "file": "components/lightbox/__tests__/lightbox-modal.test.tsx",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        71,
+        79
+      ],
+      "diff_summary": "+9 -0"
+    },
+    {
+      "file": "components/lightbox/__tests__/lightbox-modal.test.tsx",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        82,
+        82
+      ],
+      "diff_summary": "+1 -1"
+    },
+    {
+      "file": "components/lightbox/__tests__/lightbox-modal.test.tsx",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        84,
+        84
+      ],
+      "diff_summary": "+1 -1"
+    },
+    {
+      "file": "components/lightbox/__tests__/lightbox-modal.test.tsx",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        103,
+        103
+      ],
+      "diff_summary": "+1 -2"
+    },
+    {
+      "file": "components/lightbox/__tests__/lightbox-modal.test.tsx",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        107,
+        107
+      ],
+      "diff_summary": "+1 -1"
+    },
+    {
+      "file": "components/lightbox/__tests__/lightbox-modal.test.tsx",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        112,
+        160
+      ],
+      "diff_summary": "+49 -0"
+    },
+    {
+      "file": "components/lightbox/__tests__/lightbox-modal.test.tsx",
+      "entity": "makeGeneration",
+      "entity_type": "function",
+      "lines": [
+        184,
+        186
+      ],
+      "diff_summary": "+3 -0"
+    },
+    {
+      "file": "components/lightbox/__tests__/lightbox-modal.test.tsx",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        194,
+        199
+      ],
+      "diff_summary": "+6 -0"
+    },
+    {
+      "file": "components/lightbox/__tests__/lightbox-modal.test.tsx",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        203,
+        203
+      ],
+      "diff_summary": "+1 -1"
+    },
+    {
+      "file": "components/lightbox/__tests__/lightbox-modal.test.tsx",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        710,
+        1078
+      ],
+      "diff_summary": "+369 -0"
+    },
+    {
+      "file": "components/lightbox/__tests__/lightbox-navigation.test.tsx",
+      "entity": "makeGeneration",
+      "entity_type": "function",
+      "lines": [
+        94,
+        96
+      ],
+      "diff_summary": "+3 -0"
+    },
+    {
+      "file": "components/lightbox/__tests__/variation-flow.test.tsx",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        174,
+        174
+      ],
+      "diff_summary": "+1 -1"
+    },
+    {
+      "file": "components/lightbox/lightbox-modal.tsx",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        5,
+        5
+      ],
+      "diff_summary": "+1 -1"
+    },
+    {
+      "file": "components/lightbox/lightbox-modal.tsx",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        12,
+        17
+      ],
+      "diff_summary": "+6 -1"
+    },
+    {
+      "file": "components/lightbox/lightbox-modal.tsx",
+      "entity": "LightboxModal",
+      "entity_type": "function",
+      "lines": [
+        67,
+        68
+      ],
+      "diff_summary": "+2 -0"
+    },
+    {
+      "file": "components/lightbox/lightbox-modal.tsx",
+      "entity": "LightboxModal",
+      "entity_type": "function",
+      "lines": [
+        71,
+        73
+      ],
+      "diff_summary": "+3 -0"
+    },
+    {
+      "file": "components/lightbox/lightbox-modal.tsx",
+      "entity": "LightboxModal",
+      "entity_type": "function",
+      "lines": [
+        80,
+        96
+      ],
+      "diff_summary": "+17 -0"
+    },
+    {
+      "file": "components/lightbox/lightbox-modal.tsx",
+      "entity": "LightboxModal",
+      "entity_type": "function",
+      "lines": [
+        101,
+        127
+      ],
+      "diff_summary": "+27 -0"
+    },
+    {
+      "file": "components/lightbox/lightbox-modal.tsx",
+      "entity": "LightboxModal",
+      "entity_type": "function",
+      "lines": [
+        344,
+        355
+      ],
+      "diff_summary": "+12 -0"
+    },
+    {
+      "file": "components/lightbox/lightbox-modal.tsx",
+      "entity": "LightboxModal",
+      "entity_type": "function",
+      "lines": [
+        358,
+        359
+      ],
+      "diff_summary": "+2 -2"
+    },
+    {
+      "file": "components/lightbox/lightbox-modal.tsx",
+      "entity": "LightboxModal",
+      "entity_type": "function",
+      "lines": [
+        361,
+        362
+      ],
+      "diff_summary": "+2 -2"
+    },
+    {
+      "file": "components/lightbox/lightbox-modal.tsx",
+      "entity": "LightboxModal",
+      "entity_type": "function",
+      "lines": [
+        364,
+        400
+      ],
+      "diff_summary": "+37 -0"
+    },
+    {
+      "file": "components/ui/popover.tsx",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [
+        1,
+        89
+      ],
+      "diff_summary": "+89 -0"
+    },
+    {
+      "file": "components/workspace/__tests__/filter-chips.test.tsx",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [
+        1,
+        124
+      ],
+      "diff_summary": "+124 -0"
+    },
+    {
+      "file": "components/workspace/__tests__/gallery-filter-badge.test.tsx",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [
+        1,
+        424
+      ],
+      "diff_summary": "+424 -0"
+    },
+    {
+      "file": "components/workspace/__tests__/gallery-grid.test.tsx",
+      "entity": "makeGeneration",
+      "entity_type": "function",
+      "lines": [
+        41,
+        43
+      ],
+      "diff_summary": "+3 -0"
+    },
+    {
+      "file": "components/workspace/__tests__/generation-card.test.tsx",
+      "entity": "makeGeneration",
+      "entity_type": "function",
+      "lines": [
+        34,
+        36
+      ],
+      "diff_summary": "+3 -0"
+    },
+    {
+      "file": "components/workspace/__tests__/image-dropzone.test.tsx",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [
+        1,
+        578
+      ],
+      "diff_summary": "+578 -0"
+    },
+    {
+      "file": "components/workspace/__tests__/mode-selector.test.tsx",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [
+        1,
+        141
+      ],
+      "diff_summary": "+141 -0"
+    },
+    {
+      "file": "components/workspace/__tests__/prompt-area.test.tsx",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        3,
+        3
+      ],
+      "diff_summary": "+1 -1"
+    },
+    {
+      "file": "components/workspace/__tests__/prompt-area.test.tsx",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        6,
+        6
+      ],
+      "diff_summary": "+1 -0"
+    },
+    {
+      "file": "components/workspace/__tests__/prompt-area.test.tsx",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        12,
+        12
+      ],
+      "diff_summary": "+0 -1"
+    },
+    {
+      "file": "components/workspace/__tests__/prompt-area.test.tsx",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        20,
+        20
+      ],
+      "diff_summary": "+0 -1"
+    },
+    {
+      "file": "components/workspace/__tests__/prompt-area.test.tsx",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        26,
+        26
+      ],
+      "diff_summary": "+0 -1"
+    },
+    {
+      "file": "components/workspace/__tests__/prompt-area.test.tsx",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        36,
+        36
+      ],
+      "diff_summary": "+1 -1"
+    },
+    {
+      "file": "components/workspace/__tests__/prompt-area.test.tsx",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [
+        39,
+        39
+      ],
+      "diff_summary": "+1 -1"
+    }
+  ],
+  "overlaps": [],
+  "weave_validation": null,
+  "summary": {
+    "files_changed": 15,
+    "entities_changed": 50,
+    "new_files": 5,
+    "overlapping_files": 0,
+    "overlapping_entities": 0,
+    "max_severity": "none"
+  }
+}

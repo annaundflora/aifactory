@@ -1,7 +1,7 @@
 ---
 title: Roadmap
 created: 2026-03-02
-updated: 2026-03-02
+updated: 2026-03-11
 ---
 
 # Roadmap: POD Design Studio
@@ -81,6 +81,12 @@ Vision und Phasen definiert. Noch kein Code. Nächster Schritt: Discovery für P
 | LLM für Prompt-Assistent | ✅ Entschieden | P0.3 | OpenRouter API, Default: openai/gpt-oss-120b:exacto |
 | PostgreSQL ORM: Prisma vs. Drizzle | ⏳ Entscheiden | P0.1 | Drizzle = leichter, Prisma = mehr Ecosystem |
 | R2 Zugriff: Signed URLs vs. Public | ⏳ Entscheiden | P0.1 | Nur für eigenen Gebrauch → Public Bucket reicht? |
+
+## Offene Bugs
+
+| Bug | Priority | Status | Log | Phase |
+|-----|----------|--------|-----|-------|
+| Multi-Model Rate Limiting (parallel -> sequentiell) | Hoch | ✅ Behoben | [BUG](specs/phase-2/2026-03-07-model-cards/BUG-multi-model-rate-limit.md) | P2: Model Cards |
 
 ## Geparkt (Nicht jetzt)
 
