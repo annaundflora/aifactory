@@ -13,9 +13,6 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import {
@@ -24,7 +21,12 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ProjectList } from "@/components/project-list";
-import { createProject } from "@/app/actions/projects";
+import {
+  createProject,
+  renameProject,
+  deleteProject,
+  generateThumbnail,
+} from "@/app/actions/projects";
 import type { Project } from "@/lib/db/queries";
 
 interface SidebarProps {
@@ -53,6 +55,38 @@ export function Sidebar({ projects }: SidebarProps) {
     });
   };
 
+  const handleRename = async (id: string, name: string) => {
+    const result = await renameProject({ id, name });
+    if ("error" in result) {
+      toast.error(result.error);
+    } else {
+      router.refresh();
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    const result = await deleteProject({ id });
+    if ("error" in result) {
+      toast.error(result.error);
+    } else {
+      // If we deleted the active project, navigate home
+      if (id === activeProjectId) {
+        router.push("/");
+      }
+      router.refresh();
+    }
+  };
+
+  const handleRefreshThumbnail = async (id: string) => {
+    const result = await generateThumbnail({ projectId: id });
+    if ("error" in result) {
+      toast.error(result.error);
+    } else {
+      toast.success("Thumbnail wird aktualisiert...");
+      router.refresh();
+    }
+  };
+
   return (
     <ShadcnSidebar collapsible="icon">
       {/* Header with collapse trigger */}
@@ -72,6 +106,9 @@ export function Sidebar({ projects }: SidebarProps) {
               activeProjectId={activeProjectId}
               onNewProject={handleNewProject}
               isCreating={isPending}
+              onRename={handleRename}
+              onDelete={handleDelete}
+              onRefreshThumbnail={handleRefreshThumbnail}
             />
           </SidebarGroupContent>
         </SidebarGroup>

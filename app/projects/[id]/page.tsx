@@ -4,10 +4,10 @@ import { fetchGenerations } from "@/app/actions/generations";
 import { Sidebar } from "@/components/sidebar";
 import { WorkspaceStateProvider } from "@/lib/workspace-state";
 import { WorkspaceContent } from "@/components/workspace/workspace-content";
+import { WorkspaceHeader } from "@/components/workspace/workspace-header";
 import {
   SidebarInset,
   SidebarProvider,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 
 interface WorkspacePageProps {
@@ -38,12 +38,8 @@ export default async function WorkspacePage({ params }: WorkspacePageProps) {
         <Sidebar projects={projects} />
 
         {/* Main content: SidebarInset handles dynamic width adjustment */}
-        <SidebarInset>
-          <header className="flex h-14 items-center border-b px-4 gap-2">
-            {/* SidebarTrigger: only visible on mobile as hamburger */}
-            <SidebarTrigger className="shrink-0 md:hidden" />
-            <h1 className="text-xl font-bold truncate">{project.name}</h1>
-          </header>
+        <SidebarInset className="bg-muted/40">
+          <WorkspaceHeader project={{ id: project.id, name: project.name }} />
 
           <WorkspaceContent
             projectId={id}

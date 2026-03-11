@@ -23,7 +23,7 @@ export function GenerationCard({ generation, onSelect }: GenerationCardProps) {
     <button
       type="button"
       onClick={() => onSelect(generation.id)}
-      className="group relative w-full overflow-hidden rounded-lg border border-border bg-card break-inside-avoid mb-4 cursor-pointer transition-all duration-200 hover:border-primary hover:shadow-lg hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="group relative w-full overflow-hidden rounded-lg border border-border bg-card cursor-pointer transition-all duration-200 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10 hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       {/* Thumbnail */}
       <img

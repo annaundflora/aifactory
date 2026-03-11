@@ -21,6 +21,7 @@ function createModel(
     description: "A short description.",
     cover_image_url: "https://example.com/cover.jpg",
     run_count: 1_000_000,
+    created_at: "2025-01-15T00:00:00Z",
     ...overrides,
   };
 }
@@ -361,6 +362,7 @@ describe("PromptArea + ModelTrigger integration", () => {
       description: "Fast model",
       cover_image_url: "https://example.com/flux.jpg",
       run_count: 5_000_000,
+      created_at: "2025-01-15T00:00:00Z",
     },
     {
       url: "https://replicate.com/stability-ai/sdxl",
@@ -369,6 +371,7 @@ describe("PromptArea + ModelTrigger integration", () => {
       description: "SDXL model",
       cover_image_url: "https://example.com/sdxl.jpg",
       run_count: 3_000_000,
+      created_at: "2025-01-15T00:00:00Z",
     },
     {
       url: "https://replicate.com/stability-ai/sd-turbo",
@@ -377,6 +380,7 @@ describe("PromptArea + ModelTrigger integration", () => {
       description: "Turbo model",
       cover_image_url: null,
       run_count: 1_000_000,
+      created_at: "2025-01-15T00:00:00Z",
     },
   ];
 

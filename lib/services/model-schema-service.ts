@@ -78,6 +78,40 @@ export const ModelSchemaService = {
       throw new Error("Schema konnte nicht geladen werden");
     }
 
+    // Resolve $ref-based enums (e.g. allOf: [{$ref: "#/components/schemas/resolution"}])
+    // so that ParameterPanel can detect them via prop.enum
+    const allSchemas =
+      data?.latest_version?.openapi_schema?.components?.schemas as
+        | Record<string, Record<string, unknown>>
+        | undefined;
+
+    if (allSchemas) {
+      for (const [key, prop] of Object.entries(properties)) {
+        const p = prop as Record<string, unknown>;
+        if (p.allOf && Array.isArray(p.allOf)) {
+          for (const entry of p.allOf as Record<string, unknown>[]) {
+            if (typeof entry.$ref === "string") {
+              // Extract schema name from "#/components/schemas/resolution"
+              const refName = (entry.$ref as string).split("/").pop();
+              if (refName && allSchemas[refName]) {
+                const refSchema = allSchemas[refName];
+                // Merge enum and type from referenced schema into the property
+                if (refSchema.enum) {
+                  p.enum = refSchema.enum;
+                }
+                if (refSchema.type && !p.type) {
+                  p.type = refSchema.type;
+                }
+              }
+            }
+          }
+          // Remove allOf since it's now resolved
+          delete p.allOf;
+        }
+        properties[key] = p;
+      }
+    }
+
     schemaCache.set(modelId, properties);
 
     return properties;

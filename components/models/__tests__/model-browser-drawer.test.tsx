@@ -1,11 +1,18 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 
 import { ModelBrowserDrawer, type ModelBrowserDrawerProps } from "@/components/models/model-browser-drawer";
 import { type CollectionModel } from "@/lib/types/collection-model";
+
+// Mock server actions
+import { getFavoriteModels, toggleFavoriteModel } from "@/app/actions/models";
+vi.mock("@/app/actions/models", () => ({
+  getFavoriteModels: vi.fn().mockResolvedValue([]),
+  toggleFavoriteModel: vi.fn().mockResolvedValue({ isFavorite: true }),
+}));
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -19,6 +26,7 @@ function createModel(overrides: Partial<CollectionModel> = {}): CollectionModel 
     description: "A short description of the model for testing purposes.",
     cover_image_url: "https://example.com/cover.jpg",
     run_count: 1_500_000,
+    created_at: "2025-01-15T00:00:00Z",
     ...overrides,
   };
 }
@@ -113,22 +121,20 @@ describe("AC-2: Search filters model cards by search query", () => {
 // ---------------------------------------------------------------------------
 // AC-3: Owner filter chip filters Cards by owner
 // ---------------------------------------------------------------------------
-describe("AC-3: Owner filter chip filters model cards by owner", () => {
-  it("should filter model cards by owner when filter chip is clicked", async () => {
+describe("AC-3: Owner filter dropdown filters model cards by owner", () => {
+  it("should filter model cards by owner when dropdown value is changed", async () => {
     /**
      * AC-3: GIVEN Drawer ist geoeffnet mit Modellen von Ownern "black-forest-labs" und "stability-ai"
-     *       WHEN der Nutzer den Filter-Chip "stability-ai" klickt
+     *       WHEN der Nutzer im Owner-Dropdown "stability-ai" auswaehlt
      *       THEN werden nur ModelCard-Instanzen mit owner === "stability-ai" angezeigt
-     *       AND der "stability-ai"-Chip ist visuell aktiv markiert
      */
     const user = userEvent.setup();
     const props = defaultProps();
     render(<ModelBrowserDrawer {...props} />);
 
-    // Find and click the "stability-ai" filter chip
-    const chipContainer = screen.getByTestId("owner-filter-chips");
-    const stabilityChip = within(chipContainer).getByText("stability-ai");
-    await user.click(stabilityChip);
+    // Select "stability-ai" from the owner dropdown
+    const select = screen.getByTestId("owner-filter-select");
+    await user.selectOptions(select, "stability-ai");
 
     // Only stability-ai models should remain
     const grid = screen.getByTestId("model-grid");
@@ -141,9 +147,6 @@ describe("AC-3: Owner filter chip filters model cards by owner", () => {
     // Non-matching owner models should NOT be in the DOM
     expect(screen.queryByText("flux-schnell")).not.toBeInTheDocument();
     expect(screen.queryByText("flux-dev")).not.toBeInTheDocument();
-
-    // The stability-ai chip should be visually active (has primary styling)
-    expect(stabilityChip).toHaveClass("bg-primary");
   });
 });
 
@@ -461,5 +464,78 @@ describe("AC-12: Confirm button disabled when no model is selected", () => {
     const confirmButton = screen.getByTestId("confirm-button");
     expect(confirmButton).toBeDisabled();
     expect(confirmButton).toHaveTextContent("Select at least 1 model");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Favorites: chip, toggle, star icons
+// ---------------------------------------------------------------------------
+describe("Favorites functionality", () => {
+  it("should show Favorites chip when favorites exist", async () => {
+    (getFavoriteModels as Mock).mockResolvedValueOnce(["black-forest-labs/flux-schnell"]);
+
+    const props = defaultProps();
+    const { rerender } = render(<ModelBrowserDrawer {...props} open={false} />);
+    rerender(<ModelBrowserDrawer {...props} open={true} />);
+
+    // Wait for favorites to load
+    const chip = await screen.findByTestId("filter-favorites");
+    expect(chip).toBeInTheDocument();
+    expect(chip).toHaveTextContent("Favorites (1)");
+  });
+
+  it("should not show Favorites chip when no favorites exist", () => {
+    (getFavoriteModels as Mock).mockResolvedValueOnce([]);
+
+    const props = defaultProps();
+    render(<ModelBrowserDrawer {...props} />);
+
+    expect(screen.queryByTestId("filter-favorites")).not.toBeInTheDocument();
+  });
+
+  it("should render star icons on all model cards", () => {
+    const props = defaultProps();
+    render(<ModelBrowserDrawer {...props} />);
+
+    const stars = screen.getAllByTestId("favorite-star");
+    expect(stars).toHaveLength(4); // One per model card
+  });
+
+  it("should toggle favorite when star is clicked", async () => {
+    (toggleFavoriteModel as Mock).mockResolvedValueOnce({ isFavorite: true });
+
+    const user = userEvent.setup();
+    const props = defaultProps();
+    render(<ModelBrowserDrawer {...props} />);
+
+    const stars = screen.getAllByTestId("favorite-star");
+    await user.click(stars[0]);
+
+    expect(toggleFavoriteModel).toHaveBeenCalledWith({
+      modelId: "black-forest-labs/flux-schnell",
+    });
+  });
+
+  it("should filter to only favorites when Favorites chip is active", async () => {
+    (getFavoriteModels as Mock).mockResolvedValueOnce(["black-forest-labs/flux-schnell"]);
+
+    const user = userEvent.setup();
+    const props = defaultProps();
+    const { rerender } = render(<ModelBrowserDrawer {...props} open={false} />);
+    rerender(<ModelBrowserDrawer {...props} open={true} />);
+
+    // Wait for favorites to load
+    const chip = await screen.findByTestId("filter-favorites");
+    await user.click(chip);
+
+    // Only the favorited model should remain
+    const grid = screen.getByTestId("model-grid");
+    const cards = within(grid).getAllByRole("button");
+    // Each card is a button, but star buttons are also inside — count by card structure
+    // The favorited model card + its star button
+    expect(screen.getByText("flux-schnell")).toBeInTheDocument();
+    expect(screen.queryByText("flux-dev")).not.toBeInTheDocument();
+    expect(screen.queryByText("sdxl")).not.toBeInTheDocument();
+    expect(screen.queryByText("sd-turbo")).not.toBeInTheDocument();
   });
 });

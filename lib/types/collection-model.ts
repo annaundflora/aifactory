@@ -10,4 +10,5 @@ export interface CollectionModel {
   description: string | null;
   cover_image_url: string | null;
   run_count: number;
+  created_at: string;
 }

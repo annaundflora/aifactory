@@ -1,6 +1,6 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { Check, Star } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,13 +17,15 @@ export interface ModelCardProps {
   selected: boolean;
   disabled: boolean;
   onSelect: (model: CollectionModel) => void;
+  isFavorite?: boolean;
+  onFavoriteToggle?: (model: CollectionModel) => void;
 }
 
 // ---------------------------------------------------------------------------
 // ModelCard
 // ---------------------------------------------------------------------------
 
-export function ModelCard({ model, selected, disabled, onSelect }: ModelCardProps) {
+export function ModelCard({ model, selected, disabled, onSelect, isFavorite = false, onFavoriteToggle }: ModelCardProps) {
   function handleClick() {
     if (!disabled) {
       onSelect(model);
@@ -75,6 +77,29 @@ export function ModelCard({ model, selected, disabled, onSelect }: ModelCardProp
       >
         {selected && <Check className="h-3 w-3" strokeWidth={3} />}
       </div>
+
+      {/* Favorite star — top-left */}
+      {onFavoriteToggle && (
+        <button
+          type="button"
+          aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+          data-testid="favorite-star"
+          onClick={(e) => {
+            e.stopPropagation();
+            onFavoriteToggle(model);
+          }}
+          className="absolute top-2 left-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/30 transition-colors hover:bg-black/50"
+        >
+          <Star
+            className={cn(
+              "h-3.5 w-3.5",
+              isFavorite
+                ? "fill-yellow-400 text-yellow-400"
+                : "fill-none text-white/80"
+            )}
+          />
+        </button>
+      )}
 
       {/* Card body */}
       <CardContent className="flex flex-col gap-1 p-3">

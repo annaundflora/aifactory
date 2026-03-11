@@ -187,6 +187,7 @@ const COLLECTION_MODELS: CollectionModel[] = [
     description: "Fast model",
     cover_image_url: "https://example.com/flux.jpg",
     run_count: 5_000_000,
+    created_at: "2025-01-15T00:00:00Z",
   },
   {
     url: "https://replicate.com/stability-ai/sdxl",
@@ -195,6 +196,7 @@ const COLLECTION_MODELS: CollectionModel[] = [
     description: "SDXL model",
     cover_image_url: "https://example.com/sdxl.jpg",
     run_count: 3_000_000,
+    created_at: "2025-01-15T00:00:00Z",
   },
   {
     url: "https://replicate.com/stability-ai/sd-turbo",
@@ -203,6 +205,7 @@ const COLLECTION_MODELS: CollectionModel[] = [
     description: "Turbo model",
     cover_image_url: null,
     run_count: 1_000_000,
+    created_at: "2025-01-15T00:00:00Z",
   },
 ];
 

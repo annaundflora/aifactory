@@ -1,20 +1,24 @@
 import { useMemo } from 'react';
 import type { CollectionModel } from '@/lib/types/collection-model';
 
+export type SortOption = 'popular' | 'newest';
+
 /**
- * Custom hook for client-side filtering of CollectionModel arrays.
+ * Custom hook for client-side filtering and sorting of CollectionModel arrays.
  *
  * - Search: case-insensitive match against name and description (null-safe)
  * - Owner filter: single-select; null or '' disables the filter
  * - Both filters are combined with AND logic
  * - owners: unique list in first-occurrence order (no duplicates)
- * - Stateless: accepts searchQuery and ownerFilter as parameters
+ * - sortBy: "popular" sorts by run_count desc, "newest" sorts by created_at desc
+ * - Stateless: accepts searchQuery, ownerFilter, and sortBy as parameters
  * - Uses useMemo to avoid recomputation on unrelated renders
  */
 export function useModelFilters(
   models: CollectionModel[],
   searchQuery: string,
   ownerFilter: string | null,
+  sortBy: SortOption = 'newest',
 ): { filteredModels: CollectionModel[]; owners: string[] } {
   const owners = useMemo(() => {
     const seen = new Set<string>();
@@ -33,26 +37,36 @@ export function useModelFilters(
     const hasSearch = query.length > 0;
     const hasOwner = ownerFilter !== null && ownerFilter !== '';
 
-    if (!hasSearch && !hasOwner) {
-      return models;
-    }
+    let result: CollectionModel[];
 
-    return models.filter((model) => {
-      if (hasOwner && model.owner !== ownerFilter) {
-        return false;
-      }
-      if (hasSearch) {
-        const nameMatch = model.name.toLowerCase().includes(query);
-        const descMatch =
-          model.description !== null &&
-          model.description.toLowerCase().includes(query);
-        if (!nameMatch && !descMatch) {
+    if (!hasSearch && !hasOwner) {
+      result = [...models];
+    } else {
+      result = models.filter((model) => {
+        if (hasOwner && model.owner !== ownerFilter) {
           return false;
         }
-      }
-      return true;
-    });
-  }, [models, searchQuery, ownerFilter]);
+        if (hasSearch) {
+          const nameMatch = model.name.toLowerCase().includes(query);
+          const descMatch =
+            model.description !== null &&
+            model.description.toLowerCase().includes(query);
+          if (!nameMatch && !descMatch) {
+            return false;
+          }
+        }
+        return true;
+      });
+    }
+
+    if (sortBy === 'newest') {
+      result.sort((a, b) => b.created_at.localeCompare(a.created_at));
+    } else {
+      result.sort((a, b) => b.run_count - a.run_count);
+    }
+
+    return result;
+  }, [models, searchQuery, ownerFilter, sortBy]);
 
   return { filteredModels, owners };
 }

@@ -1,6 +1,7 @@
 import { eq, desc, sql } from "drizzle-orm";
 import { db } from "./index";
-import { projects, generations } from "./schema";
+import { asc } from "drizzle-orm";
+import { projects, generations, favoriteModels, projectSelectedModels } from "./schema";
 
 // ---------------------------------------------------------------------------
 // Types (inferred from schema)
@@ -231,6 +232,63 @@ export async function getFavoritesQuery(
     .limit(limit)
     .offset(offset);
   return rows as PromptHistoryRow[];
+}
+
+// ---------------------------------------------------------------------------
+// Favorite Model Queries
+// ---------------------------------------------------------------------------
+
+export async function getFavoriteModelIds(): Promise<string[]> {
+  const rows = await db
+    .select({ modelId: favoriteModels.modelId })
+    .from(favoriteModels)
+    .orderBy(desc(favoriteModels.createdAt));
+  return rows.map((r) => r.modelId);
+}
+
+export async function addFavoriteModel(modelId: string): Promise<void> {
+  await db
+    .insert(favoriteModels)
+    .values({ modelId })
+    .onConflictDoNothing();
+}
+
+export async function removeFavoriteModel(modelId: string): Promise<void> {
+  await db.delete(favoriteModels).where(eq(favoriteModels.modelId, modelId));
+}
+
+// ---------------------------------------------------------------------------
+// Project Selected Model Queries
+// ---------------------------------------------------------------------------
+
+export async function getProjectSelectedModelIds(
+  projectId: string,
+): Promise<string[]> {
+  const rows = await db
+    .select({ modelId: projectSelectedModels.modelId })
+    .from(projectSelectedModels)
+    .where(eq(projectSelectedModels.projectId, projectId))
+    .orderBy(asc(projectSelectedModels.position));
+  return rows.map((r) => r.modelId);
+}
+
+export async function saveProjectSelectedModelIds(
+  projectId: string,
+  modelIds: string[],
+): Promise<void> {
+  await db
+    .delete(projectSelectedModels)
+    .where(eq(projectSelectedModels.projectId, projectId));
+
+  if (modelIds.length > 0) {
+    await db.insert(projectSelectedModels).values(
+      modelIds.map((modelId, i) => ({
+        projectId,
+        modelId,
+        position: i,
+      })),
+    );
+  }
 }
 
 /**

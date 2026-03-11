@@ -13,6 +13,7 @@ function makeModel(
     description: null,
     cover_image_url: null,
     run_count: 0,
+    created_at: '2025-01-15T00:00:00Z',
     ...overrides,
   };
 }
@@ -159,4 +160,5 @@ describe('useModelFilters', () => {
     expect(result.current.filteredModels).toEqual(THREE_MODELS);
     expect(result.current.filteredModels).toHaveLength(3);
   });
+
 });

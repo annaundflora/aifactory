@@ -60,6 +60,7 @@ export const CollectionModelService = {
         cover_image_url:
           m.cover_image_url != null ? String(m.cover_image_url) : null,
         run_count: typeof m.run_count === "number" ? m.run_count : 0,
+        created_at: typeof m.created_at === "string" ? m.created_at : "",
       }));
 
       cache.set(CACHE_KEY, { models, timestamp: now });

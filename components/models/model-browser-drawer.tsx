@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
-import { Search, AlertCircle } from "lucide-react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { Search, AlertCircle, X, Star } from "lucide-react";
 
 import {
   Sheet,
@@ -15,8 +15,9 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { type CollectionModel } from "@/lib/types/collection-model";
-import { useModelFilters } from "@/lib/hooks/use-model-filters";
+import { useModelFilters, type SortOption } from "@/lib/hooks/use-model-filters";
 import { ModelCard } from "@/components/models/model-card";
+import { getFavoriteModels, toggleFavoriteModel } from "@/app/actions/models";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -58,9 +59,13 @@ export function ModelBrowserDrawer({
     CollectionModel[]
   >([]);
 
-  // ---- Search & filter state ---------------------------------------------
+  // ---- Search, filter & sort state ----------------------------------------
   const [searchQuery, setSearchQuery] = useState("");
   const [ownerFilter, setOwnerFilter] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<SortOption>("newest");
+  const [showSelectedOnly, setShowSelectedOnly] = useState(false);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   // ---- Track previous open value and latest selectedModels via refs ------
   const prevOpenRef = useRef(false);
@@ -73,6 +78,10 @@ export function ModelBrowserDrawer({
       setTempSelectedModels(selectedModelsRef.current);
       setSearchQuery("");
       setOwnerFilter(null);
+      setSortBy("newest");
+      setShowSelectedOnly(false);
+      setShowFavoritesOnly(false);
+      getFavoriteModels().then((ids) => setFavoriteIds(new Set(ids)));
     }
     prevOpenRef.current = open;
   }, [open]);
@@ -82,7 +91,33 @@ export function ModelBrowserDrawer({
     models,
     searchQuery,
     ownerFilter,
+    sortBy,
   );
+
+  // ---- Post-filter for "Selected" and "Favorites" views ------------------
+  const displayModels = useMemo(() => {
+    let result = filteredModels;
+    if (showSelectedOnly) {
+      result = result.filter((model) =>
+        tempSelectedModels.some(
+          (m) => m.owner === model.owner && m.name === model.name,
+        ),
+      );
+    }
+    if (showFavoritesOnly) {
+      result = result.filter((model) =>
+        favoriteIds.has(`${model.owner}/${model.name}`),
+      );
+    }
+    return result;
+  }, [filteredModels, showSelectedOnly, showFavoritesOnly, tempSelectedModels, favoriteIds]);
+
+  // ---- Auto-disable "Selected" filter when nothing is selected -----------
+  useEffect(() => {
+    if (tempSelectedModels.length === 0 && showSelectedOnly) {
+      setShowSelectedOnly(false);
+    }
+  }, [tempSelectedModels.length, showSelectedOnly]);
 
   // ---- Selection helpers -------------------------------------------------
   const isSelected = useCallback(
@@ -132,9 +167,40 @@ export function ModelBrowserDrawer({
     [onClose],
   );
 
-  // ---- Owner filter chip handler -----------------------------------------
-  const handleOwnerClick = useCallback((owner: string | null) => {
-    setOwnerFilter(owner);
+  // ---- Owner filter select handler ----------------------------------------
+  const handleOwnerChange = useCallback((value: string) => {
+    setOwnerFilter(value === "all" ? null : value);
+  }, []);
+
+  // ---- Deselect all handler ---------------------------------------------
+  const handleDeselectAll = useCallback(() => {
+    setTempSelectedModels([]);
+  }, []);
+
+  // ---- Favorite toggle handler (optimistic) ----------------------------
+  const handleFavoriteToggle = useCallback((model: CollectionModel) => {
+    const key = `${model.owner}/${model.name}`;
+    setFavoriteIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+    toggleFavoriteModel({ modelId: key }).catch(() => {
+      // Revert on error
+      setFavoriteIds((prev) => {
+        const reverted = new Set(prev);
+        if (reverted.has(key)) {
+          reverted.delete(key);
+        } else {
+          reverted.add(key);
+        }
+        return reverted;
+      });
+    });
   }, []);
 
   // ---- Confirm button text -----------------------------------------------
@@ -175,36 +241,88 @@ export function ModelBrowserDrawer({
           </div>
         </div>
 
-        {/* ---- Owner filter chips ---- */}
-        {owners.length > 0 && !isLoading && !error && (
-          <div className="flex gap-2 overflow-x-auto px-4 pb-1" data-testid="owner-filter-chips">
+        {/* ---- Sort chips + owner dropdown ---- */}
+        {!isLoading && !error && models.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 px-4 pb-1" data-testid="sort-and-filter-chips">
+            {/* Sort chips */}
             <button
               type="button"
-              onClick={() => handleOwnerClick(null)}
+              onClick={() => setSortBy("popular")}
               className={cn(
                 "shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                ownerFilter === null
+                sortBy === "popular"
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-border bg-background text-foreground hover:bg-accent",
               )}
+              data-testid="sort-popular"
             >
-              All
+              Popular
             </button>
-            {owners.map((owner) => (
+            <button
+              type="button"
+              onClick={() => setSortBy("newest")}
+              className={cn(
+                "shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                sortBy === "newest"
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background text-foreground hover:bg-accent",
+              )}
+              data-testid="sort-newest"
+            >
+              Newest
+            </button>
+
+            {/* Selected filter chip */}
+            {tempSelectedModels.length > 0 && (
               <button
-                key={owner}
                 type="button"
-                onClick={() => handleOwnerClick(owner)}
+                onClick={() => setShowSelectedOnly((prev) => !prev)}
                 className={cn(
                   "shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                  ownerFilter === owner
+                  showSelectedOnly
                     ? "border-primary bg-primary text-primary-foreground"
                     : "border-border bg-background text-foreground hover:bg-accent",
                 )}
+                data-testid="filter-selected"
               >
-                {owner}
+                Selected ({tempSelectedModels.length})
               </button>
-            ))}
+            )}
+
+            {/* Favorites filter chip */}
+            {favoriteIds.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowFavoritesOnly((prev) => !prev)}
+                className={cn(
+                  "shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors inline-flex items-center gap-1",
+                  showFavoritesOnly
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background text-foreground hover:bg-accent",
+                )}
+                data-testid="filter-favorites"
+              >
+                <Star className="h-3 w-3" />
+                Favorites ({favoriteIds.size})
+              </button>
+            )}
+
+            {/* Owner dropdown */}
+            {owners.length > 0 && (
+              <select
+                value={ownerFilter ?? "all"}
+                onChange={(e) => handleOwnerChange(e.target.value)}
+                className="h-7 rounded-full border border-border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring"
+                data-testid="owner-filter-select"
+              >
+                <option value="all">All providers</option>
+                {owners.map((owner) => (
+                  <option key={owner} value={owner}>
+                    {owner}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         )}
 
@@ -262,7 +380,7 @@ export function ModelBrowserDrawer({
           {/* Model card grid */}
           {!isLoading && !error && models.length > 0 && (
             <div className="grid grid-cols-2 gap-4" data-testid="model-grid">
-              {filteredModels.map((model) => {
+              {displayModels.map((model) => {
                 const selected = isSelected(model);
                 const disabled = !selected && atMaxSelection;
                 return (
@@ -272,6 +390,8 @@ export function ModelBrowserDrawer({
                     selected={selected}
                     disabled={disabled}
                     onSelect={handleSelect}
+                    isFavorite={favoriteIds.has(`${model.owner}/${model.name}`)}
+                    onFavoriteToggle={handleFavoriteToggle}
                   />
                 );
               })}
@@ -281,14 +401,27 @@ export function ModelBrowserDrawer({
 
         {/* ---- Sticky footer with confirm button ---- */}
         <div className="sticky bottom-0 border-t bg-background p-4">
-          <Button
-            className="w-full"
-            disabled={confirmDisabled}
-            onClick={handleConfirm}
-            data-testid="confirm-button"
-          >
-            {confirmText}
-          </Button>
+          <div className="flex gap-2">
+            {tempSelectedModels.length > 0 && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleDeselectAll}
+                data-testid="deselect-all-button"
+                title="Deselect all"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+            <Button
+              className="flex-1"
+              disabled={confirmDisabled}
+              onClick={handleConfirm}
+              data-testid="confirm-button"
+            >
+              {confirmText}
+            </Button>
+          </div>
         </div>
       </SheetContent>
     </Sheet>

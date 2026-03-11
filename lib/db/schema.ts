@@ -88,6 +88,44 @@ export const generations = pgTable(
 );
 
 // -----------------------------------------------
+// favorite_models
+// -----------------------------------------------
+export const favoriteModels = pgTable(
+  "favorite_models",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    modelId: varchar("model_id", { length: 255 }).notNull().unique(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("favorite_models_model_id_idx").on(table.modelId)]
+);
+
+// -----------------------------------------------
+// project_selected_models
+// -----------------------------------------------
+export const projectSelectedModels = pgTable(
+  "project_selected_models",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    modelId: varchar("model_id", { length: 255 }).notNull(),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("project_selected_models_project_id_idx").on(table.projectId)]
+);
+
+// -----------------------------------------------
 // prompt_snippets
 // -----------------------------------------------
 export const promptSnippets = pgTable(

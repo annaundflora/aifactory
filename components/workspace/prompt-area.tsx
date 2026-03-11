@@ -10,7 +10,7 @@ import {
   type ChangeEvent,
 } from "react";
 import { PromptTabs, type PromptTab } from "@/components/workspace/prompt-tabs";
-import { getModelSchema, getCollectionModels } from "@/app/actions/models";
+import { getModelSchema, getCollectionModels, getProjectSelectedModels, saveProjectSelectedModels } from "@/app/actions/models";
 import { generateImages, upscaleImage } from "@/app/actions/generations";
 import { useWorkspaceVariation } from "@/lib/workspace-state";
 import { ModeSelector, type GenerationMode } from "@/components/workspace/mode-selector";
@@ -22,7 +22,7 @@ import {
   ParameterPanel,
   type SchemaProperties,
 } from "@/components/workspace/parameter-panel";
-import { Loader2, Wand2, Sparkles } from "lucide-react";
+import { Loader2, Wand2, Sparkles, Minus, Plus } from "lucide-react";
 import { BuilderDrawer } from "@/components/prompt-builder/builder-drawer";
 import { LLMComparison } from "@/components/prompt-improve/llm-comparison";
 import { TemplateSelector } from "@/components/workspace/template-selector";
@@ -164,6 +164,8 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   const [promptStyle, setPromptStyle] = useState("");
   const [negativePrompt, setNegativePrompt] = useState("");
   const motivRef = useRef<HTMLTextAreaElement>(null);
+  const styleRef = useRef<HTMLTextAreaElement>(null);
+  const negativeRef = useRef<HTMLTextAreaElement>(null);
 
   // ----- Parameter state -----
   const [paramValues, setParamValues] = useState<Record<string, unknown>>({});
@@ -215,10 +217,13 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
       const result = await getCollectionModels();
       if (Array.isArray(result)) {
         setCollectionModels(result);
-        // Initialize selectedModels with first model if currently empty
+        // Initialize selectedModels: load from DB, fallback to preferred default
         setSelectedModels((prev) => {
           if (prev.length === 0 && result.length > 0) {
-            return [result[0]];
+            const preferred = result.find(
+              (m) => m.owner === "bytedance" && m.name === "seedream-4.5"
+            );
+            return [preferred ?? result[0]];
           }
           return prev;
         });
@@ -232,9 +237,54 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     }
   }, []);
 
+  // Load saved model selection from DB, then fetch collection
   useEffect(() => {
-    fetchCollectionModels();
-  }, [fetchCollectionModels]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const [savedModelIds, collectionResult] = await Promise.all([
+          getProjectSelectedModels({ projectId }),
+          getCollectionModels(),
+        ]);
+        if (cancelled) return;
+
+        if (Array.isArray(collectionResult)) {
+          setCollectionModels(collectionResult);
+
+          if (savedModelIds.length > 0) {
+            // Resolve saved IDs to CollectionModel objects
+            const resolved = savedModelIds
+              .map((id) => collectionResult.find((m) => `${m.owner}/${m.name}` === id))
+              .filter((m): m is CollectionModel => m !== undefined);
+            if (resolved.length > 0) {
+              setSelectedModels(resolved);
+            } else {
+              // Saved models no longer in collection — use default
+              const preferred = collectionResult.find(
+                (m) => m.owner === "bytedance" && m.name === "seedream-4.5"
+              );
+              setSelectedModels([preferred ?? collectionResult[0]]);
+            }
+          } else {
+            // No saved selection — use default
+            const preferred = collectionResult.find(
+              (m) => m.owner === "bytedance" && m.name === "seedream-4.5"
+            );
+            if (collectionResult.length > 0) {
+              setSelectedModels([preferred ?? collectionResult[0]]);
+            }
+          }
+        } else {
+          setCollectionError(collectionResult.error);
+        }
+      } catch {
+        setCollectionError("Failed to load models");
+      } finally {
+        if (!cancelled) setCollectionLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [projectId]);
 
   // ---------------------------------------------------------------------------
   // Save current state into modeStates
@@ -363,6 +413,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
             description: null,
             cover_image_url: null,
             run_count: 0,
+            created_at: "",
           },
         ]);
       }
@@ -547,6 +598,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
                 description: null,
                 cover_image_url: null,
                 run_count: 0,
+                created_at: "",
               },
             ]);
           }
@@ -583,6 +635,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
               description: null,
               cover_image_url: null,
               run_count: 0,
+              created_at: "",
             },
           ]);
         }
@@ -658,6 +711,19 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     []
   );
 
+  // ----- Auto-resize on programmatic value changes -----
+  useEffect(() => {
+    if (motivRef.current) autoResize(motivRef.current);
+  }, [promptMotiv]);
+
+  useEffect(() => {
+    if (styleRef.current) autoResize(styleRef.current);
+  }, [promptStyle]);
+
+  useEffect(() => {
+    if (negativeRef.current) autoResize(negativeRef.current);
+  }, [negativePrompt]);
+
   // ----- Model trigger handlers -----
   const handleModelRemove = useCallback((model: CollectionModel) => {
     setSelectedModels((prev) =>
@@ -671,7 +737,11 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
   const handleDrawerConfirm = useCallback((models: CollectionModel[]) => {
     setSelectedModels(models);
-  }, []);
+    const modelIds = models.map((m) => `${m.owner}/${m.name}`);
+    saveProjectSelectedModels({ projectId, modelIds }).catch(() => {
+      // Silently fail — UI state is already updated
+    });
+  }, [projectId]);
 
   const handleDrawerClose = useCallback(() => {
     setDrawerOpen(false);
@@ -808,10 +878,10 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
   // Shared textarea class
   const textareaClass =
-    "flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm resize-none overflow-hidden";
+    "flex w-full rounded-md border border-input bg-background px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm resize-none overflow-hidden";
 
   return (
-    <div className="space-y-4" data-testid="prompt-area">
+    <div className="space-y-3" data-testid="prompt-area">
       {/* Mode Selector — always visible at top */}
       <ModeSelector value={currentMode} onChange={handleModeChange} />
 
@@ -827,11 +897,13 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
         promptStyle={promptStyle}
         negativePrompt={negativePrompt}
       >
-        <div className="space-y-4 pt-2">
-          {/* Model Trigger (replaces Select dropdown) — hidden in upscale mode */}
+        <div className="space-y-3 pt-2">
+          {/* ── Group: Model Selection ── */}
           {showModelSelector && (
-            <div className="space-y-2">
-              <Label>Model</Label>
+            <div className="space-y-2 rounded-lg border border-border/60 bg-muted/30 p-3">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Model
+              </Label>
               <ModelTrigger
                 models={selectedModels}
                 onRemove={handleModelRemove}
@@ -852,31 +924,38 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
             onRetry={fetchCollectionModels}
           />
 
-          {/* ImageDropzone — visible in img2img and upscale modes */}
+          {/* ── Group: Source Input (img2img / upscale) ── */}
           {showImageDropzone && (
-            <ImageDropzone
-              projectId={projectId}
-              onUpload={currentMode === "img2img" ? handleImg2ImgUpload : handleUpscaleUpload}
-              initialUrl={
-                currentMode === "img2img"
-                  ? sourceImageUrl ?? undefined
-                  : upscaleSourceImageUrl ?? undefined
-              }
-              key={`dropzone-${currentMode}`}
-            />
+            <div className="space-y-3 rounded-lg border border-border/60 bg-muted/30 p-3">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Source Image
+              </Label>
+              <ImageDropzone
+                projectId={projectId}
+                onUpload={currentMode === "img2img" ? handleImg2ImgUpload : handleUpscaleUpload}
+                initialUrl={
+                  currentMode === "img2img"
+                    ? sourceImageUrl ?? undefined
+                    : upscaleSourceImageUrl ?? undefined
+                }
+                key={`dropzone-${currentMode}`}
+              />
+              {showStrengthSlider && (
+                <StrengthSlider value={strength} onChange={setStrength} />
+              )}
+            </div>
           )}
 
-          {/* StrengthSlider — visible only in img2img mode */}
-          {showStrengthSlider && (
-            <StrengthSlider value={strength} onChange={setStrength} />
-          )}
-
-          {/* Prompt fields — hidden in upscale mode */}
+          {/* ── Group: Prompt Composition ── */}
           {showPromptFields && (
-            <>
+            <div className="space-y-3 rounded-lg border border-border/60 bg-muted/30 p-3">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Prompt
+              </Label>
+
               {/* Motiv Textarea (required) */}
               <div className="space-y-2">
-                <Label htmlFor="prompt-motiv-textarea">
+                <Label htmlFor="prompt-motiv-textarea" className="text-sm">
                   Motiv <span aria-hidden="true" className="text-destructive">*</span>
                 </Label>
                 <textarea
@@ -890,11 +969,11 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
                   rows={3}
                   className={textareaClass}
                 />
-                {/* Prompt Helper Buttons */}
-                <div className="flex gap-2">
+                {/* Prompt Tools */}
+                <div className="grid grid-cols-2 gap-2">
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     onClick={() => setBuilderOpen(true)}
                     data-testid="builder-btn"
@@ -904,7 +983,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
                   </Button>
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     onClick={() => setShowImprove(true)}
                     disabled={!promptMotiv.trim() || showImprove}
@@ -931,10 +1010,11 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
               {/* Style / Modifier Textarea (optional) */}
               <div className="space-y-2">
-                <Label htmlFor="prompt-style-textarea">Style / Modifier</Label>
+                <Label htmlFor="prompt-style-textarea" className="text-sm">Style / Modifier</Label>
                 <textarea
                   id="prompt-style-textarea"
                   data-testid="prompt-style-textarea"
+                  ref={styleRef}
                   value={promptStyle}
                   onChange={handleStyleChange}
                   placeholder="Add style, mood, or modifier keywords..."
@@ -972,10 +1052,11 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
               {/* Negative Prompt (conditionally visible based on model schema) */}
               {hasNegativePrompt && (
                 <div className="space-y-2">
-                  <Label htmlFor="negative-prompt-textarea">Negative Prompt</Label>
+                  <Label htmlFor="negative-prompt-textarea" className="text-sm">Negative Prompt</Label>
                   <textarea
                     id="negative-prompt-textarea"
                     data-testid="negative-prompt-textarea"
+                    ref={negativeRef}
                     value={negativePrompt}
                     onChange={handleNegativePromptChange}
                     placeholder="What to avoid in the image..."
@@ -984,33 +1065,40 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
                   />
                 </div>
               )}
-
-              {/* Parameter Panel — only shown when exactly 1 model selected */}
-              {isSingleModel && (
-                <ParameterPanel
-                  schema={schema}
-                  isLoading={schemaLoading}
-                  values={paramValues}
-                  onChange={setParamValues}
-                />
-              )}
-
-              {/* Multi-model notice */}
-              {selectedModels.length > 1 && (
-                <p
-                  className="text-sm text-muted-foreground"
-                  data-testid="multi-model-notice"
-                >
-                  Default parameters will be used for multi-model generation.
-                </p>
-              )}
-            </>
+            </div>
           )}
 
-          {/* Upscale mode: Scale selector (inline toggle, no separate slice) */}
+          {/* ── Group: Parameters ── */}
+          {showPromptFields && isSingleModel && schema && !schemaLoading && (
+            <div className="space-y-3 rounded-lg border border-border/60 bg-muted/30 p-3">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Parameters
+              </Label>
+              <ParameterPanel
+                schema={schema}
+                isLoading={schemaLoading}
+                values={paramValues}
+                onChange={setParamValues}
+              />
+            </div>
+          )}
+
+          {/* Multi-model notice */}
+          {showPromptFields && selectedModels.length > 1 && (
+            <p
+              className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground"
+              data-testid="multi-model-notice"
+            >
+              Default parameters will be used for multi-model generation.
+            </p>
+          )}
+
+          {/* Upscale mode: Scale selector */}
           {currentMode === "upscale" && (
-            <div className="flex items-center gap-2">
-              <Label className="text-sm whitespace-nowrap">Scale</Label>
+            <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 p-3">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                Scale
+              </Label>
               <div className="flex gap-1" data-testid="scale-selector">
                 {([2, 4] as const).map((s) => (
                   <Button
@@ -1028,27 +1116,43 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
             </div>
           )}
 
-          {/* Bottom row: Variant Count + Generate/Upscale Button */}
-          <div className="flex items-center gap-3">
-            {/* Variant Count Selector — hidden in upscale mode, only when single model */}
+          {/* ── Action Bar: Variants + Generate ── */}
+          <div className="space-y-2.5">
+            {/* Variant Count Stepper — hidden in upscale mode, only when single model */}
             {showVariants && isSingleModel && (
-              <div className="flex items-center gap-2">
-                <Label htmlFor="variant-count" className="text-sm whitespace-nowrap">
+              <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                <Label className="text-xs text-muted-foreground">
                   Variants
                 </Label>
-                <div className="flex gap-1" data-testid="variant-count-selector">
-                  {VARIANT_OPTIONS.map((count) => (
-                    <Button
-                      key={count}
-                      type="button"
-                      size="sm"
-                      variant={variantCount === count ? "default" : "outline"}
-                      onClick={() => setVariantCount(count)}
-                      data-testid={`variant-count-${count}`}
-                    >
-                      {count}
-                    </Button>
-                  ))}
+                <div className="flex items-center" data-testid="variant-count-selector">
+                  <Button
+                    type="button"
+                    size="icon-xs"
+                    variant="outline"
+                    onClick={() => setVariantCount((v) => Math.max(1, v - 1) as 1 | 2 | 3 | 4)}
+                    disabled={variantCount <= 1}
+                    data-testid="variant-count-minus"
+                    aria-label="Decrease variants"
+                  >
+                    <Minus />
+                  </Button>
+                  <span
+                    className="w-8 text-center text-sm font-medium tabular-nums"
+                    data-testid="variant-count-value"
+                  >
+                    {variantCount}
+                  </span>
+                  <Button
+                    type="button"
+                    size="icon-xs"
+                    variant="outline"
+                    onClick={() => setVariantCount((v) => Math.min(4, v + 1) as 1 | 2 | 3 | 4)}
+                    disabled={variantCount >= 4}
+                    data-testid="variant-count-plus"
+                    aria-label="Increase variants"
+                  >
+                    <Plus />
+                  </Button>
                 </div>
               </div>
             )}
@@ -1058,7 +1162,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
               type="button"
               onClick={handleGenerate}
               disabled={isButtonDisabled}
-              className="ml-auto"
+              className="w-full h-11 text-base font-semibold tracking-wide"
               data-testid="generate-button"
             >
               {isGenerating ? (

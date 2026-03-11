@@ -72,8 +72,9 @@ export function TemplateSelector({
         <DropdownMenuPrimitive.Trigger asChild>
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             size="sm"
+            className="w-full"
             data-testid="template-selector-trigger"
           >
             <ChevronDown className="mr-1 size-3" />

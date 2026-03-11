@@ -5,6 +5,7 @@ import { ImageIcon } from "lucide-react";
 import { type Generation } from "@/lib/db/queries";
 import { GenerationCard } from "@/components/workspace/generation-card";
 import { type FilterValue } from "@/components/workspace/filter-chips";
+import { useColumnCount } from "@/hooks/use-column-count";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -35,6 +36,8 @@ export function GalleryGrid({
   onSelectGeneration,
   modeFilter = "all",
 }: GalleryGridProps) {
+  const columnCount = useColumnCount();
+
   // Filter to only completed generations, apply mode filter, and sort by created_at DESC
   const completedGenerations = useMemo(() => {
     return generations
@@ -47,6 +50,15 @@ export function GalleryGrid({
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
   }, [generations, modeFilter]);
+
+  // Distribute items round-robin across columns for row-wise ordering
+  const columns = useMemo(() => {
+    const cols: Generation[][] = Array.from({ length: columnCount }, () => []);
+    completedGenerations.forEach((gen, i) => {
+      cols[i % columnCount].push(gen);
+    });
+    return cols;
+  }, [completedGenerations, columnCount]);
 
   // Empty state
   if (completedGenerations.length === 0) {
@@ -62,18 +74,19 @@ export function GalleryGrid({
     );
   }
 
-  // Masonry grid via CSS columns
+  // Masonry grid via flexbox with round-robin column distribution
   return (
-    <div
-      className="columns-2 gap-4 sm:columns-3 lg:columns-4"
-      data-testid="gallery-grid"
-    >
-      {completedGenerations.map((generation) => (
-        <GenerationCard
-          key={generation.id}
-          generation={generation}
-          onSelect={onSelectGeneration}
-        />
+    <div className="flex gap-4" data-testid="gallery-grid">
+      {columns.map((col, i) => (
+        <div key={i} className="flex-1 flex flex-col gap-4">
+          {col.map((generation) => (
+            <GenerationCard
+              key={generation.id}
+              generation={generation}
+              onSelect={onSelectGeneration}
+            />
+          ))}
+        </div>
       ))}
     </div>
   );

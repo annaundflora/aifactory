@@ -19,6 +19,7 @@ function createModel(overrides: Partial<CollectionModel> = {}): CollectionModel 
     description: "A short description of the model for testing purposes.",
     cover_image_url: "https://example.com/cover.jpg",
     run_count: 1_500_000,
+    created_at: "2025-01-15T00:00:00Z",
     ...overrides,
   };
 }
@@ -202,6 +203,80 @@ describe("AC-5: Click calls onSelect with model", () => {
 
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onSelect).toHaveBeenCalledWith(model);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Favorite star icon
+// ---------------------------------------------------------------------------
+describe("Favorite star icon", () => {
+  it("should render star icon when onFavoriteToggle is provided", () => {
+    const model = createModel();
+    render(
+      <ModelCard
+        model={model}
+        selected={false}
+        disabled={false}
+        onSelect={noop}
+        isFavorite={false}
+        onFavoriteToggle={noop}
+      />
+    );
+
+    const star = screen.getByTestId("favorite-star");
+    expect(star).toBeInTheDocument();
+    expect(star).toHaveAttribute("aria-label", "Add to favorites");
+  });
+
+  it("should not render star icon when onFavoriteToggle is not provided", () => {
+    const model = createModel();
+    render(
+      <ModelCard model={model} selected={false} disabled={false} onSelect={noop} />
+    );
+
+    expect(screen.queryByTestId("favorite-star")).not.toBeInTheDocument();
+  });
+
+  it("should show filled star when isFavorite is true", () => {
+    const model = createModel();
+    render(
+      <ModelCard
+        model={model}
+        selected={false}
+        disabled={false}
+        onSelect={noop}
+        isFavorite={true}
+        onFavoriteToggle={noop}
+      />
+    );
+
+    const star = screen.getByTestId("favorite-star");
+    expect(star).toHaveAttribute("aria-label", "Remove from favorites");
+  });
+
+  it("should call onFavoriteToggle and NOT onSelect when star is clicked", async () => {
+    const model = createModel();
+    const onSelect = vi.fn();
+    const onFavoriteToggle = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <ModelCard
+        model={model}
+        selected={false}
+        disabled={false}
+        onSelect={onSelect}
+        isFavorite={false}
+        onFavoriteToggle={onFavoriteToggle}
+      />
+    );
+
+    const star = screen.getByTestId("favorite-star");
+    await user.click(star);
+
+    expect(onFavoriteToggle).toHaveBeenCalledTimes(1);
+    expect(onFavoriteToggle).toHaveBeenCalledWith(model);
+    expect(onSelect).not.toHaveBeenCalled();
   });
 });
 

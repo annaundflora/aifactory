@@ -30,6 +30,7 @@ const sampleModels: Record<string, unknown>[] = [
     description: 'A text-to-image generative AI model',
     cover_image_url: 'https://example.com/sdxl.jpg',
     run_count: 50000,
+    created_at: '2025-01-15T00:00:00Z',
     default_example: { id: 'abc' },
     latest_version: { id: 'v1' },
   },
@@ -40,6 +41,7 @@ const sampleModels: Record<string, unknown>[] = [
     description: null,
     cover_image_url: null,
     run_count: 30000,
+    created_at: '2025-01-15T00:00:00Z',
   },
 ]
 
@@ -52,6 +54,7 @@ const expectedModels: CollectionModel[] = [
     description: 'A text-to-image generative AI model',
     cover_image_url: 'https://example.com/sdxl.jpg',
     run_count: 50000,
+    created_at: '2025-01-15T00:00:00Z',
   },
   {
     url: 'https://replicate.com/black-forest-labs/flux-schnell',
@@ -60,6 +63,7 @@ const expectedModels: CollectionModel[] = [
     description: null,
     cover_image_url: null,
     run_count: 30000,
+    created_at: '2025-01-15T00:00:00Z',
   },
 ]
 
@@ -162,6 +166,7 @@ describe('CollectionModelService', () => {
         description: 'Updated model',
         cover_image_url: 'https://example.com/new.jpg',
         run_count: 99999,
+        created_at: '2025-01-15T00:00:00Z',
       },
     ]
     mockFetch.mockResolvedValueOnce(buildCollectionResponse(updatedModels))
@@ -180,6 +185,7 @@ describe('CollectionModelService', () => {
         description: 'Updated model',
         cover_image_url: 'https://example.com/new.jpg',
         run_count: 99999,
+        created_at: '2025-01-15T00:00:00Z',
       },
     ])
 

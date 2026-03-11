@@ -140,9 +140,9 @@ export function WorkspaceContent({
   const currentGeneration = completedGenerations[lightboxIndex];
 
   return (
-    <div className="flex flex-1 overflow-hidden">
+    <div className="flex flex-1 gap-3 overflow-hidden bg-muted/40 p-3">
       {/* Left: Prompt Area */}
-      <div className="w-80 shrink-0 overflow-y-auto border-r p-4">
+      <div className="w-80 shrink-0 overflow-y-auto rounded-xl border border-border/80 bg-card p-4 shadow-sm">
         <PromptArea
           projectId={projectId}
           onGenerationsCreated={handleGenerationsCreated}
@@ -150,7 +150,7 @@ export function WorkspaceContent({
       </div>
 
       {/* Right: Gallery */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto rounded-xl border border-border/80 bg-card p-6 shadow-sm">
         {/* Pending Placeholders (failed → only toast, no card) */}
         {pendingGenerations.length > 0 && (
           <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
