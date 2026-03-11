@@ -138,8 +138,8 @@ function buildReplicateInput(
  * for that model and processes them sequentially (existing behavior).
  *
  * Multi-model (modelIds.length > 1): creates 1 pending record per model
- * with default params ({}), processes all in parallel via Promise.allSettled.
- * Partial failure is allowed — each rejected result marks its record as failed.
+ * with default params ({}), processes sequentially to avoid Replicate rate limits.
+ * Partial failure is allowed — each failed generation is marked independently.
  */
 async function generate(
   projectId: string,
@@ -193,33 +193,14 @@ async function generate(
       pendingGenerations.push(gen);
     }
 
-    // Process all in parallel via Promise.allSettled (fire-and-forget).
-    // Each rejected result marks the corresponding record as failed.
+    // Process sequentially to avoid Replicate rate limits.
+    // Each generation is independent — failures don't abort the queue.
     (async () => {
-      const results = await Promise.allSettled(
-        pendingGenerations.map((gen) => processGeneration(gen))
-      );
-      for (let i = 0; i < results.length; i++) {
-        const result = results[i];
-        if (result.status === "rejected") {
-          const errorMessage =
-            result.reason instanceof Error
-              ? result.reason.message
-              : String(result.reason);
-          console.error(
-            `Generation ${pendingGenerations[i].id} fehlgeschlagen: ${errorMessage}`
-          );
-          try {
-            await updateGeneration(pendingGenerations[i].id, {
-              status: "failed",
-              errorMessage,
-            });
-          } catch (updateErr) {
-            console.error(
-              `Failed to mark generation ${pendingGenerations[i].id} as failed:`,
-              updateErr
-            );
-          }
+      for (const gen of pendingGenerations) {
+        try {
+          await processGeneration(gen);
+        } catch (err) {
+          console.error(`Generation ${gen.id} unexpected error:`, err);
         }
       }
     })().catch((err) => {

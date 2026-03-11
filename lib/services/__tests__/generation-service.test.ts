@@ -601,8 +601,8 @@ describe("GenerationService", () => {
     // AC-2: GIVEN generateImages wird mit modelIds: ["owner/model-a", "owner/model-b"] und count: 1 aufgerufen
     //        WHEN die Server Action ausgefuehrt wird
     //        THEN werden genau 2 Generation-Records erstellt (je einer pro Model-ID)
-    //        AND beide Predictions werden parallel via Promise.allSettled gestartet
-    it("AC-2: should create one record per model and start predictions in parallel for two models", async () => {
+    //        AND beide Predictions werden sequentiell gestartet
+    it("AC-2: should create one record per model and start predictions sequentially for two models", async () => {
       const genA = makeGeneration({ id: "gen-ma", modelId: "owner/model-a" });
       const genB = makeGeneration({ id: "gen-mb", modelId: "owner/model-b" });
 
@@ -640,7 +640,7 @@ describe("GenerationService", () => {
         expect.objectContaining({ modelId: "owner/model-b" })
       );
 
-      // AND: parallel via Promise.allSettled — both should be called
+      // AND: both predictions should be called sequentially
       await vi.waitFor(() => {
         expect(ReplicateClient.run).toHaveBeenCalledTimes(2);
       });
@@ -649,8 +649,8 @@ describe("GenerationService", () => {
     // AC-3: GIVEN generateImages wird mit modelIds: ["owner/m1", "owner/m2", "owner/m3"] aufgerufen
     //        WHEN die Server Action ausgefuehrt wird
     //        THEN werden genau 3 Generation-Records erstellt
-    //        AND alle 3 Predictions werden parallel via Promise.allSettled gestartet
-    it("AC-3: should create one record per model and start predictions in parallel for three models", async () => {
+    //        AND alle 3 Predictions werden sequentiell gestartet
+    it("AC-3: should create one record per model and start predictions sequentially for three models", async () => {
       const gen1 = makeGeneration({ id: "gen-m1", modelId: "owner/m1" });
       const gen2 = makeGeneration({ id: "gen-m2", modelId: "owner/m2" });
       const gen3 = makeGeneration({ id: "gen-m3", modelId: "owner/m3" });
@@ -693,14 +693,14 @@ describe("GenerationService", () => {
         expect.objectContaining({ modelId: "owner/m3" })
       );
 
-      // AND: all 3 predictions started in parallel
+      // AND: all 3 predictions started sequentially
       await vi.waitFor(() => {
         expect(ReplicateClient.run).toHaveBeenCalledTimes(3);
       });
     });
 
     // AC-4: GIVEN Multi-Model mit 2 Models: owner/model-a schlaegt fehl, owner/model-b wird erfolgreich
-    //        WHEN Promise.allSettled die Ergebnisse zurueckgibt
+    //        WHEN die sequentielle Verarbeitung abgeschlossen ist
     //        THEN wird der Record fuer owner/model-a als fehlgeschlagen markiert
     //        AND der Record fuer owner/model-b enthaelt das Ergebnis-Bild
     //        AND KEIN unbehandelter Error wird geworfen (Partial Failure ist erlaubt)
@@ -740,11 +740,11 @@ describe("GenerationService", () => {
       // Returns pending records immediately (fire-and-forget processing)
       expect(result).toHaveLength(2);
 
-      // Wait for background allSettled processing to complete
+      // Wait for background sequential processing to complete
       await vi.waitFor(() => {
         // model-a: processGeneration catches error internally and marks as failed
         // model-b: processGeneration succeeds and marks as completed
-        // The allSettled wrapper also handles rejected results
+        // The sequential loop processes each generation independently
         const updateCalls = (updateGeneration as Mock).mock.calls;
         expect(updateCalls.length).toBeGreaterThanOrEqual(2);
       });
