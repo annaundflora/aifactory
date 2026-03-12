@@ -8,3 +8,9 @@
 {"ts":"2026-03-12T10:30:03Z","slice":"slice-07","gate":"tests","result":"PASSED","retries":0}
 {"ts":"2026-03-12T11:00:00Z","slice":"slice-02","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
 {"ts":"2026-03-12T11:00:01Z","slice":"slice-08","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-12T11:05:00Z","slice":"slice-02","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-03-12T11:05:01Z","slice":"slice-08","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-03-12T11:30:00Z","slice":"slice-02","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-12T11:30:01Z","slice":"slice-08","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-12T12:00:00Z","slice":"slice-03","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-12T12:00:01Z","slice":"slice-09","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
