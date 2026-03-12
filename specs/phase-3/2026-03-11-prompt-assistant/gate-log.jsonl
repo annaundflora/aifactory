@@ -1,0 +1,4 @@
+{"ts":"2026-03-12T10:00:00Z","slice":"slice-01","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-12T10:00:01Z","slice":"slice-05","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-12T10:00:02Z","slice":"slice-06","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-12T10:00:03Z","slice":"slice-07","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}

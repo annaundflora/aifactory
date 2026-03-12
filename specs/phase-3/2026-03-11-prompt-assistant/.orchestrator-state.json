@@ -1,0 +1,25 @@
+{
+  "spec_path": "specs/phase-3/2026-03-11-prompt-assistant",
+  "feature_name": "prompt-assistant",
+  "status": "in_progress",
+  "current_state": "implementing",
+  "current_slice_id": null,
+  "retry_count": 0,
+  "failed_stage": null,
+  "waves": [
+    {"id": 1, "slices": ["slice-01", "slice-05", "slice-06", "slice-07"]},
+    {"id": 2, "slices": ["slice-02", "slice-08"]},
+    {"id": 3, "slices": ["slice-03", "slice-09"]},
+    {"id": 4, "slices": ["slice-04"]},
+    {"id": 5, "slices": ["slice-10", "slice-13a"]},
+    {"id": 6, "slices": ["slice-11", "slice-12", "slice-13b", "slice-22"]},
+    {"id": 7, "slices": ["slice-13c", "slice-14", "slice-16"]},
+    {"id": 8, "slices": ["slice-15", "slice-17", "slice-20"]},
+    {"id": 9, "slices": ["slice-18", "slice-19", "slice-21"]}
+  ],
+  "completed_slices": ["slice-01", "slice-05", "slice-06", "slice-07", "slice-02", "slice-08", "slice-03", "slice-09", "slice-04", "slice-10", "slice-13a", "slice-11", "slice-12", "slice-13b", "slice-22", "slice-13c", "slice-14", "slice-16", "slice-15", "slice-17", "slice-20"],
+  "evidence_files": [],
+  "worktree_path": "worktrees/prompt-assistant",
+  "branch": "feature/prompt-assistant",
+  "issue_number": 5
+}

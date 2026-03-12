@@ -1,0 +1,30 @@
+{
+  "files_claimed": [
+    { "file": "lib/db/schema.ts", "action": "modify", "source_slice": "slice-01-db-schema-migration" },
+    { "file": "drizzle/", "action": "modify", "source_slice": "slice-01-db-schema-migration" },
+    { "file": "lib/db/queries.ts", "action": "modify", "source_slice": "slice-02-reference-queries" },
+    { "file": "lib/services/reference-service.ts", "action": "create", "source_slice": "slice-03-reference-service" },
+    { "file": "app/actions/references.ts", "action": "create", "source_slice": "slice-04-upload-reference-action" },
+    { "file": "components/ui/collapsible.tsx", "action": "create", "source_slice": "slice-06-ui-setup-collapsible" },
+    { "file": "components/workspace/workspace-content.tsx", "action": "modify", "source_slice": "slice-06-ui-setup-collapsible" },
+    { "file": "components/workspace/reference-slot.tsx", "action": "create", "source_slice": "slice-07-reference-slot" },
+    { "file": "lib/types/reference.ts", "action": "create", "source_slice": "slice-07-reference-slot" },
+    { "file": "components/workspace/reference-bar.tsx", "action": "create", "source_slice": "slice-08-reference-bar" },
+    { "file": "components/workspace/prompt-area.tsx", "action": "modify", "source_slice": "slice-09-prompt-area-integration" },
+    { "file": "lib/workspace-state.tsx", "action": "modify", "source_slice": "slice-09-prompt-area-integration" },
+    { "file": "components/workspace/ref-hint-banner.tsx", "action": "create", "source_slice": "slice-10-ref-hint-banner" },
+    { "file": "components/workspace/compatibility-warning.tsx", "action": "create", "source_slice": "slice-11-compatibility-warning" },
+    { "file": "lib/services/model-schema-service.ts", "action": "modify", "source_slice": "slice-11-compatibility-warning" },
+    { "file": "lib/services/generation-service.ts", "action": "modify", "source_slice": "slice-12-prompt-token-mapping" },
+    { "file": "app/actions/generations.ts", "action": "modify", "source_slice": "slice-13-generation-integration" },
+    { "file": "components/workspace/generation-card.tsx", "action": "modify", "source_slice": "slice-14-gallery-drag-slot" },
+    { "file": "components/lightbox/provenance-row.tsx", "action": "create", "source_slice": "slice-15-provenance-lightbox" },
+    { "file": "components/lightbox/lightbox-modal.tsx", "action": "modify", "source_slice": "slice-15-provenance-lightbox" },
+    { "file": "lib/db/migrations/migrate-source-images.ts", "action": "create", "source_slice": "slice-17-migration-cleanup" }
+  ],
+  "summary": {
+    "files_claimed": 21,
+    "new_files": 10,
+    "modified_files": 11
+  }
+}
