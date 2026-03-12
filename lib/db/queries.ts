@@ -1,13 +1,14 @@
 import { eq, desc, sql } from "drizzle-orm";
 import { db } from "./index";
 import { asc } from "drizzle-orm";
-import { projects, generations, favoriteModels, projectSelectedModels } from "./schema";
+import { projects, generations, favoriteModels, projectSelectedModels, assistantSessions } from "./schema";
 
 // ---------------------------------------------------------------------------
 // Types (inferred from schema)
 // ---------------------------------------------------------------------------
 export type Project = typeof projects.$inferSelect;
 export type Generation = typeof generations.$inferSelect;
+export type AssistantSession = typeof assistantSessions.$inferSelect;
 
 // ---------------------------------------------------------------------------
 // Project Queries
@@ -320,4 +321,38 @@ export async function toggleFavoriteQuery(
   }
 
   return { isFavorite: updated.isFavorite };
+}
+
+// ---------------------------------------------------------------------------
+// Assistant Session Queries
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns all sessions for a project, sorted by last_message_at DESC.
+ */
+export async function getSessionsByProject(
+  projectId: string
+): Promise<AssistantSession[]> {
+  return db
+    .select()
+    .from(assistantSessions)
+    .where(eq(assistantSessions.projectId, projectId))
+    .orderBy(desc(assistantSessions.lastMessageAt));
+}
+
+/**
+ * Returns a single session by id.
+ * Throws if the session is not found.
+ */
+export async function getSessionById(
+  id: string
+): Promise<AssistantSession> {
+  const [session] = await db
+    .select()
+    .from(assistantSessions)
+    .where(eq(assistantSessions.id, id));
+  if (!session) {
+    throw new Error(`Session not found: ${id}`);
+  }
+  return session;
 }
