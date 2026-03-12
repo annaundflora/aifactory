@@ -82,6 +82,8 @@ export interface UseAssistantRuntimeOptions {
   sendMessageRef: MutableRefObject<
     ((content: string, imageUrl?: string) => void) | null
   >;
+  /** Ref to register the cancelStream function on the context */
+  cancelStreamRef: MutableRefObject<(() => void) | null>;
 }
 
 export interface UseAssistantRuntimeReturn {
@@ -100,6 +102,7 @@ export function useAssistantRuntime({
   sessionIdRef,
   selectedModel,
   sendMessageRef,
+  cancelStreamRef,
 }: UseAssistantRuntimeOptions): UseAssistantRuntimeReturn {
   const abortControllerRef = useRef<AbortController | null>(null);
   const streamingRef = useRef(false);
@@ -113,7 +116,9 @@ export function useAssistantRuntime({
       abortControllerRef.current = null;
     }
     streamingRef.current = false;
-    dispatch({ type: "SET_STREAMING", isStreaming: false });
+    // AC-9: Mark the current assistant message as done (non-streaming)
+    // MARK_ASSISTANT_DONE sets both message-level isStreaming=false and top-level isStreaming=false
+    dispatch({ type: "MARK_ASSISTANT_DONE" });
   }, [dispatch]);
 
   /**
@@ -434,6 +439,18 @@ export function useAssistantRuntime({
       }
     };
   }, [sendMessage, sendMessageRef]);
+
+  // Register the cancelStream on the context's ref so the context can delegate to it
+  useEffect(() => {
+    if (cancelStreamRef) {
+      cancelStreamRef.current = cancelStream;
+    }
+    return () => {
+      if (cancelStreamRef) {
+        cancelStreamRef.current = null;
+      }
+    };
+  }, [cancelStream, cancelStreamRef]);
 
   return {
     sendMessage,

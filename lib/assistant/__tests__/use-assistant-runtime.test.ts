@@ -62,6 +62,7 @@ function createHookOptions(
     sessionIdRef: { current: null },
     selectedModel: "anthropic/claude-sonnet-4.6",
     sendMessageRef: { current: null },
+    cancelStreamRef: { current: null },
     ...overrides,
   };
 }

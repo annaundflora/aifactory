@@ -1204,9 +1204,11 @@ function AssistantSheetContent({
     isStreaming,
     selectedModel,
     setSelectedModel,
+    cancelStream,
     dispatch,
     sessionIdRef,
     sendMessageRef,
+    cancelStreamRef,
   } = usePromptAssistant();
 
   const { sendMessage } = useAssistantRuntime({
@@ -1215,6 +1217,7 @@ function AssistantSheetContent({
     sessionIdRef,
     selectedModel,
     sendMessageRef,
+    cancelStreamRef,
   });
 
   const handleSend = useCallback(
@@ -1253,7 +1256,8 @@ function AssistantSheetContent({
         )}
         <ChatInput
           onSend={handleSend}
-          disabled={isStreaming}
+          isStreaming={isStreaming}
+          onStop={cancelStream}
           autoFocus={open}
         />
       </div>

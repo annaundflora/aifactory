@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/lib/assistant/assistant-context";
+import { StreamingIndicator } from "./streaming-indicator";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -58,7 +59,7 @@ function MessageBubble({ message }: { message: Message }) {
           </div>
         )}
 
-        {/* Message content */}
+        {/* Message content -- text builds up character by character via text-delta (AC-3) */}
         <div className="whitespace-pre-wrap break-words">
           {message.content}
           {message.isStreaming && message.content.length === 0 && (
@@ -96,6 +97,9 @@ export function ChatThread({ messages, isStreaming }: ChatThreadProps) {
       {messages.map((message) => (
         <MessageBubble key={message.id} message={message} />
       ))}
+
+      {/* AC-1/AC-2: Streaming indicator below last assistant message */}
+      <StreamingIndicator visible={isStreaming} />
 
       {/* Scroll anchor */}
       <div ref={scrollAnchorRef} aria-hidden="true" />

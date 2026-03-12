@@ -8,7 +8,7 @@ import {
   type KeyboardEvent,
   type ChangeEvent,
 } from "react";
-import { ArrowUp, Image } from "lucide-react";
+import { ArrowUp, Image, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 // ---------------------------------------------------------------------------
@@ -17,6 +17,10 @@ import { Button } from "@/components/ui/button";
 
 export interface ChatInputProps {
   onSend: (text: string) => void;
+  /** Whether the assistant is currently streaming a response */
+  isStreaming?: boolean;
+  /** Callback to stop the current stream (required when isStreaming is true) */
+  onStop?: () => void;
   disabled?: boolean;
   autoFocus?: boolean;
 }
@@ -27,6 +31,8 @@ export interface ChatInputProps {
 
 export function ChatInput({
   onSend,
+  isStreaming = false,
+  onStop,
   disabled = false,
   autoFocus = false,
 }: ChatInputProps) {
@@ -34,7 +40,7 @@ export function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const trimmed = value.trim();
-  const canSend = trimmed.length > 0 && !disabled;
+  const canSend = trimmed.length > 0 && !disabled && !isStreaming;
 
   // Auto-focus on mount when requested
   useEffect(() => {
@@ -70,6 +76,12 @@ export function ChatInput({
     }
   }, [canSend, trimmed, onSend]);
 
+  const handleStop = useCallback(() => {
+    if (onStop) {
+      onStop();
+    }
+  }, [onStop]);
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === "Enter" && !e.shiftKey) {
@@ -98,7 +110,7 @@ export function ChatInput({
         <Image className="size-4" />
       </Button>
 
-      {/* Textarea */}
+      {/* Textarea -- stays enabled during streaming (AC-7) */}
       <textarea
         ref={textareaRef}
         value={value}
@@ -111,18 +123,32 @@ export function ChatInput({
         data-testid="chat-input-textarea"
       />
 
-      {/* Send Button */}
-      <Button
-        type="button"
-        size="icon-xs"
-        disabled={!canSend}
-        onClick={handleSend}
-        data-testid="send-btn"
-        aria-label="Send message"
-        className="shrink-0"
-      >
-        <ArrowUp className="size-3" />
-      </Button>
+      {/* AC-4/AC-5: Stop button during streaming, Send button otherwise */}
+      {isStreaming ? (
+        <Button
+          type="button"
+          size="icon-xs"
+          variant="destructive"
+          onClick={handleStop}
+          data-testid="stop-btn"
+          aria-label="Stop response"
+          className="shrink-0"
+        >
+          <Square className="size-3" />
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          size="icon-xs"
+          disabled={!canSend}
+          onClick={handleSend}
+          data-testid="send-btn"
+          aria-label="Send message"
+          className="shrink-0"
+        >
+          <ArrowUp className="size-3" />
+        </Button>
+      )}
     </div>
   );
 }
