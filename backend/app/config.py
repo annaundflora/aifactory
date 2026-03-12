@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     # LangSmith Observability
     langsmith_api_key: str = ""
     langsmith_tracing: bool = False
+    langsmith_project: str = "prompt-assistant"
 
     # Assistant defaults
     assistant_model_default: str = "anthropic/claude-sonnet-4.6"
