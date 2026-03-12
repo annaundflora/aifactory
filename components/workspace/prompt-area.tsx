@@ -29,6 +29,12 @@ import { ModelTrigger } from "@/components/models/model-trigger";
 import { ModelBrowserDrawer } from "@/components/models/model-browser-drawer";
 import { AssistantTrigger } from "@/components/assistant/assistant-trigger";
 import { AssistantSheet } from "@/components/assistant/assistant-sheet";
+import { Startscreen } from "@/components/assistant/startscreen";
+import { ChatInput } from "@/components/assistant/chat-input";
+import {
+  ModelSelector,
+  DEFAULT_MODEL_SLUG,
+} from "@/components/assistant/model-selector";
 import { toast } from "sonner";
 
 // Re-export Generation type for callback
@@ -192,9 +198,22 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
   // ----- Assistant Sheet state -----
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantModel, setAssistantModel] = useState(DEFAULT_MODEL_SLUG);
 
   const handleAssistantToggle = useCallback(() => {
     setAssistantOpen((prev) => !prev);
+  }, []);
+
+  const handleAssistantChipClick = useCallback((text: string) => {
+    console.log("[PromptArea] Chip clicked:", text);
+  }, []);
+
+  const handleAssistantSend = useCallback((text: string) => {
+    console.log("[PromptArea] Chat message:", text);
+  }, []);
+
+  const handleSessionHistoryClick = useCallback(() => {
+    console.log("[PromptArea] Session history clicked");
   }, []);
 
   // ----- Variation state consumption -----
@@ -1154,7 +1173,28 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
       </PromptTabs>
 
       {/* Assistant Sheet */}
-      <AssistantSheet open={assistantOpen} onOpenChange={setAssistantOpen} />
+      <AssistantSheet
+        open={assistantOpen}
+        onOpenChange={setAssistantOpen}
+        headerSlot={
+          <ModelSelector
+            value={assistantModel}
+            onChange={setAssistantModel}
+          />
+        }
+      >
+        <div className="flex flex-1 flex-col">
+          <Startscreen
+            hasSessions={false}
+            onChipClick={handleAssistantChipClick}
+            onSessionHistoryClick={handleSessionHistoryClick}
+          />
+          <ChatInput
+            onSend={handleAssistantSend}
+            autoFocus={assistantOpen}
+          />
+        </div>
+      </AssistantSheet>
     </div>
   );
 }

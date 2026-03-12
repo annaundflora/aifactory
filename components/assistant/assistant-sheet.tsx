@@ -18,6 +18,8 @@ export interface AssistantSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children?: ReactNode;
+  /** Slot for additional header content (e.g. ModelSelector), rendered between title and close button */
+  headerSlot?: ReactNode;
 }
 
 // ---------------------------------------------------------------------------
@@ -28,6 +30,7 @@ export function AssistantSheet({
   open,
   onOpenChange,
   children,
+  headerSlot,
 }: AssistantSheetProps) {
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -55,16 +58,19 @@ export function AssistantSheet({
         {/* Header */}
         <SheetHeader className="flex flex-row items-center justify-between border-b px-4 py-3 space-y-0">
           <SheetTitle className="text-base">Prompt Assistent</SheetTitle>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            onClick={() => onOpenChange(false)}
-            data-testid="assistant-sheet-close"
-            aria-label="Close"
-          >
-            <X className="size-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            {headerSlot}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              onClick={() => onOpenChange(false)}
+              data-testid="assistant-sheet-close"
+              aria-label="Close"
+            >
+              <X className="size-4" />
+            </Button>
+          </div>
         </SheetHeader>
 
         {/* Body: children slot for future content (Slice 09+) */}
