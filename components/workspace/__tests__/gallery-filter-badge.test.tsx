@@ -4,6 +4,21 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 
+// Polyfill matchMedia for jsdom (used by shadcn/radix components)
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: vi.fn().mockImplementation(query => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
+});
+
 // ---------------------------------------------------------------------------
 // Mocks for leaf-dependencies that import server actions or Node-only modules.
 // These are NOT business-logic mocks — they stub external modules that cannot

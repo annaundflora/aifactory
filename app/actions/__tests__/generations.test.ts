@@ -36,7 +36,9 @@ vi.mock("@/lib/clients/storage", () => ({
   },
 }));
 
-import { generateImages, retryGeneration, deleteGeneration, uploadSourceImage, upscaleImage } from "@/app/actions/generations";
+
+import { generateImages, retryGeneration, deleteGeneration, upscaleImage } from "@/app/actions/generations";
+import { uploadSourceImage } from "@/app/actions/upload";
 import { GenerationService } from "@/lib/services/generation-service";
 import { getGeneration, deleteGeneration as deleteGenerationFromDb, type Generation } from "@/lib/db/queries";
 import { StorageService } from "@/lib/clients/storage";
@@ -536,7 +538,7 @@ describe("generateImages img2img extensions", () => {
     const result = await generateImages({
       projectId: "proj-001",
       promptMotiv: "A fox",
-      modelId: "black-forest-labs/flux-2-pro",
+      modelIds: ["black-forest-labs/flux-2-pro"],
       params: {},
       count: 1,
       generationMode: "img2img",
@@ -558,7 +560,7 @@ describe("generateImages img2img extensions", () => {
     const result = await generateImages({
       projectId: "proj-001",
       promptMotiv: "A fox",
-      modelId: "black-forest-labs/flux-2-pro",
+      modelIds: ["black-forest-labs/flux-2-pro"],
       params: {},
       count: 1,
       generationMode: "img2img",
@@ -581,7 +583,7 @@ describe("generateImages img2img extensions", () => {
     const result = await generateImages({
       projectId: "proj-001",
       promptMotiv: "A fox",
-      modelId: "black-forest-labs/flux-2-pro",
+      modelIds: ["black-forest-labs/flux-2-pro"],
       params: {},
       count: 1,
       generationMode: "img2img",
@@ -607,7 +609,7 @@ describe("generateImages img2img extensions", () => {
     const result = await generateImages({
       projectId: "proj-001",
       promptMotiv: "A fox",
-      modelId: "black-forest-labs/flux-2-pro",
+      modelIds: ["black-forest-labs/flux-2-pro"],
       params: {},
       count: 1,
       generationMode: "img2img",
@@ -620,7 +622,7 @@ describe("generateImages img2img extensions", () => {
       "A fox",             // promptMotiv
       "",                  // promptStyle (defaults to '')
       undefined,           // negativePrompt
-      "black-forest-labs/flux-2-pro", // modelId
+      ["black-forest-labs/flux-2-pro"], // modelIds
       {},                  // params
       1,                   // count
       "img2img",           // generationMode
@@ -643,7 +645,7 @@ describe("generateImages img2img extensions", () => {
     const result = await generateImages({
       projectId: "proj-001",
       promptMotiv: "A fox",
-      modelId: "black-forest-labs/flux-2-pro",
+      modelIds: ["black-forest-labs/flux-2-pro"],
       params: {},
       count: 1,
       // generationMode intentionally omitted (txt2img path)
@@ -656,7 +658,7 @@ describe("generateImages img2img extensions", () => {
       "A fox",
       "",
       undefined,
-      "black-forest-labs/flux-2-pro",
+      ["black-forest-labs/flux-2-pro"],
       {},
       1,
       undefined,  // generationMode
