@@ -1,4 +1,4 @@
-type SchemaProperties = Record<string, unknown>;
+export type SchemaProperties = Record<string, unknown>;
 
 const schemaCache = new Map<string, SchemaProperties>();
 
@@ -35,6 +35,44 @@ export function getImg2ImgFieldName(
     return { field: "image", isArray: false };
   }
   return undefined;
+}
+
+/**
+ * Returns the maximum number of reference images a model supports based on its schema.
+ *
+ * - If the model has no img2img field → 0 (no support)
+ * - If the img2img field is not an array (single string) → 1
+ * - If the img2img field is an array with `maxItems` → that value
+ * - If the img2img field is an array without `maxItems` → Infinity (unbounded)
+ */
+export function getMaxImageCount(schema: SchemaProperties): number {
+  const fieldInfo = getImg2ImgFieldName(schema);
+
+  // No img2img field at all → model does not support reference images
+  if (!fieldInfo) {
+    return 0;
+  }
+
+  // Single-value field (e.g. image_prompt, init_image, image) → exactly 1 image
+  if (!fieldInfo.isArray) {
+    return 1;
+  }
+
+  // Array field → check for maxItems constraint
+  const fieldSchema = schema[fieldInfo.field];
+  if (
+    fieldSchema &&
+    typeof fieldSchema === "object" &&
+    "maxItems" in (fieldSchema as Record<string, unknown>)
+  ) {
+    const maxItems = (fieldSchema as Record<string, unknown>).maxItems;
+    if (typeof maxItems === "number" && maxItems > 0) {
+      return maxItems;
+    }
+  }
+
+  // Array field without maxItems → unlimited
+  return Infinity;
 }
 
 export const ModelSchemaService = {

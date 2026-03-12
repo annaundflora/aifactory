@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { GenerationService } from "@/lib/services/generation-service";
+import { GenerationService, validateTotalMegapixels } from "@/lib/services/generation-service";
 import {
   getGenerations,
   getGeneration,
@@ -25,6 +25,16 @@ interface GenerateImagesInput {
   generationMode?: string;
   sourceImageUrl?: string;
   strength?: number;
+  /** Multi-image references (slice-09+). Passed through for slice-13 to consume. */
+  references?: Array<{
+    referenceImageId: string;
+    imageUrl: string;
+    role: string;
+    strength: string;
+    slotPosition: number;
+    width?: number;
+    height?: number;
+  }>;
 }
 
 interface UpscaleImageInput {
@@ -90,11 +100,19 @@ export async function generateImages(
 
   // img2img-specific validation
   if (input.generationMode === "img2img") {
-    if (!input.sourceImageUrl) {
+    if (!input.sourceImageUrl && (!input.references || input.references.length === 0)) {
       return { error: "Source-Image ist erforderlich fuer img2img" };
     }
     if (input.strength !== undefined && (input.strength < 0 || input.strength > 1)) {
       return { error: "Strength muss zwischen 0 und 1 liegen" };
+    }
+  }
+
+  // AC-3, AC-4: Megapixel validation for references before API call
+  if (input.references && input.references.length > 0) {
+    const mpError = validateTotalMegapixels(input.references);
+    if (mpError) {
+      return { error: mpError };
     }
   }
 
@@ -109,7 +127,8 @@ export async function generateImages(
       input.count,
       input.generationMode,
       input.sourceImageUrl,
-      input.strength
+      input.strength,
+      input.references
     );
     return generations;
   } catch (error: unknown) {

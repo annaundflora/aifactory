@@ -212,7 +212,6 @@ export function ImageDropzone({ projectId, onUpload, initialUrl }: ImageDropzone
         data-state="preview"
       >
         {/* Thumbnail */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageInfo.url}
           alt={imageInfo.filename}

@@ -88,6 +88,24 @@ vi.mock("lucide-react", () => ({
     createElement("span", { "data-testid": "icon-chevron-left", className: props.className }),
   ChevronRight: (props: Record<string, unknown>) =>
     createElement("span", { "data-testid": "icon-chevron-right", className: props.className }),
+  ImagePlus: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-image-plus", className: props.className }),
+}));
+
+// Mock ProvenanceRow (Slice 15) — render nothing in variation-flow tests
+vi.mock("@/components/lightbox/provenance-row", () => ({
+  ProvenanceRow: () => null,
+}));
+
+// Mock references server actions (Slice 16 — addGalleryAsReference + getReferenceCount)
+vi.mock("@/app/actions/references", () => ({
+  addGalleryAsReference: vi.fn().mockResolvedValue({ id: "ref-1" }),
+  getReferenceCount: vi.fn().mockResolvedValue(0),
+}));
+
+// Mock BuilderDrawer (PromptArea dependency)
+vi.mock("@/components/prompt-builder/builder-drawer", () => ({
+  BuilderDrawer: () => null,
 }));
 
 // Mock LLMComparison (PromptArea dependency)

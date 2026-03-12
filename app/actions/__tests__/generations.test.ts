@@ -627,7 +627,8 @@ describe("generateImages img2img extensions", () => {
       1,                   // count
       "img2img",           // generationMode
       "https://r2.example.com/sources/p1/abc.png", // sourceImageUrl
-      0.6                  // strength
+      0.6,                 // strength
+      undefined            // references
     );
     expect(result).toEqual(mockGenerations);
   });
@@ -663,7 +664,8 @@ describe("generateImages img2img extensions", () => {
       1,
       undefined,  // generationMode
       undefined,  // sourceImageUrl
-      undefined   // strength
+      undefined,  // strength
+      undefined   // references
     );
     expect(result).toEqual(mockGenerations);
   });

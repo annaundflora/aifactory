@@ -1,7 +1,7 @@
 import { eq, desc, sql } from "drizzle-orm";
 import { db } from "./index";
 import { asc } from "drizzle-orm";
-import { projects, generations, favoriteModels, projectSelectedModels, assistantSessions } from "./schema";
+import { projects, generations, favoriteModels, projectSelectedModels, assistantSessions, referenceImages, generationReferences } from "./schema";
 
 // ---------------------------------------------------------------------------
 // Types (inferred from schema)
@@ -9,6 +9,8 @@ import { projects, generations, favoriteModels, projectSelectedModels, assistant
 export type Project = typeof projects.$inferSelect;
 export type Generation = typeof generations.$inferSelect;
 export type AssistantSession = typeof assistantSessions.$inferSelect;
+export type ReferenceImage = typeof referenceImages.$inferSelect;
+export type GenerationReference = typeof generationReferences.$inferSelect;
 
 // ---------------------------------------------------------------------------
 // Project Queries
@@ -355,4 +357,75 @@ export async function getSessionById(
     throw new Error(`Session not found: ${id}`);
   }
   return session;
+}
+
+// ---------------------------------------------------------------------------
+// Reference Image Queries
+// ---------------------------------------------------------------------------
+
+export async function createReferenceImage(input: {
+  projectId: string;
+  imageUrl: string;
+  originalFilename?: string;
+  width?: number;
+  height?: number;
+  sourceType: string;
+  sourceGenerationId?: string;
+}): Promise<ReferenceImage> {
+  const [referenceImage] = await db
+    .insert(referenceImages)
+    .values({
+      projectId: input.projectId,
+      imageUrl: input.imageUrl,
+      originalFilename: input.originalFilename ?? null,
+      width: input.width ?? null,
+      height: input.height ?? null,
+      sourceType: input.sourceType,
+      sourceGenerationId: input.sourceGenerationId ?? null,
+    })
+    .returning();
+  return referenceImage;
+}
+
+export async function deleteReferenceImage(id: string): Promise<void> {
+  await db.delete(referenceImages).where(eq(referenceImages.id, id));
+}
+
+export async function getReferenceImagesByProject(
+  projectId: string
+): Promise<ReferenceImage[]> {
+  return db
+    .select()
+    .from(referenceImages)
+    .where(eq(referenceImages.projectId, projectId))
+    .orderBy(asc(referenceImages.createdAt));
+}
+
+// ---------------------------------------------------------------------------
+// Generation Reference Queries
+// ---------------------------------------------------------------------------
+
+export async function createGenerationReferences(
+  refs: {
+    generationId: string;
+    referenceImageId: string;
+    role: string;
+    strength: string;
+    slotPosition: number;
+  }[]
+): Promise<GenerationReference[]> {
+  return db
+    .insert(generationReferences)
+    .values(refs)
+    .returning();
+}
+
+export async function getGenerationReferences(
+  generationId: string
+): Promise<GenerationReference[]> {
+  return db
+    .select()
+    .from(generationReferences)
+    .where(eq(generationReferences.generationId, generationId))
+    .orderBy(asc(generationReferences.slotPosition));
 }
