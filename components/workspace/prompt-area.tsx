@@ -1208,11 +1208,14 @@ function AssistantSheetContent({
     activeView,
     setActiveView,
     loadSession,
+    sessionId,
     dispatch,
     sessionIdRef,
     sendMessageRef,
     cancelStreamRef,
   } = usePromptAssistant();
+
+  const { variationData } = useWorkspaceVariation();
 
   const { sendMessage } = useAssistantRuntime({
     projectId,
@@ -1230,12 +1233,48 @@ function AssistantSheetContent({
     [sendMessage]
   );
 
+  /**
+   * Slice-19 AC-8/AC-9: "Verbessere meinen aktuellen Prompt" chip handler.
+   * Enriches the chip text with current workspace fields when available.
+   */
   const handleChipClick = useCallback(
     (text: string) => {
-      sendMessage(text);
+      const IMPROVE_CHIP_TEXT = "Verbessere meinen aktuellen Prompt";
+      if (text === IMPROVE_CHIP_TEXT) {
+        const context = getWorkspaceFieldsForChip(variationData);
+        if (context) {
+          // AC-8: Prepend workspace fields as context
+          sendMessage(`${text}\n\n${context}`);
+        } else {
+          // AC-9: Send chip text as-is when all workspace fields are empty
+          sendMessage(text);
+        }
+      } else {
+        sendMessage(text);
+      }
     },
-    [sendMessage]
+    [sendMessage, variationData]
   );
+
+  /**
+   * Slice-19 AC-1/AC-4: Auto-resume active session when sheet opens.
+   * If sessionId exists but messages are empty (e.g., after page-level navigation),
+   * reload the session from backend. If messages already exist in context, the
+   * state is already preserved (AC-4/AC-7).
+   * AC-5: When no sessionId exists, startscreen is shown (default behavior).
+   */
+  const handleSheetOpen = useCallback(() => {
+    if (sessionId && messages.length === 0) {
+      // Session ID exists but state was lost -- reload from backend
+      loadSession(sessionId);
+    } else if (sessionId && messages.length > 0) {
+      // AC-1: Session is already in memory, ensure chat view is active
+      if (activeView === "startscreen") {
+        setActiveView("chat");
+      }
+    }
+    // AC-5: No sessionId -> startscreen remains (default)
+  }, [sessionId, messages.length, loadSession, activeView, setActiveView]);
 
   // AC-7: Session switcher navigates to session list
   const handleSwitcherClick = useCallback(() => {
@@ -1310,6 +1349,7 @@ function AssistantSheetContent({
     <AssistantSheet
       open={open}
       onOpenChange={onOpenChange}
+      onOpen={handleSheetOpen}
       hasCanvas={hasCanvas && activeView !== "session-list"}
       canvasSlot={<PromptCanvas />}
       headerSlot={

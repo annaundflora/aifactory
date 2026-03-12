@@ -1,10 +1,21 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/lib/assistant/assistant-context";
 import { StreamingIndicator } from "./streaming-indicator";
 import { ImagePreview } from "./image-preview";
+
+// ---------------------------------------------------------------------------
+// Constants for "Verbessere" Chip (Slice 19, AC-8)
+// ---------------------------------------------------------------------------
+
+/**
+ * Prefix used by the "Verbessere meinen aktuellen Prompt" suggestion chip.
+ * When workspace fields are included, the message contains this prefix
+ * followed by a context block in brackets.
+ */
+const WORKSPACE_CONTEXT_PATTERN = /\n\n\[Aktueller Prompt: .+\]$/;
 
 // ---------------------------------------------------------------------------
 // Props
@@ -22,6 +33,20 @@ export interface ChatThreadProps {
 function MessageBubble({ message }: { message: Message }) {
   const isUser = message.role === "user";
   const isError = message.role === "error";
+
+  // Slice-19 AC-8: Split workspace context from user message for styled display
+  const { mainContent, workspaceContext } = useMemo(() => {
+    if (isUser && WORKSPACE_CONTEXT_PATTERN.test(message.content)) {
+      const match = message.content.match(WORKSPACE_CONTEXT_PATTERN);
+      if (match) {
+        return {
+          mainContent: message.content.slice(0, match.index).trim(),
+          workspaceContext: match[0].trim(),
+        };
+      }
+    }
+    return { mainContent: message.content, workspaceContext: null };
+  }, [message.content, isUser]);
 
   return (
     <div
@@ -58,11 +83,21 @@ function MessageBubble({ message }: { message: Message }) {
 
         {/* Message content -- text builds up character by character via text-delta (AC-3) */}
         <div className="whitespace-pre-wrap break-words">
-          {message.content}
+          {mainContent}
           {message.isStreaming && message.content.length === 0 && (
             <span className="text-muted-foreground">...</span>
           )}
         </div>
+
+        {/* Slice-19 AC-8: Display workspace context in a visually distinct style */}
+        {workspaceContext && (
+          <div
+            className="mt-1.5 text-xs opacity-70 font-mono"
+            data-testid="workspace-context"
+          >
+            {workspaceContext}
+          </div>
+        )}
       </div>
     </div>
   );
