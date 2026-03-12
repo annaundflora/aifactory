@@ -73,10 +73,19 @@ export async function migrateSourceImages(): Promise<MigrationSummary> {
       }
     }
 
-    // Process migrations for this batch
+    // Process migrations for this batch: create reference images first,
+    // then batch-insert all generation_references in a single INSERT.
+    const batchRefs: {
+      generationId: string;
+      referenceImageId: string;
+      role: string;
+      strength: string;
+      slotPosition: number;
+    }[] = [];
+
     for (const item of toMigrate) {
       try {
-        // Create the reference_images record
+        // Create the reference_images record (one per generation, returns id)
         const refImage = await createReferenceImage({
           projectId: item.projectId,
           imageUrl: item.sourceImageUrl,
@@ -84,24 +93,33 @@ export async function migrateSourceImages(): Promise<MigrationSummary> {
           sourceGenerationId: item.generationId,
         });
 
-        // Create the generation_references record in a batch insert
-        await createGenerationReferences([
-          {
-            generationId: item.generationId,
-            referenceImageId: refImage.id,
-            role: "content",
-            strength: "moderate",
-            slotPosition: 1,
-          },
-        ]);
-
-        summary.migrated++;
+        batchRefs.push({
+          generationId: item.generationId,
+          referenceImageId: refImage.id,
+          role: "content",
+          strength: "moderate",
+          slotPosition: 1,
+        });
       } catch (error) {
         console.error(
-          `Error migrating generation ${item.generationId}:`,
+          `Error creating reference image for generation ${item.generationId}:`,
           error
         );
         summary.errors++;
+      }
+    }
+
+    // Batch-insert all generation_references for this chunk in one INSERT
+    if (batchRefs.length > 0) {
+      try {
+        await createGenerationReferences(batchRefs);
+        summary.migrated += batchRefs.length;
+      } catch (error) {
+        console.error(
+          `Error batch-inserting generation_references:`,
+          error
+        );
+        summary.errors += batchRefs.length;
       }
     }
   }
