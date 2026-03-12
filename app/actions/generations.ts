@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { GenerationService } from "@/lib/services/generation-service";
+import { GenerationService, validateTotalMegapixels } from "@/lib/services/generation-service";
 import {
   getGenerations,
   getGeneration,
@@ -32,6 +32,8 @@ interface GenerateImagesInput {
     role: string;
     strength: string;
     slotPosition: number;
+    width?: number;
+    height?: number;
   }>;
 }
 
@@ -106,6 +108,14 @@ export async function generateImages(
     }
   }
 
+  // AC-3, AC-4: Megapixel validation for references before API call
+  if (input.references && input.references.length > 0) {
+    const mpError = validateTotalMegapixels(input.references);
+    if (mpError) {
+      return { error: mpError };
+    }
+  }
+
   try {
     const generations = await GenerationService.generate(
       input.projectId,
@@ -117,7 +127,8 @@ export async function generateImages(
       input.count,
       input.generationMode,
       input.sourceImageUrl,
-      input.strength
+      input.strength,
+      input.references
     );
     return generations;
   } catch (error: unknown) {

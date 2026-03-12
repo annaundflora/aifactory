@@ -3,6 +3,7 @@ import { ReplicateClient } from "@/lib/clients/replicate";
 import { StorageService } from "@/lib/clients/storage";
 import {
   createGeneration,
+  createGenerationReferences,
   getGeneration,
   updateGeneration,
   type Generation,
@@ -22,6 +23,48 @@ export interface UpscaleInput {
   sourceImageUrl: string;
   scale: 2 | 4;
   sourceGenerationId?: string;
+}
+
+/**
+ * Input shape for a single reference image in the generation pipeline.
+ * Passed from UI via server action to the generation service.
+ */
+export interface ReferenceInput {
+  referenceImageId: string;
+  imageUrl: string;
+  role: string;
+  strength: string;
+  slotPosition: number;
+  width?: number;
+  height?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Megapixel Validation
+// ---------------------------------------------------------------------------
+
+const MAX_TOTAL_MEGAPIXELS = 9;
+
+/**
+ * Validate that the total megapixels of all reference images do not exceed
+ * the FLUX.2 API limit of 9 MP.
+ *
+ * Returns null if valid, or an error message string if invalid.
+ */
+export function validateTotalMegapixels(
+  references: ReferenceInput[]
+): string | null {
+  let totalPixels = 0;
+  for (const ref of references) {
+    if (ref.width && ref.height) {
+      totalPixels += ref.width * ref.height;
+    }
+  }
+  const totalMegapixels = totalPixels / 1_000_000;
+  if (totalMegapixels > MAX_TOTAL_MEGAPIXELS) {
+    return "Gesamte Bildgroesse ueberschreitet API-Limit (max 9 MP)";
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -149,14 +192,17 @@ export function composeMultiReferencePrompt(
 // Core: process a single generation
 // ---------------------------------------------------------------------------
 
-async function processGeneration(generation: Generation): Promise<Generation> {
+async function processGeneration(
+  generation: Generation,
+  references?: ReferenceInput[]
+): Promise<Generation> {
   const storageKey = `projects/${generation.projectId}/${generation.id}.png`;
 
   try {
     // 1. Call Replicate
     const result = await ReplicateClient.run(
       generation.modelId,
-      await buildReplicateInput(generation)
+      await buildReplicateInput(generation, references)
     );
 
     // 2. Convert stream to PNG buffer + get dimensions
@@ -166,7 +212,7 @@ async function processGeneration(generation: Generation): Promise<Generation> {
     const imageUrl = await StorageService.upload(buffer as unknown as Buffer, storageKey);
 
     // 4. Update DB to completed (AC-2)
-    return await updateGeneration(generation.id, {
+    const updatedGeneration = await updateGeneration(generation.id, {
       status: "completed",
       imageUrl,
       width,
@@ -174,6 +220,21 @@ async function processGeneration(generation: Generation): Promise<Generation> {
       seed: result.seed,
       replicatePredictionId: result.predictionId,
     });
+
+    // 5. Create generation_references records AFTER successful generation (AC-1, AC-7)
+    if (references && references.length > 0) {
+      await createGenerationReferences(
+        references.map((ref) => ({
+          generationId: generation.id,
+          referenceImageId: ref.referenceImageId,
+          role: ref.role,
+          strength: ref.strength,
+          slotPosition: ref.slotPosition,
+        }))
+      );
+    }
+
+    return updatedGeneration;
   } catch (error: unknown) {
     // AC-3, AC-4: Mark as failed
     const errorMessage =
@@ -190,7 +251,8 @@ async function processGeneration(generation: Generation): Promise<Generation> {
 }
 
 async function buildReplicateInput(
-  generation: Generation
+  generation: Generation,
+  references?: ReferenceInput[]
 ): Promise<Record<string, unknown>> {
   const params =
     typeof generation.modelParams === "object" && generation.modelParams !== null
@@ -206,14 +268,23 @@ async function buildReplicateInput(
     input.negative_prompt = generation.negativePrompt;
   }
 
-  if (generation.generationMode === "img2img" && generation.sourceImageUrl) {
+  if (generation.generationMode === "img2img") {
     const schema = await ModelSchemaService.getSchema(generation.modelId);
     const img2imgField = getImg2ImgFieldName(schema);
 
     if (img2imgField) {
-      input[img2imgField.field] = img2imgField.isArray
-        ? [generation.sourceImageUrl]
-        : generation.sourceImageUrl;
+      // AC-2: Multi-image references path -- URLs sorted by slotPosition ASC
+      if (references && references.length > 0) {
+        const referenceUrls = [...references]
+          .sort((a, b) => a.slotPosition - b.slotPosition)
+          .map((r) => r.imageUrl);
+        input[img2imgField.field] = referenceUrls;
+      } else if (generation.sourceImageUrl) {
+        // AC-5: Backwards-compatible fallback -- single sourceImageUrl
+        input[img2imgField.field] = img2imgField.isArray
+          ? [generation.sourceImageUrl]
+          : generation.sourceImageUrl;
+      }
     }
     // prompt_strength is already spread from modelParams via params above
   }
@@ -245,7 +316,8 @@ async function generate(
   count: number,
   generationMode?: string,
   sourceImageUrl?: string,
-  strength?: number
+  strength?: number,
+  references?: ReferenceInput[]
 ): Promise<Generation[]> {
   // Validate
   if (!promptMotiv || promptMotiv.trim().length === 0) {
@@ -275,6 +347,9 @@ async function generate(
   // Resolve effective mode
   const effectiveMode = generationMode ?? "txt2img";
 
+  // Normalize references: undefined or empty array both mean "no references"
+  const effectiveReferences = references && references.length > 0 ? references : undefined;
+
   // img2img validation
   if (effectiveMode === "img2img") {
     if (!sourceImageUrl) {
@@ -285,10 +360,27 @@ async function generate(
     }
   }
 
+  // AC-3, AC-4: Megapixel validation for references before API call
+  if (effectiveReferences) {
+    const mpError = validateTotalMegapixels(effectiveReferences);
+    if (mpError) {
+      throw new Error(mpError);
+    }
+  }
+
   // Compose prompt from motiv + style
   const motivTrimmed = promptMotiv.trim();
   const styleTrimmed = promptStyle.trim();
-  const prompt = styleTrimmed ? `${motivTrimmed}. ${styleTrimmed}` : motivTrimmed;
+  let prompt = styleTrimmed ? `${motivTrimmed}. ${styleTrimmed}` : motivTrimmed;
+
+  // AC-6, AC-8: Apply composeMultiReferencePrompt when references exist
+  if (effectiveReferences) {
+    prompt = composeMultiReferencePrompt(prompt, effectiveReferences.map((r) => ({
+      slotPosition: r.slotPosition,
+      role: r.role as ReferenceRole,
+      strength: r.strength as ReferenceStrength,
+    })));
+  }
 
   // For img2img: embed prompt_strength in stored modelParams so retry works
   const storedParams =
@@ -321,7 +413,7 @@ async function generate(
     (async () => {
       for (const gen of pendingGenerations) {
         try {
-          await processGeneration(gen);
+          await processGeneration(gen, effectiveReferences);
         } catch (err) {
           console.error(`Generation ${gen.id} unexpected error:`, err);
         }
@@ -356,7 +448,7 @@ async function generate(
   (async () => {
     for (const gen of pendingGenerations) {
       try {
-        await processGeneration(gen);
+        await processGeneration(gen, effectiveReferences);
       } catch (err) {
         console.error(`Generation ${gen.id} unexpected error:`, err);
       }
