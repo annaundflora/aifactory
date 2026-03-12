@@ -312,8 +312,8 @@ class TestAC5ErrorEvent:
                         assert "message" in data, (
                             "error data must contain 'message' key"
                         )
-                        assert "OpenRouter API timeout" in data["message"], (
-                            f"error message must contain the error description, "
+                        assert "Die Anfrage an den KI-Dienst hat zu lange gedauert" in data["message"], (
+                            f"error message must contain the German timeout message, "
                             f"got: {data['message']}"
                         )
                         break

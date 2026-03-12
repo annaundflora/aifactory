@@ -124,8 +124,8 @@ def post_process_node(state: PromptAssistantState) -> dict:
 
             entry = {"url": image_url, "analysis": content}
 
-            # Get existing list from state and append
-            existing = list(state.get(state_field, []))
+            # Get existing list from updates (prior iterations) or state and append
+            existing = list(updates.get(state_field, state.get(state_field, [])))
             existing.append(entry)
             updates[state_field] = existing
 

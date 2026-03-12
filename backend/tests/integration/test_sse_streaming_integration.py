@@ -208,7 +208,7 @@ class TestPostMessageSSEStream:
 
         body = response.text
         assert "event: error" in body
-        assert "LLM connection failed" in body
+        assert "Ein unerwarteter Fehler ist aufgetreten" in body
 
 
 # ---------------------------------------------------------------------------
