@@ -31,10 +31,16 @@ import { AssistantTrigger } from "@/components/assistant/assistant-trigger";
 import { AssistantSheet } from "@/components/assistant/assistant-sheet";
 import { Startscreen } from "@/components/assistant/startscreen";
 import { ChatInput } from "@/components/assistant/chat-input";
+import { ChatThread } from "@/components/assistant/chat-thread";
 import {
   ModelSelector,
   DEFAULT_MODEL_SLUG,
 } from "@/components/assistant/model-selector";
+import {
+  PromptAssistantProvider,
+  usePromptAssistant,
+} from "@/lib/assistant/assistant-context";
+import { useAssistantRuntime } from "@/lib/assistant/use-assistant-runtime";
 import { toast } from "sonner";
 
 // Re-export Generation type for callback
@@ -198,18 +204,9 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
   // ----- Assistant Sheet state -----
   const [assistantOpen, setAssistantOpen] = useState(false);
-  const [assistantModel, setAssistantModel] = useState(DEFAULT_MODEL_SLUG);
 
   const handleAssistantToggle = useCallback(() => {
     setAssistantOpen((prev) => !prev);
-  }, []);
-
-  const handleAssistantChipClick = useCallback((text: string) => {
-    console.log("[PromptArea] Chip clicked:", text);
-  }, []);
-
-  const handleAssistantSend = useCallback((text: string) => {
-    console.log("[PromptArea] Chat message:", text);
   }, []);
 
   const handleSessionHistoryClick = useCallback(() => {
@@ -1172,29 +1169,94 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
         </div>
       </PromptTabs>
 
-      {/* Assistant Sheet */}
-      <AssistantSheet
-        open={assistantOpen}
-        onOpenChange={setAssistantOpen}
-        headerSlot={
-          <ModelSelector
-            value={assistantModel}
-            onChange={setAssistantModel}
-          />
-        }
-      >
-        <div className="flex flex-1 flex-col">
+      {/* Assistant Sheet with Context Provider */}
+      <PromptAssistantProvider projectId={projectId}>
+        <AssistantSheetContent
+          open={assistantOpen}
+          onOpenChange={setAssistantOpen}
+          projectId={projectId}
+          onSessionHistoryClick={handleSessionHistoryClick}
+        />
+      </PromptAssistantProvider>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// AssistantSheetContent (inner component using PromptAssistantContext)
+// ---------------------------------------------------------------------------
+
+interface AssistantSheetContentProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  projectId: string;
+  onSessionHistoryClick: () => void;
+}
+
+function AssistantSheetContent({
+  open,
+  onOpenChange,
+  projectId,
+  onSessionHistoryClick,
+}: AssistantSheetContentProps) {
+  const {
+    messages,
+    isStreaming,
+    selectedModel,
+    setSelectedModel,
+    dispatch,
+    sessionIdRef,
+    sendMessageRef,
+  } = usePromptAssistant();
+
+  const { sendMessage } = useAssistantRuntime({
+    projectId,
+    dispatch,
+    sessionIdRef,
+    selectedModel,
+    sendMessageRef,
+  });
+
+  const handleSend = useCallback(
+    (text: string) => {
+      sendMessage(text);
+    },
+    [sendMessage]
+  );
+
+  const handleChipClick = useCallback(
+    (text: string) => {
+      sendMessage(text);
+    },
+    [sendMessage]
+  );
+
+  const hasMessages = messages.length > 0;
+
+  return (
+    <AssistantSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      headerSlot={
+        <ModelSelector value={selectedModel} onChange={setSelectedModel} />
+      }
+    >
+      <div className="flex flex-1 flex-col h-full">
+        {hasMessages ? (
+          <ChatThread messages={messages} isStreaming={isStreaming} />
+        ) : (
           <Startscreen
             hasSessions={false}
-            onChipClick={handleAssistantChipClick}
-            onSessionHistoryClick={handleSessionHistoryClick}
+            onChipClick={handleChipClick}
+            onSessionHistoryClick={onSessionHistoryClick}
           />
-          <ChatInput
-            onSend={handleAssistantSend}
-            autoFocus={assistantOpen}
-          />
-        </div>
-      </AssistantSheet>
-    </div>
+        )}
+        <ChatInput
+          onSend={handleSend}
+          disabled={isStreaming}
+          autoFocus={open}
+        />
+      </div>
+    </AssistantSheet>
   );
 }

@@ -6,8 +6,10 @@ import {
   useReducer,
   useCallback,
   useMemo,
+  useRef,
   type ReactNode,
   type Dispatch,
+  type MutableRefObject,
 } from "react";
 
 // ---------------------------------------------------------------------------
@@ -175,6 +177,12 @@ export interface PromptAssistantContextValue {
   sendMessage: (content: string, imageUrl?: string) => void;
   setSelectedModel: (model: string) => void;
   dispatch: Dispatch<AssistantAction>;
+  /** Ref to the current session ID (for use by useAssistantRuntime) */
+  sessionIdRef: MutableRefObject<string | null>;
+  /** Ref for registering the sendMessage implementation from useAssistantRuntime */
+  sendMessageRef: MutableRefObject<
+    ((content: string, imageUrl?: string) => void) | null
+  >;
 }
 
 const PromptAssistantContext =
@@ -187,8 +195,6 @@ const PromptAssistantContext =
 export interface PromptAssistantProviderProps {
   children: ReactNode;
   projectId: string;
-  /** Optional: override the send message handler (injected by useAssistantRuntime) */
-  onSendMessage?: (content: string, imageUrl?: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -197,17 +203,29 @@ export interface PromptAssistantProviderProps {
 
 export function PromptAssistantProvider({
   children,
-  onSendMessage,
 }: PromptAssistantProviderProps) {
   const [state, dispatch] = useReducer(assistantReducer, initialState);
 
+  // Refs that bridge the context and the runtime hook
+  const sessionIdRef = useRef<string | null>(null);
+  const sendMessageRef = useRef<
+    ((content: string, imageUrl?: string) => void) | null
+  >(null);
+
+  // Keep sessionIdRef in sync with reducer state
+  sessionIdRef.current = state.sessionId;
+
   const sendMessage = useCallback(
     (content: string, imageUrl?: string) => {
-      if (onSendMessage) {
-        onSendMessage(content, imageUrl);
+      if (sendMessageRef.current) {
+        sendMessageRef.current(content, imageUrl);
+      } else {
+        console.warn(
+          "[PromptAssistantContext] sendMessage called but no runtime registered."
+        );
       }
     },
-    [onSendMessage]
+    [] // sendMessageRef is stable (ref), no need as dependency
   );
 
   const setSelectedModel = useCallback(
@@ -228,6 +246,8 @@ export function PromptAssistantProvider({
       sendMessage,
       setSelectedModel,
       dispatch,
+      sessionIdRef,
+      sendMessageRef,
     }),
     [state, sendMessage, setSelectedModel, dispatch]
   );
