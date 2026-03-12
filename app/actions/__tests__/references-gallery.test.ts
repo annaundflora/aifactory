@@ -16,6 +16,33 @@ vi.mock("@/lib/services/reference-service", () => ({
   },
 }));
 
+// Mock DB modules to prevent DATABASE_URL requirement at import time
+vi.mock("@/lib/db", () => ({
+  db: {
+    select: vi.fn().mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([]),
+      }),
+    }),
+  },
+}));
+
+vi.mock("@/lib/db/queries", () => ({
+  getGenerationReferences: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("@/lib/db/schema", () => ({
+  referenceImages: {
+    id: "id",
+    projectId: "projectId",
+    imageUrl: "imageUrl",
+  },
+}));
+
+vi.mock("drizzle-orm", () => ({
+  eq: vi.fn(),
+}));
+
 // ---------------------------------------------------------------------------
 // Imports (AFTER mocks)
 // ---------------------------------------------------------------------------

@@ -149,6 +149,7 @@ function fireDrop(element: HTMLElement, file: File) {
   const dataTransfer = {
     files: [file],
     types: ["Files"],
+    getData: vi.fn().mockReturnValue(""),
   };
   fireEvent.drop(element, { dataTransfer });
 }
