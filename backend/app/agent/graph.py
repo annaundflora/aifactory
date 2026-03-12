@@ -4,6 +4,9 @@ Creates a compiled ReAct-style agent graph with custom state,
 OpenRouter LLM via langchain-openai, optional checkpointer support,
 and a post_process_node that updates state fields after tool execution.
 
+Tools: draft_prompt, refine_prompt, analyze_image
+(recommend_model and get_model_info added in later slices)
+
 Graph structure:
     START -> assistant_node -> (has tool calls?) -> tools_node -> post_process_node -> assistant_node
                             -> (no tool calls?) -> END
@@ -23,20 +26,28 @@ from langgraph.prebuilt import create_react_agent  # noqa: F401 - kept for test 
 
 from app.agent.prompts import SYSTEM_PROMPT
 from app.agent.state import PromptAssistantState
+from app.agent.tools.image_tools import analyze_image
 from app.agent.tools.prompt_tools import draft_prompt, refine_prompt
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 # Tool registry: all tools available to the agent.
-# Later slices (16, 20) append to this list.
-ALL_TOOLS = [draft_prompt, refine_prompt]
+# Later slices (20) may append to this list.
+ALL_TOOLS = [draft_prompt, refine_prompt, analyze_image]
 
 # Tool names whose results should update state fields via post_process_node.
 # Maps tool name -> state field to update.
 TOOL_STATE_MAPPING: dict[str, str] = {
     "draft_prompt": "draft_prompt",
     "refine_prompt": "draft_prompt",
+    "analyze_image": "reference_images",
+}
+
+# Tools whose results should be appended to a list field (not overwritten).
+# The value is the state field that holds the list.
+TOOL_APPEND_MAPPING: dict[str, str] = {
+    "analyze_image": "reference_images",
 }
 
 
@@ -47,8 +58,9 @@ def post_process_node(state: PromptAssistantState) -> dict:
     correspond to tools in TOOL_STATE_MAPPING. If so, extracts the tool
     result and updates the corresponding state field.
 
-    For draft_prompt and refine_prompt: updates state["draft_prompt"].
-    Later slices (16, 20) extend TOOL_STATE_MAPPING for their tools.
+    For draft_prompt and refine_prompt: updates state["draft_prompt"] (overwrite).
+    For analyze_image: appends {"url": <image_url>, "analysis": <result>} to
+    state["reference_images"] (append, not overwrite).
 
     Returns:
         Dict with state field updates (e.g., {"draft_prompt": {...}}).
@@ -56,38 +68,84 @@ def post_process_node(state: PromptAssistantState) -> dict:
     updates: dict = {}
     messages = state.get("messages", [])
 
-    # Walk backwards through messages to find the most recent ToolMessages
+    # Walk backwards through messages to find the most recent ToolMessages.
+    # Also collect corresponding AIMessage tool_calls to extract tool arguments
+    # (needed for analyze_image to get the image_url).
+    tool_messages: list[ToolMessage] = []
     for msg in reversed(messages):
-        if not isinstance(msg, ToolMessage):
+        if isinstance(msg, ToolMessage):
+            tool_messages.append(msg)
+        else:
             break
 
+    # Find the AIMessage just before the tool messages to get tool_call args
+    ai_message = None
+    for msg in reversed(messages):
+        if isinstance(msg, AIMessage):
+            ai_message = msg
+            break
+
+    # Build a mapping from tool_call_id -> tool_call args for URL extraction
+    tool_call_args: dict[str, dict] = {}
+    if ai_message and hasattr(ai_message, "tool_calls"):
+        for tc in ai_message.tool_calls or []:
+            tool_call_args[tc["id"]] = tc.get("args", {})
+
+    for msg in tool_messages:
         tool_name = getattr(msg, "name", None)
-        if tool_name and tool_name in TOOL_STATE_MAPPING:
-            state_field = TOOL_STATE_MAPPING[tool_name]
+        if not tool_name or tool_name not in TOOL_STATE_MAPPING:
+            continue
 
-            # Parse the tool result content
-            content = msg.content
-            if isinstance(content, str):
-                try:
-                    content = json.loads(content)
-                except (json.JSONDecodeError, TypeError):
-                    logger.warning(
-                        "Could not parse tool result for %s as JSON: %s",
-                        tool_name,
-                        content[:100] if content else "(empty)",
-                    )
-                    continue
+        state_field = TOOL_STATE_MAPPING[tool_name]
 
-            if isinstance(content, dict):
-                # Only update if we haven't already set this field
-                # (in case of multiple tool calls, last one wins)
-                if state_field not in updates:
-                    updates[state_field] = content
-                    logger.debug(
-                        "post_process_node: Updated state[%s] from tool %s",
-                        state_field,
-                        tool_name,
-                    )
+        # Parse the tool result content
+        content = msg.content
+        if isinstance(content, str):
+            try:
+                content = json.loads(content)
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(
+                    "Could not parse tool result for %s as JSON: %s",
+                    tool_name,
+                    content[:100] if content else "(empty)",
+                )
+                continue
+
+        if not isinstance(content, dict):
+            continue
+
+        # Check if this tool uses append semantics (list field)
+        if tool_name in TOOL_APPEND_MAPPING:
+            # For analyze_image: append {"url": <image_url>, "analysis": <result>}
+            # Extract the image_url from the original tool call arguments
+            tool_call_id = getattr(msg, "tool_call_id", None)
+            args = tool_call_args.get(tool_call_id, {}) if tool_call_id else {}
+            image_url = args.get("image_url", "")
+
+            entry = {"url": image_url, "analysis": content}
+
+            # Get existing list from state and append
+            existing = list(state.get(state_field, []))
+            existing.append(entry)
+            updates[state_field] = existing
+
+            logger.debug(
+                "post_process_node: Appended to state[%s] from tool %s (url=%s)",
+                state_field,
+                tool_name,
+                image_url[:80] if image_url else "(unknown)",
+            )
+        else:
+            # Simple overwrite semantics (draft_prompt, refine_prompt)
+            # Only update if we haven't already set this field
+            # (in case of multiple tool calls, last one wins)
+            if state_field not in updates:
+                updates[state_field] = content
+                logger.debug(
+                    "post_process_node: Updated state[%s] from tool %s",
+                    state_field,
+                    tool_name,
+                )
 
     return updates
 
