@@ -1,10 +1,11 @@
 """Sessions routes for the Prompt Assistant API.
 
 CRUD endpoints for assistant sessions:
-- POST /sessions           -- Create a new session
-- GET  /sessions           -- List sessions by project_id
-- GET  /sessions/{id}      -- Get a single session by ID
-- PATCH /sessions/{id}     -- Update a session (archive)
+- POST /sessions              -- Create a new session
+- GET  /sessions              -- List sessions by project_id
+- GET  /sessions/{id}         -- Get session with full state from checkpointer
+- PATCH /sessions/{id}        -- Update a session (archive)
+- PATCH /sessions/{id}/title  -- Set session title (auto-title)
 """
 
 from uuid import UUID
@@ -13,16 +14,20 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.models.dtos import (
     CreateSessionRequest,
+    SessionDetailResponse,
     SessionListResponse,
     SessionResponse,
     UpdateSessionRequest,
+    UpdateTitleRequest,
 )
+from app.services.assistant_service import AssistantService
 from app.services.session_repository import SessionRepository
 
 router = APIRouter()
 
-# Module-level repository instance
+# Module-level instances
 _repo = SessionRepository()
+_service = AssistantService()
 
 
 @router.post("/sessions", response_model=SessionResponse, status_code=201)
@@ -66,23 +71,30 @@ async def list_sessions(
     )
 
 
-@router.get("/sessions/{session_id}", response_model=SessionResponse)
+@router.get("/sessions/{session_id}", response_model=SessionDetailResponse)
 async def get_session(session_id: UUID):
-    """Get a single session by ID.
+    """Get a session with full state from the LangGraph checkpointer.
+
+    Returns session metadata plus conversation state (messages, draft_prompt,
+    recommended_model) reconstructed from the LangGraph checkpoint.
+
+    AC-1: Returns state with messages array.
+    AC-2: Returns draft_prompt if present.
+    AC-3: Returns 404 if session not found.
 
     Args:
         session_id: UUID of the session.
 
     Returns:
-        SessionResponse with HTTP 200.
+        SessionDetailResponse with HTTP 200.
 
     Raises:
         HTTPException 404: If the session does not exist.
     """
-    session = await _repo.get_by_id(session_id=session_id)
-    if session is None:
+    result = await _service.get_session_state(session_id=str(session_id))
+    if result is None:
         raise HTTPException(status_code=404, detail="Session nicht gefunden")
-    return SessionResponse(**session)
+    return result
 
 
 @router.patch("/sessions/{session_id}", response_model=SessionResponse)
@@ -104,6 +116,32 @@ async def update_session(session_id: UUID, request: UpdateSessionRequest):
     session = await _repo.update(
         session_id=session_id,
         status=request.status,
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session nicht gefunden")
+    return SessionResponse(**session)
+
+
+@router.patch("/sessions/{session_id}/title", response_model=SessionResponse)
+async def update_session_title(session_id: UUID, request: UpdateTitleRequest):
+    """Set the title of a session.
+
+    Used for auto-title generation from the first user message.
+    AC-9: Title derived from first user message (truncated to 80 chars).
+
+    Args:
+        session_id: UUID of the session.
+        request: UpdateTitleRequest with title string.
+
+    Returns:
+        SessionResponse with HTTP 200.
+
+    Raises:
+        HTTPException 404: If the session does not exist.
+    """
+    session = await _repo.set_title(
+        session_id=session_id,
+        title=request.title,
     )
     if session is None:
         raise HTTPException(status_code=404, detail="Session nicht gefunden")

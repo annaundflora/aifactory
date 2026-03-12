@@ -110,3 +110,76 @@ class SessionListResponse(BaseModel):
     """
 
     sessions: list[SessionResponse]
+
+
+# ---------------------------------------------------------------------------
+# Session Detail DTOs (Slice 13c)
+# ---------------------------------------------------------------------------
+
+
+class MessageDTO(BaseModel):
+    """A single message in the conversation history.
+
+    Converted from LangChain BaseMessage.
+    """
+
+    role: str = Field(
+        ...,
+        description='Message role: "human" or "assistant"',
+    )
+    content: str = Field(
+        ...,
+        description="Message text content",
+    )
+
+
+class DraftPromptDTO(BaseModel):
+    """Current prompt draft from LangGraph state."""
+
+    motiv: str
+    style: str
+    negative_prompt: str
+
+
+class ModelRecDTO(BaseModel):
+    """Model recommendation from LangGraph state."""
+
+    id: str
+    name: str
+    reason: str
+
+
+class SessionStateDTO(BaseModel):
+    """Reconstructed state from LangGraph checkpoint.
+
+    Contains all relevant state fields for session resume.
+    """
+
+    messages: list[MessageDTO] = Field(default_factory=list)
+    draft_prompt: Optional[DraftPromptDTO] = None
+    recommended_model: Optional[ModelRecDTO] = None
+
+
+class SessionDetailResponse(BaseModel):
+    """DTO for GET /api/assistant/sessions/{id} with full state.
+
+    Returns session metadata plus the full conversational state
+    reconstructed from the LangGraph checkpointer.
+    """
+
+    session: SessionResponse
+    state: SessionStateDTO
+
+
+class UpdateTitleRequest(BaseModel):
+    """DTO for PATCH /api/assistant/sessions/{id}/title.
+
+    Sets the session title (used for auto-title from first user message).
+    """
+
+    title: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        description="New title for the session",
+    )

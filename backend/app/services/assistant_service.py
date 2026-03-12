@@ -15,10 +15,19 @@ import time
 from collections import defaultdict
 from typing import AsyncGenerator, Optional
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from app.agent.graph import create_agent
 from app.config import settings
+from app.models.dtos import (
+    DraftPromptDTO,
+    MessageDTO,
+    ModelRecDTO,
+    SessionDetailResponse,
+    SessionResponse,
+    SessionStateDTO,
+)
+from app.services.session_repository import SessionRepository
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +110,7 @@ class AssistantService:
 
     def __init__(self):
         self._agent = create_agent(checkpointer=None)
+        self._repo = SessionRepository()
 
     async def stream_response(
         self,
@@ -281,3 +291,104 @@ class AssistantService:
             }
 
         return None
+
+    async def get_session_state(self, session_id: str) -> Optional[SessionDetailResponse]:
+        """Get the full session state from the LangGraph checkpointer.
+
+        Reads the session metadata from the database and the conversation state
+        from the LangGraph checkpoint via the compiled graph's get_state method.
+
+        AC-1: Returns session metadata and state with messages.
+        AC-2: Returns draft_prompt from state if present.
+        AC-3: Returns None if session not found (caller raises 404).
+        AC-12: Reads LangGraph checkpoint via thread_id config.
+
+        Args:
+            session_id: The session UUID (used as LangGraph thread_id).
+
+        Returns:
+            SessionDetailResponse with session metadata and full state,
+            or None if the session is not found.
+        """
+        from uuid import UUID
+
+        # Get session metadata from DB
+        session_data = await self._repo.get_by_id(session_id=UUID(session_id))
+        if session_data is None:
+            return None
+
+        session = SessionResponse(**session_data)
+
+        # Read the LangGraph checkpoint state via the compiled graph
+        config = {"configurable": {"thread_id": session_id}}
+
+        messages: list[MessageDTO] = []
+        draft_prompt: Optional[DraftPromptDTO] = None
+        recommended_model: Optional[ModelRecDTO] = None
+
+        try:
+            state_snapshot = await self._agent.aget_state(config)
+
+            if state_snapshot and state_snapshot.values:
+                state_values = state_snapshot.values
+
+                # Convert LangChain BaseMessage objects to MessageDTO
+                raw_messages = state_values.get("messages", [])
+                for msg in raw_messages:
+                    if isinstance(msg, HumanMessage):
+                        # Extract text content from multimodal messages
+                        content = msg.content
+                        if isinstance(content, list):
+                            # Multimodal message: extract text parts
+                            text_parts = [
+                                p.get("text", "") if isinstance(p, dict) else str(p)
+                                for p in content
+                                if isinstance(p, dict) and p.get("type") == "text"
+                                or isinstance(p, str)
+                            ]
+                            content = " ".join(text_parts)
+                        messages.append(
+                            MessageDTO(role="human", content=str(content))
+                        )
+                    elif isinstance(msg, AIMessage):
+                        # Skip tool-call-only messages (no visible text)
+                        content = msg.content
+                        if isinstance(content, str) and content.strip():
+                            messages.append(
+                                MessageDTO(role="assistant", content=content)
+                            )
+
+                # Extract draft_prompt from state
+                raw_draft = state_values.get("draft_prompt")
+                if raw_draft and isinstance(raw_draft, dict):
+                    draft_prompt = DraftPromptDTO(
+                        motiv=raw_draft.get("motiv", ""),
+                        style=raw_draft.get("style", ""),
+                        negative_prompt=raw_draft.get("negative_prompt", ""),
+                    )
+
+                # Extract recommended_model from state
+                raw_model = state_values.get("recommended_model")
+                if raw_model and isinstance(raw_model, dict):
+                    recommended_model = ModelRecDTO(
+                        id=raw_model.get("id", ""),
+                        name=raw_model.get("name", ""),
+                        reason=raw_model.get("reason", ""),
+                    )
+
+        except Exception:
+            # If the checkpoint cannot be read (e.g., no checkpoint exists),
+            # return session metadata with empty state.
+            logger.warning(
+                "Could not read checkpoint for session %s, returning empty state",
+                session_id,
+                exc_info=True,
+            )
+
+        state = SessionStateDTO(
+            messages=messages,
+            draft_prompt=draft_prompt,
+            recommended_model=recommended_model,
+        )
+
+        return SessionDetailResponse(session=session, state=state)

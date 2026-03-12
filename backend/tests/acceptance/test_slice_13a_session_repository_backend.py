@@ -58,7 +58,15 @@ def mock_repo():
 
 
 @pytest.fixture()
-def client(mock_repo):
+def mock_service():
+    """Create a mocked AssistantService for the GET session detail endpoint."""
+    with patch("app.routes.sessions._service") as service:
+        service.get_session_state = AsyncMock()
+        yield service
+
+
+@pytest.fixture()
+def client(mock_repo, mock_service):
     """Create a real TestClient against the actual FastAPI application."""
     from app.main import app
 
@@ -125,26 +133,40 @@ class TestSlice13aAcceptance:
         # Verify id is a valid UUID
         UUID(data["id"])  # raises ValueError if invalid
 
-    def test_ac2_get_session_by_id_returns_200(self, client, mock_repo):
+    def test_ac2_get_session_by_id_returns_200(self, client, mock_repo, mock_service):
         """AC-2: GIVEN eine existierende Session mit bekannter id
         WHEN GET /api/assistant/sessions/<id> aufgerufen wird
-        THEN antwortet der Server mit HTTP 200 und dem vollstaendigen Session-Objekt
-        (alle Felder aus AC-1).
+        THEN antwortet der Server mit HTTP 200 und the session detail response
+        containing session metadata and state.
+
+        Note: Slice 13c changed the GET detail endpoint to return
+        SessionDetailResponse (session + state) instead of plain SessionResponse.
         """
+        from app.models.dtos import (
+            SessionDetailResponse,
+            SessionResponse,
+            SessionStateDTO,
+        )
+
         session_id = uuid4()
         project_id = uuid4()
         now = datetime.utcnow()
-        session_data = _make_session_dict(
-            session_id=session_id,
+
+        session_response = SessionResponse(
+            id=session_id,
             project_id=project_id,
             title=None,
             status="active",
             message_count=0,
             has_draft=False,
+            last_message_at=now,
             created_at=now,
             updated_at=now,
         )
-        mock_repo.get_by_id.return_value = session_data
+        mock_service.get_session_state.return_value = SessionDetailResponse(
+            session=session_response,
+            state=SessionStateDTO(messages=[], draft_prompt=None, recommended_model=None),
+        )
 
         response = client.get(f"/api/assistant/sessions/{session_id}")
 
@@ -154,24 +176,28 @@ class TestSlice13aAcceptance:
 
         data = response.json()
 
-        # Verify all fields from AC-1 are present
-        assert data["id"] == str(session_id)
-        assert data["project_id"] == str(project_id)
-        assert "title" in data
-        assert "status" in data
-        assert "message_count" in data
-        assert "has_draft" in data
-        assert "created_at" in data
-        assert "updated_at" in data
-        assert "last_message_at" in data
+        # Verify session metadata is nested under "session" key
+        assert "session" in data, "Response must contain 'session' key"
+        assert "state" in data, "Response must contain 'state' key"
 
-    def test_ac3_get_nonexistent_session_returns_404(self, client, mock_repo):
+        session_data = data["session"]
+        assert session_data["id"] == str(session_id)
+        assert session_data["project_id"] == str(project_id)
+        assert "title" in session_data
+        assert "status" in session_data
+        assert "message_count" in session_data
+        assert "has_draft" in session_data
+        assert "created_at" in session_data
+        assert "updated_at" in session_data
+        assert "last_message_at" in session_data
+
+    def test_ac3_get_nonexistent_session_returns_404(self, client, mock_repo, mock_service):
         """AC-3: GIVEN keine Session mit der angegebenen id existiert
         WHEN GET /api/assistant/sessions/<non-existent-uuid> aufgerufen wird
         THEN antwortet der Server mit HTTP 404 und {"detail": "Session nicht gefunden"}.
         """
         non_existent_id = uuid4()
-        mock_repo.get_by_id.return_value = None
+        mock_service.get_session_state.return_value = None
 
         response = client.get(f"/api/assistant/sessions/{non_existent_id}")
 

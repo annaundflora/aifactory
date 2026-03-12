@@ -30,7 +30,15 @@ def mock_repo():
 
 
 @pytest.fixture()
-def client(mock_repo):
+def mock_service():
+    """Create a mocked AssistantService for the GET session detail endpoint."""
+    with patch("app.routes.sessions._service") as service:
+        service.get_session_state = AsyncMock()
+        yield service
+
+
+@pytest.fixture()
+def client(mock_repo, mock_service):
     """Create a real TestClient against the actual FastAPI application."""
     from app.main import app
 
@@ -129,23 +137,47 @@ class TestCreateSessionIntegration:
 
 
 class TestGetSessionIntegration:
-    """Integration tests for GET /api/assistant/sessions/{id}."""
+    """Integration tests for GET /api/assistant/sessions/{id}.
 
-    def test_get_session_returns_200(self, client, mock_repo):
-        """GET /sessions/{id} returns 200 with full session data."""
+    Note: Slice 13c changed the GET detail endpoint to return
+    SessionDetailResponse (session + state) instead of plain SessionResponse.
+    """
+
+    def test_get_session_returns_200(self, client, mock_repo, mock_service):
+        """GET /sessions/{id} returns 200 with session detail (session + state)."""
+        from app.models.dtos import (
+            SessionDetailResponse,
+            SessionResponse,
+            SessionStateDTO,
+        )
+
         session_id = uuid4()
-        session_data = _make_session_dict(session_id=session_id)
-        mock_repo.get_by_id.return_value = session_data
+        session_response = SessionResponse(
+            id=session_id,
+            project_id=uuid4(),
+            title=None,
+            status="active",
+            message_count=0,
+            has_draft=False,
+            last_message_at=datetime.utcnow(),
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+        mock_service.get_session_state.return_value = SessionDetailResponse(
+            session=session_response,
+            state=SessionStateDTO(messages=[], draft_prompt=None, recommended_model=None),
+        )
 
         response = client.get(f"/api/assistant/sessions/{session_id}")
 
         assert response.status_code == 200
         data = response.json()
-        assert data["id"] == str(session_id)
+        assert "session" in data
+        assert data["session"]["id"] == str(session_id)
 
-    def test_get_session_not_found_returns_404(self, client, mock_repo):
+    def test_get_session_not_found_returns_404(self, client, mock_repo, mock_service):
         """GET /sessions/{id} returns 404 when session does not exist."""
-        mock_repo.get_by_id.return_value = None
+        mock_service.get_session_state.return_value = None
 
         response = client.get(f"/api/assistant/sessions/{uuid4()}")
 
@@ -153,7 +185,7 @@ class TestGetSessionIntegration:
         data = response.json()
         assert data["detail"] == "Session nicht gefunden"
 
-    def test_get_session_invalid_uuid_returns_422(self, client, mock_repo):
+    def test_get_session_invalid_uuid_returns_422(self, client, mock_repo, mock_service):
         """GET /sessions/{invalid-uuid} returns 422."""
         response = client.get("/api/assistant/sessions/not-a-valid-uuid")
 

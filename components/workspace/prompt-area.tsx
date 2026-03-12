@@ -33,6 +33,8 @@ import { Startscreen } from "@/components/assistant/startscreen";
 import { ChatInput } from "@/components/assistant/chat-input";
 import { ChatThread } from "@/components/assistant/chat-thread";
 import { PromptCanvas } from "@/components/assistant/prompt-canvas";
+import { SessionList } from "@/components/assistant/session-list";
+import { SessionSwitcher } from "@/components/assistant/session-switcher";
 import {
   ModelSelector,
   DEFAULT_MODEL_SLUG,
@@ -210,9 +212,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     setAssistantOpen((prev) => !prev);
   }, []);
 
-  const handleSessionHistoryClick = useCallback(() => {
-    console.log("[PromptArea] Session history clicked");
-  }, []);
+  // Session history navigation is now handled inside AssistantSheetContent via context.setActiveView
 
   // ----- Variation state consumption -----
   const { variationData, clearVariation } = useWorkspaceVariation();
@@ -1176,7 +1176,6 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
           open={assistantOpen}
           onOpenChange={setAssistantOpen}
           projectId={projectId}
-          onSessionHistoryClick={handleSessionHistoryClick}
         />
       </PromptAssistantProvider>
     </div>
@@ -1191,14 +1190,12 @@ interface AssistantSheetContentProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;
-  onSessionHistoryClick: () => void;
 }
 
 function AssistantSheetContent({
   open,
   onOpenChange,
   projectId,
-  onSessionHistoryClick,
 }: AssistantSheetContentProps) {
   const {
     messages,
@@ -1207,6 +1204,9 @@ function AssistantSheetContent({
     selectedModel,
     setSelectedModel,
     cancelStream,
+    activeView,
+    setActiveView,
+    loadSession,
     dispatch,
     sessionIdRef,
     sendMessageRef,
@@ -1236,26 +1236,62 @@ function AssistantSheetContent({
     [sendMessage]
   );
 
-  const hasMessages = messages.length > 0;
+  // AC-7: Session switcher navigates to session list
+  const handleSwitcherClick = useCallback(() => {
+    setActiveView("session-list");
+  }, [setActiveView]);
 
-  return (
-    <AssistantSheet
-      open={open}
-      onOpenChange={onOpenChange}
-      hasCanvas={hasCanvas}
-      canvasSlot={<PromptCanvas />}
-      headerSlot={
-        <ModelSelector value={selectedModel} onChange={setSelectedModel} />
-      }
-    >
+  // AC-4: Loading a session from the list
+  const handleSelectSession = useCallback(
+    (id: string) => {
+      loadSession(id);
+    },
+    [loadSession]
+  );
+
+  // Navigate back from session list to startscreen or chat
+  const handleSessionListBack = useCallback(() => {
+    if (messages.length > 0) {
+      setActiveView("chat");
+    } else {
+      setActiveView("startscreen");
+    }
+  }, [messages.length, setActiveView]);
+
+  // New session from session list
+  const handleNewSession = useCallback(() => {
+    dispatch({ type: "RESET_SESSION" });
+    setActiveView("startscreen");
+  }, [dispatch, setActiveView]);
+
+  // Navigate to session list from startscreen
+  const handleSessionHistoryClick = useCallback(() => {
+    setActiveView("session-list");
+  }, [setActiveView]);
+
+  // Render the appropriate content based on activeView
+  const renderContent = () => {
+    if (activeView === "session-list") {
+      return (
+        <SessionList
+          projectId={projectId}
+          onSelectSession={handleSelectSession}
+          onBack={handleSessionListBack}
+          onNewSession={handleNewSession}
+        />
+      );
+    }
+
+    // For "chat" and "startscreen" views
+    return (
       <div className="flex flex-1 flex-col h-full">
-        {hasMessages ? (
+        {activeView === "chat" && messages.length > 0 ? (
           <ChatThread messages={messages} isStreaming={isStreaming} />
         ) : (
           <Startscreen
             hasSessions={false}
             onChipClick={handleChipClick}
-            onSessionHistoryClick={onSessionHistoryClick}
+            onSessionHistoryClick={handleSessionHistoryClick}
           />
         )}
         <ChatInput
@@ -1265,6 +1301,23 @@ function AssistantSheetContent({
           autoFocus={open}
         />
       </div>
+    );
+  };
+
+  return (
+    <AssistantSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      hasCanvas={hasCanvas && activeView !== "session-list"}
+      canvasSlot={<PromptCanvas />}
+      headerSlot={
+        <>
+          <ModelSelector value={selectedModel} onChange={setSelectedModel} />
+          <SessionSwitcher onClick={handleSwitcherClick} />
+        </>
+      }
+    >
+      {renderContent()}
     </AssistantSheet>
   );
 }
