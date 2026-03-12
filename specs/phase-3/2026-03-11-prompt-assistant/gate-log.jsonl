@@ -45,3 +45,9 @@
 {"ts":"2026-03-12T16:00:01Z","slice":"slice-14","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
 {"ts":"2026-03-12T16:00:02Z","slice":"slice-16","gate":"code_review","verdict":"REJECTED","blocking":1,"findings":["append bug: reads from state instead of updates dict"],"attempt":1}
 {"ts":"2026-03-12T16:15:00Z","slice":"slice-16","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":2}
+{"ts":"2026-03-12T16:20:00Z","slice":"slice-13c","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-03-12T16:20:00Z","slice":"slice-14","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-03-12T16:20:00Z","slice":"slice-16","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-03-12T16:45:00Z","slice":"slice-13c","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-12T16:45:00Z","slice":"slice-14","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-12T16:45:00Z","slice":"slice-16","gate":"tests","result":"PASSED","retries":0}

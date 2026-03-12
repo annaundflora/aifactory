@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/lib/assistant/assistant-context";
 import { StreamingIndicator } from "./streaming-indicator";
+import { ImagePreview } from "./image-preview";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -48,14 +49,10 @@ function MessageBubble({ message }: { message: Message }) {
             "bg-destructive/10 text-destructive border border-destructive/20 rounded-bl-md"
         )}
       >
-        {/* Image preview for user messages with image */}
+        {/* AC-6: Thumbnail inline in user message bubble (120x120, rounded) */}
         {isUser && message.imageUrl && (
           <div className="mb-2">
-            <img
-              src={message.imageUrl}
-              alt="Uploaded reference"
-              className="max-h-32 rounded-lg object-cover"
-            />
+            <ImagePreview src={message.imageUrl} size="md" />
           </div>
         )}
 

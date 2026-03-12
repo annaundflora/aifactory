@@ -4,8 +4,7 @@ Creates a compiled ReAct-style agent graph with custom state,
 OpenRouter LLM via langchain-openai, optional checkpointer support,
 and a post_process_node that updates state fields after tool execution.
 
-Tools: draft_prompt, refine_prompt, analyze_image
-(recommend_model and get_model_info added in later slices)
+Tools: draft_prompt, refine_prompt, analyze_image, recommend_model, get_model_info
 
 Graph structure:
     START -> assistant_node -> (has tool calls?) -> tools_node -> post_process_node -> assistant_node
@@ -27,14 +26,14 @@ from langgraph.prebuilt import create_react_agent  # noqa: F401 - kept for test 
 from app.agent.prompts import SYSTEM_PROMPT
 from app.agent.state import PromptAssistantState
 from app.agent.tools.image_tools import analyze_image
+from app.agent.tools.model_tools import get_model_info, recommend_model
 from app.agent.tools.prompt_tools import draft_prompt, refine_prompt
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 # Tool registry: all tools available to the agent.
-# Later slices (20) may append to this list.
-ALL_TOOLS = [draft_prompt, refine_prompt, analyze_image]
+ALL_TOOLS = [draft_prompt, refine_prompt, analyze_image, recommend_model, get_model_info]
 
 # Tool names whose results should update state fields via post_process_node.
 # Maps tool name -> state field to update.
@@ -42,6 +41,7 @@ TOOL_STATE_MAPPING: dict[str, str] = {
     "draft_prompt": "draft_prompt",
     "refine_prompt": "draft_prompt",
     "analyze_image": "reference_images",
+    "recommend_model": "recommended_model",
 }
 
 # Tools whose results should be appended to a list field (not overwritten).
@@ -112,6 +112,16 @@ def post_process_node(state: PromptAssistantState) -> dict:
                 continue
 
         if not isinstance(content, dict):
+            continue
+
+        # Skip error results (e.g., recommend_model returning {"error": "..."})
+        # These should not update state fields.
+        if "error" in content and len(content) == 1:
+            logger.debug(
+                "post_process_node: Skipping error result from tool %s: %s",
+                tool_name,
+                str(content.get("error", ""))[:100],
+            )
             continue
 
         # Check if this tool uses append semantics (list field)

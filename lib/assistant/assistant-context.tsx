@@ -12,6 +12,7 @@ import {
   type MutableRefObject,
 } from "react";
 import { toast } from "sonner";
+import { useWorkspaceVariation } from "@/lib/workspace-state";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -94,6 +95,8 @@ export interface AssistantState {
   activeView: ActiveView;
   /** Whether a session is currently being loaded */
   isLoadingSession: boolean;
+  /** Whether the current draft has been applied to the workspace */
+  isApplied: boolean;
 }
 
 const initialState: AssistantState = {
@@ -108,6 +111,7 @@ const initialState: AssistantState = {
   toolCallResults: [],
   activeView: "startscreen",
   isLoadingSession: false,
+  isApplied: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -138,7 +142,8 @@ export type AssistantAction =
       draftPrompt: DraftPrompt | null;
       recommendedModel: ModelRecommendation | null;
     }
-  | { type: "RESET_SESSION" };
+  | { type: "RESET_SESSION" }
+  | { type: "SET_IS_APPLIED"; isApplied: boolean };
 
 // ---------------------------------------------------------------------------
 // Reducer
@@ -209,6 +214,7 @@ function assistantReducer(
         ...state,
         draftPrompt: action.draftPrompt,
         hasCanvas: true,
+        isApplied: false,
       };
 
     case "UPDATE_DRAFT_FIELD": {
@@ -228,6 +234,7 @@ function assistantReducer(
         draftPrompt: action.draftPrompt,
         hasCanvas: true,
         canvasHighlight: true,
+        isApplied: false,
       };
 
     case "CLEAR_CANVAS_HIGHLIGHT":
@@ -272,6 +279,9 @@ function assistantReducer(
         selectedModel: state.selectedModel,
       };
 
+    case "SET_IS_APPLIED":
+      return { ...state, isApplied: action.isApplied };
+
     default:
       return state;
   }
@@ -296,6 +306,8 @@ export interface PromptAssistantContextValue {
   activeView: ActiveView;
   /** Whether a session is currently being loaded */
   isLoadingSession: boolean;
+  /** Whether the current draft has been applied to the workspace */
+  isApplied: boolean;
   sendMessage: (content: string, imageUrl?: string) => void;
   cancelStream: () => void;
   setSelectedModel: (model: string) => void;
@@ -305,6 +317,10 @@ export interface PromptAssistantContextValue {
   setActiveView: (view: ActiveView) => void;
   /** Load a session from the backend by ID (AC-4, AC-5, AC-6, AC-10, AC-11) */
   loadSession: (sessionId: string) => Promise<void>;
+  /** Apply the current draftPrompt to the workspace via setVariation */
+  applyToWorkspace: () => void;
+  /** Undo the last apply, restoring previous workspace values */
+  undoApply: () => void;
   dispatch: Dispatch<AssistantAction>;
   /** Ref to the current session ID (for use by useAssistantRuntime) */
   sessionIdRef: MutableRefObject<string | null>;
@@ -366,9 +382,16 @@ export function PromptAssistantProvider({
   children,
 }: PromptAssistantProviderProps) {
   const [state, dispatch] = useReducer(assistantReducer, initialState);
+  const { variationData, setVariation } = useWorkspaceVariation();
 
   // Refs that bridge the context and the runtime hook
   const sessionIdRef = useRef<string | null>(null);
+  // Snapshot of workspace values before apply, for undo
+  const undoSnapshotRef = useRef<{
+    promptMotiv: string;
+    promptStyle: string;
+    negativePrompt: string;
+  } | null>(null);
   const sendMessageRef = useRef<
     ((content: string, imageUrl?: string) => void) | null
   >(null);
@@ -509,6 +532,75 @@ export function PromptAssistantProvider({
     [dispatch]
   );
 
+  /**
+   * Apply the current draftPrompt to the workspace.
+   * AC-1: Maps canvas fields to workspace fields.
+   * AC-3: Shows sonner toast with undo action.
+   * AC-4: Snapshots previous workspace values for undo.
+   */
+  const applyToWorkspace = useCallback(() => {
+    if (!state.draftPrompt) return;
+
+    // AC-4: Snapshot current workspace values before applying
+    undoSnapshotRef.current = {
+      promptMotiv: variationData?.promptMotiv ?? "",
+      promptStyle: variationData?.promptStyle ?? "",
+      negativePrompt: variationData?.negativePrompt ?? "",
+    };
+
+    // AC-1: Map canvas fields to workspace fields, preserving modelId and modelParams
+    setVariation({
+      promptMotiv: state.draftPrompt.motiv,
+      promptStyle: state.draftPrompt.style,
+      negativePrompt: state.draftPrompt.negativePrompt,
+      modelId: variationData?.modelId ?? "",
+      modelParams: variationData?.modelParams ?? {},
+    });
+
+    dispatch({ type: "SET_IS_APPLIED", isApplied: true });
+
+    // AC-3: Show sonner toast with undo action
+    const snapshot = undoSnapshotRef.current;
+    toast("Prompt uebernommen.", {
+      duration: 5000,
+      action: {
+        label: "Rueckgaengig",
+        onClick: () => {
+          if (snapshot) {
+            setVariation({
+              promptMotiv: snapshot.promptMotiv,
+              promptStyle: snapshot.promptStyle,
+              negativePrompt: snapshot.negativePrompt,
+              modelId: variationData?.modelId ?? "",
+              modelParams: variationData?.modelParams ?? {},
+            });
+            dispatch({ type: "SET_IS_APPLIED", isApplied: false });
+          }
+        },
+      },
+    });
+  }, [state.draftPrompt, variationData, setVariation, dispatch]);
+
+  /**
+   * Undo the last apply, restoring previous workspace values.
+   * AC-4: Restores snapshot values.
+   */
+  const undoApply = useCallback(() => {
+    const snapshot = undoSnapshotRef.current;
+    if (!snapshot) return;
+
+    setVariation({
+      promptMotiv: snapshot.promptMotiv,
+      promptStyle: snapshot.promptStyle,
+      negativePrompt: snapshot.negativePrompt,
+      modelId: variationData?.modelId ?? "",
+      modelParams: variationData?.modelParams ?? {},
+    });
+
+    dispatch({ type: "SET_IS_APPLIED", isApplied: false });
+    undoSnapshotRef.current = null;
+  }, [variationData, setVariation, dispatch]);
+
   const value = useMemo<PromptAssistantContextValue>(
     () => ({
       sessionId: state.sessionId,
@@ -521,12 +613,15 @@ export function PromptAssistantProvider({
       selectedModel: state.selectedModel,
       activeView: state.activeView,
       isLoadingSession: state.isLoadingSession,
+      isApplied: state.isApplied,
       sendMessage,
       cancelStream,
       setSelectedModel,
       updateDraftField,
       setActiveView,
       loadSession,
+      applyToWorkspace,
+      undoApply,
       dispatch,
       sessionIdRef,
       sendMessageRef,
@@ -540,6 +635,8 @@ export function PromptAssistantProvider({
       updateDraftField,
       setActiveView,
       loadSession,
+      applyToWorkspace,
+      undoApply,
       dispatch,
     ]
   );
