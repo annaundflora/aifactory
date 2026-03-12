@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { ReferenceService } from "@/lib/services/reference-service";
 
+import type { ReferenceImage } from "@/lib/db/queries";
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -15,6 +17,12 @@ interface UploadReferenceImageInput {
 
 interface DeleteReferenceImageInput {
   id: string;
+}
+
+interface AddGalleryAsReferenceInput {
+  projectId: string;
+  generationId: string;
+  imageUrl: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -76,5 +84,33 @@ export async function deleteReferenceImage(
   } catch (error: unknown) {
     // AC-9: Service error returns { success: false }
     return { success: false };
+  }
+}
+
+export async function addGalleryAsReference(
+  input: AddGalleryAsReferenceInput
+): Promise<ReferenceImage | { error: string }> {
+  // AC-6: Validate projectId
+  if (!input.projectId || input.projectId.trim().length === 0) {
+    return { error: "Ungueltige Projekt-ID" };
+  }
+
+  try {
+    // AC-5: Delegate to ReferenceService.uploadFromGallery
+    const result = await ReferenceService.uploadFromGallery({
+      projectId: input.projectId,
+      generationId: input.generationId,
+      imageUrl: input.imageUrl,
+    });
+
+    // AC-8: Revalidate path after successful gallery reference creation
+    revalidatePath("/");
+
+    return result;
+  } catch (error: unknown) {
+    // AC-7: Pass through error message from service
+    return {
+      error: error instanceof Error ? error.message : "Unbekannter Fehler",
+    };
   }
 }

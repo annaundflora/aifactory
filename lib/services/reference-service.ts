@@ -183,12 +183,44 @@ async function getByProject(projectId: string): Promise<ReferenceImage[]> {
   return getReferenceImagesByProject(projectId);
 }
 
+/**
+ * Register an existing gallery image as a reference image.
+ * No R2 upload occurs — the gallery image URL is reused directly.
+ * Only a DB record with sourceType "gallery" is created.
+ */
+async function uploadFromGallery(input: {
+  projectId: string;
+  generationId: string;
+  imageUrl: string;
+}): Promise<ReferenceImage> {
+  const { projectId, generationId, imageUrl } = input;
+
+  if (!imageUrl || imageUrl.trim().length === 0) {
+    throw new Error("Bild-URL erforderlich");
+  }
+
+  if (!generationId || generationId.trim().length === 0) {
+    throw new Error("Generation-ID erforderlich");
+  }
+
+  // Create DB record only — no R2 upload, no dimension extraction
+  const record = await createReferenceImage({
+    projectId,
+    imageUrl,
+    sourceType: "gallery",
+    sourceGenerationId: generationId,
+  });
+
+  return record;
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 export const ReferenceService = {
   upload,
+  uploadFromGallery,
   delete: deleteRef,
   getByProject,
 };
