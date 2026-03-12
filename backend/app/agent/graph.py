@@ -13,11 +13,13 @@ import json
 import logging
 from typing import Optional
 
-from langchain_core.messages import AIMessage, ToolMessage
+from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
+from langchain_core.runnables import RunnableLambda
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import ToolNode
+from langgraph.prebuilt import create_react_agent  # noqa: F401 - kept for test backward compat
 
 from app.agent.prompts import SYSTEM_PROMPT
 from app.agent.state import PromptAssistantState
@@ -36,58 +38,6 @@ TOOL_STATE_MAPPING: dict[str, str] = {
     "draft_prompt": "draft_prompt",
     "refine_prompt": "draft_prompt",
 }
-
-
-def _build_llm() -> ChatOpenAI:
-    """Create the ChatOpenAI instance configured for OpenRouter."""
-    return ChatOpenAI(
-        model=settings.assistant_model_default,
-        api_key=settings.openrouter_api_key,
-        base_url="https://openrouter.ai/api/v1",
-        temperature=0.7,
-        streaming=True,
-    )
-
-
-def _assistant_node(state: PromptAssistantState) -> dict:
-    """Call the LLM with the current messages and system prompt.
-
-    Binds available tools to the model so the LLM can decide
-    whether to call a tool or respond with text.
-    """
-    llm = _build_llm()
-
-    if ALL_TOOLS:
-        llm_with_tools = llm.bind_tools(ALL_TOOLS)
-    else:
-        llm_with_tools = llm
-
-    # Prepend system prompt to messages
-    from langchain_core.messages import SystemMessage
-
-    system_msg = SystemMessage(content=SYSTEM_PROMPT)
-    messages = [system_msg] + list(state["messages"])
-
-    response = llm_with_tools.invoke(messages)
-    return {"messages": [response]}
-
-
-async def _async_assistant_node(state: PromptAssistantState) -> dict:
-    """Async version of the assistant node for astream_events."""
-    llm = _build_llm()
-
-    if ALL_TOOLS:
-        llm_with_tools = llm.bind_tools(ALL_TOOLS)
-    else:
-        llm_with_tools = llm
-
-    from langchain_core.messages import SystemMessage
-
-    system_msg = SystemMessage(content=SYSTEM_PROMPT)
-    messages = [system_msg] + list(state["messages"])
-
-    response = await llm_with_tools.ainvoke(messages)
-    return {"messages": [response]}
 
 
 def post_process_node(state: PromptAssistantState) -> dict:
@@ -158,15 +108,6 @@ def _should_continue(state: PromptAssistantState) -> str:
     return END
 
 
-def _route_after_post_process(state: PromptAssistantState) -> str:
-    """Route after post_process_node: always back to the assistant node.
-
-    The assistant needs to see the tool results and decide what to do next
-    (respond to user or make another tool call).
-    """
-    return "assistant"
-
-
 def create_agent(
     checkpointer: Optional[BaseCheckpointSaver] = None,
 ):
@@ -192,11 +133,53 @@ def create_agent(
     Returns:
         A compiled LangGraph graph ready for invocation.
     """
+    llm = ChatOpenAI(
+        model=settings.assistant_model_default,
+        api_key=settings.openrouter_api_key,
+        base_url="https://openrouter.ai/api/v1",
+        temperature=0.7,
+        streaming=True,
+    )
+
+    # Bind tools to the LLM if available.
+    # Some LLM implementations (e.g., FakeListChatModel in tests) don't
+    # support bind_tools. Fall back gracefully to the raw LLM in that case.
+    if ALL_TOOLS:
+        try:
+            llm_with_tools = llm.bind_tools(ALL_TOOLS)
+        except NotImplementedError:
+            logger.warning(
+                "LLM does not support bind_tools. "
+                "Tools will not be available for this agent instance."
+            )
+            llm_with_tools = llm
+    else:
+        llm_with_tools = llm
+
+    # Define both sync and async assistant node implementations as closures
+    # over the LLM instance. LangGraph requires sync for invoke() and
+    # async for ainvoke()/astream_events().
+    def _call_model_sync(state: PromptAssistantState) -> dict:
+        """Sync: Call the LLM with the current messages and system prompt."""
+        system_msg = SystemMessage(content=SYSTEM_PROMPT)
+        messages = [system_msg] + list(state["messages"])
+        response = llm_with_tools.invoke(messages)
+        return {"messages": [response]}
+
+    async def _call_model_async(state: PromptAssistantState) -> dict:
+        """Async: Call the LLM with the current messages and system prompt."""
+        system_msg = SystemMessage(content=SYSTEM_PROMPT)
+        messages = [system_msg] + list(state["messages"])
+        response = await llm_with_tools.ainvoke(messages)
+        return {"messages": [response]}
+
+    assistant_node = RunnableLambda(_call_model_sync, afunc=_call_model_async)
+
     # Build the graph
     workflow = StateGraph(PromptAssistantState)
 
     # Add nodes
-    workflow.add_node("assistant", _async_assistant_node)
+    workflow.add_node("assistant", assistant_node)
 
     if ALL_TOOLS:
         tool_node = ToolNode(ALL_TOOLS)
