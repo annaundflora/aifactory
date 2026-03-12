@@ -142,3 +142,55 @@ export const promptSnippets = pgTable(
   },
   (table) => [index("prompt_snippets_category_idx").on(table.category)]
 );
+
+// -----------------------------------------------
+// reference_images
+// -----------------------------------------------
+export const referenceImages = pgTable(
+  "reference_images",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    imageUrl: text("image_url").notNull(),
+    originalFilename: varchar("original_filename", { length: 255 }),
+    width: integer("width"),
+    height: integer("height"),
+    sourceType: varchar("source_type", { length: 20 }).notNull(),
+    sourceGenerationId: uuid("source_generation_id").references(
+      () => generations.id,
+      { onDelete: "set null" }
+    ),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("reference_images_project_id_idx").on(table.projectId)]
+);
+
+// -----------------------------------------------
+// generation_references
+// -----------------------------------------------
+export const generationReferences = pgTable(
+  "generation_references",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    generationId: uuid("generation_id")
+      .notNull()
+      .references(() => generations.id, { onDelete: "cascade" }),
+    referenceImageId: uuid("reference_image_id")
+      .notNull()
+      .references(() => referenceImages.id, { onDelete: "cascade" }),
+    role: varchar("role", { length: 20 }).notNull(),
+    strength: varchar("strength", { length: 20 }).notNull(),
+    slotPosition: integer("slot_position").notNull(),
+  },
+  (table) => [
+    index("generation_references_generation_id_idx").on(table.generationId),
+  ]
+);
