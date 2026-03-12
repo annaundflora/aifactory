@@ -37,6 +37,9 @@ vi.mock("lucide-react", () => ({
   ),
   Maximize2: () => null,
   Minimize2: () => null,
+  ImagePlus: (props: Record<string, unknown>) => (
+    <svg data-testid="image-plus-icon" {...props} />
+  ),
 }));
 
 // Mock lib/models
@@ -74,6 +77,12 @@ vi.mock("sonner", () => ({
 // Mock ProvenanceRow (Slice 15) — render nothing in download-button tests
 vi.mock("@/components/lightbox/provenance-row", () => ({
   ProvenanceRow: () => null,
+}));
+
+// Mock references server actions (Slice 16 — addGalleryAsReference + getReferenceCount)
+vi.mock("@/app/actions/references", () => ({
+  addGalleryAsReference: vi.fn().mockResolvedValue({ id: "ref-1" }),
+  getReferenceCount: vi.fn().mockResolvedValue(0),
 }));
 
 // Mock workspace-state (LightboxModal uses useWorkspaceVariation internally;

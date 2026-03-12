@@ -77,6 +77,9 @@ vi.mock("lucide-react", () => ({
   Trash2: (props: Record<string, unknown>) => (
     <svg data-testid="trash2-icon" {...props} />
   ),
+  ImagePlus: (props: Record<string, unknown>) => (
+    <svg data-testid="image-plus-icon" {...props} />
+  ),
 }));
 
 // Mock sonner toast — supports both toast("msg") and toast.error("msg")
@@ -143,6 +146,12 @@ vi.mock("@/components/ui/popover", () => {
 // Mock ProvenanceRow (Slice 15) — render nothing in lightbox-modal unit tests
 vi.mock("@/components/lightbox/provenance-row", () => ({
   ProvenanceRow: () => null,
+}));
+
+// Mock references server actions (Slice 16 — addGalleryAsReference + getReferenceCount)
+vi.mock("@/app/actions/references", () => ({
+  addGalleryAsReference: vi.fn().mockResolvedValue({ id: "ref-1" }),
+  getReferenceCount: vi.fn().mockResolvedValue(0),
 }));
 
 // Mock ConfirmDialog

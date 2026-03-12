@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
-import { ArrowRightLeft, Copy, Download, Loader2, Maximize2, Minimize2, Trash2, X, ZoomIn } from "lucide-react";
+import { ArrowRightLeft, Copy, Download, ImagePlus, Loader2, Maximize2, Minimize2, Trash2, X, ZoomIn } from "lucide-react";
 import { toast } from "sonner";
 import { type Generation } from "@/lib/db/queries";
 import { downloadImage, generateDownloadFilename } from "@/lib/utils";
@@ -10,6 +10,7 @@ import { modelIdToDisplayName } from "@/lib/utils/model-display-name";
 import { useWorkspaceVariation } from "@/lib/workspace-state";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { deleteGeneration, upscaleImage } from "@/app/actions/generations";
+import { addGalleryAsReference, getReferenceCount } from "@/app/actions/references";
 import { ProvenanceRow } from "@/components/lightbox/provenance-row";
 import {
   Popover,
@@ -69,10 +70,30 @@ export function LightboxModal({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUpscaling, setIsUpscaling] = useState(false);
   const [upscalePopoverOpen, setUpscalePopoverOpen] = useState(false);
+  const [referenceCount, setReferenceCount] = useState<number>(0);
   const { setVariation } = useWorkspaceVariation();
 
   const isUpscaleMode = generation.generationMode === "upscale";
   const isImg2ImgMode = generation.generationMode === "img2img";
+  const isAllSlotsFull = referenceCount >= 5;
+
+  // Fetch reference count for disabled state (AC-4)
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+
+    async function loadCount() {
+      const count = await getReferenceCount(generation.projectId);
+      if (!cancelled) {
+        setReferenceCount(count);
+      }
+    }
+
+    loadCount();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, generation.projectId]);
 
   const handleVariation = useCallback(() => {
     setVariation({
@@ -100,6 +121,32 @@ export function LightboxModal({
     });
     onClose();
   }, [generation, setVariation, onClose]);
+
+  // AC (Slice 16): "Als Referenz" handler — adds image as reference via context + server action
+  const handleUseAsReference = useCallback(async () => {
+    if (!generation.imageUrl || isAllSlotsFull) return;
+
+    // AC-2: Set addReference in context so PromptArea adds it to the next free slot
+    setVariation({
+      promptMotiv: "",
+      modelId: "",
+      modelParams: {},
+      addReference: {
+        imageUrl: generation.imageUrl,
+        generationId: generation.id,
+      },
+    });
+
+    // AC-7: Call server action to create DB record
+    addGalleryAsReference({
+      projectId: generation.projectId,
+      generationId: generation.id,
+      imageUrl: generation.imageUrl,
+    });
+
+    // AC-3: Close lightbox
+    onClose();
+  }, [generation, setVariation, onClose, isAllSlotsFull]);
 
   // AC-6, AC-7: Upscale handler — calls upscaleImage action with selected scale
   const handleUpscale = useCallback(
@@ -361,6 +408,17 @@ export function LightboxModal({
                     Variation
                   </button>
                 )}
+                {/* Slice-16 AC-1: "Als Referenz" button between Variation and img2img */}
+                <button
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:pointer-events-none disabled:opacity-50"
+                  onClick={handleUseAsReference}
+                  disabled={isAllSlotsFull}
+                  title={isAllSlotsFull ? "Alle 5 Slots belegt" : undefined}
+                  data-testid="use-as-reference-btn"
+                >
+                  <ImagePlus className="size-4" />
+                  Als Referenz
+                </button>
                 {/* AC-1/2/3/4: img2img button — visible for all modes */}
                 <button
                   className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"

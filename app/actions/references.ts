@@ -120,6 +120,24 @@ export async function addGalleryAsReference(
 }
 
 // ---------------------------------------------------------------------------
+// Reference Count (Slice 16 - used by Lightbox UseAsReference disabled state)
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the number of reference images for a project.
+ * Used by the Lightbox to determine if the "Als Referenz" button should be disabled (5/5).
+ */
+export async function getReferenceCount(
+  projectId: string
+): Promise<number> {
+  const rows = await db
+    .select({ id: referenceImages.id })
+    .from(referenceImages)
+    .where(eq(referenceImages.projectId, projectId));
+  return rows.length;
+}
+
+// ---------------------------------------------------------------------------
 // Provenance Data (Slice 15 - used by ProvenanceRow component)
 // ---------------------------------------------------------------------------
 
