@@ -141,7 +141,6 @@ export interface ReferenceSlotProps {
 
 export function ReferenceSlot({
   slotData,
-  slotPosition,
   dimmed = false,
   errorMessage,
   uploading = false,
@@ -330,7 +329,6 @@ export function ReferenceSlot({
         data-state="dimmed"
       >
         {/* Thumbnail */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={slotData.imageUrl}
           alt={slotData.originalFilename ?? `Reference @${slotData.slotPosition}`}
@@ -394,7 +392,6 @@ export function ReferenceSlot({
         data-role={slotData.role}
       >
         {/* Thumbnail */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={slotData.imageUrl}
           alt={slotData.originalFilename ?? `Reference @${slotData.slotPosition}`}

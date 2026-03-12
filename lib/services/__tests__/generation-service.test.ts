@@ -1266,7 +1266,7 @@ describe("GenerationService", () => {
       (createGeneration as Mock).mockResolvedValue(gen);
       setupUpscaleProcessingMocks();
 
-      const result = await GenerationService.upscale({
+      await GenerationService.upscale({
         projectId: "proj-001",
         sourceImageUrl: SOURCE_IMAGE_URL,
         scale: 2,

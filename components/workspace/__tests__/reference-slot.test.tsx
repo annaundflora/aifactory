@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
@@ -25,7 +26,6 @@ vi.mock("lucide-react", () => ({
 // Mock shadcn Select components as functional HTML selects
 // Radix Select uses portals and complex ARIA which jsdom cannot handle.
 vi.mock("@/components/ui/select", () => {
-  const React = require("react");
   return {
     Select: ({
       children,
@@ -48,12 +48,8 @@ vi.mock("@/components/ui/select", () => {
         </div>
       );
     },
-    SelectTrigger: ({
-      children,
-      _selectValue,
-      _onValueChange,
-      ...props
-    }: {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    SelectTrigger: ({ children, _selectValue, _onValueChange, ...props }: {
       children: React.ReactNode;
       _selectValue?: string;
       _onValueChange?: (value: string) => void;
@@ -68,10 +64,8 @@ vi.mock("@/components/ui/select", () => {
     SelectValue: ({ placeholder }: { placeholder?: string }) => {
       return <span data-slot="select-value">{placeholder}</span>;
     },
-    SelectContent: ({
-      children,
-      _onValueChange,
-    }: {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    SelectContent: ({ children, _onValueChange }: {
       children: React.ReactNode;
       _onValueChange?: (value: string) => void;
     }) => {
@@ -97,7 +91,7 @@ vi.mock("@/components/ui/select", () => {
 
 // Mock shadcn Badge to simple span
 vi.mock("@/components/ui/badge", () => {
-  const React = require("react");
+
   return {
     Badge: ({
       children,
@@ -676,45 +670,6 @@ describe("ReferenceSlot", () => {
   });
 
   describe("Role Color Mapping", () => {
-    // AC-14: Alle 5 Rollen-Farben korrekt gemappt
-    const roleColorCases: Array<{
-      role: ReferenceRole;
-      expectedBorderClass: string;
-      expectedDotColor: string;
-      label: string;
-    }> = [
-      {
-        role: "style",
-        expectedBorderClass: ROLE_COLORS.style.border,
-        expectedDotColor: ROLE_COLORS.style.dotColor,
-        label: "violet",
-      },
-      {
-        role: "content",
-        expectedBorderClass: ROLE_COLORS.content.border,
-        expectedDotColor: ROLE_COLORS.content.dotColor,
-        label: "blue",
-      },
-      {
-        role: "structure",
-        expectedBorderClass: ROLE_COLORS.structure.border,
-        expectedDotColor: ROLE_COLORS.structure.dotColor,
-        label: "green",
-      },
-      {
-        role: "character",
-        expectedBorderClass: ROLE_COLORS.character.border,
-        expectedDotColor: ROLE_COLORS.character.dotColor,
-        label: "amber",
-      },
-      {
-        role: "color",
-        expectedBorderClass: ROLE_COLORS.color.border,
-        expectedDotColor: ROLE_COLORS.color.dotColor,
-        label: "pink",
-      },
-    ];
-
     it('AC-14: should apply violet border for style role', () => {
       /**
        * AC-14: GIVEN das Rollen-Farbschema
@@ -803,7 +758,7 @@ describe("Reference Types", () => {
      * und ReferenceSlotData (mit Feldern: id, imageUrl, slotPosition, role, strength, originalFilename?, width?, height?)
      */
     // Dynamic import to test the module exports at runtime
-    const referenceModule = await import("@/lib/types/reference");
+    await import("@/lib/types/reference");
 
     // Verify the module is importable (types exist at compile time, but we verify
     // the interface contract by creating conforming objects)

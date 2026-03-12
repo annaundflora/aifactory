@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
+import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import type { ReferenceSlotData } from "@/lib/types/reference";
@@ -55,7 +56,7 @@ vi.mock("@/components/workspace/reference-slot", () => ({
 
 // Mock shadcn Collapsible components using React Context (avoids prop-cloning issues)
 vi.mock("@/components/ui/collapsible", () => {
-  const React = require("react");
+
 
   const CollapsibleCtx = React.createContext<{
     open: boolean;
@@ -134,7 +135,7 @@ vi.mock("@/components/ui/collapsible", () => {
 
 // Mock shadcn Badge to simple span
 vi.mock("@/components/ui/badge", () => {
-  const React = require("react");
+
   return {
     Badge: ({
       children,
@@ -156,16 +157,10 @@ vi.mock("@/components/ui/badge", () => {
 
 // Mock shadcn Button to a real HTML button
 vi.mock("@/components/ui/button", () => {
-  const React = require("react");
+
   return {
-    Button: ({
-      children,
-      className,
-      variant,
-      size,
-      asChild,
-      ...props
-    }: {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    Button: ({ children, className, variant, size, asChild, ...props }: {
       children: React.ReactNode;
       className?: string;
       variant?: string;
@@ -504,7 +499,6 @@ describe("ReferenceBar", () => {
        * WHEN Slot @2 per Remove-Button entfernt wird
        * THEN bleiben die verbleibenden Slots bei @1 und @3 (kein Re-Numbering) und der Counter zeigt "[2/5]"
        */
-      const user = userEvent.setup();
       const onRemove = vi.fn();
 
       // Start with 3 slots

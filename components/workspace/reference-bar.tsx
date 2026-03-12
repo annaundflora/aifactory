@@ -9,7 +9,7 @@ import {
   CollapsibleTrigger,
   CollapsibleContent,
 } from "@/components/ui/collapsible";
-import { ReferenceSlot, ROLE_COLORS } from "@/components/workspace/reference-slot";
+import { ReferenceSlot } from "@/components/workspace/reference-slot";
 import { cn } from "@/lib/utils";
 import type {
   ReferenceRole,
@@ -198,7 +198,6 @@ export function ReferenceBar({
                 className="flex items-center gap-0.5"
                 data-testid={`mini-thumb-${slot.slotPosition}`}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={slot.imageUrl}
                   alt={`Reference @${slot.slotPosition}`}

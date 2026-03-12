@@ -85,7 +85,7 @@ export async function deleteReferenceImage(
     revalidatePath("/");
 
     return { success: true };
-  } catch (error: unknown) {
+  } catch {
     // AC-9: Service error returns { success: false }
     return { success: false };
   }

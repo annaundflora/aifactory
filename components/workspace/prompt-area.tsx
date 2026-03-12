@@ -87,7 +87,6 @@ interface ModeStates {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const VARIANT_OPTIONS = [1, 2, 3, 4] as const;
 const DEFAULT_SCALE: 2 | 4 = 2;
 
 /** Auto-resize a textarea to fit its content. */

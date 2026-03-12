@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 
@@ -28,7 +29,6 @@ vi.mock("lucide-react", () => ({
 
 // Mock shadcn Select components (Radix uses portals; jsdom cannot handle)
 vi.mock("@/components/ui/select", () => {
-  const React = require("react");
   return {
     Select: ({
       children,
@@ -49,12 +49,8 @@ vi.mock("@/components/ui/select", () => {
         })}
       </div>
     ),
-    SelectTrigger: ({
-      children,
-      _selectValue,
-      _onValueChange,
-      ...props
-    }: {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    SelectTrigger: ({ children, _selectValue, _onValueChange, ...props }: {
       children: React.ReactNode;
       _selectValue?: string;
       _onValueChange?: (value: string) => void;
@@ -88,7 +84,7 @@ vi.mock("@/components/ui/select", () => {
 
 // Mock shadcn Badge to simple span
 vi.mock("@/components/ui/badge", () => {
-  const React = require("react");
+
   return {
     Badge: ({
       children,
@@ -480,7 +476,6 @@ describe("ReferenceSlot Gallery Drop", () => {
      */
     it("AC-8: should trigger onGalleryDrop callback with correct generationId and imageUrl for server action invocation", () => {
       const onGalleryDrop = vi.fn();
-      const projectId = "proj-xyz";
       const payload: GalleryDragPayload = {
         generationId: "gen-abc",
         imageUrl: "https://r2.example.com/img.png",

@@ -52,7 +52,6 @@ import { ReplicateClient } from "@/lib/clients/replicate";
 import { StorageService } from "@/lib/clients/storage";
 import {
   createGeneration,
-  getGeneration,
   updateGeneration,
 } from "@/lib/db/queries";
 import type { Generation } from "@/lib/db/queries";

@@ -65,7 +65,7 @@ const GEN_B_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
 const GEN_C_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc'
 const PROJECT_ID = 'proj-1111-2222-3333-444444444444'
 const REF_IMAGE_A_ID = 'ref-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
-const REF_IMAGE_B_ID = 'ref-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+// REF_IMAGE_B_ID reserved for future test cases
 
 function makeGenRow(id: string, projectId: string, sourceImageUrl: string | null) {
   return { id, projectId, sourceImageUrl }
