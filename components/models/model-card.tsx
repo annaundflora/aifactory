@@ -47,6 +47,7 @@ export function ModelCard({ model, selected, disabled, onSelect, isFavorite = fa
       }}
       className={cn(
         "relative flex flex-col overflow-hidden cursor-pointer transition-all duration-200",
+        "gap-0 py-0",
         "hover:shadow-md",
         selected && "ring-2 ring-primary",
         disabled && "opacity-50 pointer-events-none cursor-not-allowed"

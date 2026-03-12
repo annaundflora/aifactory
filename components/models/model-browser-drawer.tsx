@@ -379,7 +379,7 @@ export function ModelBrowserDrawer({
 
           {/* Model card grid */}
           {!isLoading && !error && models.length > 0 && (
-            <div className="grid grid-cols-2 gap-4" data-testid="model-grid">
+            <div className="grid grid-cols-2 gap-4 pt-1" data-testid="model-grid">
               {displayModels.map((model) => {
                 const selected = isSelected(model);
                 const disabled = !selected && atMaxSelection;
