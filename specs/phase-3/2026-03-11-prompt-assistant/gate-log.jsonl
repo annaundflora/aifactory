@@ -54,3 +54,10 @@
 {"ts":"2026-03-12T17:00:00Z","slice":"slice-15","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
 {"ts":"2026-03-12T17:00:00Z","slice":"slice-17","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
 {"ts":"2026-03-12T17:00:00Z","slice":"slice-20","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-12T17:05:00Z","slice":"slice-15","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-03-12T17:05:00Z","slice":"slice-17","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-03-12T17:05:00Z","slice":"slice-20","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-03-12T17:30:00Z","slice":"slice-15","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-12T17:30:00Z","slice":"slice-20","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-12T17:30:01Z","slice":"slice-17","gate":"tests","result":"FAILED","retries":0}
+{"ts":"2026-03-12T17:45:00Z","slice":"slice-17","gate":"tests","result":"PASSED","retries":1}

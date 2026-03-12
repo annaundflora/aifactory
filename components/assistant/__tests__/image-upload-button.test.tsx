@@ -11,7 +11,7 @@ import { ImageUploadButton } from "../image-upload-button";
 
 const mockUploadSourceImage = vi.fn();
 
-vi.mock("@/app/actions/generations", () => ({
+vi.mock("@/app/actions/upload", () => ({
   uploadSourceImage: (...args: unknown[]) => mockUploadSourceImage(...args),
 }));
 

@@ -87,6 +87,9 @@ const mockUpscaleImage = vi.fn();
 vi.mock("@/app/actions/generations", () => ({
   generateImages: (...args: unknown[]) => mockGenerateImages(...args),
   upscaleImage: (...args: unknown[]) => mockUpscaleImage(...args),
+}));
+
+vi.mock("@/app/actions/upload", () => ({
   uploadSourceImage: vi.fn().mockResolvedValue({ url: "https://r2.example.com/uploaded.png" }),
 }));
 

@@ -10,7 +10,7 @@ import "@testing-library/jest-dom/vitest";
 
 const mockUploadSourceImage = vi.fn();
 
-vi.mock("@/app/actions/generations", () => ({
+vi.mock("@/app/actions/upload", () => ({
   uploadSourceImage: (...args: unknown[]) => mockUploadSourceImage(...args),
 }));
 

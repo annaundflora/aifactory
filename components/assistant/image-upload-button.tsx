@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, type ChangeEvent } from "react";
 import { Image, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { uploadSourceImage } from "@/app/actions/generations";
+import { uploadSourceImage } from "@/app/actions/upload";
 
 // ---------------------------------------------------------------------------
 // Constants

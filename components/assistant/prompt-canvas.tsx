@@ -8,6 +8,7 @@ import {
   type DraftPromptField,
 } from "@/lib/assistant/assistant-context";
 import { ApplyButton } from "@/components/assistant/apply-button";
+import { ModelRecommendation } from "@/components/assistant/model-recommendation";
 
 // ---------------------------------------------------------------------------
 // Canvas Field
@@ -131,6 +132,9 @@ export function PromptCanvas() {
         highlight={canvasHighlight}
         tabIndex={3}
       />
+
+      {/* Slice-21: Model recommendation badge between negative prompt and apply button */}
+      <ModelRecommendation />
 
       {/* Slice-15: Apply button at the bottom of the canvas */}
       <ApplyButton />

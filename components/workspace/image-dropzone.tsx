@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, type DragEvent, type ChangeEvent, type ClipboardEvent } from "react";
-import { uploadSourceImage } from "@/app/actions/generations";
+import { uploadSourceImage } from "@/app/actions/upload";
 import { Loader2, X } from "lucide-react";
 
 // ---------------------------------------------------------------------------
