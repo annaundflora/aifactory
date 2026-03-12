@@ -1,9 +1,11 @@
 "use client";
 
+import { useCallback, type DragEvent } from "react";
 import { type Generation } from "@/lib/db/queries";
 import { Badge } from "@/components/ui/badge";
 import { modelIdToDisplayName } from "@/lib/utils/model-display-name";
 import { ModeBadge, type Mode } from "@/components/workspace/mode-badge";
+import { GALLERY_DRAG_MIME_TYPE } from "@/lib/constants/drag-types";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -19,9 +21,23 @@ export interface GenerationCardProps {
 // ---------------------------------------------------------------------------
 
 export function GenerationCard({ generation, onSelect }: GenerationCardProps) {
+  const handleDragStart = useCallback(
+    (e: DragEvent<HTMLButtonElement>) => {
+      const payload = JSON.stringify({
+        generationId: generation.id,
+        imageUrl: generation.imageUrl,
+      });
+      e.dataTransfer.setData(GALLERY_DRAG_MIME_TYPE, payload);
+      e.dataTransfer.effectAllowed = "copy";
+    },
+    [generation.id, generation.imageUrl]
+  );
+
   return (
     <button
       type="button"
+      draggable="true"
+      onDragStart={handleDragStart}
       onClick={() => onSelect(generation.id)}
       className="group relative w-full overflow-hidden rounded-lg border border-border bg-card cursor-pointer transition-all duration-200 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10 hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >

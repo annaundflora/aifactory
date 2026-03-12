@@ -342,7 +342,7 @@ describe("PromptArea + ModelTrigger integration", () => {
   }));
 
   // Import PromptArea AFTER mocks
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+   
   let PromptArea: typeof import("@/components/workspace/prompt-area").PromptArea;
 
   beforeAll(async () => {
