@@ -2,6 +2,11 @@
 
 Handles message validation, rate limiting, LangGraph agent invocation via
 astream_events(), and conversion of agent events into SSE-formatted events.
+
+Error handling strategy (Slice 22):
+- LLM API errors (OpenRouter timeout, 500) -> SSE error event + ERROR log
+- Stream interruptions -> SSE error event + ERROR log
+- All exceptions in stream_response are caught, logged, and converted to SSE error events
 """
 
 import json
@@ -156,7 +161,41 @@ class AssistantService:
             # Signal completion
             yield {"event": "text-done", "data": json.dumps({})}
 
+        except TimeoutError:
+            # AC-8: LLM timeout (e.g. OpenRouter timeout)
+            error_msg = (
+                "Die Anfrage an den KI-Dienst hat zu lange gedauert. "
+                "Bitte versuche es erneut."
+            )
+            logger.error(
+                "LLM timeout in stream_response for session %s",
+                session_id,
+                exc_info=True,
+            )
+            yield {
+                "event": "error",
+                "data": json.dumps({"message": error_msg}),
+            }
+
+        except ConnectionError:
+            # AC-8: LLM API connection error (backend unreachable, network issue)
+            error_msg = (
+                "Der KI-Dienst ist momentan nicht erreichbar. "
+                "Bitte versuche es spaeter erneut."
+            )
+            logger.error(
+                "LLM connection error in stream_response for session %s",
+                session_id,
+                exc_info=True,
+            )
+            yield {
+                "event": "error",
+                "data": json.dumps({"message": error_msg}),
+            }
+
         except Exception as e:
+            # AC-8: Catch-all for LLM API errors (OpenRouter 500, etc.)
+            error_msg = self._build_error_message(e)
             logger.error(
                 "Error in stream_response for session %s: %s",
                 session_id,
@@ -165,8 +204,42 @@ class AssistantService:
             )
             yield {
                 "event": "error",
-                "data": json.dumps({"message": str(e)}),
+                "data": json.dumps({"message": error_msg}),
             }
+
+    @staticmethod
+    def _build_error_message(error: Exception) -> str:
+        """Build a user-friendly error message from an exception.
+
+        Maps common LLM API errors to German-language descriptions.
+        Falls back to a generic message for unknown errors.
+        """
+        error_str = str(error).lower()
+
+        if "timeout" in error_str:
+            return (
+                "Die Anfrage an den KI-Dienst hat zu lange gedauert. "
+                "Bitte versuche es erneut."
+            )
+        if "rate limit" in error_str or "429" in error_str:
+            return (
+                "Der KI-Dienst ist momentan ueberlastet. "
+                "Bitte warte einen Moment und versuche es erneut."
+            )
+        if "401" in error_str or "unauthorized" in error_str:
+            return "Authentifizierungsfehler beim KI-Dienst."
+        if "500" in error_str or "internal server error" in error_str:
+            return (
+                "Der KI-Dienst hat einen internen Fehler gemeldet. "
+                "Bitte versuche es erneut."
+            )
+        if "502" in error_str or "bad gateway" in error_str:
+            return "Der KI-Dienst ist momentan nicht erreichbar."
+        if "503" in error_str or "service unavailable" in error_str:
+            return "Der KI-Dienst ist voruebergehend nicht verfuegbar."
+
+        # Generic fallback
+        return "Ein unerwarteter Fehler ist aufgetreten. Bitte versuche es erneut."
 
     def _convert_event(self, event: dict) -> Optional[dict]:
         """Convert a LangGraph astream_events event to an SSE event dict.

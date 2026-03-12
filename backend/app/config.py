@@ -1,3 +1,5 @@
+import os
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,3 +38,13 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Propagate LangSmith settings to environment variables so that
+# LangChain/LangGraph can auto-detect them (no explicit instrumentation needed).
+# See AC-2: LangGraph reads LANGSMITH_TRACING and LANGSMITH_API_KEY automatically.
+if settings.langsmith_tracing:
+    os.environ.setdefault("LANGSMITH_TRACING", "true")
+    if settings.langsmith_api_key:
+        os.environ.setdefault("LANGSMITH_API_KEY", settings.langsmith_api_key)
+    if settings.langsmith_project:
+        os.environ.setdefault("LANGSMITH_PROJECT", settings.langsmith_project)

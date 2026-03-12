@@ -175,6 +175,7 @@ export interface PromptAssistantContextValue {
   recommendedModel: ModelRecommendation | null;
   selectedModel: string;
   sendMessage: (content: string, imageUrl?: string) => void;
+  cancelStream: () => void;
   setSelectedModel: (model: string) => void;
   dispatch: Dispatch<AssistantAction>;
   /** Ref to the current session ID (for use by useAssistantRuntime) */
@@ -183,6 +184,8 @@ export interface PromptAssistantContextValue {
   sendMessageRef: MutableRefObject<
     ((content: string, imageUrl?: string) => void) | null
   >;
+  /** Ref for registering the cancelStream implementation from useAssistantRuntime */
+  cancelStreamRef: MutableRefObject<(() => void) | null>;
 }
 
 const PromptAssistantContext =
@@ -211,6 +214,7 @@ export function PromptAssistantProvider({
   const sendMessageRef = useRef<
     ((content: string, imageUrl?: string) => void) | null
   >(null);
+  const cancelStreamRef = useRef<(() => void) | null>(null);
 
   // Keep sessionIdRef in sync with reducer state
   sessionIdRef.current = state.sessionId;
@@ -228,6 +232,12 @@ export function PromptAssistantProvider({
     [] // sendMessageRef is stable (ref), no need as dependency
   );
 
+  const cancelStream = useCallback(() => {
+    if (cancelStreamRef.current) {
+      cancelStreamRef.current();
+    }
+  }, []);
+
   const setSelectedModel = useCallback(
     (model: string) => {
       dispatch({ type: "SET_SELECTED_MODEL", model });
@@ -244,12 +254,14 @@ export function PromptAssistantProvider({
       recommendedModel: state.recommendedModel,
       selectedModel: state.selectedModel,
       sendMessage,
+      cancelStream,
       setSelectedModel,
       dispatch,
       sessionIdRef,
       sendMessageRef,
+      cancelStreamRef,
     }),
-    [state, sendMessage, setSelectedModel, dispatch]
+    [state, sendMessage, cancelStream, setSelectedModel, dispatch]
   );
 
   return (

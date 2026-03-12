@@ -1,18 +1,170 @@
 """LangGraph agent factory for the Prompt Assistant.
 
-Creates a compiled ReAct agent graph using create_react_agent with custom state,
-OpenRouter LLM via langchain-openai, and optional checkpointer support.
+Creates a compiled ReAct-style agent graph with custom state,
+OpenRouter LLM via langchain-openai, optional checkpointer support,
+and a post_process_node that updates state fields after tool execution.
+
+Graph structure:
+    START -> assistant_node -> (has tool calls?) -> tools_node -> post_process_node -> assistant_node
+                            -> (no tool calls?) -> END
 """
 
+import json
+import logging
 from typing import Optional
 
+from langchain_core.messages import AIMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.prebuilt import create_react_agent
+from langgraph.graph import END, StateGraph
+from langgraph.prebuilt import ToolNode
 
 from app.agent.prompts import SYSTEM_PROMPT
 from app.agent.state import PromptAssistantState
+from app.agent.tools.prompt_tools import draft_prompt, refine_prompt
 from app.config import settings
+
+logger = logging.getLogger(__name__)
+
+# Tool registry: all tools available to the agent.
+# Later slices (16, 20) append to this list.
+ALL_TOOLS = [draft_prompt, refine_prompt]
+
+# Tool names whose results should update state fields via post_process_node.
+# Maps tool name -> state field to update.
+TOOL_STATE_MAPPING: dict[str, str] = {
+    "draft_prompt": "draft_prompt",
+    "refine_prompt": "draft_prompt",
+}
+
+
+def _build_llm() -> ChatOpenAI:
+    """Create the ChatOpenAI instance configured for OpenRouter."""
+    return ChatOpenAI(
+        model=settings.assistant_model_default,
+        api_key=settings.openrouter_api_key,
+        base_url="https://openrouter.ai/api/v1",
+        temperature=0.7,
+        streaming=True,
+    )
+
+
+def _assistant_node(state: PromptAssistantState) -> dict:
+    """Call the LLM with the current messages and system prompt.
+
+    Binds available tools to the model so the LLM can decide
+    whether to call a tool or respond with text.
+    """
+    llm = _build_llm()
+
+    if ALL_TOOLS:
+        llm_with_tools = llm.bind_tools(ALL_TOOLS)
+    else:
+        llm_with_tools = llm
+
+    # Prepend system prompt to messages
+    from langchain_core.messages import SystemMessage
+
+    system_msg = SystemMessage(content=SYSTEM_PROMPT)
+    messages = [system_msg] + list(state["messages"])
+
+    response = llm_with_tools.invoke(messages)
+    return {"messages": [response]}
+
+
+async def _async_assistant_node(state: PromptAssistantState) -> dict:
+    """Async version of the assistant node for astream_events."""
+    llm = _build_llm()
+
+    if ALL_TOOLS:
+        llm_with_tools = llm.bind_tools(ALL_TOOLS)
+    else:
+        llm_with_tools = llm
+
+    from langchain_core.messages import SystemMessage
+
+    system_msg = SystemMessage(content=SYSTEM_PROMPT)
+    messages = [system_msg] + list(state["messages"])
+
+    response = await llm_with_tools.ainvoke(messages)
+    return {"messages": [response]}
+
+
+def post_process_node(state: PromptAssistantState) -> dict:
+    """Process tool results and update state fields accordingly.
+
+    Reads the most recent ToolMessage(s) from state and checks if they
+    correspond to tools in TOOL_STATE_MAPPING. If so, extracts the tool
+    result and updates the corresponding state field.
+
+    For draft_prompt and refine_prompt: updates state["draft_prompt"].
+    Later slices (16, 20) extend TOOL_STATE_MAPPING for their tools.
+
+    Returns:
+        Dict with state field updates (e.g., {"draft_prompt": {...}}).
+    """
+    updates: dict = {}
+    messages = state.get("messages", [])
+
+    # Walk backwards through messages to find the most recent ToolMessages
+    for msg in reversed(messages):
+        if not isinstance(msg, ToolMessage):
+            break
+
+        tool_name = getattr(msg, "name", None)
+        if tool_name and tool_name in TOOL_STATE_MAPPING:
+            state_field = TOOL_STATE_MAPPING[tool_name]
+
+            # Parse the tool result content
+            content = msg.content
+            if isinstance(content, str):
+                try:
+                    content = json.loads(content)
+                except (json.JSONDecodeError, TypeError):
+                    logger.warning(
+                        "Could not parse tool result for %s as JSON: %s",
+                        tool_name,
+                        content[:100] if content else "(empty)",
+                    )
+                    continue
+
+            if isinstance(content, dict):
+                # Only update if we haven't already set this field
+                # (in case of multiple tool calls, last one wins)
+                if state_field not in updates:
+                    updates[state_field] = content
+                    logger.debug(
+                        "post_process_node: Updated state[%s] from tool %s",
+                        state_field,
+                        tool_name,
+                    )
+
+    return updates
+
+
+def _should_continue(state: PromptAssistantState) -> str:
+    """Route after the assistant node: to tools or to END.
+
+    If the last AI message has tool calls, route to the tools node.
+    Otherwise, end the conversation turn.
+    """
+    messages = state.get("messages", [])
+    if not messages:
+        return END
+
+    last_message = messages[-1]
+    if isinstance(last_message, AIMessage) and getattr(last_message, "tool_calls", None):
+        return "tools"
+    return END
+
+
+def _route_after_post_process(state: PromptAssistantState) -> str:
+    """Route after post_process_node: always back to the assistant node.
+
+    The assistant needs to see the tool results and decide what to do next
+    (respond to user or make another tool call).
+    """
+    return "assistant"
 
 
 def create_agent(
@@ -20,7 +172,13 @@ def create_agent(
 ):
     """Create a compiled LangGraph agent for the Prompt Assistant.
 
-    Creates a ReAct agent using create_react_agent with:
+    Builds a custom ReAct-style graph with:
+    - assistant_node: Calls the LLM with tools bound
+    - tools_node: Executes tool calls (ToolNode from langgraph.prebuilt)
+    - post_process_node: Updates state fields based on tool results
+    - Conditional routing: assistant -> tools -> post_process -> assistant, or assistant -> END
+
+    The graph uses:
     - Custom PromptAssistantState for extended state fields
     - OpenRouter LLM via ChatOpenAI with base_url override
     - System prompt with bilingual instructions (German chat, English prompts)
@@ -34,24 +192,35 @@ def create_agent(
     Returns:
         A compiled LangGraph graph ready for invocation.
     """
-    llm = ChatOpenAI(
-        model=settings.assistant_model_default,
-        api_key=settings.openrouter_api_key,
-        base_url="https://openrouter.ai/api/v1",
-        temperature=0.7,
-        streaming=True,
-    )
+    # Build the graph
+    workflow = StateGraph(PromptAssistantState)
 
-    # No tools in this slice -- tools are added in later slices (12, 16, 20).
-    # The agent can only generate text responses at this stage.
-    tools: list = []
+    # Add nodes
+    workflow.add_node("assistant", _async_assistant_node)
 
-    graph = create_react_agent(
-        model=llm,
-        tools=tools,
-        state_schema=PromptAssistantState,
-        prompt=SYSTEM_PROMPT,
-        checkpointer=checkpointer,
-    )
+    if ALL_TOOLS:
+        tool_node = ToolNode(ALL_TOOLS)
+        workflow.add_node("tools", tool_node)
+        workflow.add_node("post_process", post_process_node)
 
+    # Set entry point
+    workflow.set_entry_point("assistant")
+
+    # Add edges
+    if ALL_TOOLS:
+        # assistant -> tools (if tool calls) or -> END (if no tool calls)
+        workflow.add_conditional_edges(
+            "assistant",
+            _should_continue,
+            {"tools": "tools", END: END},
+        )
+        # tools -> post_process
+        workflow.add_edge("tools", "post_process")
+        # post_process -> assistant
+        workflow.add_edge("post_process", "assistant")
+    else:
+        # No tools: assistant always goes to END
+        workflow.add_edge("assistant", END)
+
+    graph = workflow.compile(checkpointer=checkpointer)
     return graph
