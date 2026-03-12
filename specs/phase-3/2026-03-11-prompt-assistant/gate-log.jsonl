@@ -1,0 +1,8 @@
+{"ts":"2026-03-12T10:05:00Z","slice":"slice-01","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-03-12T10:05:01Z","slice":"slice-05","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-03-12T10:05:02Z","slice":"slice-06","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-03-12T10:05:03Z","slice":"slice-07","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-03-12T10:30:00Z","slice":"slice-01","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-12T10:30:01Z","slice":"slice-05","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-12T10:30:02Z","slice":"slice-06","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-12T10:30:03Z","slice":"slice-07","gate":"tests","result":"PASSED","retries":0}
