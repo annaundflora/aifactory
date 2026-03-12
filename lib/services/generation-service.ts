@@ -9,6 +9,7 @@ import {
 } from "@/lib/db/queries";
 import { UPSCALE_MODEL } from "@/lib/models";
 import { ModelSchemaService, getImg2ImgFieldName } from "@/lib/services/model-schema-service";
+import type { ReferenceRole, ReferenceStrength } from "@/lib/types/reference";
 
 const MODEL_ID_REGEX = /^[a-z0-9-]+\/[a-z0-9._-]+$/;
 
@@ -70,6 +71,78 @@ async function streamToPngBuffer(
   const height = metadata.height ?? 0;
 
   return { buffer, width, height };
+}
+
+// ---------------------------------------------------------------------------
+// Prompt @-Token Mapping (Slice 12)
+// ---------------------------------------------------------------------------
+
+/**
+ * Input shape for a single reference in prompt composition.
+ * Subset of ReferenceSlotData -- only the fields needed for prompt mapping.
+ */
+interface PromptReference {
+  slotPosition: number;
+  role: ReferenceRole;
+  strength: ReferenceStrength;
+}
+
+/**
+ * Compose a multi-reference prompt by mapping @N tokens to @imageN,
+ * and appending role/strength guidance for the AI model.
+ *
+ * Pure function -- no DB/API calls, no side effects.
+ *
+ * Algorithm (from architecture.md):
+ *   Step 1: Replace @N with @imageN for tokens matching a reference slotPosition
+ *   Step 2: Append "Reference guidance:" with role/strength for ALL references
+ *   Step 3: Unused references (not @-mentioned in original prompt) are included too
+ *
+ * @param prompt - The already-composed prompt string (motiv + style)
+ * @param references - Array of references with slotPosition, role, and strength
+ * @returns Enhanced prompt string with @imageN tokens and reference guidance
+ */
+export function composeMultiReferencePrompt(
+  prompt: string,
+  references: PromptReference[]
+): string {
+  // AC-5: Empty references array -> return prompt unchanged
+  if (references.length === 0) {
+    return prompt;
+  }
+
+  // Build a lookup map: slotPosition -> reference
+  const refMap = new Map<number, PromptReference>();
+  for (const ref of references) {
+    refMap.set(ref.slotPosition, ref);
+  }
+
+  // Step 1: Replace @N tokens with @imageN
+  // Only replace tokens whose N matches a reference slotPosition (AC-6)
+  // Regex /@(\d+)/g as specified in constraints
+  const mappedPrompt = prompt.replace(/@(\d+)/g, (_match, digitStr: string) => {
+    const n = parseInt(digitStr, 10);
+    if (refMap.has(n)) {
+      return `@image${n}`;
+    }
+    // AC-6: Token does not match any reference -- leave unchanged
+    return _match;
+  });
+
+  // Step 2 + 3: Build reference guidance for ALL references
+  // Sort by slotPosition for consistent ordering
+  const sortedRefs = [...references].sort(
+    (a, b) => a.slotPosition - b.slotPosition
+  );
+
+  const guidanceEntries = sortedRefs.map((ref) => {
+    return `@image${ref.slotPosition} provides ${ref.role} reference with ${ref.strength} influence`;
+  });
+
+  const guidance = `Reference guidance: ${guidanceEntries.join(". ")}.`;
+
+  // Combine mapped prompt with guidance
+  return `${mappedPrompt}. ${guidance}`;
 }
 
 // ---------------------------------------------------------------------------
