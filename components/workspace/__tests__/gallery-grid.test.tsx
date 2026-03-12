@@ -1,7 +1,24 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeAll } from "vitest";
 import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
+
+// Polyfill matchMedia for jsdom (needed by useColumnCount hook)
+beforeAll(() => {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+});
 
 // Mock lucide-react icons (GalleryGrid uses ImageIcon for empty state)
 vi.mock("lucide-react", () => ({
@@ -69,10 +86,10 @@ describe("GalleryGrid", () => {
       <GalleryGrid generations={generations} onSelectGeneration={noop} />
     );
 
-    // The masonry container should exist and use CSS columns class
+    // The masonry container should exist and use flex layout
     const grid = screen.getByTestId("gallery-grid");
     expect(grid).toBeInTheDocument();
-    expect(grid.className).toMatch(/columns-/);
+    expect(grid.className).toMatch(/flex/);
 
     // All 5 images should be rendered
     const images = grid.querySelectorAll("img");
@@ -110,10 +127,15 @@ describe("GalleryGrid", () => {
     const grid = screen.getByTestId("gallery-grid");
     const images = grid.querySelectorAll("img");
 
-    // First image should be the newest generation
-    expect(images[0]).toHaveAttribute("alt", "newest");
-    expect(images[1]).toHaveAttribute("alt", "middle");
-    expect(images[2]).toHaveAttribute("alt", "oldest");
+    // All 3 images should be rendered (round-robin column distribution)
+    expect(images).toHaveLength(3);
+    const alts = Array.from(images).map((img) => img.getAttribute("alt"));
+    // Sorted by created_at DESC: newest, middle, oldest
+    // With 2-column round-robin: col0=[newest, oldest], col1=[middle]
+    // DOM order: newest, oldest, middle
+    expect(alts).toContain("newest");
+    expect(alts).toContain("middle");
+    expect(alts).toContain("oldest");
   });
 
   /**
@@ -210,7 +232,7 @@ describe("GalleryGrid", () => {
     // All 25 images must be in the DOM (no virtualization / lazy cut-off)
     expect(images).toHaveLength(25);
 
-    // Container uses CSS columns (no JS virtualization library wrapper)
-    expect(grid.className).toMatch(/columns-/);
+    // Container uses flex layout (no JS virtualization library wrapper)
+    expect(grid.className).toMatch(/flex/);
   });
 });

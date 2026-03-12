@@ -126,21 +126,58 @@ export const projectSelectedModels = pgTable(
 );
 
 // -----------------------------------------------
-// prompt_snippets
+// assistant_sessions
 // -----------------------------------------------
-export const promptSnippets = pgTable(
-  "prompt_snippets",
+export const assistantSessions = pgTable(
+  "assistant_sessions",
   {
     id: uuid("id")
       .primaryKey()
       .default(sql`gen_random_uuid()`),
-    text: varchar("text", { length: 500 }).notNull(),
-    category: varchar("category", { length: 100 }).notNull(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 255 }),
+    status: varchar("status", { length: 20 }).notNull().default("active"),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    messageCount: integer("message_count").notNull().default(0),
+    hasDraft: boolean("has_draft").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("assistant_sessions_project_id_idx").on(table.projectId),
+    index("assistant_sessions_last_message_at_idx").on(table.lastMessageAt),
+  ]
+);
+
+// -----------------------------------------------
+// assistant_images
+// -----------------------------------------------
+export const assistantImages = pgTable(
+  "assistant_images",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => assistantSessions.id, { onDelete: "cascade" }),
+    imageUrl: text("image_url").notNull(),
+    analysisResult: jsonb("analysis_result"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (table) => [index("prompt_snippets_category_idx").on(table.category)]
+  (table) => [
+    index("assistant_images_session_id_idx").on(table.sessionId),
+  ]
 );
 
 // -----------------------------------------------

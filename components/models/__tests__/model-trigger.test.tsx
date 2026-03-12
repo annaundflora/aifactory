@@ -253,16 +253,6 @@ describe("PromptArea + ModelTrigger integration", () => {
   // Mock db/queries to prevent DATABASE_URL crash
   vi.mock("@/lib/db/queries", () => ({}));
 
-  // Mock snippet-service to prevent DATABASE_URL crash
-  vi.mock("@/lib/services/snippet-service", () => ({
-    SnippetService: {
-      create: vi.fn().mockResolvedValue({}),
-      update: vi.fn().mockResolvedValue(null),
-      delete: vi.fn().mockResolvedValue(false),
-      getAll: vi.fn().mockResolvedValue({}),
-    },
-  }));
-
   // Mock MODELS registry (no longer used for Select dropdown, but still imported transitively)
   vi.mock("@/lib/models", () => ({
     MODELS: [],
@@ -274,10 +264,15 @@ describe("PromptArea + ModelTrigger integration", () => {
     getModelSchema: (...args: unknown[]) => mockGetModelSchema(...args),
     getCollectionModels: (...args: unknown[]) =>
       mockGetCollectionModels(...args),
+    getProjectSelectedModels: vi.fn().mockResolvedValue([]),
+    saveProjectSelectedModels: vi.fn().mockResolvedValue(undefined),
+    getFavoriteModels: vi.fn().mockResolvedValue([]),
+    toggleFavoriteModel: vi.fn().mockResolvedValue({ isFavorite: true }),
   }));
 
   vi.mock("@/app/actions/generations", () => ({
     generateImages: (...args: unknown[]) => mockGenerateImages(...args),
+    upscaleImage: vi.fn().mockResolvedValue(undefined),
   }));
 
   // Mock lucide-react icons
@@ -312,11 +307,36 @@ describe("PromptArea + ModelTrigger integration", () => {
     AlertCircle: (props: Record<string, unknown>) => (
       <span data-testid="alert-circle-icon" {...props} />
     ),
-  }));
-
-  // Mock BuilderDrawer
-  vi.mock("@/components/prompt-builder/builder-drawer", () => ({
-    BuilderDrawer: () => null,
+    Star: (props: Record<string, unknown>) => (
+      <span data-testid="star-icon" {...props} />
+    ),
+    Check: (props: Record<string, unknown>) => (
+      <span data-testid="check-icon-2" {...props} />
+    ),
+    Minus: (props: Record<string, unknown>) => (
+      <span data-testid="minus-icon" {...props} />
+    ),
+    Plus: (props: Record<string, unknown>) => (
+      <span data-testid="plus-icon" {...props} />
+    ),
+    ArrowUp: (props: Record<string, unknown>) => (
+      <span data-testid="arrow-up-icon" {...props} />
+    ),
+    Square: (props: Record<string, unknown>) => (
+      <span data-testid="square-icon" {...props} />
+    ),
+    ArrowLeft: (props: Record<string, unknown>) => (
+      <span data-testid="arrow-left-icon" {...props} />
+    ),
+    FileText: (props: Record<string, unknown>) => (
+      <span data-testid="file-text-icon" {...props} />
+    ),
+    History: (props: Record<string, unknown>) => (
+      <span data-testid="history-icon" {...props} />
+    ),
+    Cpu: (props: Record<string, unknown>) => (
+      <span data-testid="cpu-icon" {...props} />
+    ),
   }));
 
   // Mock LLMComparison
@@ -330,6 +350,53 @@ describe("PromptArea + ModelTrigger integration", () => {
       variationData: null,
       setVariation: vi.fn(),
       clearVariation: vi.fn(),
+    }),
+    useWorkspaceVariationOptional: () => ({
+      variationData: null,
+      setVariation: vi.fn(),
+      clearVariation: vi.fn(),
+    }),
+  }));
+
+  // Mock sonner toast
+  vi.mock("sonner", () => ({
+    toast: Object.assign(vi.fn(), {
+      error: vi.fn(),
+      success: vi.fn(),
+    }),
+  }));
+
+  // Mock assistant context
+  vi.mock("@/lib/assistant/assistant-context", () => ({
+    PromptAssistantProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    usePromptAssistant: () => ({
+      messages: [],
+      isStreaming: false,
+      hasCanvas: false,
+      selectedModel: "claude-sonnet-4-20250514",
+      setSelectedModel: vi.fn(),
+      cancelStream: vi.fn(),
+      activeView: "startscreen",
+      setActiveView: vi.fn(),
+      loadSession: vi.fn(),
+      sessionId: null,
+      dispatch: vi.fn(),
+      sessionIdRef: { current: null },
+      sendMessageRef: { current: vi.fn() },
+      cancelStreamRef: { current: vi.fn() },
+      draftPrompt: null,
+      applyToWorkspace: vi.fn(),
+      state: { messages: [], activeView: "startscreen", isStreaming: false, draftPrompt: null, isApplied: false, hasCanvas: false, modelRecommendation: null },
+    }),
+    getWorkspaceFieldsForChip: () => ({}),
+  }));
+
+  // Mock assistant runtime
+  vi.mock("@/lib/assistant/use-assistant-runtime", () => ({
+    useAssistantRuntime: () => ({
+      sendMessage: vi.fn(),
+      stopStreaming: vi.fn(),
+      isStreaming: false,
     }),
   }));
 
@@ -484,11 +551,10 @@ describe("PromptArea + ModelTrigger integration", () => {
     const variantSelector = screen.getByTestId("variant-count-selector");
     expect(variantSelector).toBeInTheDocument();
 
-    // Verify all 4 variant options are present
-    expect(screen.getByTestId("variant-count-1")).toBeInTheDocument();
-    expect(screen.getByTestId("variant-count-2")).toBeInTheDocument();
-    expect(screen.getByTestId("variant-count-3")).toBeInTheDocument();
-    expect(screen.getByTestId("variant-count-4")).toBeInTheDocument();
+    // Verify variant count stepper controls are present (minus, value, plus)
+    expect(screen.getByTestId("variant-count-minus")).toBeInTheDocument();
+    expect(screen.getByTestId("variant-count-value")).toBeInTheDocument();
+    expect(screen.getByTestId("variant-count-plus")).toBeInTheDocument();
 
     // The old Select dropdown should NOT be in the DOM
     expect(screen.queryByTestId("model-select")).not.toBeInTheDocument();

@@ -36,25 +36,11 @@ beforeAll(() => {
 // Mock lib/db/queries to prevent DATABASE_URL crash (imported by history-service chain)
 vi.mock("@/lib/db/queries", () => ({}));
 
-// Mock snippet-service to prevent DATABASE_URL crash (imports lib/db transitively)
-vi.mock("@/lib/services/snippet-service", () => ({
-  SnippetService: {
-    create: vi.fn().mockResolvedValue({}),
-    update: vi.fn().mockResolvedValue(null),
-    delete: vi.fn().mockResolvedValue(false),
-    getAll: vi.fn().mockResolvedValue({}),
-  },
-}));
-
 // Mock server actions from app/actions/prompts (called by HistoryList/FavoritesList on mount)
 vi.mock("@/app/actions/prompts", () => ({
   getPromptHistory: vi.fn().mockResolvedValue([]),
   getFavoritePrompts: vi.fn().mockResolvedValue([]),
   toggleFavorite: vi.fn().mockResolvedValue({}),
-  createSnippet: vi.fn().mockResolvedValue({}),
-  updateSnippet: vi.fn().mockResolvedValue(null),
-  deleteSnippet: vi.fn().mockResolvedValue(false),
-  getSnippets: vi.fn().mockResolvedValue([]),
   improvePrompt: vi.fn().mockResolvedValue({ improved: "" }),
 }));
 

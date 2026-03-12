@@ -42,10 +42,21 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-// Mock server action createProject
+// Mock server actions
 const mockCreateProject = vi.fn();
 vi.mock("@/app/actions/projects", () => ({
   createProject: (...args: unknown[]) => mockCreateProject(...args),
+  renameProject: vi.fn().mockResolvedValue({}),
+  deleteProject: vi.fn().mockResolvedValue({}),
+  generateThumbnail: vi.fn().mockResolvedValue({}),
+}));
+
+// Mock next/image
+vi.mock("next/image", () => ({
+  default: (props: Record<string, unknown>) => {
+    const { priority, fill, ...rest } = props;
+    return <img {...(rest as React.ImgHTMLAttributes<HTMLImageElement>)} />;
+  },
 }));
 
 // Mock sonner toast
@@ -70,6 +81,18 @@ vi.mock("lucide-react", () => ({
   ),
   XIcon: (props: Record<string, unknown>) => (
     <span data-testid="x-icon" {...props} />
+  ),
+  MoreHorizontal: (props: Record<string, unknown>) => (
+    <span data-testid="more-horizontal-icon" {...props} />
+  ),
+  Pencil: (props: Record<string, unknown>) => (
+    <span data-testid="pencil-icon" {...props} />
+  ),
+  Trash2: (props: Record<string, unknown>) => (
+    <span data-testid="trash2-icon" {...props} />
+  ),
+  RefreshCw: (props: Record<string, unknown>) => (
+    <span data-testid="refresh-cw-icon" {...props} />
   ),
 }));
 
@@ -180,8 +203,8 @@ describe("Sidebar Content Migration", () => {
     // Header: "Projects" label
     expect(screen.getByText("Projects")).toBeInTheDocument();
 
-    // "+"-Button (new project) with data-testid
-    const newProjectBtn = screen.getByTestId("sidebar-new-project");
+    // New Project button (rendered by ProjectList)
+    const newProjectBtn = screen.getByText("New Project");
     expect(newProjectBtn).toBeInTheDocument();
 
     // Scrollable project list with data-testid
@@ -423,8 +446,8 @@ describe("Sidebar Content Migration", () => {
     const user = userEvent.setup();
     renderSidebar(fourProjects);
 
-    // Find and click the new project button
-    const newProjectBtn = screen.getByTestId("sidebar-new-project");
+    // Find and click the new project button (in ProjectList)
+    const newProjectBtn = screen.getByText("New Project").closest("button") ?? screen.getByText("New Project");
     expect(newProjectBtn).toBeInTheDocument();
     await user.click(newProjectBtn);
 
@@ -456,7 +479,7 @@ describe("Sidebar Content Migration", () => {
     const user = userEvent.setup();
     renderSidebar(fourProjects);
 
-    const newProjectBtn = screen.getByTestId("sidebar-new-project");
+    const newProjectBtn = screen.getByText("New Project").closest("button") ?? screen.getByText("New Project");
     await user.click(newProjectBtn);
 
     await waitFor(() => {

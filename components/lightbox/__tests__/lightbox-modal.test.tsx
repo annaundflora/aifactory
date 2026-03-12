@@ -273,7 +273,7 @@ describe("LightboxModal", () => {
 
     // Model name (resolved via getModelById mock)
     const modelEl = screen.getByTestId("lightbox-model");
-    expect(modelEl).toHaveTextContent("FLUX 2 Pro");
+    expect(modelEl).toHaveTextContent("Flux 2 Pro");
 
     // Parameters
     const paramsEl = screen.getByTestId("lightbox-params");
