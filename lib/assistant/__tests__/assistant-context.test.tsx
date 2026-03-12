@@ -124,7 +124,7 @@ function ContextDispatcher() {
             draftPrompt: {
               motiv: "A sunset over mountains",
               style: "oil painting",
-              negative_prompt: "blurry, low quality",
+              negativePrompt: "blurry, low quality",
             },
           })
         }
@@ -262,7 +262,7 @@ describe("PromptAssistantContext", () => {
     expect(parsed).toEqual({
       motiv: "A sunset over mountains",
       style: "oil painting",
-      negative_prompt: "blurry, low quality",
+      negativePrompt: "blurry, low quality",
     });
   });
 

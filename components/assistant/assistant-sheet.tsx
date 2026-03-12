@@ -20,6 +20,10 @@ export interface AssistantSheetProps {
   children?: ReactNode;
   /** Slot for additional header content (e.g. ModelSelector), rendered between title and close button */
   headerSlot?: ReactNode;
+  /** When true, the sheet expands from 480px to 780px and shows a split-view layout */
+  hasCanvas?: boolean;
+  /** Slot for the canvas panel, rendered on the right side of the split-view */
+  canvasSlot?: ReactNode;
 }
 
 // ---------------------------------------------------------------------------
@@ -31,6 +35,8 @@ export function AssistantSheet({
   onOpenChange,
   children,
   headerSlot,
+  hasCanvas = false,
+  canvasSlot,
 }: AssistantSheetProps) {
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -50,7 +56,8 @@ export function AssistantSheet({
       <SheetContent
         side="right"
         showCloseButton={false}
-        className="w-[480px] sm:max-w-none p-0"
+        className="sm:max-w-none p-0 transition-[width] duration-300 ease-in-out"
+        style={{ width: hasCanvas ? 780 : 480 }}
         ref={contentRef}
         tabIndex={-1}
         data-testid="assistant-sheet"
@@ -73,10 +80,23 @@ export function AssistantSheet({
           </div>
         </SheetHeader>
 
-        {/* Body: children slot for future content (Slice 09+) */}
-        <div className="flex-1 overflow-y-auto">
-          {children}
-        </div>
+        {/* Body: Split-View when canvas is active, otherwise single column */}
+        {hasCanvas ? (
+          <div className="flex flex-1 flex-row overflow-hidden" data-testid="assistant-split-view">
+            {/* Left panel: Chat Thread (~50%) */}
+            <div className="flex flex-1 flex-col overflow-y-auto border-r">
+              {children}
+            </div>
+            {/* Right panel: Canvas (~50%) */}
+            <div className="flex flex-1 flex-col overflow-y-auto">
+              {canvasSlot}
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto">
+            {children}
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   );

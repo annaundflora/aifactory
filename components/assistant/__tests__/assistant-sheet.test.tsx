@@ -24,8 +24,8 @@ describe("AssistantSheet", () => {
     expect(sheetContent).toBeInTheDocument();
     expect(sheetContent).toBeVisible();
 
-    // Verify the 480px width class is applied
-    expect(sheetContent.className).toMatch(/w-\[480px\]/);
+    // Verify the 480px width is applied via inline style (default without canvas)
+    expect(sheetContent.style.width).toBe("480px");
   });
 
   // --------------------------------------------------------------------------

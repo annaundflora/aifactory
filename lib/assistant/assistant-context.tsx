@@ -11,6 +11,7 @@ import {
   type Dispatch,
   type MutableRefObject,
 } from "react";
+import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -28,8 +29,11 @@ export interface Message {
 export interface DraftPrompt {
   motiv: string;
   style: string;
-  negative_prompt: string;
+  negativePrompt: string;
 }
+
+/** Field names for the DraftPrompt type */
+export type DraftPromptField = keyof DraftPrompt;
 
 export interface ModelRecommendation {
   id: string;
@@ -42,6 +46,34 @@ export interface ToolCallResult {
   data: Record<string, unknown>;
 }
 
+/** Possible views within the assistant sheet */
+export type ActiveView = "chat" | "session-list" | "startscreen";
+
+// ---------------------------------------------------------------------------
+// Session Detail Response (from backend GET /api/assistant/sessions/{id})
+// ---------------------------------------------------------------------------
+
+interface SessionDetailState {
+  messages: Array<{ role: string; content: string }>;
+  draft_prompt: {
+    motiv: string;
+    style: string;
+    negative_prompt: string;
+  } | null;
+  recommended_model: { id: string; name: string; reason: string } | null;
+}
+
+interface SessionDetailResponse {
+  session: {
+    id: string;
+    title: string | null;
+    status: string;
+    message_count: number;
+    has_draft: boolean;
+  };
+  state: SessionDetailState;
+}
+
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
@@ -51,9 +83,17 @@ export interface AssistantState {
   messages: Message[];
   isStreaming: boolean;
   draftPrompt: DraftPrompt | null;
+  /** Whether the canvas panel should be visible (true once a draft_prompt has been received) */
+  hasCanvas: boolean;
+  /** Transient flag to trigger a visual highlight on canvas fields after a refine_prompt event */
+  canvasHighlight: boolean;
   recommendedModel: ModelRecommendation | null;
   selectedModel: string;
   toolCallResults: ToolCallResult[];
+  /** Current view within the assistant sheet */
+  activeView: ActiveView;
+  /** Whether a session is currently being loaded */
+  isLoadingSession: boolean;
 }
 
 const initialState: AssistantState = {
@@ -61,9 +101,13 @@ const initialState: AssistantState = {
   messages: [],
   isStreaming: false,
   draftPrompt: null,
+  hasCanvas: false,
+  canvasHighlight: false,
   recommendedModel: null,
   selectedModel: "anthropic/claude-sonnet-4.6",
   toolCallResults: [],
+  activeView: "startscreen",
+  isLoadingSession: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -79,9 +123,21 @@ export type AssistantAction =
   | { type: "ADD_ERROR_MESSAGE"; content: string }
   | { type: "SET_STREAMING"; isStreaming: boolean }
   | { type: "SET_DRAFT_PROMPT"; draftPrompt: DraftPrompt }
+  | { type: "UPDATE_DRAFT_FIELD"; field: DraftPromptField; value: string }
+  | { type: "REFINE_DRAFT"; draftPrompt: DraftPrompt }
+  | { type: "CLEAR_CANVAS_HIGHLIGHT" }
   | { type: "SET_RECOMMENDED_MODEL"; recommendedModel: ModelRecommendation }
   | { type: "ADD_TOOL_CALL_RESULT"; result: ToolCallResult }
   | { type: "SET_SELECTED_MODEL"; model: string }
+  | { type: "SET_ACTIVE_VIEW"; view: ActiveView }
+  | { type: "SET_LOADING_SESSION"; isLoading: boolean }
+  | {
+      type: "LOAD_SESSION";
+      sessionId: string;
+      messages: Message[];
+      draftPrompt: DraftPrompt | null;
+      recommendedModel: ModelRecommendation | null;
+    }
   | { type: "RESET_SESSION" };
 
 // ---------------------------------------------------------------------------
@@ -97,10 +153,18 @@ function assistantReducer(
       return { ...state, sessionId: action.sessionId };
 
     case "ADD_USER_MESSAGE":
-      return { ...state, messages: [...state.messages, action.message] };
+      return {
+        ...state,
+        messages: [...state.messages, action.message],
+        activeView: "chat",
+      };
 
     case "ADD_ASSISTANT_MESSAGE":
-      return { ...state, messages: [...state.messages, action.message] };
+      return {
+        ...state,
+        messages: [...state.messages, action.message],
+        activeView: "chat",
+      };
 
     case "APPEND_ASSISTANT_DELTA": {
       const msgs = [...state.messages];
@@ -141,7 +205,33 @@ function assistantReducer(
       return { ...state, isStreaming: action.isStreaming };
 
     case "SET_DRAFT_PROMPT":
-      return { ...state, draftPrompt: action.draftPrompt };
+      return {
+        ...state,
+        draftPrompt: action.draftPrompt,
+        hasCanvas: true,
+      };
+
+    case "UPDATE_DRAFT_FIELD": {
+      if (!state.draftPrompt) return state;
+      return {
+        ...state,
+        draftPrompt: {
+          ...state.draftPrompt,
+          [action.field]: action.value,
+        },
+      };
+    }
+
+    case "REFINE_DRAFT":
+      return {
+        ...state,
+        draftPrompt: action.draftPrompt,
+        hasCanvas: true,
+        canvasHighlight: true,
+      };
+
+    case "CLEAR_CANVAS_HIGHLIGHT":
+      return { ...state, canvasHighlight: false };
 
     case "SET_RECOMMENDED_MODEL":
       return { ...state, recommendedModel: action.recommendedModel };
@@ -155,8 +245,32 @@ function assistantReducer(
     case "SET_SELECTED_MODEL":
       return { ...state, selectedModel: action.model };
 
+    case "SET_ACTIVE_VIEW":
+      return { ...state, activeView: action.view };
+
+    case "SET_LOADING_SESSION":
+      return { ...state, isLoadingSession: action.isLoading };
+
+    case "LOAD_SESSION":
+      return {
+        ...state,
+        sessionId: action.sessionId,
+        messages: action.messages,
+        draftPrompt: action.draftPrompt,
+        hasCanvas: action.draftPrompt !== null,
+        canvasHighlight: false,
+        recommendedModel: action.recommendedModel,
+        toolCallResults: [],
+        isStreaming: false,
+        isLoadingSession: false,
+        activeView: "chat",
+      };
+
     case "RESET_SESSION":
-      return { ...initialState, selectedModel: state.selectedModel };
+      return {
+        ...initialState,
+        selectedModel: state.selectedModel,
+      };
 
     default:
       return state;
@@ -172,11 +286,25 @@ export interface PromptAssistantContextValue {
   messages: Message[];
   isStreaming: boolean;
   draftPrompt: DraftPrompt | null;
+  /** Whether the canvas panel should be visible */
+  hasCanvas: boolean;
+  /** Transient flag for highlighting canvas fields after a refine_prompt event */
+  canvasHighlight: boolean;
   recommendedModel: ModelRecommendation | null;
   selectedModel: string;
+  /** Current view within the assistant sheet */
+  activeView: ActiveView;
+  /** Whether a session is currently being loaded */
+  isLoadingSession: boolean;
   sendMessage: (content: string, imageUrl?: string) => void;
   cancelStream: () => void;
   setSelectedModel: (model: string) => void;
+  /** Update a single field in the draft prompt (local edit, no API call) */
+  updateDraftField: (field: DraftPromptField, value: string) => void;
+  /** Navigate to a specific view */
+  setActiveView: (view: ActiveView) => void;
+  /** Load a session from the backend by ID (AC-4, AC-5, AC-6, AC-10, AC-11) */
+  loadSession: (sessionId: string) => Promise<void>;
   dispatch: Dispatch<AssistantAction>;
   /** Ref to the current session ID (for use by useAssistantRuntime) */
   sessionIdRef: MutableRefObject<string | null>;
@@ -201,6 +329,36 @@ export interface PromptAssistantProviderProps {
 }
 
 // ---------------------------------------------------------------------------
+// Auto-Title Helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Sends a PATCH request to the backend to set the session title.
+ * Truncates the first user message to max 80 characters as the title.
+ * AC-9: Auto-title from first user message.
+ */
+async function updateSessionTitle(
+  sessionId: string,
+  firstUserMessage: string
+): Promise<void> {
+  const title =
+    firstUserMessage.length > 80
+      ? firstUserMessage.slice(0, 80)
+      : firstUserMessage;
+
+  try {
+    await fetch(`/api/assistant/sessions/${sessionId}/title`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title }),
+    });
+  } catch {
+    // Auto-title is best-effort, don't block the user
+    console.warn("[PromptAssistantContext] Failed to set auto-title");
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Provider
 // ---------------------------------------------------------------------------
 
@@ -215,6 +373,8 @@ export function PromptAssistantProvider({
     ((content: string, imageUrl?: string) => void) | null
   >(null);
   const cancelStreamRef = useRef<(() => void) | null>(null);
+  // Track whether auto-title has already been triggered for this session
+  const autoTitleSentRef = useRef<string | null>(null);
 
   // Keep sessionIdRef in sync with reducer state
   sessionIdRef.current = state.sessionId;
@@ -223,13 +383,30 @@ export function PromptAssistantProvider({
     (content: string, imageUrl?: string) => {
       if (sendMessageRef.current) {
         sendMessageRef.current(content, imageUrl);
+
+        // AC-9: Auto-title after first user message is sent.
+        // Trigger the title update asynchronously after the send.
+        const sid = sessionIdRef.current;
+        if (sid && autoTitleSentRef.current !== sid) {
+          autoTitleSentRef.current = sid;
+          updateSessionTitle(sid, content);
+        } else if (!sid) {
+          // Session will be created by the runtime. Schedule a delayed check.
+          setTimeout(() => {
+            const newSid = sessionIdRef.current;
+            if (newSid && autoTitleSentRef.current !== newSid) {
+              autoTitleSentRef.current = newSid;
+              updateSessionTitle(newSid, content);
+            }
+          }, 2000);
+        }
       } else {
         console.warn(
           "[PromptAssistantContext] sendMessage called but no runtime registered."
         );
       }
     },
-    [] // sendMessageRef is stable (ref), no need as dependency
+    [] // sendMessageRef and sessionIdRef are stable (refs)
   );
 
   const cancelStream = useCallback(() => {
@@ -245,23 +422,126 @@ export function PromptAssistantProvider({
     [dispatch]
   );
 
+  const updateDraftField = useCallback(
+    (field: DraftPromptField, value: string) => {
+      dispatch({ type: "UPDATE_DRAFT_FIELD", field, value });
+    },
+    [dispatch]
+  );
+
+  const setActiveView = useCallback(
+    (view: ActiveView) => {
+      dispatch({ type: "SET_ACTIVE_VIEW", view });
+    },
+    [dispatch]
+  );
+
+  /**
+   * Load a session from the backend by ID.
+   * AC-4: Restores messages from session state.
+   * AC-5: Sets draftPrompt from session state.
+   * AC-6: Sets recommendedModel from session state.
+   * AC-10: Replaces current session state when switching.
+   * AC-11: Shows error toast on failure.
+   */
+  const loadSession = useCallback(
+    async (sessionId: string) => {
+      dispatch({ type: "SET_LOADING_SESSION", isLoading: true });
+
+      try {
+        const response = await fetch(
+          `/api/assistant/sessions/${sessionId}`
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data: SessionDetailResponse = await response.json();
+
+        // Convert backend messages to frontend Message format
+        const messages: Message[] = data.state.messages.map(
+          (msg, index) => ({
+            id: `restored-${sessionId}-${index}`,
+            role: msg.role === "human" ? "user" : "assistant",
+            content: msg.content,
+          })
+        );
+
+        // Convert backend draft_prompt (snake_case) to frontend DraftPrompt (camelCase)
+        const draftPrompt: DraftPrompt | null = data.state.draft_prompt
+          ? {
+              motiv: data.state.draft_prompt.motiv,
+              style: data.state.draft_prompt.style,
+              negativePrompt: data.state.draft_prompt.negative_prompt,
+            }
+          : null;
+
+        // Convert backend recommended_model to frontend ModelRecommendation
+        const recommendedModel: ModelRecommendation | null =
+          data.state.recommended_model
+            ? {
+                id: data.state.recommended_model.id,
+                name: data.state.recommended_model.name,
+                reason: data.state.recommended_model.reason,
+              }
+            : null;
+
+        // AC-10: Replace current session state entirely
+        dispatch({
+          type: "LOAD_SESSION",
+          sessionId,
+          messages,
+          draftPrompt,
+          recommendedModel,
+        });
+
+        // Update the sessionIdRef for the runtime
+        sessionIdRef.current = sessionId;
+        // Reset auto-title tracking for this session (it already has a title)
+        autoTitleSentRef.current = sessionId;
+      } catch {
+        // AC-11: Show error toast and stay on session list
+        dispatch({ type: "SET_LOADING_SESSION", isLoading: false });
+        toast.error("Session konnte nicht geladen werden");
+      }
+    },
+    [dispatch]
+  );
+
   const value = useMemo<PromptAssistantContextValue>(
     () => ({
       sessionId: state.sessionId,
       messages: state.messages,
       isStreaming: state.isStreaming,
       draftPrompt: state.draftPrompt,
+      hasCanvas: state.hasCanvas,
+      canvasHighlight: state.canvasHighlight,
       recommendedModel: state.recommendedModel,
       selectedModel: state.selectedModel,
+      activeView: state.activeView,
+      isLoadingSession: state.isLoadingSession,
       sendMessage,
       cancelStream,
       setSelectedModel,
+      updateDraftField,
+      setActiveView,
+      loadSession,
       dispatch,
       sessionIdRef,
       sendMessageRef,
       cancelStreamRef,
     }),
-    [state, sendMessage, cancelStream, setSelectedModel, dispatch]
+    [
+      state,
+      sendMessage,
+      cancelStream,
+      setSelectedModel,
+      updateDraftField,
+      setActiveView,
+      loadSession,
+      dispatch,
+    ]
   );
 
   return (

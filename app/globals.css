@@ -124,3 +124,20 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Canvas highlight animation for refine_prompt updates (Slice 14) */
+@keyframes canvas-highlight {
+  0% {
+    background-color: oklch(0.93 0.045 289 / 0%);
+  }
+  30% {
+    background-color: oklch(0.93 0.045 289 / 40%);
+  }
+  100% {
+    background-color: oklch(0.93 0.045 289 / 0%);
+  }
+}
+
+.animate-canvas-highlight {
+  animation: canvas-highlight 600ms ease-out;
+}

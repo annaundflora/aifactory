@@ -32,6 +32,7 @@ import { AssistantSheet } from "@/components/assistant/assistant-sheet";
 import { Startscreen } from "@/components/assistant/startscreen";
 import { ChatInput } from "@/components/assistant/chat-input";
 import { ChatThread } from "@/components/assistant/chat-thread";
+import { PromptCanvas } from "@/components/assistant/prompt-canvas";
 import {
   ModelSelector,
   DEFAULT_MODEL_SLUG,
@@ -1202,6 +1203,7 @@ function AssistantSheetContent({
   const {
     messages,
     isStreaming,
+    hasCanvas,
     selectedModel,
     setSelectedModel,
     cancelStream,
@@ -1240,6 +1242,8 @@ function AssistantSheetContent({
     <AssistantSheet
       open={open}
       onOpenChange={onOpenChange}
+      hasCanvas={hasCanvas}
+      canvasSlot={<PromptCanvas />}
       headerSlot={
         <ModelSelector value={selectedModel} onChange={setSelectedModel} />
       }

@@ -160,13 +160,25 @@ export function useAssistantRuntime({
             dispatch({ type: "ADD_TOOL_CALL_RESULT", result: toolCallResult });
 
             // Dispatch specific actions based on tool type
-            if (
-              result.tool === "draft_prompt" ||
-              result.tool === "refine_prompt"
-            ) {
+            if (result.tool === "draft_prompt") {
+              const rawData = result.data as { motiv: string; style: string; negative_prompt: string };
               dispatch({
                 type: "SET_DRAFT_PROMPT",
-                draftPrompt: result.data as unknown as DraftPrompt,
+                draftPrompt: {
+                  motiv: rawData.motiv,
+                  style: rawData.style,
+                  negativePrompt: rawData.negative_prompt,
+                },
+              });
+            } else if (result.tool === "refine_prompt") {
+              const rawData = result.data as { motiv: string; style: string; negative_prompt: string };
+              dispatch({
+                type: "REFINE_DRAFT",
+                draftPrompt: {
+                  motiv: rawData.motiv,
+                  style: rawData.style,
+                  negativePrompt: rawData.negative_prompt,
+                },
               });
             } else if (result.tool === "recommend_model") {
               dispatch({
