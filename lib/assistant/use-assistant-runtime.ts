@@ -315,6 +315,11 @@ export function useAssistantRuntime({
       signal: AbortSignal
     ) => {
       try {
+        // Re-assert streaming state: on first message, createSession consumed the
+        // greeting SSE stream which ended with MARK_ASSISTANT_DONE, setting
+        // isStreaming back to false. We must re-enable it before fetching.
+        dispatch({ type: "SET_STREAMING", isStreaming: true });
+
         const body: Record<string, unknown> = {
           content,
           model: selectedModelRef.current,
