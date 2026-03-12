@@ -3,7 +3,9 @@
 Pydantic models for request/response validation on API endpoints.
 """
 
+from datetime import datetime
 from typing import Literal, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, Field, HttpUrl
 
@@ -45,3 +47,66 @@ class SendMessageRequest(BaseModel):
         default=None,
         description="Optional LLM model slug",
     )
+
+
+# ---------------------------------------------------------------------------
+# Session DTOs (Slice 13a)
+# ---------------------------------------------------------------------------
+
+
+class CreateSessionRequest(BaseModel):
+    """DTO for POST /api/assistant/sessions.
+
+    Creates a new assistant session linked to an AI Factory project.
+
+    Fields:
+        project_id: UUID of the project this session belongs to.
+    """
+
+    project_id: UUID = Field(
+        ...,
+        description="UUID of the project this session belongs to",
+    )
+
+
+class UpdateSessionRequest(BaseModel):
+    """DTO for PATCH /api/assistant/sessions/{id}.
+
+    Only archiving is supported.
+
+    Fields:
+        status: Must be "archived".
+    """
+
+    status: Literal["archived"] = Field(
+        ...,
+        description='New session status. Only "archived" is allowed.',
+    )
+
+
+class SessionResponse(BaseModel):
+    """DTO for a single session in API responses.
+
+    Contains all metadata fields from the assistant_sessions table.
+    """
+
+    id: UUID
+    project_id: UUID
+    title: Optional[str] = None
+    status: str
+    message_count: int
+    has_draft: bool
+    last_message_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class SessionListResponse(BaseModel):
+    """DTO for GET /api/assistant/sessions (list).
+
+    Wraps a list of SessionResponse objects.
+    """
+
+    sessions: list[SessionResponse]
