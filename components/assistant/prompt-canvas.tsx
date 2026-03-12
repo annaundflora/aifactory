@@ -7,6 +7,7 @@ import {
   usePromptAssistant,
   type DraftPromptField,
 } from "@/lib/assistant/assistant-context";
+import { ApplyButton } from "@/components/assistant/apply-button";
 
 // ---------------------------------------------------------------------------
 // Canvas Field
@@ -130,6 +131,9 @@ export function PromptCanvas() {
         highlight={canvasHighlight}
         tabIndex={3}
       />
+
+      {/* Slice-15: Apply button at the bottom of the canvas */}
+      <ApplyButton />
     </div>
   );
 }

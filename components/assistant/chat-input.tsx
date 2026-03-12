@@ -77,7 +77,11 @@ export function ChatInput({
   const handleSend = useCallback(() => {
     if (!canSend) return;
     console.log("[ChatInput] Sending:", trimmed, "imageUrl:", pendingImageUrl);
-    onSend(trimmed, pendingImageUrl ?? undefined);
+    if (pendingImageUrl) {
+      onSend(trimmed, pendingImageUrl);
+    } else {
+      onSend(trimmed);
+    }
     setValue("");
     setPendingImageUrl(null);
     // Reset textarea height after clearing

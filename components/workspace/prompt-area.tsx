@@ -1223,8 +1223,8 @@ function AssistantSheetContent({
   });
 
   const handleSend = useCallback(
-    (text: string) => {
-      sendMessage(text);
+    (text: string, imageUrl?: string) => {
+      sendMessage(text, imageUrl);
     },
     [sendMessage]
   );
@@ -1299,6 +1299,7 @@ function AssistantSheetContent({
           isStreaming={isStreaming}
           onStop={cancelStream}
           autoFocus={open}
+          projectId={projectId}
         />
       </div>
     );
