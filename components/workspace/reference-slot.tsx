@@ -18,6 +18,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import {
+  GALLERY_DRAG_MIME_TYPE,
+  type GalleryDragPayload,
+} from "@/lib/constants/drag-types";
 import type {
   ReferenceRole,
   ReferenceStrength,
@@ -127,6 +131,8 @@ export interface ReferenceSlotProps {
   onRemove?: () => void;
   /** Called when retry is clicked in error state */
   onRetry?: () => void;
+  /** Called when a gallery generation is dropped (drag from GenerationCard) */
+  onGalleryDrop?: (data: GalleryDragPayload) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -145,6 +151,7 @@ export function ReferenceSlot({
   onStrengthChange,
   onRemove,
   onRetry,
+  onGalleryDrop,
 }: ReferenceSlotProps) {
   // Internal visual state for drag-over (only relevant when empty)
   const [visualState, setVisualState] = useState<SlotVisualState>("empty");
@@ -157,14 +164,33 @@ export function ReferenceSlot({
   const isUploading = uploading;
 
   // ---------------------------------------------------------------------------
+  // Helpers: detect gallery drag via custom MIME type
+  // ---------------------------------------------------------------------------
+
+  const isGalleryDrag = useCallback((e: DragEvent<HTMLDivElement>): boolean => {
+    return Array.from(e.dataTransfer.types).includes(GALLERY_DRAG_MIME_TYPE);
+  }, []);
+
+  // ---------------------------------------------------------------------------
   // Drag & Drop handlers (empty/error state)
   // ---------------------------------------------------------------------------
 
-  const handleDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setVisualState("drag-over");
-  }, []);
+  const handleDragOver = useCallback(
+    (e: DragEvent<HTMLDivElement>) => {
+      // AC-7: Reject drops on filled (ready) slots
+      if (isReady) return;
+
+      const galleryDrag = isGalleryDrag(e);
+      const hasFiles = e.dataTransfer.types.includes("Files");
+
+      if (galleryDrag || hasFiles) {
+        e.preventDefault();
+        e.stopPropagation();
+        setVisualState("drag-over");
+      }
+    },
+    [isReady, isGalleryDrag]
+  );
 
   const handleDragLeave = useCallback((e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -174,9 +200,26 @@ export function ReferenceSlot({
 
   const handleDrop = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
+      // AC-7: Reject drops on filled (ready) slots
+      if (isReady) return;
+
       e.preventDefault();
       e.stopPropagation();
 
+      // AC-6: Gallery drag takes precedence
+      const galleryData = e.dataTransfer.getData(GALLERY_DRAG_MIME_TYPE);
+      if (galleryData) {
+        setVisualState("empty");
+        try {
+          const parsed: GalleryDragPayload = JSON.parse(galleryData);
+          onGalleryDrop?.(parsed);
+        } catch {
+          // Invalid payload, ignore
+        }
+        return;
+      }
+
+      // AC-5: Native file drop (existing behavior)
       const file = e.dataTransfer.files?.[0];
       if (!file) {
         setVisualState("empty");
@@ -186,7 +229,7 @@ export function ReferenceSlot({
       setVisualState("empty");
       onUpload?.(file);
     },
-    [onUpload]
+    [isReady, onUpload, onGalleryDrop]
   );
 
   // ---------------------------------------------------------------------------
