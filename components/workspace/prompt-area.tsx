@@ -558,6 +558,12 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   useEffect(() => {
     if (!variationData) return;
 
+    // Skip addReference-only payloads — they are handled by the dedicated
+    // addReference useEffect below. Without this guard the else-branch would
+    // set promptMotiv to undefined (corrupting the current prompt) and call
+    // clearVariation() before the addReference useEffect ever runs.
+    if (variationData.addReference && !variationData.targetMode && !variationData.promptMotiv) return;
+
     // If variationData has a targetMode, switch to it
     if (variationData.targetMode) {
       const targetMode = variationData.targetMode as GenerationMode;
