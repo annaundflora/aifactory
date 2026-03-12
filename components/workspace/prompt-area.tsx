@@ -27,6 +27,8 @@ import { LLMComparison } from "@/components/prompt-improve/llm-comparison";
 import { type CollectionModel } from "@/lib/types/collection-model";
 import { ModelTrigger } from "@/components/models/model-trigger";
 import { ModelBrowserDrawer } from "@/components/models/model-browser-drawer";
+import { AssistantTrigger } from "@/components/assistant/assistant-trigger";
+import { AssistantSheet } from "@/components/assistant/assistant-sheet";
 import { toast } from "sonner";
 
 // Re-export Generation type for callback
@@ -187,6 +189,13 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
   // ----- LLM comparison -----
   const [showImprove, setShowImprove] = useState(false);
+
+  // ----- Assistant Sheet state -----
+  const [assistantOpen, setAssistantOpen] = useState(false);
+
+  const handleAssistantToggle = useCallback(() => {
+    setAssistantOpen((prev) => !prev);
+  }, []);
 
   // ----- Variation state consumption -----
   const { variationData, clearVariation } = useWorkspaceVariation();
@@ -968,6 +977,10 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
                 />
                 {/* Prompt Tools */}
                 <div className="flex gap-2">
+                  <AssistantTrigger
+                    isOpen={assistantOpen}
+                    onClick={handleAssistantToggle}
+                  />
                   <Button
                     type="button"
                     variant="secondary"
@@ -1139,6 +1152,9 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
           </div>
         </div>
       </PromptTabs>
+
+      {/* Assistant Sheet */}
+      <AssistantSheet open={assistantOpen} onOpenChange={setAssistantOpen} />
     </div>
   );
 }
