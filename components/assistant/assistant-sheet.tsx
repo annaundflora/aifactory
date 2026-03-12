@@ -24,6 +24,12 @@ export interface AssistantSheetProps {
   hasCanvas?: boolean;
   /** Slot for the canvas panel, rendered on the right side of the split-view */
   canvasSlot?: ReactNode;
+  /**
+   * Callback fired when the sheet transitions to open.
+   * Used by Slice 19 to auto-resume active sessions.
+   * AC-1: When opening with an active sessionId, the session is loaded automatically.
+   */
+  onOpen?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -37,8 +43,10 @@ export function AssistantSheet({
   headerSlot,
   hasCanvas = false,
   canvasSlot,
+  onOpen,
 }: AssistantSheetProps) {
   const contentRef = useRef<HTMLDivElement>(null);
+  const prevOpenRef = useRef(false);
 
   // AC-7: Move focus inside the sheet when opened
   useEffect(() => {
@@ -50,6 +58,14 @@ export function AssistantSheet({
       return () => clearTimeout(timer);
     }
   }, [open]);
+
+  // Slice-19 AC-1: Fire onOpen callback when sheet transitions from closed to open
+  useEffect(() => {
+    if (open && !prevOpenRef.current && onOpen) {
+      onOpen();
+    }
+    prevOpenRef.current = open;
+  }, [open, onOpen]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

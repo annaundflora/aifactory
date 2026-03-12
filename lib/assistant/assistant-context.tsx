@@ -141,6 +141,8 @@ export type AssistantAction =
       messages: Message[];
       draftPrompt: DraftPrompt | null;
       recommendedModel: ModelRecommendation | null;
+      /** Whether the draft was previously applied to the workspace (AC-6) */
+      isApplied?: boolean;
     }
   | { type: "RESET_SESSION" }
   | { type: "SET_IS_APPLIED"; isApplied: boolean };
@@ -271,6 +273,8 @@ function assistantReducer(
         isStreaming: false,
         isLoadingSession: false,
         activeView: "chat",
+        // AC-6: Restore isApplied flag (defaults to false when not provided)
+        isApplied: action.isApplied ?? false,
       };
 
     case "RESET_SESSION":
@@ -646,6 +650,40 @@ export function PromptAssistantProvider({
       {children}
     </PromptAssistantContext.Provider>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Helper: Workspace Fields for "Verbessere" Chip (AC-8, AC-9)
+// ---------------------------------------------------------------------------
+
+/**
+ * Formats current workspace prompt fields as a context string to be prepended
+ * to the "Verbessere meinen aktuellen Prompt" chip message.
+ *
+ * AC-8: When workspace fields have content, they are included as context.
+ * AC-9: When all fields are empty, returns null (chip text sent as-is).
+ */
+export function getWorkspaceFieldsForChip(variationData: {
+  promptMotiv?: string;
+  promptStyle?: string;
+  negativePrompt?: string;
+} | null): string | null {
+  const motiv = variationData?.promptMotiv ?? "";
+  const style = variationData?.promptStyle ?? "";
+  const negative = variationData?.negativePrompt ?? "";
+
+  // AC-9: All fields empty -> return null
+  if (!motiv && !style && !negative) {
+    return null;
+  }
+
+  // AC-8: Format fields as context string
+  const parts: string[] = [];
+  if (motiv) parts.push(`motiv=${motiv}`);
+  if (style) parts.push(`style=${style}`);
+  if (negative) parts.push(`negative=${negative}`);
+
+  return `[Aktueller Prompt: ${parts.join(", ")}]`;
 }
 
 // ---------------------------------------------------------------------------

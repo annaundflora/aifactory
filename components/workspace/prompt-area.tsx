@@ -42,6 +42,7 @@ import {
 import {
   PromptAssistantProvider,
   usePromptAssistant,
+  getWorkspaceFieldsForChip,
 } from "@/lib/assistant/assistant-context";
 import { useAssistantRuntime } from "@/lib/assistant/use-assistant-runtime";
 import { toast } from "sonner";
