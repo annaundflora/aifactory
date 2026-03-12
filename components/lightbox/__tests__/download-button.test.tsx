@@ -71,6 +71,11 @@ vi.mock("sonner", () => ({
   },
 }));
 
+// Mock ProvenanceRow (Slice 15) — render nothing in download-button tests
+vi.mock("@/components/lightbox/provenance-row", () => ({
+  ProvenanceRow: () => null,
+}));
+
 // Mock workspace-state (LightboxModal uses useWorkspaceVariation internally;
 // variation-specific behaviour is tested in variation-flow.test.tsx)
 vi.mock("@/lib/workspace-state", () => ({

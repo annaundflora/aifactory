@@ -10,6 +10,7 @@ import { modelIdToDisplayName } from "@/lib/utils/model-display-name";
 import { useWorkspaceVariation } from "@/lib/workspace-state";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { deleteGeneration, upscaleImage } from "@/app/actions/generations";
+import { ProvenanceRow } from "@/components/lightbox/provenance-row";
 import {
   Popover,
   PopoverTrigger,
@@ -341,6 +342,10 @@ export function LightboxModal({
                 {formatDate(generation.createdAt)}
               </p>
             </div>
+
+            {/* Provenance: Reference thumbnails (Slice 15) */}
+            {/* AC-5: Lives within !isFullscreen block, so hidden in fullscreen */}
+            <ProvenanceRow generationId={generation.id} />
 
             {/* Actions */}
             {generation.imageUrl && (

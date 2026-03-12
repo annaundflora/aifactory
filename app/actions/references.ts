@@ -2,6 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { ReferenceService } from "@/lib/services/reference-service";
+import { getGenerationReferences } from "@/lib/db/queries";
+import { db } from "@/lib/db";
+import { eq } from "drizzle-orm";
+import { referenceImages } from "@/lib/db/schema";
 
 import type { ReferenceImage } from "@/lib/db/queries";
 
@@ -113,4 +117,55 @@ export async function addGalleryAsReference(
       error: error instanceof Error ? error.message : "Unbekannter Fehler",
     };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Provenance Data (Slice 15 - used by ProvenanceRow component)
+// ---------------------------------------------------------------------------
+
+export interface ProvenanceItem {
+  id: string;
+  slotPosition: number;
+  role: string;
+  strength: string;
+  imageUrl: string;
+  referenceImageId: string;
+}
+
+/**
+ * Fetches generation references with resolved imageUrls for the ProvenanceRow.
+ * Uses existing getGenerationReferences query + individual reference image lookups.
+ * Returns [] if no references exist.
+ */
+export async function getProvenanceData(
+  generationId: string
+): Promise<ProvenanceItem[]> {
+  const refs = await getGenerationReferences(generationId);
+
+  if (refs.length === 0) {
+    return [];
+  }
+
+  // Resolve imageUrl for each reference by looking up the reference_images table
+  const items: ProvenanceItem[] = [];
+
+  for (const ref of refs) {
+    const [refImage] = await db
+      .select({ imageUrl: referenceImages.imageUrl })
+      .from(referenceImages)
+      .where(eq(referenceImages.id, ref.referenceImageId));
+
+    if (refImage) {
+      items.push({
+        id: ref.id,
+        slotPosition: ref.slotPosition,
+        role: ref.role,
+        strength: ref.strength,
+        imageUrl: refImage.imageUrl,
+        referenceImageId: ref.referenceImageId,
+      });
+    }
+  }
+
+  return items;
 }

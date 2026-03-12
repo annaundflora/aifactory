@@ -54,6 +54,11 @@ vi.mock("lucide-react", () => ({
     createElement("span", { "data-testid": "icon-minimize", className: props.className }),
 }));
 
+// Mock ProvenanceRow (Slice 15) — render nothing in variation-flow tests
+vi.mock("@/components/lightbox/provenance-row", () => ({
+  ProvenanceRow: () => null,
+}));
+
 // Mock BuilderDrawer (PromptArea dependency)
 vi.mock("@/components/prompt-builder/builder-drawer", () => ({
   BuilderDrawer: () => null,

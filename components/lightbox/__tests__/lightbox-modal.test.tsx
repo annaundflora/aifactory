@@ -140,6 +140,11 @@ vi.mock("@/components/ui/popover", () => {
   };
 });
 
+// Mock ProvenanceRow (Slice 15) — render nothing in lightbox-modal unit tests
+vi.mock("@/components/lightbox/provenance-row", () => ({
+  ProvenanceRow: () => null,
+}));
+
 // Mock ConfirmDialog
 vi.mock("@/components/shared/confirm-dialog", () => ({
   ConfirmDialog: ({ open, onConfirm, onCancel }: { open: boolean; title?: string; description?: string; confirmLabel?: string; cancelLabel?: string; onConfirm: () => void; onCancel: () => void }) => {
