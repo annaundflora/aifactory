@@ -15,7 +15,13 @@ import { generateImages, upscaleImage } from "@/app/actions/generations";
 import { useWorkspaceVariation } from "@/lib/workspace-state";
 import { ModeSelector, type GenerationMode } from "@/components/workspace/mode-selector";
 import { ImageDropzone } from "@/components/workspace/image-dropzone";
-import { StrengthSlider } from "@/components/workspace/strength-slider";
+import { ReferenceBar, getLowestFreePosition } from "@/components/workspace/reference-bar";
+import { uploadReferenceImage, deleteReferenceImage } from "@/app/actions/references";
+import type {
+  ReferenceSlotData,
+  ReferenceRole,
+  ReferenceStrength,
+} from "@/lib/types/reference";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -63,8 +69,7 @@ interface Img2ImgState {
   modelId: string;
   paramValues: Record<string, unknown>;
   variantCount: number;
-  sourceImageUrl: string | null;
-  strength: number;
+  referenceSlots: ReferenceSlotData[];
 }
 
 interface UpscaleState {
@@ -82,8 +87,6 @@ interface ModeStates {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const VARIANT_OPTIONS = [1, 2, 3, 4] as const;
-const DEFAULT_STRENGTH = 0.6;
 const DEFAULT_SCALE: 2 | 4 = 2;
 
 /** Auto-resize a textarea to fit its content. */
@@ -123,8 +126,7 @@ function createInitialModeStates(modelId: string): ModeStates {
       modelId,
       paramValues: {},
       variantCount: 1,
-      sourceImageUrl: null,
-      strength: DEFAULT_STRENGTH,
+      referenceSlots: [],
     },
     upscale: {
       sourceImageUrl: null,
@@ -173,9 +175,8 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   // ----- Variant count -----
   const [variantCount, setVariantCount] = useState(1);
 
-  // ----- img2img-specific state -----
-  const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(null);
-  const [strength, setStrength] = useState(DEFAULT_STRENGTH);
+  // ----- img2img-specific state: reference slots (replaces sourceImageUrl + strength) -----
+  const [referenceSlots, setReferenceSlots] = useState<ReferenceSlotData[]>([]);
 
   // ----- upscale-specific state -----
   const [upscaleSourceImageUrl, setUpscaleSourceImageUrl] = useState<string | null>(null);
@@ -310,8 +311,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
           modelId: selectedModelId,
           paramValues,
           variantCount,
-          sourceImageUrl,
-          strength,
+          referenceSlots,
         };
       } else if (currentMode === "upscale") {
         updated.upscale = {
@@ -329,8 +329,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     selectedModelId,
     paramValues,
     variantCount,
-    sourceImageUrl,
-    strength,
+    referenceSlots,
     upscaleSourceImageUrl,
     upscaleScale,
   ]);
@@ -450,8 +449,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
           modelId: selectedModelId,
           paramValues,
           variantCount,
-          sourceImageUrl,
-          strength,
+          referenceSlots,
         };
       } else if (currentMode === "upscale") {
         snapshot.upscale = {
@@ -477,8 +475,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
       } else if (targetMode === "img2img") {
         if (fromHasPrompt) {
           // txt2img -> img2img: "Keep" prompt, model, params; restore img2img-specific fields
-          setSourceImageUrl(snapshot.img2img.sourceImageUrl);
-          setStrength(snapshot.img2img.strength);
+          setReferenceSlots(snapshot.img2img.referenceSlots);
           // Prompt, model, params, variantCount stay as-is (Keep)
         } else {
           // upscale -> img2img: "Restore" all from snapshot
@@ -489,8 +486,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
           setSelectedModelFromId(s.modelId);
           setParamValues(s.paramValues);
           setVariantCount(s.variantCount);
-          setSourceImageUrl(s.sourceImageUrl);
-          setStrength(s.strength);
+          setReferenceSlots(s.referenceSlots);
         }
       } else if (targetMode === "txt2img") {
         if (fromHasPrompt) {
@@ -512,13 +508,12 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
       //    Only transfer when the target mode's stored sourceImageUrl is null/undefined
       //    (restore wins over transfer — avoids overwriting a previously stored image)
       if (currentMode === "img2img" && targetMode === "upscale") {
-        if (!snapshot.upscale.sourceImageUrl) {
-          setUpscaleSourceImageUrl(sourceImageUrl);
+        if (!snapshot.upscale.sourceImageUrl && referenceSlots.length > 0) {
+          // Use the first reference slot's image as the upscale source
+          setUpscaleSourceImageUrl(referenceSlots[0].imageUrl);
         }
       } else if (currentMode === "upscale" && targetMode === "img2img") {
-        if (!snapshot.img2img.sourceImageUrl) {
-          setSourceImageUrl(upscaleSourceImageUrl);
-        }
+        // Upscale -> img2img: referenceSlots are restored from snapshot already
       }
 
       // 4. If switching to img2img, check model compatibility (AC-12)
@@ -546,8 +541,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
       negativePrompt,
       paramValues,
       variantCount,
-      sourceImageUrl,
-      strength,
+      referenceSlots,
       upscaleSourceImageUrl,
       upscaleScale,
       checkAndAutoSwitchModel,
@@ -563,6 +557,12 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   useEffect(() => {
     if (!variationData) return;
 
+    // Skip addReference-only payloads — they are handled by the dedicated
+    // addReference useEffect below. Without this guard the else-branch would
+    // set promptMotiv to undefined (corrupting the current prompt) and call
+    // clearVariation() before the addReference useEffect ever runs.
+    if (variationData.addReference && !variationData.targetMode && !variationData.promptMotiv) return;
+
     // If variationData has a targetMode, switch to it
     if (variationData.targetMode) {
       const targetMode = variationData.targetMode as GenerationMode;
@@ -575,9 +575,22 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
         setPromptMotiv(variationData.promptMotiv);
         setPromptStyle(variationData.promptStyle ?? "");
         setNegativePrompt(variationData.negativePrompt ?? "");
-        setSourceImageUrl(variationData.sourceImageUrl ?? null);
-        if (variationData.strength !== undefined) {
-          setStrength(variationData.strength);
+        // If variation provides a sourceImageUrl, add it as a reference slot
+        if (variationData.sourceImageUrl) {
+          const occupiedPositions = referenceSlots.map((s) => s.slotPosition);
+          const pos = getLowestFreePosition(occupiedPositions);
+          if (pos !== -1) {
+            setReferenceSlots((prev) => [
+              ...prev,
+              {
+                id: `var-${Date.now()}`,
+                imageUrl: variationData.sourceImageUrl!,
+                slotPosition: pos,
+                role: "content" as ReferenceRole,
+                strength: "moderate" as ReferenceStrength,
+              },
+            ]);
+          }
         }
 
         if (variationData.modelId !== selectedModelIdRef.current) {
@@ -645,7 +658,42 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     }
 
     clearVariation();
-  }, [variationData, clearVariation, collectionModels, saveCurrentModeState]);
+  }, [variationData, clearVariation, collectionModels, saveCurrentModeState, referenceSlots]);
+
+  // ---------------------------------------------------------------------------
+  // addReference consumption (AC-7, AC-8): auto-switch to img2img, add ref, clear
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!variationData?.addReference) return;
+
+    const { imageUrl, generationId } = variationData.addReference;
+
+    // Auto-switch to img2img mode
+    if (currentMode !== "img2img") {
+      saveCurrentModeState();
+      setCurrentMode("img2img");
+    }
+
+    // Add image as new reference to next free slot
+    setReferenceSlots((prev) => {
+      const occupiedPositions = prev.map((s) => s.slotPosition);
+      const pos = getLowestFreePosition(occupiedPositions);
+      if (pos === -1) return prev; // All 5 slots full
+      return [
+        ...prev,
+        {
+          id: generationId ?? `ref-${Date.now()}`,
+          imageUrl,
+          slotPosition: pos,
+          role: "content" as ReferenceRole,
+          strength: "moderate" as ReferenceStrength,
+        },
+      ];
+    });
+
+    clearVariation();
+  }, [variationData?.addReference, clearVariation, currentMode, saveCurrentModeState]);
 
   // ----- Load schema on model change -----
   const loadSchema = useCallback(async (modelId: string) => {
@@ -751,13 +799,155 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   // Image upload handlers
   // ---------------------------------------------------------------------------
 
-  const handleImg2ImgUpload = useCallback((url: string | null) => {
-    setSourceImageUrl(url);
-  }, []);
-
   const handleUpscaleUpload = useCallback((url: string | null) => {
     setUpscaleSourceImageUrl(url);
   }, []);
+
+  // ---------------------------------------------------------------------------
+  // ReferenceBar handlers
+  // ---------------------------------------------------------------------------
+
+  const handleReferenceAdd = useCallback(
+    (file: File, position: number) => {
+      // Upload file via server action, then add to slots
+      (async () => {
+        const result = await uploadReferenceImage({ projectId, file });
+        if ("error" in result) {
+          toast(result.error);
+          return;
+        }
+        setReferenceSlots((prev) => [
+          ...prev,
+          {
+            id: result.id,
+            imageUrl: result.imageUrl,
+            slotPosition: position,
+            role: "content" as ReferenceRole,
+            strength: "moderate" as ReferenceStrength,
+            width: result.width,
+            height: result.height,
+          },
+        ]);
+      })();
+    },
+    [projectId]
+  );
+
+  const handleReferenceRemove = useCallback((slotPosition: number) => {
+    setReferenceSlots((prev) => {
+      const slot = prev.find((s) => s.slotPosition === slotPosition);
+      if (slot) {
+        // Fire-and-forget delete from server
+        deleteReferenceImage({ id: slot.id }).catch(() => {});
+      }
+      return prev.filter((s) => s.slotPosition !== slotPosition);
+    });
+  }, []);
+
+  const handleReferenceRoleChange = useCallback(
+    (slotPosition: number, role: ReferenceRole) => {
+      setReferenceSlots((prev) =>
+        prev.map((s) =>
+          s.slotPosition === slotPosition ? { ...s, role } : s
+        )
+      );
+    },
+    []
+  );
+
+  const handleReferenceStrengthChange = useCallback(
+    (slotPosition: number, strength: ReferenceStrength) => {
+      setReferenceSlots((prev) =>
+        prev.map((s) =>
+          s.slotPosition === slotPosition ? { ...s, strength } : s
+        )
+      );
+    },
+    []
+  );
+
+  const handleReferenceUpload = useCallback(
+    (file: File, slotPosition: number) => {
+      (async () => {
+        const result = await uploadReferenceImage({ projectId, file });
+        if ("error" in result) {
+          toast(result.error);
+          return;
+        }
+        setReferenceSlots((prev) => {
+          // If slot already exists, replace it; otherwise add new
+          const exists = prev.find((s) => s.slotPosition === slotPosition);
+          if (exists) {
+            return prev.map((s) =>
+              s.slotPosition === slotPosition
+                ? {
+                    ...s,
+                    id: result.id,
+                    imageUrl: result.imageUrl,
+                    width: result.width,
+                    height: result.height,
+                  }
+                : s
+            );
+          }
+          return [
+            ...prev,
+            {
+              id: result.id,
+              imageUrl: result.imageUrl,
+              slotPosition,
+              role: "content" as ReferenceRole,
+              strength: "moderate" as ReferenceStrength,
+              width: result.width,
+              height: result.height,
+            },
+          ];
+        });
+      })();
+    },
+    [projectId]
+  );
+
+  const handleReferenceUploadUrl = useCallback(
+    (url: string, slotPosition: number) => {
+      (async () => {
+        const result = await uploadReferenceImage({ projectId, url });
+        if ("error" in result) {
+          toast(result.error);
+          return;
+        }
+        setReferenceSlots((prev) => {
+          const exists = prev.find((s) => s.slotPosition === slotPosition);
+          if (exists) {
+            return prev.map((s) =>
+              s.slotPosition === slotPosition
+                ? {
+                    ...s,
+                    id: result.id,
+                    imageUrl: result.imageUrl,
+                    width: result.width,
+                    height: result.height,
+                  }
+                : s
+            );
+          }
+          return [
+            ...prev,
+            {
+              id: result.id,
+              imageUrl: result.imageUrl,
+              slotPosition,
+              role: "content" as ReferenceRole,
+              strength: "moderate" as ReferenceStrength,
+              width: result.width,
+              height: result.height,
+            },
+          ];
+        });
+      })();
+    },
+    [projectId]
+  );
 
   // ---------------------------------------------------------------------------
   // Generate / Upscale handlers
@@ -785,10 +975,24 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
         }
       });
     } else if (currentMode === "img2img") {
-      // AC-8: Don't generate without source image
-      if (!sourceImageUrl) return;
       if (!promptMotiv.trim()) return;
       if (selectedModels.length === 0) return;
+
+      // AC-9: Pass referenceSlots data to generateImages
+      // AC-10: If no references, generate without them (backwards compat)
+      const filledSlots = referenceSlots.filter((s) => s.imageUrl);
+      const references = filledSlots.length > 0
+        ? filledSlots.map((s) => ({
+            referenceImageId: s.id,
+            imageUrl: s.imageUrl,
+            role: s.role,
+            strength: s.strength,
+            slotPosition: s.slotPosition,
+          }))
+        : undefined;
+
+      // Backwards compat: use first reference as sourceImageUrl if present
+      const sourceImageUrl = filledSlots.length > 0 ? filledSlots[0].imageUrl : undefined;
 
       startGeneration(async () => {
         const modelIds = selectedModels.map((m) => `${m.owner}/${m.name}`);
@@ -802,7 +1006,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
           count: isSingleModel ? variantCount : 1,
           generationMode: "img2img",
           sourceImageUrl,
-          strength,
+          references,
         });
         if (Array.isArray(result)) {
           onGenerationsCreated?.(result);
@@ -832,8 +1036,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     isSingleModel,
     paramValues,
     variantCount,
-    sourceImageUrl,
-    strength,
+    referenceSlots,
     upscaleSourceImageUrl,
     upscaleScale,
     projectId,
@@ -858,7 +1061,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   const isButtonDisabled = (() => {
     if (isGenerating) return true;
     if (currentMode === "txt2img") return !promptMotiv.trim() || selectedModels.length === 0;
-    if (currentMode === "img2img") return !sourceImageUrl || !promptMotiv.trim() || selectedModels.length === 0;
+    if (currentMode === "img2img") return !promptMotiv.trim() || selectedModels.length === 0;
     if (currentMode === "upscale") return !upscaleSourceImageUrl;
     return true;
   })();
@@ -873,8 +1076,8 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   const showPromptFields = currentMode !== "upscale";
   const showModelSelector = currentMode !== "upscale";
   const showVariants = currentMode !== "upscale";
-  const showImageDropzone = currentMode === "img2img" || currentMode === "upscale";
-  const showStrengthSlider = currentMode === "img2img";
+  const showImageDropzone = currentMode === "upscale";
+  const showReferenceBar = true; // Always rendered; hidden via CSS when not img2img
 
   // Shared textarea class
   const textareaClass =
@@ -924,7 +1127,25 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
             onRetry={fetchCollectionModels}
           />
 
-          {/* ── Group: Source Input (img2img / upscale) ── */}
+          {/* ── Group: ReferenceBar (img2img) — hidden, not unmounted, in other modes ── */}
+          {showReferenceBar && (
+            <div
+              className={currentMode === "img2img" ? "" : "hidden"}
+              data-testid="reference-bar-wrapper"
+            >
+              <ReferenceBar
+                slots={referenceSlots}
+                onAdd={handleReferenceAdd}
+                onRemove={handleReferenceRemove}
+                onRoleChange={handleReferenceRoleChange}
+                onStrengthChange={handleReferenceStrengthChange}
+                onUpload={handleReferenceUpload}
+                onUploadUrl={handleReferenceUploadUrl}
+              />
+            </div>
+          )}
+
+          {/* ── Group: Source Input (upscale only) ── */}
           {showImageDropzone && (
             <div className="space-y-3 rounded-lg border border-border/60 bg-muted/30 p-3">
               <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -932,17 +1153,10 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
               </Label>
               <ImageDropzone
                 projectId={projectId}
-                onUpload={currentMode === "img2img" ? handleImg2ImgUpload : handleUpscaleUpload}
-                initialUrl={
-                  currentMode === "img2img"
-                    ? sourceImageUrl ?? undefined
-                    : upscaleSourceImageUrl ?? undefined
-                }
+                onUpload={handleUpscaleUpload}
+                initialUrl={upscaleSourceImageUrl ?? undefined}
                 key={`dropzone-${currentMode}`}
               />
-              {showStrengthSlider && (
-                <StrengthSlider value={strength} onChange={setStrength} />
-              )}
             </div>
           )}
 

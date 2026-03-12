@@ -142,7 +142,7 @@ export function WorkspaceContent({
   return (
     <div className="flex flex-1 gap-3 overflow-hidden bg-muted/40 p-3">
       {/* Left: Prompt Area */}
-      <div className="w-80 shrink-0 overflow-y-auto rounded-xl border border-border/80 bg-card p-4 shadow-sm">
+      <div className="w-[480px] shrink-0 overflow-y-auto rounded-xl border border-border/80 bg-card p-4 shadow-sm">
         <PromptArea
           projectId={projectId}
           onGenerationsCreated={handleGenerationsCreated}
