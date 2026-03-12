@@ -100,7 +100,7 @@ export async function generateImages(
 
   // img2img-specific validation
   if (input.generationMode === "img2img") {
-    if (!input.sourceImageUrl) {
+    if (!input.sourceImageUrl && (!input.references || input.references.length === 0)) {
       return { error: "Source-Image ist erforderlich fuer img2img" };
     }
     if (input.strength !== undefined && (input.strength < 0 || input.strength > 1)) {

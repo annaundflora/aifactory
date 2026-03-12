@@ -352,7 +352,7 @@ async function generate(
 
   // img2img validation
   if (effectiveMode === "img2img") {
-    if (!sourceImageUrl) {
+    if (!sourceImageUrl && !effectiveReferences) {
       throw new Error("Source-Image ist erforderlich fuer img2img");
     }
     if (strength !== undefined && (strength < 0 || strength > 1)) {
