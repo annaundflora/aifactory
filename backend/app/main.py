@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routes.health import router as health_router
+from app.routes.messages import router as messages_router
 
 
 @asynccontextmanager
@@ -37,6 +38,7 @@ def create_app() -> FastAPI:
 
     # Register routers
     application.include_router(health_router, prefix="/api/assistant")
+    application.include_router(messages_router, prefix="/api/assistant")
 
     return application
 
