@@ -31,11 +31,8 @@ export function ModelRecommendation() {
 
     // AC-4: Preserve all existing workspace fields, only override modelId
     setVariation({
-      promptMotiv: variationData?.promptMotiv ?? "",
-      promptStyle: variationData?.promptStyle ?? "",
-      negativePrompt: variationData?.negativePrompt ?? "",
+      ...variationData,
       modelId: recommendedModel.id,
-      modelParams: variationData?.modelParams ?? {},
     });
   }, [recommendedModel, variationData, setVariation]);
 
