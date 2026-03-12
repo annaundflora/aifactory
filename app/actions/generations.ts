@@ -25,6 +25,14 @@ interface GenerateImagesInput {
   generationMode?: string;
   sourceImageUrl?: string;
   strength?: number;
+  /** Multi-image references (slice-09+). Passed through for slice-13 to consume. */
+  references?: Array<{
+    referenceImageId: string;
+    imageUrl: string;
+    role: string;
+    strength: string;
+    slotPosition: number;
+  }>;
 }
 
 interface UpscaleImageInput {

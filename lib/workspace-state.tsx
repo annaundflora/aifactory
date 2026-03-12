@@ -17,6 +17,8 @@ export interface WorkspaceVariationState {
   sourceImageUrl?: string;
   strength?: number;
   sourceGenerationId?: string;
+  /** Used by Lightbox "Use as Reference" button (slice-16) to add a reference image */
+  addReference?: { imageUrl: string; generationId?: string };
 }
 
 // ---------------------------------------------------------------------------
