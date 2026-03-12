@@ -24,6 +24,18 @@ import {
 } from "../assistant-context";
 
 // ---------------------------------------------------------------------------
+// Mock workspace-state to avoid needing WorkspaceStateProvider wrapper
+// ---------------------------------------------------------------------------
+
+vi.mock("@/lib/workspace-state", () => ({
+  useWorkspaceVariation: () => ({
+    variationData: null,
+    setVariation: vi.fn(),
+    clearVariation: vi.fn(),
+  }),
+}));
+
+// ---------------------------------------------------------------------------
 // Mock sonner toast
 // ---------------------------------------------------------------------------
 

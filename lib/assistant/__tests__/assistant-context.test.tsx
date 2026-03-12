@@ -3,6 +3,15 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 
+// Mock workspace-state to avoid needing WorkspaceStateProvider wrapper
+vi.mock("@/lib/workspace-state", () => ({
+  useWorkspaceVariation: () => ({
+    variationData: null,
+    setVariation: vi.fn(),
+    clearVariation: vi.fn(),
+  }),
+}));
+
 import {
   PromptAssistantProvider,
   usePromptAssistant,
