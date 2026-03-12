@@ -38,16 +38,6 @@ beforeAll(() => {
 // Mock db/queries to prevent DATABASE_URL crash
 vi.mock("@/lib/db/queries", () => ({}));
 
-// Mock snippet-service to prevent DATABASE_URL crash
-vi.mock("@/lib/services/snippet-service", () => ({
-  SnippetService: {
-    create: vi.fn().mockResolvedValue({}),
-    update: vi.fn().mockResolvedValue(null),
-    delete: vi.fn().mockResolvedValue(false),
-    getAll: vi.fn().mockResolvedValue({}),
-  },
-}));
-
 // Mock sonner toast
 const mockToast = vi.fn();
 vi.mock("sonner", () => ({
@@ -89,6 +79,8 @@ const mockGetCollectionModels = vi.fn();
 vi.mock("@/app/actions/models", () => ({
   getModelSchema: (...args: unknown[]) => mockGetModelSchema(...args),
   getCollectionModels: (...args: unknown[]) => mockGetCollectionModels(...args),
+  getProjectSelectedModels: vi.fn().mockResolvedValue([]),
+  saveProjectSelectedModels: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock generateImages and upscaleImage server actions
@@ -97,6 +89,9 @@ const mockUpscaleImage = vi.fn();
 vi.mock("@/app/actions/generations", () => ({
   generateImages: (...args: unknown[]) => mockGenerateImages(...args),
   upscaleImage: (...args: unknown[]) => mockUpscaleImage(...args),
+}));
+
+vi.mock("@/app/actions/upload", () => ({
   uploadSourceImage: vi.fn().mockResolvedValue({ url: "https://r2.example.com/uploaded.png" }),
 }));
 
@@ -116,17 +111,16 @@ vi.mock("lucide-react", () => ({
     createElement("span", { "data-testid": "wand-icon", ...props }),
   Sparkles: (props: Record<string, unknown>) =>
     createElement("span", { "data-testid": "sparkles-icon", ...props }),
+  Minus: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "minus-icon", ...props }),
+  Plus: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "plus-icon", ...props }),
   X: (props: Record<string, unknown>) =>
     createElement("span", { "data-testid": "x-icon", ...props }),
   Search: (props: Record<string, unknown>) =>
     createElement("span", { "data-testid": "search-icon", ...props }),
   AlertCircle: (props: Record<string, unknown>) =>
     createElement("span", { "data-testid": "alert-circle-icon", ...props }),
-}));
-
-// Mock BuilderDrawer (external component, not under test here)
-vi.mock("@/components/prompt-builder/builder-drawer", () => ({
-  BuilderDrawer: () => null,
 }));
 
 // Mock LLMComparison (external component, not under test here)
@@ -154,6 +148,77 @@ vi.mock("@/lib/workspace-state", () => ({
     setVariation: mockSetVariation,
     clearVariation: mockClearVariation,
   }),
+  useWorkspaceVariationOptional: () => ({
+    variationData: mockVariationData,
+    setVariation: mockSetVariation,
+    clearVariation: mockClearVariation,
+  }),
+}));
+
+// Mock assistant context and provider (pass-through)
+vi.mock("@/lib/assistant/assistant-context", () => ({
+  PromptAssistantProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  usePromptAssistant: () => ({
+    messages: [],
+    draftPrompt: null,
+    recommendedModel: null,
+    isStreaming: false,
+    hasCanvas: false,
+    activeView: "startscreen" as const,
+    setActiveView: vi.fn(),
+    sessionId: null,
+    threadId: null,
+    sessions: [],
+    selectedModel: "gpt-4o-mini",
+    setSelectedModel: vi.fn(),
+    toolResults: [],
+    dispatch: vi.fn(),
+    cancelStream: vi.fn(),
+    loadSession: vi.fn(),
+    projectId: "test-project",
+    messagesEndRef: { current: null },
+    sessionIdRef: { current: null },
+    sendMessageRef: { current: null },
+    cancelStreamRef: { current: null },
+  }),
+  getWorkspaceFieldsForChip: () => ({ motiv: "", style: "", negativePrompt: "" }),
+}));
+
+// Mock assistant runtime hook
+vi.mock("@/lib/assistant/use-assistant-runtime", () => ({
+  useAssistantRuntime: () => ({
+    sendMessage: vi.fn(),
+  }),
+}));
+
+// Mock assistant UI components as stubs
+vi.mock("@/components/assistant/assistant-trigger", () => ({
+  AssistantTrigger: () => <div data-testid="mock-assistant-trigger" />,
+}));
+vi.mock("@/components/assistant/assistant-sheet", () => ({
+  AssistantSheet: () => <div data-testid="mock-assistant-sheet" />,
+}));
+vi.mock("@/components/assistant/startscreen", () => ({
+  Startscreen: () => null,
+}));
+vi.mock("@/components/assistant/chat-input", () => ({
+  ChatInput: () => null,
+}));
+vi.mock("@/components/assistant/chat-thread", () => ({
+  ChatThread: () => null,
+}));
+vi.mock("@/components/assistant/prompt-canvas", () => ({
+  PromptCanvas: () => null,
+}));
+vi.mock("@/components/assistant/session-list", () => ({
+  SessionList: () => null,
+}));
+vi.mock("@/components/assistant/session-switcher", () => ({
+  SessionSwitcher: () => null,
+}));
+vi.mock("@/components/assistant/model-selector", () => ({
+  ModelSelector: () => null,
+  DEFAULT_MODEL_SLUG: "gpt-4o-mini",
 }));
 
 // Capture ModelBrowserDrawer props so tests can invoke onConfirm
@@ -530,9 +595,10 @@ describe("PromptArea Multi-Mode (Slice 14)", () => {
     const user = userEvent.setup();
     await renderPromptArea();
 
-    // Click variant count 3 button
-    const variant3Btn = screen.getByTestId("variant-count-3");
-    await user.click(variant3Btn);
+    // Click plus button twice to go from 1 -> 3 (stepper UI)
+    const plusBtn = screen.getByTestId("variant-count-plus");
+    await user.click(plusBtn);
+    await user.click(plusBtn);
 
     // Type a prompt and generate
     const textarea = screen.getByTestId("prompt-motiv-textarea");
@@ -556,16 +622,33 @@ describe("PromptArea Multi-Mode (Slice 14)", () => {
    * THEN ist der Default-Wert 1 und die auswaehlbaren Werte sind 1, 2, 3, 4
    */
   it("should render variant-count selector with default 1 and options 1-4", async () => {
+    const user = userEvent.setup();
     await renderPromptArea();
 
     const selector = screen.getByTestId("variant-count-selector");
     expect(selector).toBeInTheDocument();
 
-    // All 4 options should be present with correct text
-    expect(screen.getByTestId("variant-count-1")).toHaveTextContent("1");
-    expect(screen.getByTestId("variant-count-2")).toHaveTextContent("2");
-    expect(screen.getByTestId("variant-count-3")).toHaveTextContent("3");
-    expect(screen.getByTestId("variant-count-4")).toHaveTextContent("4");
+    // Stepper UI: minus button, value display, plus button
+    const minusBtn = screen.getByTestId("variant-count-minus");
+    const valueDisplay = screen.getByTestId("variant-count-value");
+    const plusBtn = screen.getByTestId("variant-count-plus");
+
+    // Default value is 1
+    expect(valueDisplay).toHaveTextContent("1");
+    // Minus should be disabled at min value
+    expect(minusBtn).toBeDisabled();
+    // Plus should be enabled
+    expect(plusBtn).not.toBeDisabled();
+
+    // Can increment to 4 (max)
+    await user.click(plusBtn);
+    expect(valueDisplay).toHaveTextContent("2");
+    await user.click(plusBtn);
+    expect(valueDisplay).toHaveTextContent("3");
+    await user.click(plusBtn);
+    expect(valueDisplay).toHaveTextContent("4");
+    // Plus should be disabled at max value
+    expect(plusBtn).toBeDisabled();
   });
 
   /**

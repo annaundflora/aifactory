@@ -24,3 +24,12 @@ npm-debug.log*
 
 # docker
 postgres-data/
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.venv/
+venv/
+.pytest_cache/

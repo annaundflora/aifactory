@@ -73,7 +73,7 @@ describe("AC-1: Drawer opens and renders all model cards and search input", () =
     // Exactly 4 ModelCards rendered in the grid
     const grid = screen.getByTestId("model-grid");
     // Each ModelCard renders a Card with role="button"
-    const cards = within(grid).getAllByRole("button");
+    const cards = within(grid).getAllByRole("button").filter((el) => el.hasAttribute("aria-pressed"));
     expect(cards).toHaveLength(4);
 
     // Search input with correct placeholder
@@ -103,7 +103,7 @@ describe("AC-2: Search filters model cards by search query", () => {
     await user.type(searchInput, "flux");
 
     const grid = screen.getByTestId("model-grid");
-    const cards = within(grid).getAllByRole("button");
+    const cards = within(grid).getAllByRole("button").filter((el) => el.hasAttribute("aria-pressed"));
 
     // Only "flux-schnell" and "flux-dev" should match (name contains "flux")
     expect(cards).toHaveLength(2);
@@ -138,7 +138,7 @@ describe("AC-3: Owner filter dropdown filters model cards by owner", () => {
 
     // Only stability-ai models should remain
     const grid = screen.getByTestId("model-grid");
-    const cards = within(grid).getAllByRole("button");
+    const cards = within(grid).getAllByRole("button").filter((el) => el.hasAttribute("aria-pressed"));
     expect(cards).toHaveLength(2);
 
     expect(screen.getByText("sdxl")).toBeInTheDocument();
@@ -169,7 +169,7 @@ describe("AC-4: Card selection enables confirm button with correct label", () =>
 
     // Click the first model card
     const grid = screen.getByTestId("model-grid");
-    const cards = within(grid).getAllByRole("button");
+    const cards = within(grid).getAllByRole("button").filter((el) => el.hasAttribute("aria-pressed"));
     await user.click(cards[0]);
 
     // The clicked card should now have selected state (ring-2 ring-primary)
@@ -200,7 +200,7 @@ describe("AC-5: Max-3 enforcement prevents selecting more than 3 models", () => 
     render(<ModelBrowserDrawer {...props} />);
 
     const grid = screen.getByTestId("model-grid");
-    const cards = within(grid).getAllByRole("button");
+    const cards = within(grid).getAllByRole("button").filter((el) => el.hasAttribute("aria-pressed"));
 
     // Select 3 cards
     await user.click(cards[0]);
@@ -243,7 +243,7 @@ describe("AC-6: Deselecting a card by clicking it again", () => {
     render(<ModelBrowserDrawer {...props} />);
 
     const grid = screen.getByTestId("model-grid");
-    const cards = within(grid).getAllByRole("button");
+    const cards = within(grid).getAllByRole("button").filter((el) => el.hasAttribute("aria-pressed"));
 
     // Select 2 cards
     await user.click(cards[0]);
@@ -295,7 +295,7 @@ describe("AC-7: Close without confirm discards temp selection", () => {
     const { rerender } = render(<ModelBrowserDrawer {...props} />);
 
     const grid = screen.getByTestId("model-grid");
-    const cards = within(grid).getAllByRole("button");
+    const cards = within(grid).getAllByRole("button").filter((el) => el.hasAttribute("aria-pressed"));
 
     // Add a second model to temp selection
     await user.click(cards[1]);
@@ -343,7 +343,7 @@ describe("AC-8: Confirm passes selected models and closes drawer", () => {
     render(<ModelBrowserDrawer {...props} />);
 
     const grid = screen.getByTestId("model-grid");
-    const cards = within(grid).getAllByRole("button");
+    const cards = within(grid).getAllByRole("button").filter((el) => el.hasAttribute("aria-pressed"));
 
     // Select 2 models
     await user.click(cards[0]);
@@ -530,7 +530,7 @@ describe("Favorites functionality", () => {
 
     // Only the favorited model should remain
     const grid = screen.getByTestId("model-grid");
-    const cards = within(grid).getAllByRole("button");
+    const cards = within(grid).getAllByRole("button").filter((el) => el.hasAttribute("aria-pressed"));
     // Each card is a button, but star buttons are also inside — count by card structure
     // The favorited model card + its star button
     expect(screen.getByText("flux-schnell")).toBeInTheDocument();

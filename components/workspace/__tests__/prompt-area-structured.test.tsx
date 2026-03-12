@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
-import { render, screen, waitFor, act } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import { createElement } from "react";
 import type { ReactNode } from "react";
+import { type CollectionModel } from "@/lib/types/collection-model";
 
 // ---------------------------------------------------------------------------
 // Polyfills for jsdom (Radix UI needs ResizeObserver + pointer events)
@@ -36,81 +37,77 @@ beforeAll(() => {
 
 // Mock db/queries to prevent DATABASE_URL crash (type-only import in source,
 // but vitest still resolves it transitively)
-vi.mock("@/lib/db/queries", () => ({
-  // Only the Generation type is used (as a type import), no runtime needed
-}));
+vi.mock("@/lib/db/queries", () => ({}));
 
-// Mock snippet-service to prevent DATABASE_URL crash (imports lib/db transitively)
-vi.mock("@/lib/services/snippet-service", () => ({
-  SnippetService: {
-    create: vi.fn().mockResolvedValue({}),
-    update: vi.fn().mockResolvedValue(null),
-    delete: vi.fn().mockResolvedValue(false),
-    getAll: vi.fn().mockResolvedValue({}),
-  },
+// Mock sonner toast
+const mockToast = vi.fn();
+vi.mock("sonner", () => ({
+  toast: (...args: unknown[]) => mockToast(...args),
 }));
 
 // Mock MODELS registry
 vi.mock("@/lib/models", () => ({
   MODELS: [
-    { id: "model-1", displayName: "FLUX 2 Pro", pricePerImage: 0.055 },
-    { id: "model-2", displayName: "Nano Banana 2", pricePerImage: 0 },
+    { id: "black-forest-labs/flux-schnell", displayName: "FLUX Schnell", pricePerImage: 0.055 },
+    { id: "stability-ai/sdxl", displayName: "Stable Diffusion XL", pricePerImage: 0 },
   ],
   getModelById: (id: string) => {
     const models: Record<string, { id: string; displayName: string; pricePerImage: number }> = {
-      "model-1": { id: "model-1", displayName: "FLUX 2 Pro", pricePerImage: 0.055 },
-      "model-2": { id: "model-2", displayName: "Nano Banana 2", pricePerImage: 0 },
+      "black-forest-labs/flux-schnell": { id: "black-forest-labs/flux-schnell", displayName: "FLUX Schnell", pricePerImage: 0.055 },
+      "stability-ai/sdxl": { id: "stability-ai/sdxl", displayName: "Stable Diffusion XL", pricePerImage: 0 },
     };
     return models[id] ?? undefined;
   },
 }));
 
-// Mock getModelSchema server action
+// Mock getModelSchema + getCollectionModels server actions
 const mockGetModelSchema = vi.fn();
+const mockGetCollectionModels = vi.fn();
 vi.mock("@/app/actions/models", () => ({
   getModelSchema: (...args: unknown[]) => mockGetModelSchema(...args),
+  getCollectionModels: (...args: unknown[]) => mockGetCollectionModels(...args),
+  getProjectSelectedModels: vi.fn().mockResolvedValue([]),
+  saveProjectSelectedModels: vi.fn().mockResolvedValue(undefined),
 }));
 
-// Mock generateImages server action
+// Mock generateImages and upscaleImage server actions
 const mockGenerateImages = vi.fn();
+const mockUpscaleImage = vi.fn();
 vi.mock("@/app/actions/generations", () => ({
   generateImages: (...args: unknown[]) => mockGenerateImages(...args),
+  upscaleImage: (...args: unknown[]) => mockUpscaleImage(...args),
 }));
 
-// Mock lucide-react icons (TemplateSelector uses ChevronDown; Radix Select uses ChevronDownIcon/UpIcon/CheckIcon)
+vi.mock("@/app/actions/upload", () => ({
+  uploadSourceImage: vi.fn().mockResolvedValue({ url: "https://r2.example.com/uploaded.png" }),
+}));
+
+// Mock lucide-react icons
 vi.mock("lucide-react", () => ({
-  ChevronDown: (props: Record<string, unknown>) => (
-    <span data-testid="chevron-down" {...props} />
-  ),
-  ChevronDownIcon: (props: Record<string, unknown>) => (
-    <span data-testid="chevron-down-icon" {...props} />
-  ),
-  ChevronUpIcon: (props: Record<string, unknown>) => (
-    <span data-testid="chevron-up-icon" {...props} />
-  ),
-  CheckIcon: (props: Record<string, unknown>) => (
-    <span data-testid="check-icon" {...props} />
-  ),
-  Loader2: (props: Record<string, unknown>) => (
-    <span data-testid="loader-icon" {...props} />
-  ),
-  Wand2: (props: Record<string, unknown>) => (
-    <span data-testid="wand-icon" {...props} />
-  ),
-  Sparkles: (props: Record<string, unknown>) => (
-    <span data-testid="sparkles-icon" {...props} />
-  ),
-}));
-
-// Mock BuilderDrawer -- captures onClose callback so we can simulate it
-let capturedBuilderOnClose: ((prompt: string) => void) | null = null;
-vi.mock("@/components/prompt-builder/builder-drawer", () => ({
-  BuilderDrawer: ({ open, onClose }: { open: boolean; onClose: (prompt: string) => void; basePrompt: string }) => {
-    capturedBuilderOnClose = onClose;
-    return open
-      ? createElement("div", { "data-testid": "builder-drawer" }, "Builder Drawer Open")
-      : null;
-  },
+  ChevronDown: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "chevron-down", ...props }),
+  ChevronDownIcon: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "chevron-down-icon", ...props }),
+  ChevronUpIcon: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "chevron-up-icon", ...props }),
+  CheckIcon: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "check-icon", ...props }),
+  Loader2: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "loader-icon", ...props }),
+  Wand2: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "wand-icon", ...props }),
+  Sparkles: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "sparkles-icon", ...props }),
+  Minus: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "minus-icon", ...props }),
+  Plus: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "plus-icon", ...props }),
+  X: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "x-icon", ...props }),
+  Search: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "search-icon", ...props }),
+  AlertCircle: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "alert-circle-icon", ...props }),
 }));
 
 // Mock LLMComparison
@@ -136,10 +133,112 @@ vi.mock("@/lib/workspace-state", () => ({
     setVariation: mockSetVariation,
     clearVariation: mockClearVariation,
   }),
+  useWorkspaceVariationOptional: () => ({
+    variationData: mockVariationData,
+    setVariation: mockSetVariation,
+    clearVariation: mockClearVariation,
+  }),
+}));
+
+// Mock assistant context and provider (pass-through)
+vi.mock("@/lib/assistant/assistant-context", () => ({
+  PromptAssistantProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  usePromptAssistant: () => ({
+    messages: [],
+    draftPrompt: null,
+    recommendedModel: null,
+    isStreaming: false,
+    hasCanvas: false,
+    activeView: "startscreen" as const,
+    setActiveView: vi.fn(),
+    sessionId: null,
+    threadId: null,
+    sessions: [],
+    selectedModel: "gpt-4o-mini",
+    setSelectedModel: vi.fn(),
+    toolResults: [],
+    dispatch: vi.fn(),
+    cancelStream: vi.fn(),
+    loadSession: vi.fn(),
+    projectId: "test-project",
+    messagesEndRef: { current: null },
+    sessionIdRef: { current: null },
+    sendMessageRef: { current: null },
+    cancelStreamRef: { current: null },
+  }),
+  getWorkspaceFieldsForChip: () => ({ motiv: "", style: "", negativePrompt: "" }),
+}));
+
+// Mock assistant runtime hook
+vi.mock("@/lib/assistant/use-assistant-runtime", () => ({
+  useAssistantRuntime: () => ({
+    sendMessage: vi.fn(),
+  }),
+}));
+
+// Mock assistant UI components as stubs
+vi.mock("@/components/assistant/assistant-trigger", () => ({
+  AssistantTrigger: () => createElement("div", { "data-testid": "mock-assistant-trigger" }),
+}));
+vi.mock("@/components/assistant/assistant-sheet", () => ({
+  AssistantSheet: () => createElement("div", { "data-testid": "mock-assistant-sheet" }),
+}));
+vi.mock("@/components/assistant/startscreen", () => ({
+  Startscreen: () => null,
+}));
+vi.mock("@/components/assistant/chat-input", () => ({
+  ChatInput: () => null,
+}));
+vi.mock("@/components/assistant/chat-thread", () => ({
+  ChatThread: () => null,
+}));
+vi.mock("@/components/assistant/prompt-canvas", () => ({
+  PromptCanvas: () => null,
+}));
+vi.mock("@/components/assistant/session-list", () => ({
+  SessionList: () => null,
+}));
+vi.mock("@/components/assistant/session-switcher", () => ({
+  SessionSwitcher: () => null,
+}));
+vi.mock("@/components/assistant/model-selector", () => ({
+  ModelSelector: () => null,
+  DEFAULT_MODEL_SLUG: "gpt-4o-mini",
+}));
+
+// Mock ModelBrowserDrawer
+vi.mock("@/components/models/model-browser-drawer", () => ({
+  ModelBrowserDrawer: (props: Record<string, unknown>) =>
+    createElement("div", { "data-testid": "mock-model-browser-drawer" }),
 }));
 
 // Import AFTER mocks
 import { PromptArea } from "@/components/workspace/prompt-area";
+
+// ---------------------------------------------------------------------------
+// Fixtures
+// ---------------------------------------------------------------------------
+
+const COLLECTION_MODELS: CollectionModel[] = [
+  {
+    url: "https://replicate.com/black-forest-labs/flux-schnell",
+    owner: "black-forest-labs",
+    name: "flux-schnell",
+    description: "Fast model",
+    cover_image_url: "https://example.com/flux.jpg",
+    run_count: 5_000_000,
+    created_at: "2025-01-15T00:00:00Z",
+  },
+  {
+    url: "https://replicate.com/stability-ai/sdxl",
+    owner: "stability-ai",
+    name: "sdxl",
+    description: "SDXL model",
+    cover_image_url: "https://example.com/sdxl.jpg",
+    run_count: 3_000_000,
+    created_at: "2025-01-15T00:00:00Z",
+  },
+];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -173,9 +272,13 @@ const schemaWithNeg = {
 async function renderPromptArea(schema = schemaWithoutNeg) {
   mockGetModelSchema.mockResolvedValue(schema);
   const result = render(<PromptArea projectId="proj-1" />);
-  // Wait for initial schema load to complete
+  // Wait for getCollectionModels to be called on mount
   await waitFor(() => {
-    expect(mockGetModelSchema).toHaveBeenCalled();
+    expect(mockGetCollectionModels).toHaveBeenCalled();
+  });
+  // Wait for model-trigger to appear (selectedModels initialized from collection)
+  await waitFor(() => {
+    expect(screen.getByTestId("model-trigger")).toBeInTheDocument();
   });
   // Wait for loading state to clear
   await waitFor(() => {
@@ -193,10 +296,12 @@ async function renderPromptArea(schema = schemaWithoutNeg) {
 describe("Prompt Area -- Structured Fields", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetCollectionModels.mockResolvedValue(COLLECTION_MODELS);
     mockGetModelSchema.mockResolvedValue(schemaWithoutNeg);
     mockGenerateImages.mockResolvedValue([]);
+    mockUpscaleImage.mockResolvedValue({ id: "gen-1" });
     mockVariationData = null;
-    capturedBuilderOnClose = null;
+    mockToast.mockClear();
   });
 
   // -------------------------------------------------------------------------
@@ -389,7 +494,7 @@ describe("Prompt Area -- Structured Fields", () => {
     mockVariationData = {
       promptMotiv: "Eagle soaring",
       promptStyle: "digital art",
-      modelId: "model-1",
+      modelId: "black-forest-labs/flux-schnell",
       modelParams: {},
     };
 
@@ -419,23 +524,17 @@ describe("Prompt Area -- Structured Fields", () => {
      *            Style = "digital art", Negative = "blurry"
      */
 
-    // Use schema with negative_prompt so the field renders
-    mockGetModelSchema.mockResolvedValue(schemaWithNeg);
-
     // Provide variation data with all three fields
     mockVariationData = {
       promptMotiv: "Eagle",
       promptStyle: "digital art",
       negativePrompt: "blurry",
-      modelId: "model-1",
+      modelId: "black-forest-labs/flux-schnell",
       modelParams: { aspect_ratio: "1:1" },
     };
 
-    render(<PromptArea projectId="proj-1" />);
-
-    await waitFor(() => {
-      expect(mockGetModelSchema).toHaveBeenCalled();
-    });
+    // Use schema with negative_prompt so the field renders
+    await renderPromptArea(schemaWithNeg);
 
     // Motiv field should be populated
     const motivTextarea = screen.getByTestId("prompt-motiv-textarea") as HTMLTextAreaElement;
@@ -476,43 +575,9 @@ describe("Prompt Area -- Structured Fields", () => {
         expect.objectContaining({
           projectId: "proj-1",
           promptMotiv: "A beautiful sunset",
-          modelId: "model-1",
         })
       );
     });
-  });
-
-  // -------------------------------------------------------------------------
-  // AC-10: Builder-Output ins Style-Feld
-  // -------------------------------------------------------------------------
-  it("AC-10: should write builder composed prompt to style/modifier field on drawer close", async () => {
-    /**
-     * AC-10: GIVEN der Builder-Drawer wird geschlossen mit einem komponierten Prompt
-     *        WHEN der Builder onClose(composedPrompt) aufruft
-     *        THEN wird der komponierte Text ins Style/Modifier-Feld geschrieben (nicht ins Motiv-Feld)
-     */
-    const user = userEvent.setup();
-    await renderPromptArea();
-
-    // Open the builder drawer
-    const builderBtn = screen.getByTestId("builder-btn");
-    await user.click(builderBtn);
-
-    // The mock BuilderDrawer should be rendered and capturedBuilderOnClose set
-    expect(capturedBuilderOnClose).not.toBeNull();
-
-    // Simulate builder closing with a composed prompt
-    act(() => {
-      capturedBuilderOnClose!("oil painting, warm tones, cinematic lighting");
-    });
-
-    // Style field should contain the composed prompt
-    const styleTextarea = screen.getByTestId("prompt-style-textarea") as HTMLTextAreaElement;
-    expect(styleTextarea.value).toBe("oil painting, warm tones, cinematic lighting");
-
-    // Motiv field should NOT have been changed
-    const motivTextarea = screen.getByTestId("prompt-motiv-textarea") as HTMLTextAreaElement;
-    expect(motivTextarea.value).toBe("");
   });
 
   // -------------------------------------------------------------------------
@@ -549,7 +614,7 @@ describe("Prompt Area -- Structured Fields", () => {
     // through to PromptArea fields (complementing AC-7/AC-8).
     mockVariationData = {
       promptMotiv: "Generated from lightbox",
-      modelId: "model-1",
+      modelId: "black-forest-labs/flux-schnell",
       modelParams: { aspect_ratio: "16:9" },
     };
 
