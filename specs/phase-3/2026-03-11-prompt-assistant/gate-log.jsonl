@@ -51,3 +51,6 @@
 {"ts":"2026-03-12T16:45:00Z","slice":"slice-13c","gate":"tests","result":"PASSED","retries":0}
 {"ts":"2026-03-12T16:45:00Z","slice":"slice-14","gate":"tests","result":"PASSED","retries":0}
 {"ts":"2026-03-12T16:45:00Z","slice":"slice-16","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-12T17:00:00Z","slice":"slice-15","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-12T17:00:00Z","slice":"slice-17","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-12T17:00:00Z","slice":"slice-20","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
