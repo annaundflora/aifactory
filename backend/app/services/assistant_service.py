@@ -17,6 +17,8 @@ from typing import AsyncGenerator, Optional
 
 from langchain_core.messages import AIMessage, HumanMessage
 
+from langgraph.checkpoint.memory import MemorySaver
+
 from app.agent.graph import create_agent
 from app.config import settings
 from app.models.dtos import (
@@ -109,7 +111,7 @@ class AssistantService:
     """
 
     def __init__(self):
-        self._agent = create_agent(checkpointer=None)
+        self._agent = create_agent(checkpointer=MemorySaver())
         self._repo = SessionRepository()
 
     async def stream_response(
@@ -277,6 +279,10 @@ class AssistantService:
         elif kind == "on_tool_end":
             tool_name = event.get("name", "unknown")
             tool_output = event.get("data", {}).get("output", {})
+
+            # Extract content from LangChain message objects (e.g. ToolMessage)
+            if hasattr(tool_output, "content"):
+                tool_output = tool_output.content
 
             # Try to parse the tool output if it's a string
             if isinstance(tool_output, str):

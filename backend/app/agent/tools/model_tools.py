@@ -29,13 +29,13 @@ logger = logging.getLogger(__name__)
 _MATCHING_RULES: list[dict] = [
     {
         "keywords": ["photorealistic", "photorealism", "photo", "realistic", "fotorealistisch", "fotorealismus", "portrait", "landscape photography"],
-        "model_patterns": [("black-forest-labs", "flux"), ("flux",)],
+        "model_patterns": [("black-forest-labs", "flux-2-max"), ("black-forest-labs", "flux-2"), ("black-forest-labs", "flux"), ("flux",)],
         "category": "photorealistic",
         "reason_de": "Dieses Modell eignet sich besonders gut fuer fotorealistische Bilder mit hoher Detailtreue.",
     },
     {
-        "keywords": ["text", "typography", "lettering", "schrift", "text im bild", "logo text", "signage"],
-        "model_patterns": [("ideogram",), ("black-forest-labs", "flux")],
+        "keywords": ["typography", "lettering", "schrift", "text im bild", "logo text", "signage", "text overlay", "text on image"],
+        "model_patterns": [("ideogram",), ("black-forest-labs", "flux-2-max"), ("black-forest-labs", "flux")],
         "category": "text-in-image",
         "reason_de": "Dieses Modell kann Text in Bildern besonders gut und praezise darstellen.",
     },
@@ -47,13 +47,13 @@ _MATCHING_RULES: list[dict] = [
     },
     {
         "keywords": ["illustration", "artistic", "painting", "watercolor", "oil painting", "digital art", "concept art", "kuenstlerisch"],
-        "model_patterns": [("midjourney",), ("playground",), ("stability",)],
+        "model_patterns": [("midjourney",), ("playground",), ("stability",), ("black-forest-labs", "flux-2-max")],
         "category": "artistic",
         "reason_de": "Dieses Modell erzeugt besonders kuenstlerische und kreative Bildkompositionen.",
     },
     {
         "keywords": ["3d", "3d render", "3d rendering", "cgi", "blender"],
-        "model_patterns": [("flux",), ("stability",)],
+        "model_patterns": [("black-forest-labs", "flux-2-max"), ("flux",), ("stability",)],
         "category": "3d",
         "reason_de": "Dieses Modell liefert gute Ergebnisse bei 3D-Renderings und CGI-artigen Bildern.",
     },
@@ -115,9 +115,9 @@ def _get_default_model(available_models: list[dict]) -> dict:
     """
     if not available_models:
         return {
-            "id": "black-forest-labs/flux-schnell",
-            "name": "flux-schnell",
-            "reason": "Flux Schnell ist ein vielseitiges Modell, das fuer die meisten Anwendungsfaelle gute Ergebnisse liefert.",
+            "id": "black-forest-labs/flux-2-max",
+            "name": "flux-2-max",
+            "reason": "Flux 2 Max ist ein vielseitiges Modell mit hoher Qualitaet, das fuer die meisten Anwendungsfaelle hervorragende Ergebnisse liefert.",
         }
 
     # Sort by run_count descending, pick the most popular

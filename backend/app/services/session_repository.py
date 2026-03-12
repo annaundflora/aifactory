@@ -24,7 +24,7 @@ class SessionRepository:
     """
 
     def __init__(self, database_url: Optional[str] = None):
-        self._database_url = database_url or settings.database_url
+        self._database_url = database_url or settings.psycopg_database_url
 
     async def _get_connection(self) -> psycopg.AsyncConnection:
         """Create a new async connection with dict_row factory."""

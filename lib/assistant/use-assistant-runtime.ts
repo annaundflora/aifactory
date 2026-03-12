@@ -38,33 +38,50 @@ interface SSEErrorEvent {
 /**
  * Parses a raw SSE text block into individual events.
  * SSE format: `event: {type}\ndata: {json}\n\n`
- * Handles multi-line data fields by joining them.
+ *
+ * Uses line-by-line parsing per the SSE spec: an empty line (or end of input)
+ * signals the end of the current event. This correctly handles multiple events
+ * in a single text block, regardless of how chunk boundaries align.
  */
 export function parseSSEEvents(
   rawText: string
 ): Array<{ event: string; data: string }> {
   const events: Array<{ event: string; data: string }> = [];
-  const blocks = rawText.split("\n\n");
 
-  for (const block of blocks) {
-    if (!block.trim()) continue;
+  // Normalize \r\n to \n, then split into individual lines
+  const lines = rawText.replace(/\r\n/g, "\n").split("\n");
 
-    let eventType = "";
-    const dataLines: string[] = [];
+  let eventType = "";
+  let dataLines: string[] = [];
 
-    const lines = block.split("\n");
-    for (const line of lines) {
-      if (line.startsWith("event:")) {
-        eventType = line.slice(6).trim();
-      } else if (line.startsWith("data:")) {
-        dataLines.push(line.slice(5).trim());
-      }
-    }
-
+  const flush = () => {
     if (eventType && dataLines.length > 0) {
       events.push({ event: eventType, data: dataLines.join("\n") });
     }
+    eventType = "";
+    dataLines = [];
+  };
+
+  for (const line of lines) {
+    if (line === "") {
+      // Empty line = end of current event per SSE spec
+      flush();
+    } else if (line.startsWith("event:")) {
+      // If we encounter a new event: field while we already have accumulated
+      // data, flush the previous event first. This handles malformed streams
+      // where double-newline separators are missing.
+      if (eventType && dataLines.length > 0) {
+        flush();
+      }
+      eventType = line.slice(6).trim();
+    } else if (line.startsWith("data:")) {
+      dataLines.push(line.slice(5).trim());
+    }
+    // Ignore comments (lines starting with ':') and unknown fields per spec
   }
+
+  // Flush any trailing event that wasn't terminated by an empty line
+  flush();
 
   return events;
 }
@@ -238,24 +255,25 @@ export function useAssistantRuntime({
 
           buffer += decoder.decode(value, { stream: true });
 
-          // Process complete SSE events (separated by double newline)
-          const parts = buffer.split("\n\n");
-          // Keep the last part as buffer (may be incomplete)
-          buffer = parts.pop() || "";
+          // Find the last double-newline boundary. Everything before it
+          // contains complete SSE events; everything after may be incomplete.
+          const normalised = buffer.replace(/\r\n/g, "\n");
+          const lastBoundary = normalised.lastIndexOf("\n\n");
 
-          for (const part of parts) {
-            if (!part.trim()) continue;
+          if (lastBoundary === -1) continue; // no complete event yet
 
-            const events = parseSSEEvents(part + "\n\n");
-            for (const { event, data } of events) {
-              handleSSEEvent(event, data);
-            }
+          const complete = normalised.slice(0, lastBoundary + 2);
+          buffer = normalised.slice(lastBoundary + 2);
+
+          const events = parseSSEEvents(complete);
+          for (const { event, data } of events) {
+            handleSSEEvent(event, data);
           }
         }
 
-        // Process any remaining buffer
+        // Process any remaining buffer (may lack trailing \n\n)
         if (buffer.trim()) {
-          const events = parseSSEEvents(buffer + "\n\n");
+          const events = parseSSEEvents(buffer);
           for (const { event, data } of events) {
             handleSSEEvent(event, data);
           }
@@ -294,21 +312,22 @@ export function useAssistantRuntime({
           return null;
         }
 
-        // Add an empty assistant message for the greeting stream
-        dispatch({
-          type: "ADD_ASSISTANT_MESSAGE",
-          message: {
-            id: `assistant-${Date.now()}`,
-            role: "assistant",
-            content: "",
-            isStreaming: true,
-          },
-        });
+        // Session creation returns JSON (not SSE), parse the session ID
+        const sessionData = await response.json();
+        const newSessionId = sessionData.id;
 
-        // Consume SSE stream from session creation (metadata + greeting)
-        await consumeSSEStream(response, signal);
+        if (!newSessionId) {
+          dispatch({
+            type: "ADD_ERROR_MESSAGE",
+            content: "Session-ID fehlt in der Antwort.",
+          });
+          return null;
+        }
 
-        return sessionIdRef.current;
+        sessionIdRef.current = newSessionId;
+        dispatch({ type: "SET_SESSION_ID", sessionId: newSessionId });
+
+        return newSessionId;
       } catch (err) {
         if (signal.aborted) return null;
         dispatch({
@@ -318,7 +337,7 @@ export function useAssistantRuntime({
         return null;
       }
     },
-    [projectId, dispatch, consumeSSEStream, sessionIdRef]
+    [projectId, dispatch, sessionIdRef]
   );
 
   /**

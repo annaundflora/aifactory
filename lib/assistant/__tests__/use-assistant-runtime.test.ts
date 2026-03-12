@@ -166,21 +166,11 @@ describe("useAssistantRuntime", () => {
       fetchCalls.push({ url, body });
 
       if (url === "/api/assistant/sessions") {
-        // Session creation returns SSE stream with metadata event
-        return mockSSEResponse([
-          {
-            event: "metadata",
-            data: JSON.stringify({
-              session_id: "session-abc",
-              thread_id: "thread-xyz",
-            }),
-          },
-          {
-            event: "text-delta",
-            data: JSON.stringify({ content: "Hello! " }),
-          },
-          { event: "text-done", data: JSON.stringify({}) },
-        ]);
+        // Session creation returns JSON with session id
+        return new Response(JSON.stringify({ id: "session-abc" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
       }
 
       if (url === "/api/assistant/sessions/session-abc/messages") {
@@ -238,20 +228,11 @@ describe("useAssistantRuntime", () => {
       const url = typeof input === "string" ? input : input.toString();
 
       if (url === "/api/assistant/sessions") {
-        return mockSSEResponse([
-          {
-            event: "metadata",
-            data: JSON.stringify({
-              session_id: "session-done",
-              thread_id: "thread-done",
-            }),
-          },
-          {
-            event: "text-delta",
-            data: JSON.stringify({ content: "Greeting" }),
-          },
-          { event: "text-done", data: JSON.stringify({}) },
-        ]);
+        // Session creation returns JSON with session id
+        return new Response(JSON.stringify({ id: "session-done" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
       }
 
       if (url.includes("/messages")) {
@@ -279,7 +260,7 @@ describe("useAssistantRuntime", () => {
       await result.current.sendMessage("Test");
     });
 
-    // Verify MARK_ASSISTANT_DONE was dispatched (at least twice: greeting + response)
+    // Verify MARK_ASSISTANT_DONE was dispatched for the response stream
     const markDoneActions = dispatch.mock.calls
       .map(([action]: [AssistantAction]) => action)
       .filter((a: AssistantAction) => a.type === "MARK_ASSISTANT_DONE");
@@ -312,16 +293,11 @@ describe("useAssistantRuntime", () => {
       const url = typeof input === "string" ? input : input.toString();
 
       if (url === "/api/assistant/sessions") {
-        return mockSSEResponse([
-          {
-            event: "metadata",
-            data: JSON.stringify({
-              session_id: "session-tool",
-              thread_id: "thread-tool",
-            }),
-          },
-          { event: "text-done", data: JSON.stringify({}) },
-        ]);
+        // Session creation returns JSON with session id
+        return new Response(JSON.stringify({ id: "session-tool" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
       }
 
       if (url.includes("/messages")) {
@@ -406,16 +382,11 @@ describe("useAssistantRuntime", () => {
       const url = typeof input === "string" ? input : input.toString();
 
       if (url === "/api/assistant/sessions") {
-        return mockSSEResponse([
-          {
-            event: "metadata",
-            data: JSON.stringify({
-              session_id: "session-err",
-              thread_id: "thread-err",
-            }),
-          },
-          { event: "text-done", data: JSON.stringify({}) },
-        ]);
+        // Session creation returns JSON with session id
+        return new Response(JSON.stringify({ id: "session-err" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
       }
 
       if (url.includes("/messages")) {

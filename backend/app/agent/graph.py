@@ -206,6 +206,7 @@ def create_agent(
         api_key=settings.openrouter_api_key,
         base_url="https://openrouter.ai/api/v1",
         temperature=0.7,
+        max_tokens=4096,
         streaming=True,
     )
 
