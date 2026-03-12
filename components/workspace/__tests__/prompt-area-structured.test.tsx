@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
-import { render, screen, waitFor, act } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import { createElement } from "react";
@@ -40,16 +40,6 @@ vi.mock("@/lib/db/queries", () => ({
   // Only the Generation type is used (as a type import), no runtime needed
 }));
 
-// Mock snippet-service to prevent DATABASE_URL crash (imports lib/db transitively)
-vi.mock("@/lib/services/snippet-service", () => ({
-  SnippetService: {
-    create: vi.fn().mockResolvedValue({}),
-    update: vi.fn().mockResolvedValue(null),
-    delete: vi.fn().mockResolvedValue(false),
-    getAll: vi.fn().mockResolvedValue({}),
-  },
-}));
-
 // Mock MODELS registry
 vi.mock("@/lib/models", () => ({
   MODELS: [
@@ -77,7 +67,7 @@ vi.mock("@/app/actions/generations", () => ({
   generateImages: (...args: unknown[]) => mockGenerateImages(...args),
 }));
 
-// Mock lucide-react icons (TemplateSelector uses ChevronDown; Radix Select uses ChevronDownIcon/UpIcon/CheckIcon)
+// Mock lucide-react icons
 vi.mock("lucide-react", () => ({
   ChevronDown: (props: Record<string, unknown>) => (
     <span data-testid="chevron-down" {...props} />
@@ -100,17 +90,6 @@ vi.mock("lucide-react", () => ({
   Sparkles: (props: Record<string, unknown>) => (
     <span data-testid="sparkles-icon" {...props} />
   ),
-}));
-
-// Mock BuilderDrawer -- captures onClose callback so we can simulate it
-let capturedBuilderOnClose: ((prompt: string) => void) | null = null;
-vi.mock("@/components/prompt-builder/builder-drawer", () => ({
-  BuilderDrawer: ({ open, onClose }: { open: boolean; onClose: (prompt: string) => void; basePrompt: string }) => {
-    capturedBuilderOnClose = onClose;
-    return open
-      ? createElement("div", { "data-testid": "builder-drawer" }, "Builder Drawer Open")
-      : null;
-  },
 }));
 
 // Mock LLMComparison
@@ -196,7 +175,6 @@ describe("Prompt Area -- Structured Fields", () => {
     mockGetModelSchema.mockResolvedValue(schemaWithoutNeg);
     mockGenerateImages.mockResolvedValue([]);
     mockVariationData = null;
-    capturedBuilderOnClose = null;
   });
 
   // -------------------------------------------------------------------------
@@ -480,39 +458,6 @@ describe("Prompt Area -- Structured Fields", () => {
         })
       );
     });
-  });
-
-  // -------------------------------------------------------------------------
-  // AC-10: Builder-Output ins Style-Feld
-  // -------------------------------------------------------------------------
-  it("AC-10: should write builder composed prompt to style/modifier field on drawer close", async () => {
-    /**
-     * AC-10: GIVEN der Builder-Drawer wird geschlossen mit einem komponierten Prompt
-     *        WHEN der Builder onClose(composedPrompt) aufruft
-     *        THEN wird der komponierte Text ins Style/Modifier-Feld geschrieben (nicht ins Motiv-Feld)
-     */
-    const user = userEvent.setup();
-    await renderPromptArea();
-
-    // Open the builder drawer
-    const builderBtn = screen.getByTestId("builder-btn");
-    await user.click(builderBtn);
-
-    // The mock BuilderDrawer should be rendered and capturedBuilderOnClose set
-    expect(capturedBuilderOnClose).not.toBeNull();
-
-    // Simulate builder closing with a composed prompt
-    act(() => {
-      capturedBuilderOnClose!("oil painting, warm tones, cinematic lighting");
-    });
-
-    // Style field should contain the composed prompt
-    const styleTextarea = screen.getByTestId("prompt-style-textarea") as HTMLTextAreaElement;
-    expect(styleTextarea.value).toBe("oil painting, warm tones, cinematic lighting");
-
-    // Motiv field should NOT have been changed
-    const motivTextarea = screen.getByTestId("prompt-motiv-textarea") as HTMLTextAreaElement;
-    expect(motivTextarea.value).toBe("");
   });
 
   // -------------------------------------------------------------------------

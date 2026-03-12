@@ -15,16 +15,6 @@ vi.mock('@/lib/services/prompt-history-service', () => ({
   },
 }))
 
-// Also mock the other services imported by prompts.ts to avoid side effects
-vi.mock('@/lib/services/snippet-service', () => ({
-  SnippetService: {
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-    getAll: vi.fn(),
-  },
-}))
-
 vi.mock('@/lib/services/prompt-service', () => ({
   PromptService: {
     improve: vi.fn(),

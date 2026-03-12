@@ -38,16 +38,6 @@ beforeAll(() => {
 // Mock db/queries to prevent DATABASE_URL crash
 vi.mock("@/lib/db/queries", () => ({}));
 
-// Mock snippet-service to prevent DATABASE_URL crash
-vi.mock("@/lib/services/snippet-service", () => ({
-  SnippetService: {
-    create: vi.fn().mockResolvedValue({}),
-    update: vi.fn().mockResolvedValue(null),
-    delete: vi.fn().mockResolvedValue(false),
-    getAll: vi.fn().mockResolvedValue({}),
-  },
-}));
-
 // Mock sonner toast
 const mockToast = vi.fn();
 vi.mock("sonner", () => ({
@@ -122,11 +112,6 @@ vi.mock("lucide-react", () => ({
     createElement("span", { "data-testid": "search-icon", ...props }),
   AlertCircle: (props: Record<string, unknown>) =>
     createElement("span", { "data-testid": "alert-circle-icon", ...props }),
-}));
-
-// Mock BuilderDrawer (external component, not under test here)
-vi.mock("@/components/prompt-builder/builder-drawer", () => ({
-  BuilderDrawer: () => null,
 }));
 
 // Mock LLMComparison (external component, not under test here)

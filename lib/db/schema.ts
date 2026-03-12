@@ -126,24 +126,6 @@ export const projectSelectedModels = pgTable(
 );
 
 // -----------------------------------------------
-// prompt_snippets
-// -----------------------------------------------
-export const promptSnippets = pgTable(
-  "prompt_snippets",
-  {
-    id: uuid("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    text: varchar("text", { length: 500 }).notNull(),
-    category: varchar("category", { length: 100 }).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => [index("prompt_snippets_category_idx").on(table.category)]
-);
-
-// -----------------------------------------------
 // assistant_sessions
 // -----------------------------------------------
 export const assistantSessions = pgTable(

@@ -22,10 +22,8 @@ import {
   ParameterPanel,
   type SchemaProperties,
 } from "@/components/workspace/parameter-panel";
-import { Loader2, Wand2, Sparkles, Minus, Plus } from "lucide-react";
-import { BuilderDrawer } from "@/components/prompt-builder/builder-drawer";
+import { Loader2, Sparkles, Minus, Plus } from "lucide-react";
 import { LLMComparison } from "@/components/prompt-improve/llm-comparison";
-import { TemplateSelector } from "@/components/workspace/template-selector";
 import { type CollectionModel } from "@/lib/types/collection-model";
 import { ModelTrigger } from "@/components/models/model-trigger";
 import { ModelBrowserDrawer } from "@/components/models/model-browser-drawer";
@@ -187,8 +185,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   // ----- Tab state -----
   const [activeTab, setActiveTab] = useState<PromptTab>("prompt");
 
-  // ----- Builder drawer + LLM comparison -----
-  const [builderOpen, setBuilderOpen] = useState(false);
+  // ----- LLM comparison -----
   const [showImprove, setShowImprove] = useState(false);
 
   // ----- Variation state consumption -----
@@ -970,17 +967,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
                   className={textareaClass}
                 />
                 {/* Prompt Tools */}
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setBuilderOpen(true)}
-                    data-testid="builder-btn"
-                  >
-                    <Wand2 className="mr-1 size-3" />
-                    Builder
-                  </Button>
+                <div className="flex gap-2">
                   <Button
                     type="button"
                     variant="secondary"
@@ -993,19 +980,6 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
                     Improve
                   </Button>
                 </div>
-                {/* Template Selector */}
-                <TemplateSelector
-                  hasContent={
-                    promptMotiv.trim().length > 0 ||
-                    promptStyle.trim().length > 0 ||
-                    negativePrompt.trim().length > 0
-                  }
-                  onApplyTemplate={(template) => {
-                    setPromptMotiv(template.motiv);
-                    setPromptStyle(template.style);
-                    setNegativePrompt(template.negativePrompt);
-                  }}
-                />
               </div>
 
               {/* Style / Modifier Textarea (optional) */}
@@ -1036,18 +1010,6 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
                   onDiscard={() => setShowImprove(false)}
                 />
               )}
-
-              {/* Prompt Builder Drawer — output goes to Style/Modifier field */}
-              <BuilderDrawer
-                open={builderOpen}
-                onClose={(composedPrompt) => {
-                  setBuilderOpen(false);
-                  if (composedPrompt) {
-                    setPromptStyle(composedPrompt);
-                  }
-                }}
-                basePrompt={promptStyle}
-              />
 
               {/* Negative Prompt (conditionally visible based on model schema) */}
               {hasNegativePrompt && (

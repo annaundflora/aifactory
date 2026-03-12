@@ -253,16 +253,6 @@ describe("PromptArea + ModelTrigger integration", () => {
   // Mock db/queries to prevent DATABASE_URL crash
   vi.mock("@/lib/db/queries", () => ({}));
 
-  // Mock snippet-service to prevent DATABASE_URL crash
-  vi.mock("@/lib/services/snippet-service", () => ({
-    SnippetService: {
-      create: vi.fn().mockResolvedValue({}),
-      update: vi.fn().mockResolvedValue(null),
-      delete: vi.fn().mockResolvedValue(false),
-      getAll: vi.fn().mockResolvedValue({}),
-    },
-  }));
-
   // Mock MODELS registry (no longer used for Select dropdown, but still imported transitively)
   vi.mock("@/lib/models", () => ({
     MODELS: [],
@@ -312,11 +302,6 @@ describe("PromptArea + ModelTrigger integration", () => {
     AlertCircle: (props: Record<string, unknown>) => (
       <span data-testid="alert-circle-icon" {...props} />
     ),
-  }));
-
-  // Mock BuilderDrawer
-  vi.mock("@/components/prompt-builder/builder-drawer", () => ({
-    BuilderDrawer: () => null,
   }));
 
   // Mock LLMComparison

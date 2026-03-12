@@ -12,16 +12,6 @@ import type { ReactNode } from "react";
 // Mock db/queries to prevent DATABASE_URL crash (type-only import chain)
 vi.mock("@/lib/db/queries", () => ({}));
 
-// Mock snippet-service to prevent DATABASE_URL crash (imports lib/db directly)
-vi.mock("@/lib/services/snippet-service", () => ({
-  SnippetService: {
-    create: vi.fn().mockResolvedValue({}),
-    update: vi.fn().mockResolvedValue(null),
-    delete: vi.fn().mockResolvedValue(false),
-    getAll: vi.fn().mockResolvedValue([]),
-  },
-}));
-
 // Mock next/image to render a plain <img>
 vi.mock("next/image", () => ({
   default: (props: Record<string, unknown>) =>
@@ -52,11 +42,6 @@ vi.mock("lucide-react", () => ({
     createElement("span", { "data-testid": "icon-maximize", className: props.className }),
   Minimize2: (props: Record<string, unknown>) =>
     createElement("span", { "data-testid": "icon-minimize", className: props.className }),
-}));
-
-// Mock BuilderDrawer (PromptArea dependency)
-vi.mock("@/components/prompt-builder/builder-drawer", () => ({
-  BuilderDrawer: () => null,
 }));
 
 // Mock LLMComparison (PromptArea dependency)

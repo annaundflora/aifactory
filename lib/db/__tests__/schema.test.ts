@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { getTableConfig } from 'drizzle-orm/pg-core'
-import { projects, generations, promptSnippets } from '../schema'
+import { projects, generations } from '../schema'
 
 /**
  * Unit tests for DB Schema Definition (slice-01-docker-db-schema)
@@ -169,61 +169,4 @@ describe('DB Schema Definition', () => {
     })
   })
 
-  // -----------------------------------------------------------
-  // AC-6: prompt_snippets table
-  // -----------------------------------------------------------
-  describe('AC-6: prompt_snippets table', () => {
-    it('should define prompt_snippets table with id, text, category, created_at columns', () => {
-      /**
-       * AC-6: GIVEN die Tabellen existieren
-       *       WHEN die Tabelle `prompt_snippets` inspiziert wird
-       *       THEN enthaelt sie die Spalten: id UUID PK, text VARCHAR(500),
-       *            category VARCHAR(100) mit Index, created_at TIMESTAMPTZ
-       */
-      const config = getTableConfig(promptSnippets)
-
-      expect(config.name).toBe('prompt_snippets')
-
-      const columnMap = Object.fromEntries(
-        config.columns.map((c) => [c.name, c])
-      )
-
-      // id: UUID PK
-      expect(columnMap['id']).toBeDefined()
-      expect(columnMap['id'].columnType).toBe('PgUUID')
-      expect(columnMap['id'].primary).toBe(true)
-      expect(columnMap['id'].hasDefault).toBe(true)
-
-      // text: VARCHAR(500) NOT NULL
-      expect(columnMap['text']).toBeDefined()
-      expect(columnMap['text'].columnType).toBe('PgVarchar')
-      expect((columnMap['text'] as any).config.length).toBe(500)
-      expect(columnMap['text'].notNull).toBe(true)
-
-      // category: VARCHAR(100) NOT NULL
-      expect(columnMap['category']).toBeDefined()
-      expect(columnMap['category'].columnType).toBe('PgVarchar')
-      expect((columnMap['category'] as any).config.length).toBe(100)
-      expect(columnMap['category'].notNull).toBe(true)
-
-      // created_at: TIMESTAMPTZ
-      expect(columnMap['created_at']).toBeDefined()
-      expect(columnMap['created_at'].columnType).toBe('PgTimestamp')
-      expect(columnMap['created_at'].hasDefault).toBe(true)
-    })
-
-    it('should define index on prompt_snippets.category', () => {
-      /**
-       * AC-6: GIVEN die Tabellen existieren
-       *       WHEN die Tabelle `prompt_snippets` inspiziert wird
-       *       THEN hat category einen Index
-       */
-      const config = getTableConfig(promptSnippets)
-
-      const indexNames = config.indexes.map((idx) => idx.config.name)
-
-      expect(indexNames).toContain('prompt_snippets_category_idx')
-      expect(config.indexes.length).toBe(1)
-    })
-  })
 })
