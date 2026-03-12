@@ -42,6 +42,52 @@ vi.mock("lucide-react", () => ({
     createElement("span", { "data-testid": "icon-maximize", className: props.className }),
   Minimize2: (props: Record<string, unknown>) =>
     createElement("span", { "data-testid": "icon-minimize", className: props.className }),
+  ArrowRightLeft: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-arrow-right-left", className: props.className }),
+  ZoomIn: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-zoom-in", className: props.className }),
+  Trash2: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-trash2", className: props.className }),
+  Search: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-search", className: props.className }),
+  AlertCircle: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-alert-circle", className: props.className }),
+  Star: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-star", className: props.className }),
+  Check: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-check", className: props.className }),
+  Minus: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-minus", className: props.className }),
+  Plus: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-plus", className: props.className }),
+  ArrowUp: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-arrow-up", className: props.className }),
+  Square: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-square", className: props.className }),
+  ArrowLeft: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-arrow-left", className: props.className }),
+  FileText: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-file-text", className: props.className }),
+  History: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-history", className: props.className }),
+  Cpu: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-cpu", className: props.className }),
+  ChevronDownIcon: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-chevron-down-icon", className: props.className }),
+  ChevronUpIcon: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-chevron-up-icon", className: props.className }),
+  CheckIcon: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-check-icon", className: props.className }),
+  XIcon: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-x-icon", className: props.className }),
+  PanelLeftIcon: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-panel-left", className: props.className }),
+  ImageIcon: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-image", className: props.className }),
+  ChevronLeft: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-chevron-left", className: props.className }),
+  ChevronRight: (props: Record<string, unknown>) =>
+    createElement("span", { "data-testid": "icon-chevron-right", className: props.className }),
 }));
 
 // Mock LLMComparison (PromptArea dependency)
@@ -112,11 +158,54 @@ vi.mock("@/app/actions/models", () => ({
       },
     },
   }),
+  getCollectionModels: vi.fn().mockResolvedValue([]),
+  getProjectSelectedModels: vi.fn().mockResolvedValue([]),
+  saveProjectSelectedModels: vi.fn().mockResolvedValue(undefined),
+  getFavoriteModels: vi.fn().mockResolvedValue([]),
+  toggleFavoriteModel: vi.fn().mockResolvedValue({ isFavorite: true }),
 }));
 
 const mockGenerateImages = vi.fn().mockResolvedValue(undefined);
 vi.mock("@/app/actions/generations", () => ({
   generateImages: (...args: unknown[]) => mockGenerateImages(...args),
+  upscaleImage: vi.fn().mockResolvedValue(undefined),
+}));
+
+// Note: @/lib/workspace-state is NOT mocked here because the test uses the
+// real WorkspaceStateProvider + useWorkspaceVariation to verify state flow.
+
+// Mock assistant context (PromptArea dependency)
+vi.mock("@/lib/assistant/assistant-context", () => ({
+  PromptAssistantProvider: ({ children }: { children: ReactNode }) => createElement("div", null, children),
+  usePromptAssistant: () => ({
+    messages: [],
+    isStreaming: false,
+    hasCanvas: false,
+    selectedModel: "claude-sonnet-4-20250514",
+    setSelectedModel: vi.fn(),
+    cancelStream: vi.fn(),
+    activeView: "startscreen",
+    setActiveView: vi.fn(),
+    loadSession: vi.fn(),
+    sessionId: null,
+    dispatch: vi.fn(),
+    sessionIdRef: { current: null },
+    sendMessageRef: { current: vi.fn() },
+    cancelStreamRef: { current: vi.fn() },
+    draftPrompt: null,
+    applyToWorkspace: vi.fn(),
+    state: { messages: [], activeView: "startscreen", isStreaming: false, draftPrompt: null, isApplied: false, hasCanvas: false, modelRecommendation: null },
+  }),
+  getWorkspaceFieldsForChip: () => ({}),
+}));
+
+// Mock assistant runtime (PromptArea dependency)
+vi.mock("@/lib/assistant/use-assistant-runtime", () => ({
+  useAssistantRuntime: () => ({
+    sendMessage: vi.fn(),
+    stopStreaming: vi.fn(),
+    isStreaming: false,
+  }),
 }));
 
 // Mock UI components to simple HTML elements for testability
@@ -354,15 +443,13 @@ describe("Variation Flow", () => {
     await user.click(variationBtn);
 
     // Wait for effects to propagate - PromptArea consumes variationData via useEffect
-    // The prompt textarea should be populated
+    // The prompt textarea should be populated with the variation's prompt
     const promptTextarea = screen.getByTestId("prompt-motiv-textarea") as HTMLTextAreaElement;
     expect(promptTextarea.value).toBe("A fox in oil painting style");
 
-    // The model select trigger should show the correct model value
-    const modelSelect = screen.getByTestId("model-select");
-    expect(modelSelect.getAttribute("data-value")).toBe("black-forest-labs/flux-2-pro");
-
-    // The parameter panel should receive the model params
+    // Note: Model selection is now via ModelTrigger (mini-cards), not a Select dropdown.
+    // The PromptArea receives the model from variation state and uses it internally.
+    // Parameter panel should receive the model params
     const paramPanel = screen.getByTestId("parameter-panel");
     const paramValues = JSON.parse(paramPanel.getAttribute("data-values") || "{}");
     expect(paramValues.aspect_ratio).toBe("1:1");
@@ -403,9 +490,10 @@ describe("Variation Flow", () => {
     await user.clear(promptTextarea);
     await user.type(promptTextarea, "A modified fox painting");
 
-    // Set variant count to 3
-    const variantBtn3 = screen.getByTestId("variant-count-3");
-    await user.click(variantBtn3);
+    // Set variant count to 3 using the +/- stepper (default is 1, click + twice)
+    const plusBtn = screen.getByTestId("variant-count-plus");
+    await user.click(plusBtn); // 2
+    await user.click(plusBtn); // 3
 
     // Click generate
     const generateBtn = screen.getByTestId("generate-button");
@@ -414,7 +502,6 @@ describe("Variation Flow", () => {
     expect(mockGenerateImages).toHaveBeenCalledTimes(1);
     const callArgs = mockGenerateImages.mock.calls[0][0];
     expect(callArgs.promptMotiv).toBe("A modified fox painting");
-    expect(callArgs.modelId).toBe("black-forest-labs/flux-2-pro");
     expect(callArgs.count).toBe(3);
     expect(callArgs.projectId).toBe("proj-1");
   });

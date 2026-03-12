@@ -26,6 +26,11 @@ vi.mock("@/lib/workspace-state", () => ({
     setVariation: mockSetVariation,
     clearVariation: vi.fn(),
   }),
+  useWorkspaceVariationOptional: () => ({
+    variationData: mockVariationData,
+    setVariation: mockSetVariation,
+    clearVariation: vi.fn(),
+  }),
 }));
 
 vi.mock("sonner", () => ({

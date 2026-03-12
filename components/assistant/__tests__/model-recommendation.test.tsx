@@ -65,7 +65,7 @@ vi.mock("@/lib/assistant/assistant-context", async () => {
 });
 
 vi.mock("@/lib/workspace-state", () => ({
-  useWorkspaceVariation: () => ({
+  useWorkspaceVariationOptional: () => ({
     variationData: mockVariationData,
     setVariation: mockSetVariation,
     clearVariation: vi.fn(),

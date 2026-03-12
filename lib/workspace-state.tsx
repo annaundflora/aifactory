@@ -70,3 +70,12 @@ export function useWorkspaceVariation(): WorkspaceVariationContextValue {
   }
   return context;
 }
+
+/**
+ * Optional variant that returns null when no WorkspaceStateProvider is present.
+ * Use this in components that may render outside the provider tree
+ * (e.g. nested inside contexts that are tested independently).
+ */
+export function useWorkspaceVariationOptional(): WorkspaceVariationContextValue | null {
+  return useContext(WorkspaceVariationContext);
+}

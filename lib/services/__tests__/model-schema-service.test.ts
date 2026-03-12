@@ -346,15 +346,20 @@ describe('ModelSchemaService.supportsImg2Img', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1) // Still only 1 total
   })
 
-  // AC-7: GIVEN ein unbekanntes Modell (nicht in MODELS aus lib/models.ts)
+  // AC-7: GIVEN ein unbekanntes Modell das nicht auf Replicate existiert
   //       WHEN supportsImg2Img(modelId) aufgerufen wird
-  //       THEN wirft die Methode einen Error mit der Meldung "Unbekanntes Modell"
-  it('AC-7: should throw "Unbekanntes Modell" for an unknown modelId', async () => {
+  //       THEN wirft die Methode einen Error (Schema konnte nicht geladen werden)
+  it('AC-7: should throw error for an unknown modelId when API returns 404', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+    })
+
     await expect(
       ModelSchemaService.supportsImg2Img('unknown/nonexistent-model')
-    ).rejects.toThrow('Unbekanntes Modell')
+    ).rejects.toThrow('Schema konnte nicht geladen werden')
 
-    // fetch should never be called for an unknown model
-    expect(mockFetch).not.toHaveBeenCalled()
+    expect(mockFetch).toHaveBeenCalledTimes(1)
   })
 })

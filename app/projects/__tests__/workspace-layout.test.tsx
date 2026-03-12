@@ -68,6 +68,18 @@ vi.mock("lucide-react", () => ({
   XIcon: (props: Record<string, unknown>) => (
     <span data-testid="x-icon" {...props} />
   ),
+  MoreHorizontal: (props: Record<string, unknown>) => (
+    <span data-testid="more-horizontal-icon" {...props} />
+  ),
+  Pencil: (props: Record<string, unknown>) => (
+    <span data-testid="pencil-icon" {...props} />
+  ),
+  Trash2: (props: Record<string, unknown>) => (
+    <span data-testid="trash2-icon" {...props} />
+  ),
+  RefreshCw: (props: Record<string, unknown>) => (
+    <span data-testid="refresh-cw-icon" {...props} />
+  ),
 }));
 
 // Mock useIsMobile hook - default to desktop

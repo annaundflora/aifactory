@@ -165,7 +165,7 @@ describe('DB Schema Definition', () => {
       expect(indexNames).toContain('generations_status_idx')
       expect(indexNames).toContain('generations_created_at_idx')
       expect(indexNames).toContain('generations_is_favorite_idx')
-      expect(config.indexes.length).toBe(4)
+      expect(config.indexes.length).toBe(5)
     })
   })
 

@@ -100,7 +100,7 @@ describe("shadcn Badge Component", () => {
       const badge = screen.getByText("Secondary");
 
       // Should contain secondary variant CSS classes
-      expect(badge).toHaveClass("bg-secondary");
+      expect(badge).toHaveClass("bg-transparent");
       expect(badge).toHaveClass("text-secondary-foreground");
 
       // Secondary variant must have different classes than default

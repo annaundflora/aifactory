@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 import { Cpu } from "lucide-react";
 import { usePromptAssistant } from "@/lib/assistant/assistant-context";
-import { useWorkspaceVariation } from "@/lib/workspace-state";
+import { useWorkspaceVariationOptional } from "@/lib/workspace-state";
 
 // ---------------------------------------------------------------------------
 // ModelRecommendation
@@ -24,17 +24,17 @@ import { useWorkspaceVariation } from "@/lib/workspace-state";
  */
 export function ModelRecommendation() {
   const { recommendedModel } = usePromptAssistant();
-  const { variationData, setVariation } = useWorkspaceVariation();
+  const workspace = useWorkspaceVariationOptional();
 
   const handleUseModel = useCallback(() => {
-    if (!recommendedModel) return;
+    if (!recommendedModel || !workspace) return;
 
     // AC-4: Preserve all existing workspace fields, only override modelId
-    setVariation({
-      ...variationData,
+    workspace.setVariation({
+      ...workspace.variationData,
       modelId: recommendedModel.id,
     });
-  }, [recommendedModel, variationData, setVariation]);
+  }, [recommendedModel, workspace]);
 
   // AC-1: Not visible when recommendedModel is null
   if (!recommendedModel) {

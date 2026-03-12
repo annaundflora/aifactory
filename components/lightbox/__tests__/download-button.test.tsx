@@ -11,6 +11,9 @@ import { type Generation } from "@/lib/db/queries";
 // Mocks (mock_external strategy per slice spec)
 // ---------------------------------------------------------------------------
 
+// Mock db/queries to prevent DATABASE_URL crash
+vi.mock("@/lib/db/queries", () => ({}));
+
 // Mock next/image as plain img element
 vi.mock("next/image", () => ({
   default: (props: Record<string, unknown>) => {
@@ -37,6 +40,9 @@ vi.mock("lucide-react", () => ({
   ),
   Maximize2: () => null,
   Minimize2: () => null,
+  ArrowRightLeft: () => null,
+  ZoomIn: () => null,
+  Trash2: () => null,
 }));
 
 // Mock lib/models
