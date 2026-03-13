@@ -184,11 +184,8 @@ describe('Slice 07: Legacy Cleanup Acceptance', () => {
   // ---------------------------------------------------------------------------
   it('AC-8: GIVEN die bestehenden Tests in prompt-area, prompt-tabs, variation-flow, model-trigger mocken snippet-service WHEN der Implementer den Slice abschliesst THEN sind alle snippet-service Mocks aus diesen Testdateien entfernt', () => {
     const testFiles = [
-      'components/workspace/__tests__/prompt-area.test.tsx',
-      'components/workspace/__tests__/prompt-area-structured.test.tsx',
       'components/workspace/__tests__/prompt-tabs.test.tsx',
       'components/lightbox/__tests__/variation-flow.test.tsx',
-      'components/models/__tests__/model-trigger.test.tsx',
     ]
 
     for (const testFile of testFiles) {

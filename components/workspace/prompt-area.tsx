@@ -29,7 +29,8 @@ import {
   ParameterPanel,
   type SchemaProperties,
 } from "@/components/workspace/parameter-panel";
-import { Loader2, Sparkles, Minus, Plus } from "lucide-react";
+import { Loader2, Sparkles, Minus, Plus, ChevronDown } from "lucide-react";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { LLMComparison } from "@/components/prompt-improve/llm-comparison";
 import { type CollectionModel } from "@/lib/types/collection-model";
 import { ModelTrigger } from "@/components/models/model-trigger";
@@ -1306,19 +1307,24 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
             </div>
           )}
 
-          {/* ── Group: Parameters ── */}
+          {/* ── Group: Parameters (collapsible, default closed) ── */}
           {showPromptFields && isSingleModel && schema && !schemaLoading && (
-            <div className="space-y-3 rounded-lg border border-border/60 bg-muted/30 p-3">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Parameters
-              </Label>
-              <ParameterPanel
-                schema={schema}
-                isLoading={schemaLoading}
-                values={paramValues}
-                onChange={setParamValues}
-              />
-            </div>
+            <Collapsible defaultOpen={false} className="group rounded-lg border border-border/60 bg-muted/30">
+              <CollapsibleTrigger className="flex w-full items-center justify-between p-3">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground pointer-events-none">
+                  Parameters
+                </Label>
+                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="px-3 pb-3">
+                <ParameterPanel
+                  schema={schema}
+                  isLoading={schemaLoading}
+                  values={paramValues}
+                  onChange={setParamValues}
+                />
+              </CollapsibleContent>
+            </Collapsible>
           )}
 
           {/* Multi-model notice */}
