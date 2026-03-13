@@ -40,6 +40,19 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
 
+// Stub CanvasDetailView + Provider (server-side deps, complex tree)
+vi.mock("@/components/canvas/canvas-detail-view", () => ({
+  CanvasDetailView: (props: Record<string, unknown>) => (
+    <div data-testid="canvas-detail-view">CanvasDetailView Stub</div>
+  ),
+}));
+
+vi.mock("@/lib/canvas-detail-context", () => ({
+  CanvasDetailProvider: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="canvas-detail-provider">{children}</div>
+  ),
+}));
+
 // Stub child components to isolate layout testing
 vi.mock("@/components/workspace/prompt-area", () => ({
   PromptArea: (props: Record<string, unknown>) => (
@@ -214,5 +227,170 @@ describe("AC-5: Gallery flex layout", () => {
     // Verify the layout container uses flexbox with gap
     expect(outerDiv.className).toContain("flex");
     expect(outerDiv.className).toContain("gap-");
+  });
+});
+
+// ===========================================================================
+// Slice 18: Lightbox Removal + Cleanup
+// ===========================================================================
+
+import { readFileSync } from "fs";
+import { resolve } from "path";
+
+const WORKSPACE_CONTENT_PATH = resolve(
+  __dirname,
+  "workspace-content.tsx"
+);
+const workspaceContentSource = readFileSync(WORKSPACE_CONTENT_PATH, "utf-8");
+
+describe("Slice 18: Lightbox Removal - WorkspaceContent", () => {
+  // -------------------------------------------------------------------------
+  // AC-1: Keine Lightbox-Imports in workspace-content.tsx
+  // -------------------------------------------------------------------------
+  describe("AC-1: No Lightbox imports", () => {
+    /**
+     * AC-1: GIVEN workspace-content.tsx enthaelt aktuell import { LightboxModal }
+     *       und import { LightboxNavigation }
+     *       WHEN Slice 18 implementiert ist
+     *       THEN enthaelt workspace-content.tsx keine Imports aus
+     *       @/components/lightbox/lightbox-modal oder
+     *       @/components/lightbox/lightbox-navigation
+     */
+    it("should not import LightboxModal from lightbox-modal", () => {
+      expect(workspaceContentSource).not.toMatch(
+        /import\s+.*LightboxModal/
+      );
+      expect(workspaceContentSource).not.toMatch(
+        /from\s+['"].*lightbox-modal['"]/
+      );
+    });
+
+    it("should not import LightboxNavigation from lightbox-navigation", () => {
+      expect(workspaceContentSource).not.toMatch(
+        /import\s+.*LightboxNavigation/
+      );
+      expect(workspaceContentSource).not.toMatch(
+        /from\s+['"].*lightbox-navigation['"]/
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-2: Keine Lightbox-State-Variablen oder Handler
+  // -------------------------------------------------------------------------
+  describe("AC-2: No Lightbox state variables or handlers", () => {
+    /**
+     * AC-2: GIVEN workspace-content.tsx enthaelt aktuell State-Variablen
+     *       lightboxOpen, lightboxIndex und zugehoerige Handler
+     *       (handleLightboxClose, handleLightboxNavigate, handleLightboxDelete)
+     *       WHEN Slice 18 implementiert ist
+     *       THEN existieren keine dieser State-Variablen oder Handler mehr
+     */
+    it("should not contain lightboxOpen state", () => {
+      expect(workspaceContentSource).not.toMatch(/lightboxOpen/);
+    });
+
+    it("should not contain lightboxIndex state", () => {
+      expect(workspaceContentSource).not.toMatch(/lightboxIndex/);
+    });
+
+    it("should not contain handleLightboxClose handler", () => {
+      expect(workspaceContentSource).not.toMatch(/handleLightboxClose/);
+    });
+
+    it("should not contain handleLightboxNavigate handler", () => {
+      expect(workspaceContentSource).not.toMatch(/handleLightboxNavigate/);
+    });
+
+    it("should not contain handleLightboxDelete handler", () => {
+      expect(workspaceContentSource).not.toMatch(/handleLightboxDelete/);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-3: Keine Lightbox-Komponenten im JSX
+  // -------------------------------------------------------------------------
+  describe("AC-3: No Lightbox components rendered in JSX", () => {
+    /**
+     * AC-3: GIVEN workspace-content.tsx rendert aktuell <LightboxModal> und
+     *       <LightboxNavigation> im JSX
+     *       WHEN Slice 18 implementiert ist
+     *       THEN sind beide Komponenten-Referenzen aus dem JSX entfernt
+     */
+    it("should not render LightboxModal in JSX", () => {
+      expect(workspaceContentSource).not.toMatch(/<LightboxModal/);
+    });
+
+    it("should not render LightboxNavigation in JSX", () => {
+      expect(workspaceContentSource).not.toMatch(/<LightboxNavigation/);
+    });
+
+    it("should render gallery view without any lightbox elements", () => {
+      render(
+        <WorkspaceContent projectId="test-project" initialGenerations={[]} />
+      );
+
+      // Gallery view should be rendered
+      expect(screen.getByTestId("workspace-gallery-view")).toBeInTheDocument();
+
+      // No lightbox elements in the DOM
+      expect(screen.queryByTestId("lightbox-modal")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("lightbox-navigation")).not.toBeInTheDocument();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-7: Lightbox-Mocks in workspace-content.test.tsx bereinigt
+  // -------------------------------------------------------------------------
+  describe("AC-7: No Lightbox mocks in workspace-content tests", () => {
+    /**
+     * AC-7: GIVEN die Test-Datei workspace-content.test.tsx mockt aktuell
+     *       LightboxModal und LightboxNavigation
+     *       WHEN Slice 18 implementiert ist
+     *       THEN sind diese Mocks und alle lightbox-bezogenen Test-Assertions
+     *       entfernt oder aktualisiert
+     */
+    it("should not contain LightboxModal mocks in this test file", () => {
+      const testFileSource = readFileSync(
+        resolve(__dirname, "workspace-content.test.tsx"),
+        "utf-8"
+      );
+      // The mock registration lines should not reference lightbox-modal
+      expect(testFileSource).not.toMatch(
+        /vi\.mock\(['"].*lightbox-modal['"]/
+      );
+    });
+
+    it("should not contain LightboxNavigation mocks in this test file", () => {
+      const testFileSource = readFileSync(
+        resolve(__dirname, "workspace-content.test.tsx"),
+        "utf-8"
+      );
+      // The mock registration lines should not reference lightbox-navigation
+      expect(testFileSource).not.toMatch(
+        /vi\.mock\(['"].*lightbox-navigation['"]/
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Functional: WorkspaceContent renders CanvasDetailView (not Lightbox)
+  // -------------------------------------------------------------------------
+  describe("Functional: CanvasDetailView replaces Lightbox", () => {
+    it("should import CanvasDetailView instead of LightboxModal", () => {
+      // Verify the replacement import exists
+      expect(workspaceContentSource).toMatch(
+        /import\s+.*CanvasDetailView.*from\s+['"]@\/components\/canvas\/canvas-detail-view['"]/
+      );
+      // And the old one is gone
+      expect(workspaceContentSource).not.toMatch(
+        /import\s+.*LightboxModal/
+      );
+    });
+
+    it("should use detailViewOpen state instead of lightboxOpen", () => {
+      expect(workspaceContentSource).toMatch(/detailViewOpen/);
+      expect(workspaceContentSource).not.toMatch(/lightboxOpen/);
+    });
   });
 });
