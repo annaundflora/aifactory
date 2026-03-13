@@ -31,6 +31,9 @@ export function WorkspaceContent({
   const [modeFilter, setModeFilter] = useState<FilterValue>("all");
 
   // ----- Detail-View state -----
+  // NOTE(slice-18): detailViewOpen state is internal here. Slice-18 will
+  // refactor this component to lift the state into a shared context or expose
+  // it via props/callbacks so external consumers can read it.
   const [detailViewOpen, setDetailViewOpen] = useState(false);
   const [selectedGenerationId, setSelectedGenerationId] = useState<string | null>(null);
 

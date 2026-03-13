@@ -29,6 +29,7 @@ export function CanvasHeader({
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
+      if (e.repeat) return;
 
       const activeEl = document.activeElement;
       if (

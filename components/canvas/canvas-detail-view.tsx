@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useState, useMemo, type ReactNode } from "react";
+import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useCanvasDetail } from "@/lib/canvas-detail-context";
 import { CanvasHeader } from "@/components/canvas/canvas-header";
+import { Button } from "@/components/ui/button";
 import { type Generation } from "@/lib/db/queries";
 
 // ---------------------------------------------------------------------------
@@ -33,6 +35,7 @@ export function CanvasDetailView({
   undoRedoSlot,
 }: CanvasDetailViewProps) {
   const { state } = useCanvasDetail();
+  const [chatOpen, setChatOpen] = useState(true);
 
   // Find the current generation from context to display the correct image
   const currentGeneration = useMemo(() => {
@@ -52,7 +55,21 @@ export function CanvasDetailView({
         onBack={onBack}
         modelSelectorSlot={modelSelectorSlot}
         undoRedoSlot={undoRedoSlot}
-      />
+      >
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => setChatOpen((prev) => !prev)}
+          aria-label={chatOpen ? "Close chat panel" : "Open chat panel"}
+          data-testid="chat-toggle-button"
+        >
+          {chatOpen ? (
+            <PanelRightClose className="size-4" />
+          ) : (
+            <PanelRightOpen className="size-4" />
+          )}
+        </Button>
+      </CanvasHeader>
 
       {/* Body: 3-column layout */}
       <div className="flex flex-1 overflow-hidden">
@@ -83,13 +100,15 @@ export function CanvasDetailView({
           )}
         </main>
 
-        {/* Right: Chat slot (collapsible) */}
-        <aside
-          className="flex w-80 shrink-0 flex-col border-l border-border/80 bg-card"
-          data-testid="chat-slot"
-        >
-          {chatSlot}
-        </aside>
+        {/* Right: Chat slot (collapsible, initial visible) */}
+        {chatOpen && (
+          <aside
+            className="flex w-80 shrink-0 flex-col border-l border-border/80 bg-card"
+            data-testid="chat-slot"
+          >
+            {chatSlot}
+          </aside>
+        )}
       </div>
     </div>
   );
