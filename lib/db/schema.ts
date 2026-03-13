@@ -74,6 +74,7 @@ export const generations = pgTable(
       (): AnyPgColumn => generations.id,
       { onDelete: "set null" }
     ),
+    batchId: uuid("batch_id"),
   },
   (table) => [
     index("generations_project_id_idx").on(table.projectId),
@@ -84,6 +85,7 @@ export const generations = pgTable(
       table.projectId,
       table.generationMode
     ),
+    index("generations_batch_id_idx").on(table.batchId),
   ]
 );
 
