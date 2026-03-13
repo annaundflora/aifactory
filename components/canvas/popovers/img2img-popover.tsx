@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Minus, Plus } from "lucide-react";
 import { useCanvasDetail } from "@/lib/canvas-detail-context";
 import {
@@ -69,6 +69,17 @@ export function Img2imgPopover({
   const [motiv, setMotiv] = useState("");
   const [style, setStyle] = useState("");
   const [variants, setVariants] = useState(1);
+
+  // Track all blob URLs we create so we can revoke them on unmount
+  const blobUrlsRef = useRef<Set<string>>(new Set());
+
+  // Cleanup all blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      blobUrlsRef.current.clear();
+    };
+  }, []);
 
   const isOpen = state.activeToolId === "img2img";
 

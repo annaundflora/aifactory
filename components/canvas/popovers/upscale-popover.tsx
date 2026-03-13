@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 
 export interface UpscalePopoverProps {
   onUpscale: (params: { scale: 2 | 4 }) => void;
-  isUpscaleDisabled?: boolean;
+  isUpscaleDisabled: boolean;
 }
 
 // ---------------------------------------------------------------------------

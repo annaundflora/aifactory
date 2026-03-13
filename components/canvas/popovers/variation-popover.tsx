@@ -71,7 +71,16 @@ export function VariationPopover({
   const [strength, setStrength] = useState<VariationStrength>("balanced");
   const [count, setCount] = useState<number>(1);
 
-  // Reset form state when popover opens with new generation prompt
+  // Reset form state when generation changes or popover reopens
+  useEffect(() => {
+    if (isOpen) {
+      setPrompt(generation.prompt ?? "");
+      setStrength("balanced");
+      setCount(1);
+    }
+  }, [isOpen, generation.id]);
+
+  // Handle popover open/close
   const handleOpenChange = useCallback(
     (open: boolean) => {
       if (!open) {
