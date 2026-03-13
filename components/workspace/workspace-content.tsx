@@ -8,8 +8,6 @@ import { PromptArea } from "@/components/workspace/prompt-area";
 import { GalleryGrid } from "@/components/workspace/gallery-grid";
 import { GenerationPlaceholder } from "@/components/workspace/generation-placeholder";
 import { FilterChips, type FilterValue } from "@/components/workspace/filter-chips";
-import { LightboxModal } from "@/components/lightbox/lightbox-modal";
-import { LightboxNavigation } from "@/components/lightbox/lightbox-navigation";
 import { CanvasDetailView } from "@/components/canvas/canvas-detail-view";
 import { CanvasDetailProvider } from "@/lib/canvas-detail-context";
 import { startViewTransitionIfSupported } from "@/lib/utils/view-transition";
@@ -37,10 +35,6 @@ export function WorkspaceContent({
   // it via props/callbacks so external consumers can read it.
   const [detailViewOpen, setDetailViewOpen] = useState(false);
   const [selectedGenerationId, setSelectedGenerationId] = useState<string | null>(null);
-
-  // ----- Lightbox state -----
-  const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   // ----- Polling -----
   const hasPending = useMemo(
@@ -139,22 +133,6 @@ export function WorkspaceContent({
     });
   }, []);
 
-  const handleLightboxClose = useCallback(() => {
-    setLightboxOpen(false);
-  }, []);
-
-  const handleLightboxNavigate = useCallback((index: number) => {
-    setLightboxIndex(index);
-  }, []);
-
-  const handleLightboxDelete = useCallback(() => {
-    // Refresh after delete
-    setLightboxOpen(false);
-    fetchGenerations(projectId).then(setGenerations).catch(console.error);
-  }, [projectId]);
-
-  const currentGeneration = completedGenerations[lightboxIndex];
-
   // Find the selected generation for the detail view
   const selectedGeneration = selectedGenerationId
     ? completedGenerations.find((g) => g.id === selectedGenerationId) ?? null
@@ -210,23 +188,6 @@ export function WorkspaceContent({
         />
       </div>
 
-      {/* Lightbox */}
-      {currentGeneration && lightboxOpen && (
-        <div className="fixed inset-0 z-50">
-          <LightboxModal
-            generation={currentGeneration}
-            isOpen={lightboxOpen}
-            onClose={handleLightboxClose}
-            onDeleted={handleLightboxDelete}
-            onGenerationCreated={(gen) => setGenerations((prev) => [gen, ...prev])}
-          />
-          <LightboxNavigation
-            generations={completedGenerations}
-            currentIndex={lightboxIndex}
-            onNavigate={handleLightboxNavigate}
-          />
-        </div>
-      )}
     </div>
   );
 }

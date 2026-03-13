@@ -61,14 +61,6 @@ vi.mock("@/components/workspace/filter-chips", () => ({
   FilterChips: () => <div data-testid="filter-chips">FilterChips Stub</div>,
 }));
 
-vi.mock("@/components/lightbox/lightbox-modal", () => ({
-  LightboxModal: () => <div data-testid="lightbox-modal" />,
-}));
-
-vi.mock("@/components/lightbox/lightbox-navigation", () => ({
-  LightboxNavigation: () => <div data-testid="lightbox-navigation" />,
-}));
-
 // Import AFTER mocks are set up
 import { WorkspaceContent } from "@/components/workspace/workspace-content";
 import {
