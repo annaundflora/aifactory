@@ -37,7 +37,7 @@ export function CanvasDetailView({
   modelSelectorSlot,
   undoRedoSlot,
 }: CanvasDetailViewProps) {
-  const { state } = useCanvasDetail();
+  const { state, dispatch } = useCanvasDetail();
   const [chatOpen, setChatOpen] = useState(true);
 
   // Find the current generation from context to display the correct image
@@ -47,6 +47,22 @@ export function CanvasDetailView({
       generation
     );
   }, [allGenerations, state.currentGenerationId, generation]);
+
+  // Handler for Prev/Next navigation
+  const handleNavigate = useCallback(
+    (id: string) => {
+      dispatch({ type: "SET_CURRENT_IMAGE", generationId: id });
+    },
+    [dispatch]
+  );
+
+  // Handler for sibling thumbnail selection
+  const handleSiblingSelect = useCallback(
+    (id: string) => {
+      dispatch({ type: "SET_CURRENT_IMAGE", generationId: id });
+    },
+    [dispatch]
+  );
 
   return (
     <div
@@ -86,24 +102,28 @@ export function CanvasDetailView({
 
         {/* Center: Canvas area (flex: 1) */}
         <main
-          className="relative flex flex-1 items-center justify-center overflow-hidden bg-muted/40 p-4"
+          className="relative flex flex-1 flex-col overflow-hidden bg-muted/40"
           data-testid="canvas-area"
         >
-          {currentGeneration.imageUrl ? (
-            <img
-              src={currentGeneration.imageUrl}
-              alt={currentGeneration.prompt || "Generated image"}
-              className="max-h-full max-w-full object-contain"
-              style={{
-                viewTransitionName: `canvas-image-${currentGeneration.id}`,
-              }}
-              data-testid="canvas-image"
+          {/* Image + Navigation overlay */}
+          <div className="relative flex flex-1 items-center justify-center p-4">
+            <CanvasNavigation
+              allGenerations={allGenerations}
+              currentGenerationId={state.currentGenerationId}
+              onNavigate={handleNavigate}
             />
-          ) : (
-            <div className="flex items-center justify-center text-muted-foreground">
-              No image available
-            </div>
-          )}
+            <CanvasImage
+              generation={currentGeneration}
+              isLoading={state.isGenerating}
+            />
+          </div>
+
+          {/* Sibling thumbnails below the image */}
+          <SiblingThumbnails
+            batchId={currentGeneration.batchId}
+            currentGenerationId={state.currentGenerationId}
+            onSelect={handleSiblingSelect}
+          />
         </main>
 
         {/* Right: Chat slot (collapsible, initial visible) */}
