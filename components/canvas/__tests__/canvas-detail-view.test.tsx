@@ -1,0 +1,200 @@
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
+
+// ---------------------------------------------------------------------------
+// Mocks (mock_external strategy)
+// ---------------------------------------------------------------------------
+
+// Mock lucide-react icons used by CanvasDetailView and CanvasHeader
+vi.mock("lucide-react", () => ({
+  ArrowLeft: (props: Record<string, unknown>) => (
+    <span data-testid="arrow-left-icon" {...props} />
+  ),
+  PanelRightClose: (props: Record<string, unknown>) => (
+    <span data-testid="panel-right-close-icon" {...props} />
+  ),
+  PanelRightOpen: (props: Record<string, unknown>) => (
+    <span data-testid="panel-right-open-icon" {...props} />
+  ),
+}));
+
+// Import AFTER mocks
+import { CanvasDetailView } from "@/components/canvas/canvas-detail-view";
+import { CanvasDetailProvider } from "@/lib/canvas-detail-context";
+import { type Generation } from "@/lib/db/queries";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function makeGeneration(overrides: Partial<Generation> = {}): Generation {
+  return {
+    id: overrides.id ?? "gen-default-1",
+    projectId: overrides.projectId ?? "project-1",
+    prompt: overrides.prompt ?? "a test prompt",
+    negativePrompt: overrides.negativePrompt ?? null,
+    modelId: overrides.modelId ?? "model-1",
+    modelParams: overrides.modelParams ?? {},
+    status: overrides.status ?? "completed",
+    imageUrl: overrides.imageUrl ?? "https://example.com/image.png",
+    replicatePredictionId: overrides.replicatePredictionId ?? null,
+    errorMessage: overrides.errorMessage ?? null,
+    width: overrides.width ?? 512,
+    height: overrides.height ?? 512,
+    seed: overrides.seed ?? null,
+    createdAt: overrides.createdAt ?? new Date(),
+    promptMotiv: overrides.promptMotiv ?? "",
+    promptStyle: overrides.promptStyle ?? "",
+    isFavorite: overrides.isFavorite ?? false,
+    generationMode: overrides.generationMode ?? "txt2img",
+    sourceImageUrl: overrides.sourceImageUrl ?? null,
+    sourceGenerationId: overrides.sourceGenerationId ?? null,
+  };
+}
+
+/**
+ * Renders CanvasDetailView wrapped in CanvasDetailProvider (required by the component).
+ */
+function renderDetailView(
+  options: {
+    generation?: Generation;
+    allGenerations?: Generation[];
+    onBack?: () => void;
+    initialGenerationId?: string;
+    toolbarSlot?: React.ReactNode;
+    chatSlot?: React.ReactNode;
+  } = {}
+) {
+  const generation =
+    options.generation ?? makeGeneration({ id: "gen-abc-123" });
+  const allGenerations = options.allGenerations ?? [generation];
+  const onBack = options.onBack ?? vi.fn();
+  const initialGenerationId =
+    options.initialGenerationId ?? generation.id;
+
+  return render(
+    <CanvasDetailProvider initialGenerationId={initialGenerationId}>
+      <CanvasDetailView
+        generation={generation}
+        allGenerations={allGenerations}
+        onBack={onBack}
+        toolbarSlot={options.toolbarSlot}
+        chatSlot={options.chatSlot}
+      />
+    </CanvasDetailProvider>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("CanvasDetailView", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /**
+   * AC-2: GIVEN die CanvasDetailView ist sichtbar
+   *       WHEN das Layout geprueft wird
+   *       THEN besteht es aus 3 Spalten: Toolbar-Slot links (48px breit),
+   *            Canvas-Bereich mitte (flex: 1), Chat-Slot rechts (collapsible, initial sichtbar)
+   */
+  it("AC-2: should render 3-column layout with toolbar slot, canvas area, and chat slot", () => {
+    renderDetailView();
+
+    // The root container should exist
+    const detailView = screen.getByTestId("canvas-detail-view");
+    expect(detailView).toBeInTheDocument();
+
+    // Toolbar slot (left, 48px = w-12 in tailwind)
+    const toolbarSlot = screen.getByTestId("toolbar-slot");
+    expect(toolbarSlot).toBeInTheDocument();
+    expect(toolbarSlot.tagName).toBe("ASIDE");
+    // w-12 = 48px in Tailwind
+    expect(toolbarSlot.className).toMatch(/w-12/);
+    expect(toolbarSlot.className).toMatch(/shrink-0/);
+
+    // Canvas area (center, flex: 1)
+    const canvasArea = screen.getByTestId("canvas-area");
+    expect(canvasArea).toBeInTheDocument();
+    expect(canvasArea.tagName).toBe("MAIN");
+    expect(canvasArea.className).toMatch(/flex-1/);
+
+    // Chat slot (right, collapsible, initially visible)
+    const chatSlot = screen.getByTestId("chat-slot");
+    expect(chatSlot).toBeInTheDocument();
+    expect(chatSlot.tagName).toBe("ASIDE");
+    expect(chatSlot.className).toMatch(/shrink-0/);
+  });
+
+  /**
+   * AC-8: GIVEN die CanvasDetailView ist sichtbar
+   *       WHEN der Canvas-Bereich (mittlere Spalte) geprueft wird
+   *       THEN zeigt er das Bild der aktuellen currentGenerationId aus dem Context zentriert an (max-fit)
+   */
+  it("AC-8: should display the current generation image centered in the canvas area", () => {
+    const generation = makeGeneration({
+      id: "gen-img-test",
+      imageUrl: "https://example.com/current-image.png",
+      prompt: "beautiful landscape",
+    });
+
+    renderDetailView({
+      generation,
+      allGenerations: [generation],
+      initialGenerationId: "gen-img-test",
+    });
+
+    // The image should be rendered in the canvas area
+    const canvasImage = screen.getByTestId("canvas-image");
+    expect(canvasImage).toBeInTheDocument();
+    expect(canvasImage).toHaveAttribute(
+      "src",
+      "https://example.com/current-image.png"
+    );
+    expect(canvasImage).toHaveAttribute("alt", "beautiful landscape");
+
+    // Image uses object-contain for max-fit display
+    expect(canvasImage.className).toMatch(/object-contain/);
+
+    // Canvas area uses centering classes
+    const canvasArea = screen.getByTestId("canvas-area");
+    expect(canvasArea.className).toMatch(/items-center/);
+    expect(canvasArea.className).toMatch(/justify-center/);
+  });
+
+  /**
+   * AC-8 (context matching): GIVEN multiple generations and a specific currentGenerationId
+   *       WHEN the canvas area is rendered
+   *       THEN the image matching currentGenerationId from context is displayed
+   */
+  it("AC-8: should display the image matching the currentGenerationId from context", () => {
+    const gen1 = makeGeneration({
+      id: "gen-1",
+      imageUrl: "https://example.com/img1.png",
+      prompt: "first image",
+    });
+    const gen2 = makeGeneration({
+      id: "gen-2",
+      imageUrl: "https://example.com/img2.png",
+      prompt: "second image",
+    });
+
+    renderDetailView({
+      generation: gen1,
+      allGenerations: [gen1, gen2],
+      initialGenerationId: "gen-2",
+    });
+
+    // The image displayed should be gen-2 (matching the context's currentGenerationId)
+    const canvasImage = screen.getByTestId("canvas-image");
+    expect(canvasImage).toHaveAttribute(
+      "src",
+      "https://example.com/img2.png"
+    );
+    expect(canvasImage).toHaveAttribute("alt", "second image");
+  });
+});
