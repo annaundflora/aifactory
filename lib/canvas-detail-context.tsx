@@ -205,7 +205,7 @@ export function CanvasDetailProvider({
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [state.isGenerating, state.undoStack, state.redoStack, dispatch]);
+  }, [state.isGenerating, state.undoStack.length, state.redoStack.length]);
 
   return (
     <CanvasDetailContext.Provider value={{ state, dispatch }}>

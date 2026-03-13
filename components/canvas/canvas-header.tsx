@@ -4,6 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import { ArrowLeft, Undo2, Redo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCanvasDetail } from "@/lib/canvas-detail-context";
+import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
 // UndoRedoButtons
@@ -36,9 +37,9 @@ export function UndoRedoButtons() {
         size="icon-sm"
         onClick={handleUndo}
         aria-label="Undo"
-        aria-disabled={!canUndo}
+        aria-disabled={!canUndo || undefined}
         data-testid="undo-button"
-        className={!canUndo ? "pointer-events-none opacity-40" : ""}
+        className={cn(!canUndo && "pointer-events-none opacity-40")}
         tabIndex={!canUndo ? -1 : 0}
       >
         <Undo2 className="size-4" />
@@ -48,9 +49,9 @@ export function UndoRedoButtons() {
         size="icon-sm"
         onClick={handleRedo}
         aria-label="Redo"
-        aria-disabled={!canRedo}
+        aria-disabled={!canRedo || undefined}
         data-testid="redo-button"
-        className={!canRedo ? "pointer-events-none opacity-40" : ""}
+        className={cn(!canRedo && "pointer-events-none opacity-40")}
         tabIndex={!canRedo ? -1 : 0}
       >
         <Redo2 className="size-4" />
