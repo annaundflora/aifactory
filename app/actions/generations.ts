@@ -6,6 +6,7 @@ import {
   getGenerations,
   getGeneration,
   deleteGeneration as deleteGenerationFromDb,
+  getSiblingsByBatchId,
   type Generation,
 } from "@/lib/db/queries";
 import { StorageService } from "@/lib/clients/storage";
@@ -245,5 +246,28 @@ export async function deleteGeneration(
   } catch (error) {
     console.error("deleteGeneration error:", error);
     return { success: false };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// getSiblingGenerations
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns all completed sibling generations for a given batchId.
+ * Returns an empty array when batchId is null/undefined or on error.
+ */
+export async function getSiblingGenerations(
+  batchId: string | null
+): Promise<Generation[]> {
+  if (!batchId) {
+    return [];
+  }
+
+  try {
+    return await getSiblingsByBatchId(batchId);
+  } catch (error) {
+    console.error("getSiblingGenerations error:", error);
+    return [];
   }
 }
