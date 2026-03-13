@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import { modelIdToDisplayName } from "../model-display-name";
 
@@ -71,19 +71,14 @@ describe("No lib/models imports after refactoring", () => {
   // THEN existiert KEIN Import von @/lib/models
   // AND der Display-Name wird ueber modelIdToDisplayName abgeleitet
   // ---------------------------------------------------------------------------
-  it("AC-6: lightbox-modal.tsx should not import from lib/models and should use modelIdToDisplayName", () => {
+  it("AC-6: lightbox-modal.tsx was removed by slice-18 (replaced by CanvasDetailView)", () => {
+    // slice-18 deleted lightbox-modal.tsx — the file no longer exists.
+    // The lib/models refactoring concern is now moot for this file.
     const filePath = resolve(
       __dirname,
       "../../../components/lightbox/lightbox-modal.tsx",
     );
-    const source = readFileSync(filePath, "utf-8");
-
-    // Must NOT import from lib/models
-    expect(source).not.toMatch(/@\/lib\/models/);
-    expect(source).not.toMatch(/from\s+["'].*lib\/models["']/);
-
-    // Must use modelIdToDisplayName
-    expect(source).toMatch(/modelIdToDisplayName/);
+    expect(() => readFileSync(filePath, "utf-8")).toThrow();
   });
 
   // ---------------------------------------------------------------------------

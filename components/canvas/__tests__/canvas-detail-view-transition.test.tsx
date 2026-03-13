@@ -28,11 +28,73 @@ beforeAll(() => {
 // Mocks (mock_external strategy — only external deps and heavy siblings)
 // ---------------------------------------------------------------------------
 
+// Mock db/queries to prevent DATABASE_URL error at module scope
+vi.mock("@/lib/db/queries", () => ({
+  updateProjectThumbnail: vi.fn(),
+}));
+
 // Mock server action (external)
 vi.mock("@/app/actions/generations", () => ({
   fetchGenerations: vi.fn().mockResolvedValue([]),
   getSiblingGenerations: vi.fn().mockResolvedValue([]),
+  generateImages: vi.fn().mockResolvedValue([]),
+  upscaleImage: vi.fn().mockResolvedValue({}),
+  deleteGeneration: vi.fn().mockResolvedValue({ success: true }),
 }));
+
+// Mock model actions (used by CanvasModelSelector)
+vi.mock("@/app/actions/models", () => ({
+  getCollectionModels: vi.fn().mockResolvedValue([]),
+  checkImg2ImgSupport: vi.fn().mockResolvedValue(true),
+}));
+
+// Mock ModelBrowserDrawer
+vi.mock("@/components/models/model-browser-drawer", () => ({
+  ModelBrowserDrawer: () => null,
+}));
+
+// Mock lib/utils
+vi.mock("@/lib/utils", () => ({
+  cn: (...args: unknown[]) => args.filter(Boolean).join(" "),
+  downloadImage: vi.fn().mockResolvedValue(undefined),
+  generateDownloadFilename: vi.fn().mockReturnValue("image.png"),
+}));
+
+// Mock lucide-react icons used across the canvas component tree
+vi.mock("lucide-react", () => {
+  const stub = (name: string) => {
+    const Comp = (props: Record<string, unknown>) => (
+      <span data-testid={`${name}-icon`} {...props} />
+    );
+    Comp.displayName = name;
+    return Comp;
+  };
+  return {
+    ArrowLeft: stub("ArrowLeft"),
+    ArrowUp: stub("ArrowUp"),
+    ChevronLeft: stub("ChevronLeft"),
+    ChevronRight: stub("ChevronRight"),
+    ChevronDown: stub("ChevronDown"),
+    ChevronUp: stub("ChevronUp"),
+    Copy: stub("Copy"),
+    ArrowRightLeft: stub("ArrowRightLeft"),
+    ZoomIn: stub("ZoomIn"),
+    Download: stub("Download"),
+    Trash2: stub("Trash2"),
+    Info: stub("Info"),
+    ImageOff: stub("ImageOff"),
+    Loader2: stub("Loader2"),
+    PanelRightClose: stub("PanelRightClose"),
+    PanelRightOpen: stub("PanelRightOpen"),
+    MessageSquare: stub("MessageSquare"),
+    Minus: stub("Minus"),
+    Plus: stub("Plus"),
+    Sparkles: stub("Sparkles"),
+    Library: stub("Library"),
+    Undo2: stub("Undo2"),
+    Redo2: stub("Redo2"),
+  };
+});
 
 // Mock sonner
 vi.mock("sonner", () => ({

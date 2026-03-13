@@ -73,7 +73,9 @@ const {
 // ---------------------------------------------------------------------------
 
 // Mock db/queries to prevent DATABASE_URL error at module scope
-vi.mock("@/lib/db/queries", () => ({} as Record<string, unknown>));
+vi.mock("@/lib/db/queries", () => ({
+  updateProjectThumbnail: vi.fn(),
+} as Record<string, unknown>));
 
 // Mock server actions (external deps)
 vi.mock("@/app/actions/generations", () => ({
@@ -132,6 +134,10 @@ vi.mock("lucide-react", () => {
     CheckIcon: stub("CheckIcon"),
     ChevronDownIcon: stub("ChevronDownIcon"),
     ChevronUpIcon: stub("ChevronUpIcon"),
+    Undo2: stub("Undo2"),
+    Redo2: stub("Redo2"),
+    Library: stub("Library"),
+    ChevronUp: stub("ChevronUp"),
   };
 });
 

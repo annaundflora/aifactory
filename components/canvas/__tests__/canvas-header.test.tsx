@@ -8,15 +8,22 @@ import "@testing-library/jest-dom/vitest";
 // Mocks (mock_external strategy)
 // ---------------------------------------------------------------------------
 
-// Mock lucide-react icons used by CanvasHeader
+// Mock lucide-react icons used by CanvasHeader (ArrowLeft, Undo2, Redo2)
 vi.mock("lucide-react", () => ({
   ArrowLeft: (props: Record<string, unknown>) => (
     <span data-testid="arrow-left-icon" {...props} />
+  ),
+  Undo2: (props: Record<string, unknown>) => (
+    <span data-testid="undo2-icon" {...props} />
+  ),
+  Redo2: (props: Record<string, unknown>) => (
+    <span data-testid="redo2-icon" {...props} />
   ),
 }));
 
 // Import AFTER mocks
 import { CanvasHeader } from "@/components/canvas/canvas-header";
+import { CanvasDetailProvider } from "@/lib/canvas-detail-context";
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -37,7 +44,11 @@ describe("CanvasHeader", () => {
    *            und leere Undo/Redo-Slots (rechts)
    */
   it("AC-3: should render back button, model selector slot, and undo/redo slots", () => {
-    render(<CanvasHeader onBack={mockOnBack} />);
+    render(
+      <CanvasDetailProvider initialGenerationId="gen-test">
+        <CanvasHeader onBack={mockOnBack} />
+      </CanvasDetailProvider>
+    );
 
     // Header container exists
     const header = screen.getByTestId("canvas-header");
@@ -69,7 +80,11 @@ describe("CanvasHeader", () => {
    */
   it("AC-4: should call onBack when back button is clicked", async () => {
     const user = userEvent.setup();
-    render(<CanvasHeader onBack={mockOnBack} />);
+    render(
+      <CanvasDetailProvider initialGenerationId="gen-test">
+        <CanvasHeader onBack={mockOnBack} />
+      </CanvasDetailProvider>
+    );
 
     const backButton = screen.getByTestId("canvas-back-button");
     await user.click(backButton);
@@ -85,7 +100,11 @@ describe("CanvasHeader", () => {
    * At the CanvasHeader level, ESC triggers onBack when no input is focused.
    */
   it("AC-5: should call onBack when Escape is pressed and no input is focused", () => {
-    render(<CanvasHeader onBack={mockOnBack} />);
+    render(
+      <CanvasDetailProvider initialGenerationId="gen-test">
+        <CanvasHeader onBack={mockOnBack} />
+      </CanvasDetailProvider>
+    );
 
     // Ensure no input/textarea is focused (document.body is active by default)
     expect(document.activeElement).toBe(document.body);
@@ -104,7 +123,9 @@ describe("CanvasHeader", () => {
   it("AC-6: should not call onBack when Escape is pressed and an input is focused", () => {
     const { container } = render(
       <div>
-        <CanvasHeader onBack={mockOnBack} />
+        <CanvasDetailProvider initialGenerationId="gen-test">
+          <CanvasHeader onBack={mockOnBack} />
+        </CanvasDetailProvider>
         <input data-testid="test-input" type="text" />
       </div>
     );
@@ -127,7 +148,9 @@ describe("CanvasHeader", () => {
   it("AC-6: should not call onBack when Escape is pressed and a textarea is focused", () => {
     render(
       <div>
-        <CanvasHeader onBack={mockOnBack} />
+        <CanvasDetailProvider initialGenerationId="gen-test">
+          <CanvasHeader onBack={mockOnBack} />
+        </CanvasDetailProvider>
         <textarea data-testid="test-textarea" />
       </div>
     );

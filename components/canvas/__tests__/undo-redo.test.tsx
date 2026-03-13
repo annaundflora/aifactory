@@ -296,7 +296,7 @@ describe("Undo/Redo Keyboard Shortcuts", () => {
     // Strategy: render a component that programmatically accesses the real
     // dispatch (not the mock). We do this via a ref passed through a callback.
 
-    let realDispatch: React.Dispatch<CanvasDetailAction> | null = null;
+    const realDispatch: React.Dispatch<CanvasDetailAction> | null = null;
 
     // This component uses the mocked useCanvasDetail, but that's fine --
     // we just need to get the real dispatch somehow.

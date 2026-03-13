@@ -8,11 +8,35 @@ import "@testing-library/jest-dom/vitest";
 // ---------------------------------------------------------------------------
 
 // Mock db/queries to prevent DATABASE_URL error at module scope
-vi.mock("@/lib/db/queries", () => ({}));
+vi.mock("@/lib/db/queries", () => ({
+  updateProjectThumbnail: vi.fn(),
+}));
 
 // Mock server actions that reach the database
 vi.mock("@/app/actions/generations", () => ({
   getSiblingGenerations: vi.fn().mockResolvedValue([]),
+  generateImages: vi.fn().mockResolvedValue([]),
+  upscaleImage: vi.fn().mockResolvedValue({}),
+  fetchGenerations: vi.fn().mockResolvedValue([]),
+  deleteGeneration: vi.fn().mockResolvedValue({ success: true }),
+}));
+
+// Mock lib/utils to avoid real download/image utilities
+vi.mock("@/lib/utils", () => ({
+  cn: (...args: unknown[]) => args.filter(Boolean).join(" "),
+  downloadImage: vi.fn().mockResolvedValue(undefined),
+  generateDownloadFilename: vi.fn().mockReturnValue("image.png"),
+}));
+
+// Mock model actions (used by CanvasModelSelector)
+vi.mock("@/app/actions/models", () => ({
+  getCollectionModels: vi.fn().mockResolvedValue([]),
+  checkImg2ImgSupport: vi.fn().mockResolvedValue(true),
+}));
+
+// Mock ModelBrowserDrawer (complex external component)
+vi.mock("@/components/models/model-browser-drawer", () => ({
+  ModelBrowserDrawer: () => null,
 }));
 
 // Mock sonner (used by canvas-toolbar and other canvas components)
@@ -34,6 +58,7 @@ vi.mock("lucide-react", () => {
     ArrowUp: stub("ArrowUp"),
     ChevronLeft: stub("ChevronLeft"),
     ChevronRight: stub("ChevronRight"),
+    ChevronDown: stub("ChevronDown"),
     Copy: stub("Copy"),
     ArrowRightLeft: stub("ArrowRightLeft"),
     ZoomIn: stub("ZoomIn"),
@@ -47,6 +72,11 @@ vi.mock("lucide-react", () => {
     MessageSquare: stub("MessageSquare"),
     Minus: stub("Minus"),
     Plus: stub("Plus"),
+    Sparkles: stub("Sparkles"),
+    Library: stub("Library"),
+    Undo2: stub("Undo2"),
+    Redo2: stub("Redo2"),
+    ChevronUp: stub("ChevronUp"),
   };
 });
 
@@ -81,6 +111,7 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
     generationMode: overrides.generationMode ?? "txt2img",
     sourceImageUrl: overrides.sourceImageUrl ?? null,
     sourceGenerationId: overrides.sourceGenerationId ?? null,
+    batchId: overrides.batchId ?? null,
   };
 }
 
