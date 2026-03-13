@@ -56,7 +56,7 @@ export function CanvasImage({ generation, isLoading = false }: CanvasImageProps)
   return (
     <div className="relative flex h-full w-full items-center justify-center" data-testid="canvas-image-container">
       {/* Generation overlay: semi-transparent with "Generating" text + spinner (AC-4) */}
-      {isLoading && imgState === "loaded" && (
+      {isLoading && (
         <div
           className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-background/60 backdrop-blur-sm"
           data-testid="canvas-image-generating-overlay"

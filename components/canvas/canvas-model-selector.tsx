@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { ChevronDown, Library } from "lucide-react";
 import { toast } from "sonner";
 import { useCanvasDetail } from "@/lib/canvas-detail-context";
@@ -46,9 +46,17 @@ export function CanvasModelSelector({
 }: CanvasModelSelectorProps) {
   const { state, dispatch } = useCanvasDetail();
 
-  // Initialize selectedModelId from the image's model on first render
+  // Track previous initialModelId to detect navigation to a different image
+  const prevInitialModelIdRef = useRef(initialModelId);
+
+  // Initialize or reset selectedModelId when navigating to a different image
   useEffect(() => {
-    if (!state.selectedModelId && initialModelId) {
+    if (prevInitialModelIdRef.current !== initialModelId) {
+      // Image changed: reset to the new image's model
+      dispatch({ type: "SET_SELECTED_MODEL", modelId: initialModelId });
+      prevInitialModelIdRef.current = initialModelId;
+    } else if (!state.selectedModelId && initialModelId) {
+      // First render: initialize from the image's model
       dispatch({ type: "SET_SELECTED_MODEL", modelId: initialModelId });
     }
   }, [initialModelId, state.selectedModelId, dispatch]);

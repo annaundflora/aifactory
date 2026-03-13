@@ -68,11 +68,20 @@ export function CanvasDetailView({
   const { state, dispatch } = useCanvasDetail();
   const [chatOpen, setChatOpen] = useState(true);
 
-  // Track pending generation IDs for polling
-  const [pendingGenerationIds, setPendingGenerationIds] = useState<string[]>(
-    []
-  );
+  // Track pending generation IDs for polling via ref to avoid effect churn.
+  // A counter state triggers re-renders when pending list changes.
+  const pendingGenerationIdsRef = useRef<string[]>([]);
+  const [pendingCount, setPendingCount] = useState(0);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  /** Helper to update pendingGenerationIds ref and trigger re-render */
+  const setPendingGenerationIds = useCallback((updater: string[] | ((prev: string[]) => string[])) => {
+    const next = typeof updater === "function"
+      ? updater(pendingGenerationIdsRef.current)
+      : updater;
+    pendingGenerationIdsRef.current = next;
+    setPendingCount(next.length);
+  }, []);
 
   // Find the current generation from context to display the correct image
   const currentGeneration = useMemo(() => {
@@ -117,8 +126,13 @@ export function CanvasDetailView({
   // Polling: check for generation completion / failure
   // ---------------------------------------------------------------------------
 
+  // Stable projectId extracted from generation prop to avoid depending on
+  // mutable currentGeneration inside the polling effect.
+  const projectIdRef = useRef(generation.projectId);
+  projectIdRef.current = generation.projectId;
+
   useEffect(() => {
-    if (pendingGenerationIds.length === 0) {
+    if (pendingCount === 0) {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
@@ -126,12 +140,21 @@ export function CanvasDetailView({
       return;
     }
 
+    let cancelled = false;
+
     const poll = async () => {
       try {
-        const projectId = currentGeneration.projectId;
+        const projectId = projectIdRef.current;
         const results = await fetchGenerations(projectId);
 
-        for (const pendingId of pendingGenerationIds) {
+        if (cancelled) return;
+
+        // Read current pending IDs from ref (not stale closure state)
+        const currentPending = [...pendingGenerationIdsRef.current];
+        const resolvedIds: string[] = [];
+
+        // Process ALL completed/failed generations in a single poll cycle
+        for (const pendingId of currentPending) {
           const gen = results.find((g) => g.id === pendingId);
           if (!gen) continue;
 
@@ -141,25 +164,32 @@ export function CanvasDetailView({
               type: "PUSH_UNDO",
               generationId: gen.id,
             });
-            dispatch({ type: "SET_GENERATING", isGenerating: false });
-            setPendingGenerationIds((prev) =>
-              prev.filter((id) => id !== pendingId)
-            );
-            return; // Handle one at a time
-          }
-
-          if (gen.status === "failed") {
+            resolvedIds.push(pendingId);
+          } else if (gen.status === "failed") {
             // AC-8: Show error toast, keep current image
-            dispatch({ type: "SET_GENERATING", isGenerating: false });
             toast.error(gen.errorMessage || "Generation fehlgeschlagen.");
-            setPendingGenerationIds((prev) =>
-              prev.filter((id) => id !== pendingId)
-            );
-            return;
+            resolvedIds.push(pendingId);
+          }
+        }
+
+        if (cancelled) return;
+
+        // Remove all resolved IDs at once
+        if (resolvedIds.length > 0) {
+          setPendingGenerationIds((prev) =>
+            prev.filter((id) => !resolvedIds.includes(id))
+          );
+
+          // Turn off generating if no more pending IDs remain
+          // (ref is already updated by setPendingGenerationIds)
+          if (pendingGenerationIdsRef.current.length === 0) {
+            dispatch({ type: "SET_GENERATING", isGenerating: false });
           }
         }
       } catch (error) {
-        console.error("Generation polling error:", error);
+        if (!cancelled) {
+          console.error("Generation polling error:", error);
+        }
       }
     };
 
@@ -167,12 +197,13 @@ export function CanvasDetailView({
     pollIntervalRef.current = setInterval(poll, GENERATION_POLL_INTERVAL_MS);
 
     return () => {
+      cancelled = true;
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
       }
     };
-  }, [pendingGenerationIds, currentGeneration.projectId, dispatch]);
+  }, [pendingCount, dispatch, setPendingGenerationIds]);
 
   // ---------------------------------------------------------------------------
   // AC-1: Variation popover -> generateImages()
@@ -221,7 +252,7 @@ export function CanvasDetailView({
         toast.error("Generation fehlgeschlagen.");
       }
     },
-    [state.isGenerating, state.selectedModelId, currentGeneration, dispatch]
+    [state.isGenerating, state.selectedModelId, currentGeneration, dispatch, setPendingGenerationIds]
   );
 
   // ---------------------------------------------------------------------------
@@ -278,7 +309,7 @@ export function CanvasDetailView({
         toast.error("Generation fehlgeschlagen.");
       }
     },
-    [state.isGenerating, state.selectedModelId, currentGeneration, dispatch]
+    [state.isGenerating, state.selectedModelId, currentGeneration, dispatch, setPendingGenerationIds]
   );
 
   // ---------------------------------------------------------------------------
@@ -321,7 +352,7 @@ export function CanvasDetailView({
         toast.error("Upscale fehlgeschlagen.");
       }
     },
-    [state.isGenerating, currentGeneration, dispatch]
+    [state.isGenerating, currentGeneration, dispatch, setPendingGenerationIds]
   );
 
   // ---------------------------------------------------------------------------
