@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.routes.canvas_sessions import router as canvas_sessions_router
 from app.routes.health import router as health_router
 from app.routes.messages import router as messages_router
 from app.routes.sessions import router as sessions_router
@@ -41,6 +42,7 @@ def create_app() -> FastAPI:
     application.include_router(health_router, prefix="/api/assistant")
     application.include_router(messages_router, prefix="/api/assistant")
     application.include_router(sessions_router, prefix="/api/assistant")
+    application.include_router(canvas_sessions_router, prefix="/api/assistant")
 
     return application
 
