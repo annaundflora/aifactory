@@ -55,8 +55,21 @@ export function CanvasImage({ generation, isLoading = false }: CanvasImageProps)
 
   return (
     <div className="relative flex h-full w-full items-center justify-center" data-testid="canvas-image-container">
-      {/* Loading indicator: shown while image is loading or external isLoading prop */}
-      {(imgState === "loading" || isLoading) && (
+      {/* Generation overlay: semi-transparent with "Generating" text + spinner (AC-4) */}
+      {isLoading && imgState === "loaded" && (
+        <div
+          className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-background/60 backdrop-blur-sm"
+          data-testid="canvas-image-generating-overlay"
+        >
+          <Loader2 className="size-8 animate-spin text-foreground" />
+          <span className="text-sm font-medium text-foreground">
+            Generating
+          </span>
+        </div>
+      )}
+
+      {/* Loading indicator: shown while image is initially loading (not generation) */}
+      {imgState === "loading" && (
         <div
           className="absolute inset-0 flex items-center justify-center"
           data-testid="canvas-image-loading"
@@ -82,7 +95,7 @@ export function CanvasImage({ generation, isLoading = false }: CanvasImageProps)
           src={generation.imageUrl}
           alt={generation.prompt || "Generated image"}
           className={`max-h-full max-w-full object-contain transition-opacity ${
-            imgState === "loaded" && !isLoading ? "opacity-100" : "opacity-0"
+            imgState === "loaded" ? "opacity-100" : "opacity-0"
           }`}
           style={{ viewTransitionName: `canvas-image-${generation.id}` }}
           onLoad={handleLoad}
