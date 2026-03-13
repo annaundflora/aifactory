@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback } from "react";
 import { Minus, Plus } from "lucide-react";
 import { useCanvasDetail } from "@/lib/canvas-detail-context";
 import {
@@ -12,8 +12,6 @@ import { ReferenceBar } from "@/components/workspace/reference-bar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { getLowestFreePosition } from "@/components/workspace/reference-bar";
-import { uploadSourceImage } from "@/app/actions/upload";
 import type { Generation } from "@/lib/db/queries";
 import type {
   ReferenceRole,
