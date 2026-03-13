@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { StreamingIndicator } from "@/components/assistant/streaming-indicator";
 import { type ChatMessage } from "@/lib/types/chat-message";
 
 // ---------------------------------------------------------------------------
@@ -10,6 +11,8 @@ import { type ChatMessage } from "@/lib/types/chat-message";
 
 export interface CanvasChatMessagesProps {
   messages: ChatMessage[];
+  /** True while a bot response is being streamed (shows streaming indicator) */
+  isStreaming?: boolean;
   onChipClick?: (text: string) => void;
 }
 
@@ -60,6 +63,7 @@ function MessageBubble({
   onChipClick?: (text: string) => void;
 }) {
   const isUser = message.role === "user";
+  const isError = message.isError === true;
 
   return (
     <div
@@ -70,12 +74,15 @@ function MessageBubble({
         className={cn(
           "max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed",
           isUser && "bg-primary text-primary-foreground rounded-br-md",
-          !isUser && "bg-muted text-foreground rounded-bl-md"
+          !isUser && !isError && "bg-muted text-foreground rounded-bl-md",
+          // AC-9: Error bubbles visually marked
+          !isUser && isError && "bg-destructive/10 text-destructive border border-destructive/30 rounded-bl-md"
         )}
+        data-testid={isError ? "bot-message-error" : undefined}
       >
         <div className="whitespace-pre-wrap break-words">{message.content}</div>
 
-        {/* AC-7: Chips below bot text */}
+        {/* AC-5: Clarification chips below bot text */}
         {!isUser && message.chips && message.chips.length > 0 && (
           <div
             className="mt-2 flex flex-wrap gap-1.5"
@@ -105,16 +112,17 @@ function MessageBubble({
 
 export function CanvasChatMessages({
   messages,
+  isStreaming = false,
   onChipClick,
 }: CanvasChatMessagesProps) {
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
 
-  // AC-13: Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when new messages arrive or streaming state changes
   useEffect(() => {
     if (scrollAnchorRef.current) {
       scrollAnchorRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages]);
+  }, [messages, isStreaming]);
 
   return (
     <div
@@ -140,6 +148,9 @@ export function CanvasChatMessages({
             return null;
         }
       })}
+
+      {/* AC-3: Streaming indicator while text-delta events are being received */}
+      <StreamingIndicator visible={isStreaming} />
 
       {/* Scroll anchor */}
       <div ref={scrollAnchorRef} aria-hidden="true" />

@@ -9,4 +9,6 @@ export interface ChatMessage {
   role: "user" | "bot" | "system" | "separator";
   content: string;
   chips?: string[];
+  /** True when this bot message represents an error (SSE error event or timeout) */
+  isError?: boolean;
 }

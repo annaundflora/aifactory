@@ -23,6 +23,22 @@ vi.mock("lucide-react", () => ({
   ),
 }));
 
+// Mock the canvas chat service (backend calls)
+vi.mock("@/lib/canvas-chat-service", () => ({
+  createSession: vi.fn().mockResolvedValue("test-session-id"),
+  sendMessage: vi.fn().mockReturnValue((async function* () {})()),
+}));
+
+// Mock the generateImages server action
+vi.mock("@/app/actions/generations", () => ({
+  generateImages: vi.fn().mockResolvedValue([]),
+}));
+
+// Mock sonner toast
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn(), success: vi.fn() },
+}));
+
 // Stable crypto.randomUUID for deterministic test IDs
 let uuidCounter = 0;
 vi.stubGlobal("crypto", {
@@ -80,7 +96,7 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
 function renderChatPanel(
   options: {
     generation?: Generation;
-    onSendMessage?: (text: string) => void;
+    projectId?: string;
     initialGenerationId?: string;
   } = {}
 ) {
@@ -88,12 +104,13 @@ function renderChatPanel(
     options.generation ?? makeGeneration({ id: "gen-chat-1" });
   const initialGenerationId =
     options.initialGenerationId ?? generation.id;
+  const projectId = options.projectId ?? generation.projectId;
 
   return render(
     <CanvasDetailProvider initialGenerationId={initialGenerationId}>
       <CanvasChatPanel
         generation={generation}
-        onSendMessage={options.onSendMessage}
+        projectId={projectId}
       />
     </CanvasDetailProvider>
   );

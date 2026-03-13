@@ -7,12 +7,20 @@ import {
   useEffect,
 } from "react";
 import { MessageSquare, Minus, Plus } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useCanvasDetail } from "@/lib/canvas-detail-context";
 import { CanvasChatMessages } from "./canvas-chat-messages";
 import { CanvasChatInput } from "./canvas-chat-input";
 import { type Generation } from "@/lib/db/queries";
 import { type ChatMessage } from "@/lib/types/chat-message";
+import {
+  createSession,
+  sendMessage as sendCanvasMessage,
+  type CanvasImageContext,
+  type SSECanvasGenerateEvent,
+} from "@/lib/canvas-chat-service";
+import { generateImages } from "@/app/actions/generations";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -29,7 +37,7 @@ const COLLAPSED_WIDTH = 48;
 
 export interface CanvasChatPanelProps {
   generation: Generation;
-  onSendMessage?: (text: string) => void;
+  projectId: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -60,15 +68,22 @@ function buildSeparatorMessage(identifier: string): ChatMessage {
   };
 }
 
+function buildImageContext(generation: Generation): CanvasImageContext {
+  return {
+    image_url: generation.imageUrl ?? "",
+    prompt: generation.prompt ?? "",
+    model_id: generation.modelId ?? "",
+    model_params: (generation.modelParams as Record<string, unknown>) ?? {},
+    generation_id: generation.id,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // CanvasChatPanel
 // ---------------------------------------------------------------------------
 
-export function CanvasChatPanel({
-  generation,
-  onSendMessage,
-}: CanvasChatPanelProps) {
-  const { state } = useCanvasDetail();
+export function CanvasChatPanel({ generation, projectId }: CanvasChatPanelProps) {
+  const { state, dispatch } = useCanvasDetail();
 
   // Local UI state
   const [collapsed, setCollapsed] = useState(false);
@@ -76,19 +91,65 @@ export function CanvasChatPanel({
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
     buildInitMessage(generation),
   ]);
+  const [isStreaming, setIsStreaming] = useState(false);
+
+  // Session state — local to the chat panel (not in Context per spec constraint)
+  const sessionIdRef = useRef<string | null>(null);
 
   // Track the last generation id for context separator
   const lastGenerationIdRef = useRef(state.currentGenerationId);
 
+  // Keep image context in a ref — updated on generation change
+  const imageContextRef = useRef<CanvasImageContext>(buildImageContext(generation));
+
   // Width before collapse for restoring
   const preCollapseWidthRef = useRef(DEFAULT_WIDTH);
 
-  // -------------------------------------------------------------------------
-  // AC-9: Context separator when image changes
-  // -------------------------------------------------------------------------
+  // Abort controller for ongoing SSE streams
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // ---------------------------------------------------------------------------
+  // AC-1: Auto-create canvas session when the panel mounts (expanded)
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (collapsed) return;
+    if (sessionIdRef.current) return; // session already exists
+
+    let cancelled = false;
+
+    const initSession = async () => {
+      try {
+        const sessionId = await createSession(projectId, imageContextRef.current);
+        if (!cancelled) {
+          sessionIdRef.current = sessionId;
+          dispatch({ type: "SET_CHAT_SESSION", chatSessionId: sessionId });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("[CanvasChatPanel] Failed to create canvas session:", error);
+          toast.error("Verbindungsfehler: Chat-Session konnte nicht erstellt werden.");
+        }
+      }
+    };
+
+    initSession();
+
+    return () => {
+      cancelled = true;
+    };
+  // Run on mount and whenever collapsed state becomes false (first expansion)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collapsed, projectId]);
+
+  // ---------------------------------------------------------------------------
+  // AC-10: Update image_context when currentGenerationId changes
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (state.currentGenerationId !== lastGenerationIdRef.current) {
       lastGenerationIdRef.current = state.currentGenerationId;
+
+      // Update the image context ref for subsequent messages
+      imageContextRef.current = buildImageContext(generation);
 
       // Build identifier from whatever info we have
       const identifier = generation.prompt
@@ -103,9 +164,9 @@ export function CanvasChatPanel({
     }
   }, [state.currentGenerationId, generation]);
 
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // AC-2 / AC-3: Collapse / Expand
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   const handleCollapse = useCallback(() => {
     preCollapseWidthRef.current = width;
     setCollapsed(true);
@@ -116,9 +177,9 @@ export function CanvasChatPanel({
     setWidth(preCollapseWidthRef.current || DEFAULT_WIDTH);
   }, []);
 
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // AC-4: Resize handle (mousedown/mousemove/mouseup)
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   const panelRef = useRef<HTMLDivElement>(null);
   const isResizing = useRef(false);
   const rAfRef = useRef<number | null>(null);
@@ -147,6 +208,9 @@ export function CanvasChatPanel({
   useEffect(() => {
     return () => {
       cleanupResizeListeners();
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     };
   }, [cleanupResizeListeners]);
 
@@ -161,7 +225,6 @@ export function CanvasChatPanel({
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         if (!isResizing.current) return;
-        // Cancel any pending rAF before scheduling a new one
         if (rAfRef.current !== null) {
           cancelAnimationFrame(rAfRef.current);
         }
@@ -189,9 +252,145 @@ export function CanvasChatPanel({
     [collapsed, width, cleanupResizeListeners]
   );
 
-  // -------------------------------------------------------------------------
-  // AC-11: Send message
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // AC-6: Handle canvas-generate event -> call generateImages()
+  // ---------------------------------------------------------------------------
+  const handleCanvasGenerate = useCallback(
+    async (event: SSECanvasGenerateEvent) => {
+      dispatch({ type: "SET_GENERATING", isGenerating: true });
+
+      try {
+        await generateImages({
+          projectId,
+          promptMotiv: event.prompt,
+          modelIds: [event.model_id],
+          params: event.params ?? {},
+          count: 1,
+          generationMode: event.action === "img2img" ? "img2img" : "txt2img",
+        });
+        // Polling in WorkspaceContent will detect completion and replace image
+      } catch (error) {
+        console.error("[CanvasChatPanel] generateImages failed:", error);
+        toast.error("Generierung fehlgeschlagen.");
+        dispatch({ type: "SET_GENERATING", isGenerating: false });
+      }
+    },
+    [dispatch, projectId]
+  );
+
+  // ---------------------------------------------------------------------------
+  // Core send logic — used by handleSend and handleChipClick
+  // ---------------------------------------------------------------------------
+  const sendMessageToBackend = useCallback(
+    async (text: string) => {
+      // Ensure we have a session
+      if (!sessionIdRef.current) {
+        try {
+          const sessionId = await createSession(projectId, imageContextRef.current);
+          sessionIdRef.current = sessionId;
+          dispatch({ type: "SET_CHAT_SESSION", chatSessionId: sessionId });
+        } catch (error) {
+          console.error("[CanvasChatPanel] Failed to create session:", error);
+          toast.error("Verbindungsfehler: Chat-Session konnte nicht erstellt werden.");
+          return;
+        }
+      }
+
+      // Abort any ongoing stream
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+
+      setIsStreaming(true);
+
+      // Placeholder message id for the in-progress bot response
+      const botMsgId = `bot-${crypto.randomUUID()}`;
+
+      // Add an empty bot message that we'll fill incrementally
+      setMessages((prev) => [
+        ...prev,
+        { id: botMsgId, role: "bot", content: "" },
+      ]);
+
+      try {
+        const stream = sendCanvasMessage(
+          sessionIdRef.current,
+          text,
+          imageContextRef.current
+        );
+
+        for await (const event of stream) {
+          switch (event.type) {
+            case "text-delta": {
+              // AC-3: Append delta to the bot message
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === botMsgId
+                    ? { ...msg, content: msg.content + event.content }
+                    : msg
+                )
+              );
+              break;
+            }
+
+            case "text-done": {
+              // AC-4: Mark message as done (streaming indicator will hide)
+              setIsStreaming(false);
+              break;
+            }
+
+            case "canvas-generate": {
+              // AC-6: Trigger generation via server action
+              setIsStreaming(false);
+              await handleCanvasGenerate(event);
+              break;
+            }
+
+            case "error": {
+              // AC-8 / AC-9: Show error in the bot bubble and re-enable input
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === botMsgId
+                    ? {
+                        ...msg,
+                        content: event.message,
+                        isError: true,
+                      }
+                    : msg
+                )
+              );
+              setIsStreaming(false);
+              break;
+            }
+          }
+        }
+      } catch (error) {
+        console.error("[CanvasChatPanel] SSE stream error:", error);
+        toast.error("Verbindungsfehler");
+        // Replace placeholder with error message
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === botMsgId
+              ? {
+                  ...msg,
+                  content: "Verbindung unterbrochen. Bitte erneut versuchen.",
+                  isError: true,
+                }
+              : msg
+          )
+        );
+        setIsStreaming(false);
+      } finally {
+        abortControllerRef.current = null;
+      }
+    },
+    [projectId, dispatch, handleCanvasGenerate]
+  );
+
+  // ---------------------------------------------------------------------------
+  // AC-2: Send message
+  // ---------------------------------------------------------------------------
   const handleSend = useCallback(
     (text: string) => {
       const userMsg: ChatMessage = {
@@ -200,17 +399,14 @@ export function CanvasChatPanel({
         content: text,
       };
       setMessages((prev) => [...prev, userMsg]);
-
-      if (onSendMessage) {
-        onSendMessage(text);
-      }
+      sendMessageToBackend(text);
     },
-    [onSendMessage]
+    [sendMessageToBackend]
   );
 
-  // -------------------------------------------------------------------------
-  // AC-8: Chip click
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // AC-5: Chip click -> send chip text as new message
+  // ---------------------------------------------------------------------------
   const handleChipClick = useCallback(
     (chipText: string) => {
       const userMsg: ChatMessage = {
@@ -219,24 +415,46 @@ export function CanvasChatPanel({
         content: chipText,
       };
       setMessages((prev) => [...prev, userMsg]);
-
-      if (onSendMessage) {
-        onSendMessage(chipText);
-      }
+      sendMessageToBackend(chipText);
     },
-    [onSendMessage]
+    [sendMessageToBackend]
   );
 
-  // -------------------------------------------------------------------------
-  // AC-12: New session
-  // -------------------------------------------------------------------------
-  const handleNewSession = useCallback(() => {
-    setMessages([buildInitMessage(generation)]);
-  }, [generation]);
+  // ---------------------------------------------------------------------------
+  // AC-11: New session — reset session + chat history
+  // ---------------------------------------------------------------------------
+  const handleNewSession = useCallback(async () => {
+    // Abort any ongoing stream
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsStreaming(false);
 
-  // -------------------------------------------------------------------------
+    // Discard old session
+    sessionIdRef.current = null;
+    dispatch({ type: "SET_CHAT_SESSION", chatSessionId: null });
+
+    // Reset history to just the init message
+    setMessages([buildInitMessage(generation)]);
+
+    // Create a new session
+    try {
+      const sessionId = await createSession(projectId, imageContextRef.current);
+      sessionIdRef.current = sessionId;
+      dispatch({ type: "SET_CHAT_SESSION", chatSessionId: sessionId });
+    } catch (error) {
+      console.error("[CanvasChatPanel] Failed to create new session:", error);
+      toast.error("Verbindungsfehler: Neue Session konnte nicht erstellt werden.");
+    }
+  }, [generation, projectId, dispatch]);
+
+  // AC-7: Chat input disabled while isGenerating
+  const inputDisabled = state.isGenerating || isStreaming;
+
+  // ---------------------------------------------------------------------------
   // Collapsed: 48px icon strip
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   if (collapsed) {
     return (
       <div
@@ -260,9 +478,9 @@ export function CanvasChatPanel({
     );
   }
 
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // Expanded panel
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   return (
     <div
       ref={panelRef}
@@ -310,11 +528,12 @@ export function CanvasChatPanel({
       {/* Messages area */}
       <CanvasChatMessages
         messages={messages}
+        isStreaming={isStreaming}
         onChipClick={handleChipClick}
       />
 
-      {/* Input */}
-      <CanvasChatInput onSend={handleSend} disabled={false} />
+      {/* Input — disabled while generating or streaming */}
+      <CanvasChatInput onSend={handleSend} disabled={inputDisabled} />
     </div>
   );
 }

@@ -23,6 +23,22 @@ vi.mock("lucide-react", () => ({
   ),
 }));
 
+// Mock the canvas chat service (backend calls)
+vi.mock("@/lib/canvas-chat-service", () => ({
+  createSession: vi.fn().mockResolvedValue("test-session-id"),
+  sendMessage: vi.fn().mockReturnValue((async function* () {})()),
+}));
+
+// Mock the generateImages server action
+vi.mock("@/app/actions/generations", () => ({
+  generateImages: vi.fn().mockResolvedValue([]),
+}));
+
+// Mock sonner toast
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn(), success: vi.fn() },
+}));
+
 // Stable crypto.randomUUID for deterministic test IDs
 let uuidCounter = 0;
 vi.stubGlobal("crypto", {
@@ -75,7 +91,7 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
 function renderChatPanel(
   options: {
     generation?: Generation;
-    onSendMessage?: (text: string) => void;
+    projectId?: string;
     initialGenerationId?: string;
   } = {}
 ) {
@@ -83,12 +99,13 @@ function renderChatPanel(
     options.generation ?? makeGeneration({ id: "gen-input-test" });
   const initialGenerationId =
     options.initialGenerationId ?? generation.id;
+  const projectId = options.projectId ?? generation.projectId;
 
   return render(
     <CanvasDetailProvider initialGenerationId={initialGenerationId}>
       <CanvasChatPanel
         generation={generation}
-        onSendMessage={options.onSendMessage}
+        projectId={projectId}
       />
     </CanvasDetailProvider>
   );
@@ -146,9 +163,8 @@ describe("CanvasChatInput", () => {
    */
   it("AC-11: should add user message to history and clear input on send", async () => {
     const user = userEvent.setup();
-    const onSendMessage = vi.fn();
 
-    renderChatPanel({ onSendMessage });
+    renderChatPanel();
 
     const textarea = screen.getByTestId("canvas-chat-input-textarea");
     const sendButton = screen.getByTestId("canvas-chat-send-button");
@@ -169,10 +185,6 @@ describe("CanvasChatInput", () => {
 
     // Input field should be cleared
     expect(textarea).toHaveValue("");
-
-    // onSendMessage callback should have been called
-    expect(onSendMessage).toHaveBeenCalledTimes(1);
-    expect(onSendMessage).toHaveBeenCalledWith("Make the sky more blue");
   });
 
   /**
@@ -183,9 +195,8 @@ describe("CanvasChatInput", () => {
    */
   it("AC-11: should send message when Enter key is pressed", async () => {
     const user = userEvent.setup();
-    const onSendMessage = vi.fn();
 
-    renderChatPanel({ onSendMessage });
+    renderChatPanel();
 
     const textarea = screen.getByTestId("canvas-chat-input-textarea");
 
@@ -199,9 +210,6 @@ describe("CanvasChatInput", () => {
 
     // Input should be cleared
     expect(textarea).toHaveValue("");
-
-    // Callback fired
-    expect(onSendMessage).toHaveBeenCalledWith("Adjust contrast");
   });
 
   /**
