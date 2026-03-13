@@ -213,11 +213,11 @@ describe('Generations Schema — Multi-Mode Extensions (slice-01-db-schema)', ()
     expect(indexNames).toContain('generations_created_at_idx')
     expect(indexNames).toContain('generations_is_favorite_idx')
 
-    // Total: 4 existing + 1 new (generations_project_mode_idx) = 5
-    expect(config.indexes.length).toBe(5)
+    // Total: 4 existing + 1 composite (generations_project_mode_idx) + 1 (generations_batch_id_idx) = 6
+    expect(config.indexes.length).toBe(6)
 
-    // Total columns: 17 existing + 3 new = 20
-    expect(config.columns.length).toBe(20)
+    // Total columns: 17 existing + 3 multi-mode + 1 batchId = 21
+    expect(config.columns.length).toBe(21)
   })
 
   // -----------------------------------------------------------
