@@ -12,6 +12,7 @@ import { LightboxModal } from "@/components/lightbox/lightbox-modal";
 import { LightboxNavigation } from "@/components/lightbox/lightbox-navigation";
 import { CanvasDetailView } from "@/components/canvas/canvas-detail-view";
 import { CanvasDetailProvider } from "@/lib/canvas-detail-context";
+import { startViewTransitionIfSupported } from "@/lib/utils/view-transition";
 
 const POLLING_INTERVAL_MS = 3000;
 
@@ -123,15 +124,19 @@ export function WorkspaceContent({
   // ----- Detail-View handlers -----
   const handleSelectGeneration = useCallback(
     (id: string) => {
-      setSelectedGenerationId(id);
-      setDetailViewOpen(true);
+      startViewTransitionIfSupported(() => {
+        setSelectedGenerationId(id);
+        setDetailViewOpen(true);
+      });
     },
     []
   );
 
   const handleDetailViewClose = useCallback(() => {
-    setDetailViewOpen(false);
-    setSelectedGenerationId(null);
+    startViewTransitionIfSupported(() => {
+      setDetailViewOpen(false);
+      setSelectedGenerationId(null);
+    });
   }, []);
 
   const handleLightboxClose = useCallback(() => {

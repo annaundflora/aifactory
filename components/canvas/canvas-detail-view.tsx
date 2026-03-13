@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, useMemo, type ReactNode } from "react";
+import { useState, useMemo, useCallback, type ReactNode } from "react";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useCanvasDetail } from "@/lib/canvas-detail-context";
 import { CanvasHeader } from "@/components/canvas/canvas-header";
+import { CanvasImage } from "@/components/canvas/canvas-image";
+import { CanvasNavigation } from "@/components/canvas/canvas-navigation";
+import { SiblingThumbnails } from "@/components/canvas/sibling-thumbnails";
 import { Button } from "@/components/ui/button";
 import { type Generation } from "@/lib/db/queries";
 
@@ -91,6 +94,9 @@ export function CanvasDetailView({
               src={currentGeneration.imageUrl}
               alt={currentGeneration.prompt || "Generated image"}
               className="max-h-full max-w-full object-contain"
+              style={{
+                viewTransitionName: `canvas-image-${currentGeneration.id}`,
+              }}
               data-testid="canvas-image"
             />
           ) : (
