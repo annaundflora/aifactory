@@ -127,7 +127,11 @@ export function CanvasDetailView({
         </main>
 
         {/* Right: Chat slot (panel manages its own collapse/expand + width) */}
-        {chatOpen && chatSlot}
+        {chatOpen && (
+          <aside data-testid="chat-slot">
+            {chatSlot}
+          </aside>
+        )}
       </div>
     </div>
   );

@@ -54,7 +54,7 @@ function buildInitMessage(generation: Generation): ChatMessage {
 
 function buildSeparatorMessage(identifier: string): ChatMessage {
   return {
-    id: `sep-${identifier}-${Date.now()}`,
+    id: `sep-${identifier}-${crypto.randomUUID()}`,
     role: "separator",
     content: `Kontext: ${identifier}`,
   };

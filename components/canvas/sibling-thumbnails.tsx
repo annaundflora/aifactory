@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { getSiblingGenerations } from "@/app/actions/generations";
 import { type Generation } from "@/lib/db/queries";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -46,8 +47,20 @@ export function SiblingThumbnails({
   }, [batchId]);
 
   // Don't render anything for single-image generations or single siblings
-  if (!batchId || siblings.length <= 1) {
+  if (!batchId || (!isPending && siblings.length <= 1)) {
     return null;
+  }
+
+  // Show skeleton placeholders while siblings are being fetched
+  if (isPending && siblings.length === 0) {
+    return (
+      <div
+        className="flex items-center justify-center gap-2 py-2"
+        data-testid="sibling-thumbnails-loading"
+      >
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
   return (
@@ -55,7 +68,7 @@ export function SiblingThumbnails({
       className="flex items-center justify-center gap-2 py-2"
       data-testid="sibling-thumbnails"
     >
-      {siblings.map((sibling) => {
+      {siblings.map((sibling, index) => {
         const isActive = sibling.id === currentGenerationId;
         return (
           <button
@@ -66,9 +79,10 @@ export function SiblingThumbnails({
               "hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               isActive
                 ? "border-primary ring-2 ring-primary/30"
-                : "border-border/50 opacity-70 hover:border-border"
+                : "border-border/50 opacity-70 hover:border-border",
+              isPending && "pointer-events-none opacity-50"
             )}
-            aria-label={`Sibling image ${sibling.id}`}
+            aria-label={`Variant ${index + 1} of ${siblings.length}`}
             aria-current={isActive ? "true" : undefined}
             data-testid={`sibling-thumbnail-${sibling.id}`}
           >

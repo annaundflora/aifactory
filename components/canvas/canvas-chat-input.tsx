@@ -73,6 +73,7 @@ export function CanvasChatInput({
         placeholder="Describe changes..."
         rows={1}
         disabled={disabled}
+        maxLength={5000}
         className="flex-1 resize-none border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
         data-testid="canvas-chat-input-textarea"
       />
