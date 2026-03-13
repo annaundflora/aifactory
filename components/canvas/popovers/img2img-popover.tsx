@@ -103,24 +103,39 @@ export function Img2imgPopover({
 
   const handleAddReference = useCallback(
     (file: File, position: number) => {
-      if (slots.length >= MAX_REFERENCES) return;
-
       const objectUrl = URL.createObjectURL(file);
+      blobUrlsRef.current.add(objectUrl);
+
       const newSlot: ReferenceSlotData = {
-        id: `ref-${Date.now()}-${position}`,
+        id: `ref-${crypto.randomUUID()}`,
         imageUrl: objectUrl,
         slotPosition: position,
         role: "style" as ReferenceRole,
         strength: "moderate" as ReferenceStrength,
         originalFilename: file.name,
       };
-      setSlots((prev) => [...prev, newSlot]);
+      setSlots((prev) => {
+        if (prev.length >= MAX_REFERENCES) {
+          // Revoke the URL we just created since we won't use it
+          URL.revokeObjectURL(objectUrl);
+          blobUrlsRef.current.delete(objectUrl);
+          return prev;
+        }
+        return [...prev, newSlot];
+      });
     },
-    [slots.length]
+    []
   );
 
   const handleRemoveReference = useCallback((slotPosition: number) => {
-    setSlots((prev) => prev.filter((s) => s.slotPosition !== slotPosition));
+    setSlots((prev) => {
+      const slot = prev.find((s) => s.slotPosition === slotPosition);
+      if (slot && slot.imageUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(slot.imageUrl);
+        blobUrlsRef.current.delete(slot.imageUrl);
+      }
+      return prev.filter((s) => s.slotPosition !== slotPosition);
+    });
   }, []);
 
   const handleRoleChange = useCallback(
@@ -147,12 +162,12 @@ export function Img2imgPopover({
 
   const handleUpload = useCallback(
     async (file: File, slotPosition: number) => {
-      if (slots.length >= MAX_REFERENCES && !slots.find((s) => s.slotPosition === slotPosition)) return;
-
       // Create a temporary slot with object URL for immediate feedback
       const objectUrl = URL.createObjectURL(file);
+      blobUrlsRef.current.add(objectUrl);
+
       const tempSlot: ReferenceSlotData = {
-        id: `ref-${Date.now()}-${slotPosition}`,
+        id: `ref-${crypto.randomUUID()}`,
         imageUrl: objectUrl,
         slotPosition,
         role: "style" as ReferenceRole,
@@ -163,14 +178,24 @@ export function Img2imgPopover({
       setSlots((prev) => {
         const existing = prev.find((s) => s.slotPosition === slotPosition);
         if (existing) {
+          // Revoke old blob URL when replacing
+          if (existing.imageUrl.startsWith("blob:")) {
+            URL.revokeObjectURL(existing.imageUrl);
+            blobUrlsRef.current.delete(existing.imageUrl);
+          }
           return prev.map((s) =>
             s.slotPosition === slotPosition ? tempSlot : s
           );
         }
+        if (prev.length >= MAX_REFERENCES) {
+          URL.revokeObjectURL(objectUrl);
+          blobUrlsRef.current.delete(objectUrl);
+          return prev;
+        }
         return [...prev, tempSlot];
       });
     },
-    [slots]
+    []
   );
 
   const handleUploadUrl = useCallback(

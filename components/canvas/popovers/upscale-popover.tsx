@@ -33,7 +33,7 @@ export interface UpscalePopoverProps {
 
 export function UpscalePopover({
   onUpscale,
-  isUpscaleDisabled = false,
+  isUpscaleDisabled,
 }: UpscalePopoverProps) {
   const { state, dispatch } = useCanvasDetail();
   const isOpen = state.activeToolId === "upscale";
@@ -80,7 +80,7 @@ export function UpscalePopover({
                 aria-label="Upscale"
                 data-testid="upscale-icon-disabled"
                 className="pointer-events-none opacity-50"
-                tabIndex={-1}
+                tabIndex={0}
               >
                 <ZoomIn className="size-4" />
               </button>
