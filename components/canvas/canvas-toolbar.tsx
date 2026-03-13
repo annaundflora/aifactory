@@ -74,7 +74,7 @@ export function CanvasToolbar({ generation, onDelete }: CanvasToolbarProps) {
   // -------------------------------------------------------------------------
 
   const handleDownload = useCallback(async () => {
-    if (!generation.imageUrl || isDownloading) return;
+    if (isDisabled || !generation.imageUrl || isDownloading) return;
     setIsDownloading(true);
     try {
       const filename = generateDownloadFilename(
@@ -87,7 +87,7 @@ export function CanvasToolbar({ generation, onDelete }: CanvasToolbarProps) {
     } finally {
       setIsDownloading(false);
     }
-  }, [generation.imageUrl, generation.prompt, generation.createdAt, isDownloading]);
+  }, [isDisabled, generation.imageUrl, generation.prompt, generation.createdAt, isDownloading]);
 
   const handleToolClick = useCallback(
     (tool: ToolDef) => {
@@ -125,7 +125,7 @@ export function CanvasToolbar({ generation, onDelete }: CanvasToolbarProps) {
   return (
     <TooltipProvider delayDuration={300}>
       <nav
-        className="flex flex-col items-center py-2"
+        className="flex flex-col items-center py-2 w-12"
         aria-label="Canvas tools"
         data-testid="canvas-toolbar"
       >

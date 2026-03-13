@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { ImageOff, Loader2 } from "lucide-react";
 import { type Generation } from "@/lib/db/queries";
 
@@ -26,6 +26,11 @@ export function CanvasImage({ generation, isLoading = false }: CanvasImageProps)
   const [imgState, setImgState] = useState<"loading" | "loaded" | "error">(
     generation.imageUrl ? "loading" : "error"
   );
+
+  // Reset image state when the generation changes (e.g. sibling navigation)
+  useEffect(() => {
+    setImgState(generation.imageUrl ? "loading" : "error");
+  }, [generation.id]);
 
   const handleLoad = useCallback(() => {
     setImgState("loaded");
@@ -79,6 +84,7 @@ export function CanvasImage({ generation, isLoading = false }: CanvasImageProps)
           className={`max-h-full max-w-full object-contain transition-opacity ${
             imgState === "loaded" && !isLoading ? "opacity-100" : "opacity-0"
           }`}
+          style={{ viewTransitionName: `canvas-image-${generation.id}` }}
           onLoad={handleLoad}
           onError={handleError}
           data-testid="canvas-image"

@@ -16,7 +16,11 @@ export function startViewTransitionIfSupported(callback: () => void): void {
     "startViewTransition" in document &&
     typeof (document as any).startViewTransition === "function"
   ) {
-    (document as any).startViewTransition(callback);
+    try {
+      (document as any).startViewTransition(callback);
+    } catch {
+      callback();
+    }
   } else {
     callback();
   }
