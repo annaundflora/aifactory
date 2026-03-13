@@ -200,10 +200,8 @@ export function Img2imgPopover({
 
   const handleUploadUrl = useCallback(
     (url: string, slotPosition: number) => {
-      if (slots.length >= MAX_REFERENCES && !slots.find((s) => s.slotPosition === slotPosition)) return;
-
       const newSlot: ReferenceSlotData = {
-        id: `ref-${Date.now()}-${slotPosition}`,
+        id: `ref-${crypto.randomUUID()}`,
         imageUrl: url,
         slotPosition,
         role: "style" as ReferenceRole,
@@ -213,22 +211,25 @@ export function Img2imgPopover({
       setSlots((prev) => {
         const existing = prev.find((s) => s.slotPosition === slotPosition);
         if (existing) {
+          if (existing.imageUrl.startsWith("blob:")) {
+            URL.revokeObjectURL(existing.imageUrl);
+            blobUrlsRef.current.delete(existing.imageUrl);
+          }
           return prev.map((s) =>
             s.slotPosition === slotPosition ? newSlot : s
           );
         }
+        if (prev.length >= MAX_REFERENCES) return prev;
         return [...prev, newSlot];
       });
     },
-    [slots]
+    []
   );
 
   const handleGalleryDrop = useCallback(
     (data: GalleryDragPayload, slotPosition: number) => {
-      if (slots.length >= MAX_REFERENCES && !slots.find((s) => s.slotPosition === slotPosition)) return;
-
       const newSlot: ReferenceSlotData = {
-        id: `ref-${Date.now()}-${slotPosition}`,
+        id: `ref-${crypto.randomUUID()}`,
         imageUrl: data.imageUrl,
         slotPosition,
         role: "style" as ReferenceRole,
@@ -238,14 +239,19 @@ export function Img2imgPopover({
       setSlots((prev) => {
         const existing = prev.find((s) => s.slotPosition === slotPosition);
         if (existing) {
+          if (existing.imageUrl.startsWith("blob:")) {
+            URL.revokeObjectURL(existing.imageUrl);
+            blobUrlsRef.current.delete(existing.imageUrl);
+          }
           return prev.map((s) =>
             s.slotPosition === slotPosition ? newSlot : s
           );
         }
+        if (prev.length >= MAX_REFERENCES) return prev;
         return [...prev, newSlot];
       });
     },
-    [slots]
+    []
   );
 
   // -------------------------------------------------------------------------
