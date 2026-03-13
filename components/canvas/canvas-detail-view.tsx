@@ -126,15 +126,8 @@ export function CanvasDetailView({
           />
         </main>
 
-        {/* Right: Chat slot (collapsible, initial visible) */}
-        {chatOpen && (
-          <aside
-            className="flex w-80 shrink-0 flex-col border-l border-border/80 bg-card"
-            data-testid="chat-slot"
-          >
-            {chatSlot}
-          </aside>
-        )}
+        {/* Right: Chat slot (panel manages its own collapse/expand + width) */}
+        {chatOpen && chatSlot}
       </div>
     </div>
   );

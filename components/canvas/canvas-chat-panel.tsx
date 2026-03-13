@@ -5,7 +5,6 @@ import {
   useCallback,
   useRef,
   useEffect,
-  type ReactNode,
 } from "react";
 import { MessageSquare, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
