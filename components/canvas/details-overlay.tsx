@@ -77,8 +77,11 @@ export function DetailsOverlay({ generation }: DetailsOverlayProps) {
   return (
     <div
       data-testid="details-overlay"
+      role="region"
+      aria-expanded={isExpanded}
+      aria-label="Generation details"
       className="overflow-hidden transition-[max-height] duration-300 ease-in-out"
-      style={{ maxHeight: isExpanded ? "500px" : "0px" }}
+      style={{ maxHeight: isExpanded ? "9999px" : "0px" }}
     >
       <div className="border-b border-border/80 bg-card px-4 py-3">
         {/* Header row with title and hide button */}

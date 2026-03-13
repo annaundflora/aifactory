@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Sparkles } from "lucide-react";
 import { useCanvasDetail } from "@/lib/canvas-detail-context";
 import {
