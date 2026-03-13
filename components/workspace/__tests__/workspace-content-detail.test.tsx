@@ -52,6 +52,9 @@ vi.mock("lucide-react", () => ({
   ImageIcon: (props: Record<string, unknown>) => (
     <span data-testid="image-icon" {...props} />
   ),
+  Loader2: (props: Record<string, unknown>) => (
+    <span data-testid="loader2-icon" {...props} />
+  ),
 }));
 
 // Mock PromptArea (heavy component with many server-action deps)

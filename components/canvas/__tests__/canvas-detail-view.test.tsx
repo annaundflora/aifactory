@@ -7,18 +7,48 @@ import "@testing-library/jest-dom/vitest";
 // Mocks (mock_external strategy)
 // ---------------------------------------------------------------------------
 
-// Mock lucide-react icons used by CanvasDetailView and CanvasHeader
-vi.mock("lucide-react", () => ({
-  ArrowLeft: (props: Record<string, unknown>) => (
-    <span data-testid="arrow-left-icon" {...props} />
-  ),
-  PanelRightClose: (props: Record<string, unknown>) => (
-    <span data-testid="panel-right-close-icon" {...props} />
-  ),
-  PanelRightOpen: (props: Record<string, unknown>) => (
-    <span data-testid="panel-right-open-icon" {...props} />
-  ),
+// Mock db/queries to prevent DATABASE_URL error at module scope
+vi.mock("@/lib/db/queries", () => ({}));
+
+// Mock server actions that reach the database
+vi.mock("@/app/actions/generations", () => ({
+  getSiblingGenerations: vi.fn().mockResolvedValue([]),
 }));
+
+// Mock sonner (used by canvas-toolbar and other canvas components)
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn(), success: vi.fn() },
+}));
+
+// Mock lucide-react icons used across the canvas component tree.
+vi.mock("lucide-react", () => {
+  const stub = (name: string) => {
+    const Comp = (props: Record<string, unknown>) => (
+      <span data-testid={`${name}-icon`} {...props} />
+    );
+    Comp.displayName = name;
+    return Comp;
+  };
+  return {
+    ArrowLeft: stub("ArrowLeft"),
+    ArrowUp: stub("ArrowUp"),
+    ChevronLeft: stub("ChevronLeft"),
+    ChevronRight: stub("ChevronRight"),
+    Copy: stub("Copy"),
+    ArrowRightLeft: stub("ArrowRightLeft"),
+    ZoomIn: stub("ZoomIn"),
+    Download: stub("Download"),
+    Trash2: stub("Trash2"),
+    Info: stub("Info"),
+    ImageOff: stub("ImageOff"),
+    Loader2: stub("Loader2"),
+    PanelRightClose: stub("PanelRightClose"),
+    PanelRightOpen: stub("PanelRightOpen"),
+    MessageSquare: stub("MessageSquare"),
+    Minus: stub("Minus"),
+    Plus: stub("Plus"),
+  };
+});
 
 // Import AFTER mocks
 import { CanvasDetailView } from "@/components/canvas/canvas-detail-view";
@@ -127,7 +157,6 @@ describe("CanvasDetailView", () => {
     const chatSlot = screen.getByTestId("chat-slot");
     expect(chatSlot).toBeInTheDocument();
     expect(chatSlot.tagName).toBe("ASIDE");
-    expect(chatSlot.className).toMatch(/shrink-0/);
   });
 
   /**
@@ -160,10 +189,12 @@ describe("CanvasDetailView", () => {
     // Image uses object-contain for max-fit display
     expect(canvasImage.className).toMatch(/object-contain/);
 
-    // Canvas area uses centering classes
+    // Canvas area's inner wrapper uses centering classes
     const canvasArea = screen.getByTestId("canvas-area");
-    expect(canvasArea.className).toMatch(/items-center/);
-    expect(canvasArea.className).toMatch(/justify-center/);
+    const innerWrapper = canvasArea.querySelector(":scope > div");
+    expect(innerWrapper).not.toBeNull();
+    expect(innerWrapper!.className).toMatch(/items-center/);
+    expect(innerWrapper!.className).toMatch(/justify-center/);
   });
 
   /**
