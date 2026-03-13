@@ -142,6 +142,14 @@ export function CanvasChatPanel({ generation, projectId }: CanvasChatPanelProps)
   }, [collapsed, projectId]);
 
   // ---------------------------------------------------------------------------
+  // HIGH-2: Keep imageContextRef fresh whenever the generation prop changes
+  // (e.g. Prev/Next navigation), independently of currentGenerationId context
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    imageContextRef.current = buildImageContext(generation);
+  }, [generation.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---------------------------------------------------------------------------
   // AC-10: Update image_context when currentGenerationId changes
   // ---------------------------------------------------------------------------
   useEffect(() => {
@@ -272,6 +280,7 @@ export function CanvasChatPanel({ generation, projectId }: CanvasChatPanelProps)
       } catch (error) {
         console.error("[CanvasChatPanel] generateImages failed:", error);
         toast.error("Generierung fehlgeschlagen.");
+      } finally {
         dispatch({ type: "SET_GENERATING", isGenerating: false });
       }
     },
@@ -306,31 +315,37 @@ export function CanvasChatPanel({ generation, projectId }: CanvasChatPanelProps)
 
       // Placeholder message id for the in-progress bot response
       const botMsgId = `bot-${crypto.randomUUID()}`;
-
-      // Add an empty bot message that we'll fill incrementally
-      setMessages((prev) => [
-        ...prev,
-        { id: botMsgId, role: "bot", content: "" },
-      ]);
+      // Track whether the bot bubble has been inserted yet (MEDIUM-1: avoid empty bubble)
+      let botBubbleInserted = false;
 
       try {
         const stream = sendCanvasMessage(
           sessionIdRef.current,
           text,
-          imageContextRef.current
+          imageContextRef.current,
+          abortControllerRef.current.signal
         );
 
         for await (const event of stream) {
           switch (event.type) {
             case "text-delta": {
-              // AC-3: Append delta to the bot message
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === botMsgId
-                    ? { ...msg, content: msg.content + event.content }
-                    : msg
-                )
-              );
+              // AC-3: Append delta to the bot message.
+              // Insert the bubble on the first non-empty delta (MEDIUM-1).
+              if (!botBubbleInserted && event.content) {
+                botBubbleInserted = true;
+                setMessages((prev) => [
+                  ...prev,
+                  { id: botMsgId, role: "bot", content: event.content },
+                ]);
+              } else if (botBubbleInserted) {
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === botMsgId
+                      ? { ...msg, content: msg.content + event.content }
+                      : msg
+                  )
+                );
+              }
               break;
             }
 
@@ -348,18 +363,27 @@ export function CanvasChatPanel({ generation, projectId }: CanvasChatPanelProps)
             }
 
             case "error": {
-              // AC-8 / AC-9: Show error in the bot bubble and re-enable input
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === botMsgId
-                    ? {
-                        ...msg,
-                        content: event.message,
-                        isError: true,
-                      }
-                    : msg
-                )
-              );
+              // AC-8 / AC-9: Show error in the bot bubble and re-enable input.
+              // If the bubble was not inserted yet, add it now.
+              if (!botBubbleInserted) {
+                botBubbleInserted = true;
+                setMessages((prev) => [
+                  ...prev,
+                  { id: botMsgId, role: "bot", content: event.message, isError: true },
+                ]);
+              } else {
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === botMsgId
+                      ? {
+                          ...msg,
+                          content: event.message,
+                          isError: true,
+                        }
+                      : msg
+                  )
+                );
+              }
               setIsStreaming(false);
               break;
             }
@@ -368,18 +392,30 @@ export function CanvasChatPanel({ generation, projectId }: CanvasChatPanelProps)
       } catch (error) {
         console.error("[CanvasChatPanel] SSE stream error:", error);
         toast.error("Verbindungsfehler");
-        // Replace placeholder with error message
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === botMsgId
-              ? {
-                  ...msg,
-                  content: "Verbindung unterbrochen. Bitte erneut versuchen.",
-                  isError: true,
-                }
-              : msg
-          )
-        );
+        // Replace placeholder with error message (or insert bubble if not yet shown)
+        if (!botBubbleInserted) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: botMsgId,
+              role: "bot",
+              content: "Verbindung unterbrochen. Bitte erneut versuchen.",
+              isError: true,
+            },
+          ]);
+        } else {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === botMsgId
+                ? {
+                    ...msg,
+                    content: "Verbindung unterbrochen. Bitte erneut versuchen.",
+                    isError: true,
+                  }
+                : msg
+            )
+          );
+        }
         setIsStreaming(false);
       } finally {
         abortControllerRef.current = null;
@@ -399,7 +435,9 @@ export function CanvasChatPanel({ generation, projectId }: CanvasChatPanelProps)
         content: text,
       };
       setMessages((prev) => [...prev, userMsg]);
-      sendMessageToBackend(text);
+      sendMessageToBackend(text).catch((err) =>
+        console.error("[CanvasChatPanel] send failed:", err)
+      );
     },
     [sendMessageToBackend]
   );
@@ -415,7 +453,9 @@ export function CanvasChatPanel({ generation, projectId }: CanvasChatPanelProps)
         content: chipText,
       };
       setMessages((prev) => [...prev, userMsg]);
-      sendMessageToBackend(chipText);
+      sendMessageToBackend(chipText).catch((err) =>
+        console.error("[CanvasChatPanel] send failed:", err)
+      );
     },
     [sendMessageToBackend]
   );

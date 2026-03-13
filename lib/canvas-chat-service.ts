@@ -97,7 +97,8 @@ function parseSSEChunk(text: string): Array<{ event: string; data: string }> {
     }
   }
 
-  flush();
+  // Do NOT flush here — incomplete events (no trailing \n\n) stay in the
+  // caller's buffer and will be processed in the next chunk or at stream end.
   return events;
 }
 
@@ -203,7 +204,8 @@ export async function createSession(
 export async function* sendMessage(
   sessionId: string,
   content: string,
-  imageContext: CanvasImageContext
+  imageContext: CanvasImageContext,
+  signal?: AbortSignal
 ): AsyncGenerator<CanvasSSEEvent> {
   const response = await fetch(
     `${CANVAS_SESSIONS_URL}/${sessionId}/messages`,
@@ -214,6 +216,7 @@ export async function* sendMessage(
         content,
         image_context: imageContext,
       }),
+      signal,
     }
   );
 
@@ -246,16 +249,19 @@ export async function* sendMessage(
 
       // Race the read() against a timeout slice
       const timeRemaining = SSE_TIMEOUT_MS - (Date.now() - lastEventAt);
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
       const timeoutPromise = new Promise<{ done: true; value: undefined }>(
-        (resolve) =>
-          setTimeout(
+        (resolve) => {
+          timeoutId = setTimeout(
             () => resolve({ done: true as const, value: undefined }),
             timeRemaining
-          )
+          );
+        }
       );
       const readPromise = reader.read();
 
       const result = await Promise.race([readPromise, timeoutPromise]);
+      clearTimeout(timeoutId);
 
       if (result.done) {
         // Either stream ended or timeout fired
