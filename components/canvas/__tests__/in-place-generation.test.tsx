@@ -1,0 +1,1035 @@
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from "vitest";
+import { render, screen, waitFor, act } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import "@testing-library/jest-dom/vitest";
+import React from "react";
+
+// ---------------------------------------------------------------------------
+// Polyfills for jsdom (Radix Popover / Select / DropdownMenu use these)
+// ---------------------------------------------------------------------------
+
+beforeAll(() => {
+  if (typeof globalThis.ResizeObserver === "undefined") {
+    globalThis.ResizeObserver = class ResizeObserver {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof globalThis.ResizeObserver;
+  }
+
+  if (typeof globalThis.PointerEvent === "undefined") {
+    globalThis.PointerEvent = class PointerEvent extends MouseEvent {
+      readonly pointerId: number;
+      constructor(type: string, params: PointerEventInit = {}) {
+        super(type, params);
+        this.pointerId = params.pointerId ?? 0;
+      }
+    } as unknown as typeof globalThis.PointerEvent;
+  }
+
+  if (typeof HTMLElement.prototype.scrollIntoView === "undefined") {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+  }
+  if (typeof HTMLElement.prototype.hasPointerCapture === "undefined") {
+    HTMLElement.prototype.hasPointerCapture = vi.fn().mockReturnValue(false);
+  }
+  if (typeof HTMLElement.prototype.setPointerCapture === "undefined") {
+    HTMLElement.prototype.setPointerCapture = vi.fn();
+  }
+  if (typeof HTMLElement.prototype.releasePointerCapture === "undefined") {
+    HTMLElement.prototype.releasePointerCapture = vi.fn();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Hoisted mock functions (available before vi.mock factories execute)
+// ---------------------------------------------------------------------------
+
+const {
+  mockGenerateImages,
+  mockUpscaleImage,
+  mockFetchGenerations,
+  mockDeleteGeneration,
+  mockGetCollectionModels,
+  mockCheckImg2ImgSupport,
+  mockToastFn,
+  mockToastError,
+  mockToastSuccess,
+} = vi.hoisted(() => ({
+  mockGenerateImages: vi.fn(),
+  mockUpscaleImage: vi.fn(),
+  mockFetchGenerations: vi.fn(),
+  mockDeleteGeneration: vi.fn(),
+  mockGetCollectionModels: vi.fn(),
+  mockCheckImg2ImgSupport: vi.fn(),
+  mockToastFn: vi.fn(),
+  mockToastError: vi.fn(),
+  mockToastSuccess: vi.fn(),
+}));
+
+// ---------------------------------------------------------------------------
+// Mocks (mock_external strategy)
+// ---------------------------------------------------------------------------
+
+// Mock db/queries to prevent DATABASE_URL error at module scope
+vi.mock("@/lib/db/queries", () => ({} as Record<string, unknown>));
+
+// Mock server actions (external deps)
+vi.mock("@/app/actions/generations", () => ({
+  generateImages: (...args: unknown[]) => mockGenerateImages(...args),
+  upscaleImage: (...args: unknown[]) => mockUpscaleImage(...args),
+  fetchGenerations: (...args: unknown[]) => mockFetchGenerations(...args),
+  deleteGeneration: (...args: unknown[]) => mockDeleteGeneration(...args),
+  getSiblingGenerations: vi.fn().mockResolvedValue([]),
+}));
+
+// Mock model actions
+vi.mock("@/app/actions/models", () => ({
+  getCollectionModels: (...args: unknown[]) => mockGetCollectionModels(...args),
+  checkImg2ImgSupport: (...args: unknown[]) => mockCheckImg2ImgSupport(...args),
+}));
+
+// Mock sonner toast
+vi.mock("sonner", () => {
+  const toast = Object.assign(mockToastFn, {
+    error: mockToastError,
+    success: mockToastSuccess,
+  });
+  return { toast };
+});
+
+// Mock lucide-react icons
+vi.mock("lucide-react", () => {
+  const stub = (name: string) => {
+    const Comp = (props: Record<string, unknown>) => (
+      <span data-testid={`${name}-icon`} {...props} />
+    );
+    Comp.displayName = name;
+    return Comp;
+  };
+  return {
+    ArrowLeft: stub("ArrowLeft"),
+    ArrowUp: stub("ArrowUp"),
+    ChevronLeft: stub("ChevronLeft"),
+    ChevronRight: stub("ChevronRight"),
+    ChevronDown: stub("ChevronDown"),
+    Copy: stub("Copy"),
+    ArrowRightLeft: stub("ArrowRightLeft"),
+    ZoomIn: stub("ZoomIn"),
+    Download: stub("Download"),
+    Trash2: stub("Trash2"),
+    Info: stub("Info"),
+    ImageOff: stub("ImageOff"),
+    Loader2: stub("Loader2"),
+    PanelRightClose: stub("PanelRightClose"),
+    PanelRightOpen: stub("PanelRightOpen"),
+    MessageSquare: stub("MessageSquare"),
+    Minus: stub("Minus"),
+    Plus: stub("Plus"),
+    Sparkles: stub("Sparkles"),
+    Library: stub("Library"),
+    CheckIcon: stub("CheckIcon"),
+    ChevronDownIcon: stub("ChevronDownIcon"),
+    ChevronUpIcon: stub("ChevronUpIcon"),
+  };
+});
+
+// Mock ModelBrowserDrawer -- complex external component
+// For AC-11 we need the mock to pass a specific model on confirm.
+// The mock stores props so tests can call onConfirm programmatically.
+let capturedDrawerOnConfirm: ((models: Array<{ owner: string; name: string }>) => void) | null = null;
+
+vi.mock("@/components/models/model-browser-drawer", () => ({
+  ModelBrowserDrawer: (props: Record<string, unknown>) => {
+    const open = props.open as boolean;
+    const onConfirm = props.onConfirm as (models: Array<{ owner: string; name: string }>) => void;
+    const onClose = props.onClose as () => void;
+    // Capture onConfirm for programmatic invocation in tests
+    capturedDrawerOnConfirm = onConfirm;
+    if (!open) return null;
+    return (
+      <div data-testid="model-browser-drawer">
+        <button data-testid="model-browser-close" onClick={onClose}>
+          Close
+        </button>
+      </div>
+    );
+  },
+}));
+
+// Mock download utils
+vi.mock("@/lib/utils", () => ({
+  cn: (...args: unknown[]) => args.filter(Boolean).join(" "),
+  downloadImage: vi.fn(),
+  generateDownloadFilename: vi.fn().mockReturnValue("image.png"),
+}));
+
+// Mock ReferenceBar (complex sub-component used by img2img popover)
+vi.mock("@/components/workspace/reference-bar", () => ({
+  ReferenceBar: (props: Record<string, unknown>) => (
+    <div data-testid="reference-bar" {...props} />
+  ),
+}));
+
+// ---------------------------------------------------------------------------
+// Imports (AFTER mocks)
+// ---------------------------------------------------------------------------
+
+import { CanvasDetailView } from "@/components/canvas/canvas-detail-view";
+import { CanvasModelSelector } from "@/components/canvas/canvas-model-selector";
+import {
+  CanvasDetailProvider,
+  useCanvasDetail,
+} from "@/lib/canvas-detail-context";
+import type { Generation } from "@/lib/db/queries";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function makeGeneration(overrides: Partial<Generation> = {}): Generation {
+  return {
+    id: overrides.id ?? "gen-default-1",
+    projectId: overrides.projectId ?? "project-1",
+    prompt: overrides.prompt ?? "A dramatic sunset",
+    negativePrompt: overrides.negativePrompt ?? null,
+    modelId: overrides.modelId ?? "black-forest-labs/flux-2-max",
+    modelParams: overrides.modelParams ?? {},
+    status: overrides.status ?? "completed",
+    imageUrl: overrides.imageUrl ?? "https://example.com/image.png",
+    replicatePredictionId: overrides.replicatePredictionId ?? null,
+    errorMessage: overrides.errorMessage ?? null,
+    width: overrides.width ?? 512,
+    height: overrides.height ?? 512,
+    seed: overrides.seed ?? null,
+    createdAt: overrides.createdAt ?? new Date("2026-03-13T12:00:00Z"),
+    promptMotiv: overrides.promptMotiv ?? "",
+    promptStyle: overrides.promptStyle ?? "",
+    isFavorite: overrides.isFavorite ?? false,
+    generationMode: overrides.generationMode ?? "txt2img",
+    sourceImageUrl: overrides.sourceImageUrl ?? null,
+    sourceGenerationId: overrides.sourceGenerationId ?? null,
+    batchId: overrides.batchId ?? null,
+  };
+}
+
+/**
+ * Helper component that dispatches a context action on mount.
+ */
+function DispatchOnMount({
+  action,
+}: {
+  action: Parameters<ReturnType<typeof useCanvasDetail>["dispatch"]>[0];
+}) {
+  const { dispatch } = useCanvasDetail();
+  React.useEffect(() => {
+    dispatch(action);
+  }, [dispatch]);
+  return null;
+}
+
+/**
+ * Helper to read current context state for assertions.
+ */
+function StateReader({
+  onState,
+}: {
+  onState: (state: ReturnType<typeof useCanvasDetail>["state"]) => void;
+}) {
+  const { state } = useCanvasDetail();
+  React.useEffect(() => {
+    onState(state);
+  });
+  return null;
+}
+
+/**
+ * Renders CanvasDetailView wrapped in CanvasDetailProvider.
+ */
+function renderDetailView(
+  options: {
+    generation?: Generation;
+    allGenerations?: Generation[];
+    onBack?: () => void;
+    initialGenerationId?: string;
+    extraChildren?: React.ReactNode;
+  } = {}
+) {
+  const generation = options.generation ?? makeGeneration();
+  const allGenerations = options.allGenerations ?? [generation];
+  const onBack = options.onBack ?? vi.fn();
+  const initialGenerationId = options.initialGenerationId ?? generation.id;
+
+  return render(
+    <CanvasDetailProvider initialGenerationId={initialGenerationId}>
+      <CanvasDetailView
+        generation={generation}
+        allGenerations={allGenerations}
+        onBack={onBack}
+      />
+      {options.extraChildren}
+    </CanvasDetailProvider>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tests: In-Place Generation Flow (AC-1 through AC-8)
+// ---------------------------------------------------------------------------
+
+describe("In-Place Generation Flow", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    // Default: generateImages returns a pending generation
+    mockGenerateImages.mockResolvedValue([
+      makeGeneration({ id: "gen-new-1", status: "pending" }),
+    ]);
+    // Default: upscaleImage returns a pending generation
+    mockUpscaleImage.mockResolvedValue(
+      makeGeneration({ id: "gen-upscale-1", status: "pending" })
+    );
+    // Default: fetchGenerations returns empty
+    mockFetchGenerations.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-1: Variation-Popover triggert generateImages mit korrekten Params
+  // -------------------------------------------------------------------------
+
+  /**
+   * AC-1: GIVEN der User klickt "Generate" im Variation-Popover mit
+   *       { prompt: "A dramatic sunset", strength: "creative", count: 2 }
+   *       WHEN der Callback ausgefuehrt wird
+   *       THEN wird generateImages() Server Action aufgerufen mit dem aktuellen
+   *       Bild als img2img-Input, dem Prompt, dem Model aus dem Header-Selector
+   *       und count 2, und das Popover schliesst sich
+   */
+  it("AC-1: should call generateImages with current image as img2img input, prompt, header model, and count when variation popover generates", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const generation = makeGeneration({
+      id: "gen-var-1",
+      prompt: "A dramatic sunset",
+      modelId: "black-forest-labs/flux-2-max",
+      imageUrl: "https://example.com/current.png",
+    });
+
+    renderDetailView({
+      generation,
+      extraChildren: (
+        <DispatchOnMount
+          action={{ type: "SET_ACTIVE_TOOL", toolId: "variation" }}
+        />
+      ),
+    });
+
+    // Wait for the variation popover to appear
+    const popover = await screen.findByTestId("variation-popover");
+    expect(popover).toBeInTheDocument();
+
+    // Change the prompt
+    const textarea = screen.getByTestId("variation-prompt");
+    await user.clear(textarea);
+    await user.type(textarea, "A dramatic sunset");
+
+    // Select count 2
+    const btn2 = screen.getByTestId("variation-count-2");
+    await user.click(btn2);
+
+    // Select "Creative" strength
+    const strengthTrigger = screen.getByTestId("variation-strength-trigger");
+    await user.click(strengthTrigger);
+    const creativeOption = await screen.findByTestId(
+      "variation-strength-creative"
+    );
+    await user.click(creativeOption);
+
+    // Click generate
+    const generateBtn = screen.getByTestId("variation-generate-button");
+    await user.click(generateBtn);
+
+    // Assert generateImages was called with correct params
+    await waitFor(() => {
+      expect(mockGenerateImages).toHaveBeenCalledTimes(1);
+    });
+
+    const callArgs = mockGenerateImages.mock.calls[0][0];
+    expect(callArgs.projectId).toBe("project-1");
+    expect(callArgs.promptMotiv).toBe("A dramatic sunset");
+    expect(callArgs.modelIds).toEqual(["black-forest-labs/flux-2-max"]);
+    expect(callArgs.count).toBe(2);
+    expect(callArgs.generationMode).toBe("img2img");
+    expect(callArgs.sourceImageUrl).toBe("https://example.com/current.png");
+    // strength "creative" maps to prompt_strength 0.85
+    expect(callArgs.strength).toBe(0.85);
+
+    // Popover should close
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId("variation-popover")
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-2: img2img-Popover triggert generateImages mit References
+  // -------------------------------------------------------------------------
+
+  /**
+   * AC-2: GIVEN der User klickt "Generate" im img2img-Popover mit References,
+   *       Prompt und Variants
+   *       WHEN der Callback ausgefuehrt wird
+   *       THEN wird generateImages() Server Action aufgerufen mit den Reference-
+   *       Inputs, dem Prompt, dem Model aus dem Header-Selector und der gewaehlten
+   *       Variant-Anzahl
+   */
+  it("AC-2: should call generateImages with references, prompt, header model, and variants when img2img popover generates", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const generation = makeGeneration({
+      id: "gen-img2img-1",
+      modelId: "black-forest-labs/flux-2-max",
+    });
+
+    renderDetailView({
+      generation,
+      extraChildren: (
+        <DispatchOnMount
+          action={{ type: "SET_ACTIVE_TOOL", toolId: "img2img" }}
+        />
+      ),
+    });
+
+    // Wait for img2img popover
+    const popover = await screen.findByTestId("img2img-popover");
+    expect(popover).toBeInTheDocument();
+
+    // Fill in motiv text
+    const motivTextarea = screen.getByTestId("motiv-textarea");
+    await user.type(motivTextarea, "A cyberpunk cityscape");
+
+    // Click generate (with default variants = 1)
+    const generateBtn = screen.getByTestId("generate-button");
+    await user.click(generateBtn);
+
+    // Assert generateImages was called
+    await waitFor(() => {
+      expect(mockGenerateImages).toHaveBeenCalledTimes(1);
+    });
+
+    const callArgs = mockGenerateImages.mock.calls[0][0];
+    expect(callArgs.projectId).toBe("project-1");
+    expect(callArgs.promptMotiv).toBe("A cyberpunk cityscape");
+    expect(callArgs.modelIds).toEqual(["black-forest-labs/flux-2-max"]);
+    expect(callArgs.count).toBe(1);
+    expect(callArgs.generationMode).toBe("img2img");
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-3: Upscale-Popover triggert upscaleImage mit hardcoded Model
+  // -------------------------------------------------------------------------
+
+  /**
+   * AC-3: GIVEN der User klickt "4x Upscale" im Upscale-Popover
+   *       WHEN der Callback ausgefuehrt wird
+   *       THEN wird upscaleImage() Server Action aufgerufen mit der aktuellen
+   *       Bild-URL und scale: 4 (hardcoded Model nightmareai/real-esrgan,
+   *       ignoriert Header-Selector)
+   */
+  it("AC-3: should call upscaleImage with current image URL, scale 4, and hardcoded real-esrgan model", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const generation = makeGeneration({
+      id: "gen-upscale-test",
+      imageUrl: "https://example.com/to-upscale.png",
+      modelId: "black-forest-labs/flux-2-max",
+    });
+
+    renderDetailView({
+      generation,
+      extraChildren: (
+        <DispatchOnMount
+          action={{ type: "SET_ACTIVE_TOOL", toolId: "upscale" }}
+        />
+      ),
+    });
+
+    // Wait for upscale popover
+    const popover = await screen.findByTestId("upscale-popover");
+    expect(popover).toBeInTheDocument();
+
+    // Click 4x upscale button
+    const upscale4xBtn = screen.getByTestId("upscale-4x-button");
+    await user.click(upscale4xBtn);
+
+    // Assert upscaleImage was called with correct params
+    await waitFor(() => {
+      expect(mockUpscaleImage).toHaveBeenCalledTimes(1);
+    });
+
+    const callArgs = mockUpscaleImage.mock.calls[0][0];
+    expect(callArgs.sourceImageUrl).toBe(
+      "https://example.com/to-upscale.png"
+    );
+    expect(callArgs.scale).toBe(4);
+    expect(callArgs.projectId).toBe("project-1");
+    expect(callArgs.sourceGenerationId).toBe("gen-upscale-test");
+    // The header model is NOT passed to upscaleImage -- upscale uses hardcoded
+    // nightmareai/real-esrgan on the server side. The client call does not
+    // include modelIds at all, confirming header selector is ignored.
+    expect(callArgs.modelIds).toBeUndefined();
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-4: Loading-Overlay bei isGenerating
+  // -------------------------------------------------------------------------
+
+  /**
+   * AC-4: GIVEN eine Generation wurde via Popover getriggert
+   *       WHEN der isGenerating-State auf true gesetzt wird
+   *       THEN zeigt das Canvas-Image einen semi-transparenten Overlay mit dem
+   *       Text "Generating" und einem Spinner
+   */
+  it('AC-4: should show semi-transparent overlay with "Generating" text and spinner when isGenerating is true', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const generation = makeGeneration({
+      id: "gen-loading-test",
+      imageUrl: "https://example.com/loading.png",
+    });
+
+    mockGenerateImages.mockResolvedValue([
+      makeGeneration({ id: "gen-pending-1", status: "pending" }),
+    ]);
+
+    renderDetailView({
+      generation,
+      extraChildren: (
+        <DispatchOnMount
+          action={{ type: "SET_ACTIVE_TOOL", toolId: "variation" }}
+        />
+      ),
+    });
+
+    // Initially no overlay
+    expect(
+      screen.queryByTestId("canvas-image-generating-overlay")
+    ).not.toBeInTheDocument();
+
+    // Trigger generation via variation popover
+    await screen.findByTestId("variation-popover");
+    const generateBtn = screen.getByTestId("variation-generate-button");
+    await user.click(generateBtn);
+
+    // After generation is triggered, the overlay should appear
+    await waitFor(() => {
+      const overlay = screen.getByTestId(
+        "canvas-image-generating-overlay"
+      );
+      expect(overlay).toBeInTheDocument();
+      // Semi-transparent: bg-background/60
+      expect(overlay.className).toMatch(/bg-background\/60/);
+      // Contains "Generating" text
+      expect(overlay).toHaveTextContent("Generating");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-5: Alle Inputs disabled waehrend Generation
+  // -------------------------------------------------------------------------
+
+  /**
+   * AC-5: GIVEN isGenerating ist true
+   *       WHEN die UI gerendert wird
+   *       THEN sind alle Toolbar-Icons disabled (nicht klickbar), der Chat-Input
+   *       ist disabled, und Undo/Redo-Buttons sind disabled
+   */
+  it("AC-5: should disable toolbar icons, chat input, and undo/redo buttons when isGenerating is true", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const generation = makeGeneration({
+      id: "gen-disabled-test",
+      imageUrl: "https://example.com/disabled.png",
+    });
+
+    mockGenerateImages.mockResolvedValue([
+      makeGeneration({ id: "gen-pending-2", status: "pending" }),
+    ]);
+
+    renderDetailView({
+      generation,
+      extraChildren: (
+        <DispatchOnMount
+          action={{ type: "SET_ACTIVE_TOOL", toolId: "variation" }}
+        />
+      ),
+    });
+
+    // Trigger generation
+    await screen.findByTestId("variation-popover");
+    const generateBtn = screen.getByTestId("variation-generate-button");
+    await user.click(generateBtn);
+
+    // Wait for isGenerating to be true
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("canvas-image-generating-overlay")
+      ).toBeInTheDocument();
+    });
+
+    // Toolbar buttons should be disabled (aria-disabled="true")
+    const toolbarButtonIds = [
+      "toolbar-variation",
+      "toolbar-img2img",
+      "toolbar-upscale",
+      "toolbar-download",
+      "toolbar-delete",
+      "toolbar-details",
+    ];
+    for (const testId of toolbarButtonIds) {
+      const btn = screen.getByTestId(testId);
+      expect(btn).toHaveAttribute("aria-disabled", "true");
+    }
+
+    // Chat toggle button should be disabled
+    const chatToggle = screen.getByTestId("chat-toggle-button");
+    expect(chatToggle).toBeDisabled();
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-6: Polling-Completion ersetzt Bild
+  // -------------------------------------------------------------------------
+
+  /**
+   * AC-6: GIVEN eine Generation laeuft (pending in DB)
+   *       WHEN das Polling eine Generation mit status: "completed" erkennt
+   *       THEN wird das neue Bild als currentGenerationId gesetzt, isGenerating
+   *       wird auf false gesetzt, und der Loading-Overlay verschwindet
+   */
+  it("AC-6: should set new generation as currentGenerationId and clear isGenerating when polling detects completed status", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const generation = makeGeneration({
+      id: "gen-poll-test",
+      imageUrl: "https://example.com/poll.png",
+    });
+    const completedGeneration = makeGeneration({
+      id: "gen-new-completed",
+      status: "completed",
+      imageUrl: "https://example.com/new-image.png",
+    });
+
+    mockGenerateImages.mockResolvedValue([
+      makeGeneration({ id: "gen-new-completed", status: "pending" }),
+    ]);
+
+    // First poll returns pending, second returns completed
+    mockFetchGenerations
+      .mockResolvedValueOnce([
+        makeGeneration({ id: "gen-new-completed", status: "pending" }),
+      ])
+      .mockResolvedValue([completedGeneration]);
+
+    let latestState: ReturnType<typeof useCanvasDetail>["state"] | null =
+      null;
+
+    renderDetailView({
+      generation,
+      allGenerations: [generation, completedGeneration],
+      extraChildren: (
+        <>
+          <DispatchOnMount
+            action={{ type: "SET_ACTIVE_TOOL", toolId: "variation" }}
+          />
+          <StateReader
+            onState={(s) => {
+              latestState = s;
+            }}
+          />
+        </>
+      ),
+    });
+
+    // Trigger generation
+    await screen.findByTestId("variation-popover");
+    const generateBtn = screen.getByTestId("variation-generate-button");
+    await user.click(generateBtn);
+
+    // Wait for isGenerating
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("canvas-image-generating-overlay")
+      ).toBeInTheDocument();
+    });
+
+    // Advance timers to trigger polling (3s interval + buffer)
+    await act(async () => {
+      vi.advanceTimersByTime(3100);
+    });
+
+    // After polling detects completed, overlay should disappear
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId("canvas-image-generating-overlay")
+      ).not.toBeInTheDocument();
+    });
+
+    // currentGenerationId should now be the new completed generation
+    expect(latestState).not.toBeNull();
+    expect(latestState!.currentGenerationId).toBe("gen-new-completed");
+    expect(latestState!.isGenerating).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-7: Altes Bild auf Undo-Stack bei Replace
+  // -------------------------------------------------------------------------
+
+  /**
+   * AC-7: GIVEN eine Generation wurde completed und das neue Bild ersetzt das
+   *       aktuelle
+   *       WHEN der Replace-Flow ausgefuehrt wird
+   *       THEN wird die vorherige currentGenerationId auf den Undo-Stack gepusht
+   *       und der Redo-Stack geleert
+   */
+  it("AC-7: should push previous currentGenerationId to undo stack and clear redo stack on image replace", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const generation = makeGeneration({
+      id: "gen-undo-test",
+      imageUrl: "https://example.com/original.png",
+    });
+    const completedGeneration = makeGeneration({
+      id: "gen-replaced",
+      status: "completed",
+      imageUrl: "https://example.com/replaced.png",
+    });
+
+    mockGenerateImages.mockResolvedValue([
+      makeGeneration({ id: "gen-replaced", status: "pending" }),
+    ]);
+
+    // Poll returns completed immediately on first poll
+    mockFetchGenerations.mockResolvedValue([completedGeneration]);
+
+    let latestState: ReturnType<typeof useCanvasDetail>["state"] | null =
+      null;
+
+    renderDetailView({
+      generation,
+      allGenerations: [generation, completedGeneration],
+      extraChildren: (
+        <>
+          <DispatchOnMount
+            action={{ type: "SET_ACTIVE_TOOL", toolId: "variation" }}
+          />
+          <StateReader
+            onState={(s) => {
+              latestState = s;
+            }}
+          />
+        </>
+      ),
+    });
+
+    // Trigger generation
+    await screen.findByTestId("variation-popover");
+    const generateBtn = screen.getByTestId("variation-generate-button");
+    await user.click(generateBtn);
+
+    // Wait for polling to complete and replace image
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId("canvas-image-generating-overlay")
+      ).not.toBeInTheDocument();
+    });
+
+    // The previous generation should be pushed to undo stack
+    expect(latestState).not.toBeNull();
+    expect(latestState!.undoStack).toContain("gen-undo-test");
+    // Redo stack should be empty after replace
+    expect(latestState!.redoStack).toEqual([]);
+    // Current should be the new one
+    expect(latestState!.currentGenerationId).toBe("gen-replaced");
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-8: Fehler-Handling bei failed Generation
+  // -------------------------------------------------------------------------
+
+  /**
+   * AC-8: GIVEN eine Generation laeuft und das Polling status: "failed" erkennt
+   *       WHEN der Fehler verarbeitet wird
+   *       THEN wird isGenerating auf false gesetzt, ein Toast mit Fehlermeldung
+   *       angezeigt, und das aktuelle Bild bleibt unveraendert
+   */
+  it("AC-8: should clear isGenerating, show error toast, and keep current image when polling detects failed status", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const generation = makeGeneration({
+      id: "gen-fail-test",
+      imageUrl: "https://example.com/keep-this.png",
+    });
+
+    mockGenerateImages.mockResolvedValue([
+      makeGeneration({ id: "gen-will-fail", status: "pending" }),
+    ]);
+
+    // Poll returns failed generation
+    mockFetchGenerations.mockResolvedValue([
+      makeGeneration({
+        id: "gen-will-fail",
+        status: "failed",
+        errorMessage: "GPU out of memory",
+      }),
+    ]);
+
+    let latestState: ReturnType<typeof useCanvasDetail>["state"] | null =
+      null;
+
+    renderDetailView({
+      generation,
+      extraChildren: (
+        <>
+          <DispatchOnMount
+            action={{ type: "SET_ACTIVE_TOOL", toolId: "variation" }}
+          />
+          <StateReader
+            onState={(s) => {
+              latestState = s;
+            }}
+          />
+        </>
+      ),
+    });
+
+    // Trigger generation
+    await screen.findByTestId("variation-popover");
+    const generateBtn = screen.getByTestId("variation-generate-button");
+    await user.click(generateBtn);
+
+    // Wait for polling to detect failure and clear isGenerating
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId("canvas-image-generating-overlay")
+      ).not.toBeInTheDocument();
+    });
+
+    // isGenerating should be false
+    expect(latestState!.isGenerating).toBe(false);
+
+    // Toast.error should have been called with the error message
+    expect(mockToastError).toHaveBeenCalledWith("GPU out of memory");
+
+    // Current image should remain unchanged
+    expect(latestState!.currentGenerationId).toBe("gen-fail-test");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: CanvasModelSelector (AC-9 through AC-11)
+// ---------------------------------------------------------------------------
+
+describe("CanvasModelSelector", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockGetCollectionModels.mockResolvedValue([]);
+    mockCheckImg2ImgSupport.mockResolvedValue(true);
+    capturedDrawerOnConfirm = null;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-9: Model-Selector initialisiert aus Bild-Model
+  // -------------------------------------------------------------------------
+
+  /**
+   * AC-9: GIVEN der User oeffnet die Detail-View fuer ein Bild mit
+   *       modelId: "flux-2-max"
+   *       WHEN der Model-Selector im Header gerendert wird
+   *       THEN zeigt er flux-2-max als vorausgewaehltes Model (initialisiert
+   *       aus dem Bild-Model)
+   */
+  it("AC-9: should initialize with the current image model as selected model", () => {
+    render(
+      <CanvasDetailProvider initialGenerationId="gen-model-init">
+        <CanvasModelSelector initialModelId="black-forest-labs/flux-2-max" />
+      </CanvasDetailProvider>
+    );
+
+    // The model selector button should display the model name portion
+    const selector = screen.getByTestId("canvas-model-selector");
+    expect(selector).toBeInTheDocument();
+    // It should show the formatted name (just the model portion after "/")
+    expect(selector).toHaveTextContent("flux-2-max");
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-10: Geaendertes Model wird bei Generation verwendet
+  // -------------------------------------------------------------------------
+
+  /**
+   * AC-10: GIVEN der User aendert das Model im Header-Selector auf ein anderes
+   *        Model
+   *        WHEN der User danach "Generate" im Variation-Popover klickt
+   *        THEN wird das neu gewaehlte Model an generateImages() uebergeben
+   *        (nicht das Original-Model des Bildes)
+   */
+  it("AC-10: should pass the user-selected model to generateImages instead of the original image model", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    mockGenerateImages.mockResolvedValue([
+      makeGeneration({ id: "gen-new-model", status: "pending" }),
+    ]);
+    mockFetchGenerations.mockResolvedValue([]);
+
+    const generation = makeGeneration({
+      id: "gen-model-change",
+      modelId: "black-forest-labs/flux-2-max",
+      imageUrl: "https://example.com/img.png",
+    });
+
+    // Dispatch SET_SELECTED_MODEL to a different model, simulating user
+    // having changed the model in the header selector before generating.
+    renderDetailView({
+      generation,
+      extraChildren: (
+        <DispatchOnMount
+          action={{
+            type: "SET_SELECTED_MODEL",
+            modelId: "stability-ai/sdxl",
+          }}
+        />
+      ),
+    });
+
+    // Open variation popover via toolbar click
+    const variationBtn = screen.getByTestId("toolbar-variation");
+    await user.click(variationBtn);
+
+    // Wait for popover
+    const popover = await screen.findByTestId("variation-popover");
+    expect(popover).toBeInTheDocument();
+
+    // Click generate
+    const generateBtn = screen.getByTestId("variation-generate-button");
+    await user.click(generateBtn);
+
+    // Assert that the user-selected model was used, not the original
+    await waitFor(() => {
+      expect(mockGenerateImages).toHaveBeenCalledTimes(1);
+    });
+
+    const callArgs = mockGenerateImages.mock.calls[0][0];
+    expect(callArgs.modelIds).toEqual(["stability-ai/sdxl"]);
+    // NOT the original model
+    expect(callArgs.modelIds).not.toEqual([
+      "black-forest-labs/flux-2-max",
+    ]);
+  });
+
+  // -------------------------------------------------------------------------
+  // AC-11: Auto-Switch bei nicht-img2img-faehigem Model
+  // -------------------------------------------------------------------------
+
+  /**
+   * AC-11: GIVEN der User waehlt ein Model das img2img nicht unterstuetzt
+   *        WHEN der Selector das Model akzeptiert
+   *        THEN wird automatisch zum ersten img2img-faehigen Model gewechselt
+   *        und ein Toast-Hinweis angezeigt
+   */
+  it("AC-11: should auto-switch to first img2img-capable model and show toast when incompatible model is selected", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    const compatibleModels = [
+      {
+        url: "https://replicate.com/no-img2img/model-bad",
+        owner: "no-img2img",
+        name: "model-bad",
+        description: "No img2img",
+        cover_image_url: null,
+        run_count: 100,
+        created_at: "2024-01-01",
+      },
+      {
+        url: "https://replicate.com/good-vendor/img2img-model",
+        owner: "good-vendor",
+        name: "img2img-model",
+        description: "Supports img2img",
+        cover_image_url: null,
+        run_count: 200,
+        created_at: "2024-01-02",
+      },
+    ];
+
+    mockGetCollectionModels.mockResolvedValue(compatibleModels);
+
+    // checkImg2ImgSupport call sequence:
+    // 1. Initial check for selected model (no-img2img/model-bad) -> false
+    // 2. Iteration: no-img2img/model-bad (cache miss due to React state) -> false
+    // 3. Iteration: good-vendor/img2img-model -> true
+    mockCheckImg2ImgSupport
+      .mockResolvedValueOnce(false)  // initial check
+      .mockResolvedValueOnce(false)  // iteration: bad model again
+      .mockResolvedValueOnce(true);  // iteration: good model
+
+    let latestState: ReturnType<typeof useCanvasDetail>["state"] | null =
+      null;
+
+    render(
+      <CanvasDetailProvider initialGenerationId="gen-autoswitch">
+        <CanvasModelSelector initialModelId="black-forest-labs/flux-2-max" />
+        <StateReader
+          onState={(s) => {
+            latestState = s;
+          }}
+        />
+      </CanvasDetailProvider>
+    );
+
+    // Open the dropdown to access "Browse Models"
+    const selector = screen.getByTestId("canvas-model-selector");
+    await user.click(selector);
+
+    // Click "Browse Models" to open the drawer
+    const browseBtn = await screen.findByTestId("canvas-model-browse");
+    await user.click(browseBtn);
+
+    // The ModelBrowserDrawer should now be open
+    await screen.findByTestId("model-browser-drawer");
+
+    // Wait for collection models to load (fetchModels is called on drawer open)
+    await waitFor(() => {
+      expect(mockGetCollectionModels).toHaveBeenCalledTimes(1);
+    });
+
+    // Allow the state update from getCollectionModels to settle
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // Now programmatically call the captured onConfirm with the bad model
+    // (simulating the user selecting a model in the drawer and clicking confirm)
+    expect(capturedDrawerOnConfirm).not.toBeNull();
+    await act(async () => {
+      capturedDrawerOnConfirm!([
+        { owner: "no-img2img", name: "model-bad" },
+      ]);
+    });
+
+    // Wait for the auto-switch to happen
+    await waitFor(() => {
+      // Toast should have been called with an img2img incompatibility message
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.stringContaining("img2img")
+      );
+    });
+
+    // State should have been updated to the first compatible model
+    await waitFor(() => {
+      expect(latestState!.selectedModelId).toBe(
+        "good-vendor/img2img-model"
+      );
+    });
+  });
+});
