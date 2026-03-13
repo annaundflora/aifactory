@@ -1,8 +1,63 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Undo2, Redo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useCanvasDetail } from "@/lib/canvas-detail-context";
+
+// ---------------------------------------------------------------------------
+// UndoRedoButtons
+// ---------------------------------------------------------------------------
+
+/**
+ * Undo and Redo icon buttons that read from CanvasDetailContext.
+ * Must be rendered inside a CanvasDetailProvider.
+ */
+export function UndoRedoButtons() {
+  const { state, dispatch } = useCanvasDetail();
+
+  const canUndo = state.undoStack.length > 0 && !state.isGenerating;
+  const canRedo = state.redoStack.length > 0 && !state.isGenerating;
+
+  function handleUndo() {
+    if (!canUndo) return;
+    dispatch({ type: "POP_UNDO" });
+  }
+
+  function handleRedo() {
+    if (!canRedo) return;
+    dispatch({ type: "POP_REDO" });
+  }
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        onClick={handleUndo}
+        aria-label="Undo"
+        aria-disabled={!canUndo}
+        data-testid="undo-button"
+        className={!canUndo ? "pointer-events-none opacity-40" : ""}
+        tabIndex={!canUndo ? -1 : 0}
+      >
+        <Undo2 className="size-4" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        onClick={handleRedo}
+        aria-label="Redo"
+        aria-disabled={!canRedo}
+        data-testid="redo-button"
+        className={!canRedo ? "pointer-events-none opacity-40" : ""}
+        tabIndex={!canRedo ? -1 : 0}
+      >
+        <Redo2 className="size-4" />
+      </Button>
+    </>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Props
@@ -12,6 +67,7 @@ export interface CanvasHeaderProps {
   onBack: () => void;
   children?: ReactNode;
   modelSelectorSlot?: ReactNode;
+  /** Optional override for the undo/redo area. Defaults to <UndoRedoButtons />. */
   undoRedoSlot?: ReactNode;
 }
 
@@ -70,9 +126,9 @@ export function CanvasHeader({
         {modelSelectorSlot}
       </div>
 
-      {/* Right: Undo/Redo slots + children */}
+      {/* Right: Undo/Redo + children */}
       <div className="flex items-center gap-2" data-testid="undo-redo-slot">
-        {undoRedoSlot}
+        {undoRedoSlot ?? <UndoRedoButtons />}
         {children}
       </div>
     </header>

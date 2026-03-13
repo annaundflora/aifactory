@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useReducer } from "react";
+import { createContext, useContext, useReducer, useEffect } from "react";
 import type { Dispatch, ReactNode } from "react";
 
 // ---------------------------------------------------------------------------
@@ -162,6 +162,50 @@ export function CanvasDetailProvider({
     chatSessionId: null,
     selectedModelId: null,
   });
+
+  // ---------------------------------------------------------------------------
+  // Global keyboard shortcuts: Cmd/Ctrl+Z (undo), Cmd/Ctrl+Shift+Z (redo)
+  // Suppressed when an input/textarea/contentEditable element has focus.
+  // Suppressed when isGenerating is true.
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      // Only handle Cmd/Ctrl modifier
+      const hasModifier = e.metaKey || e.ctrlKey;
+      if (!hasModifier) return;
+
+      // Only handle Z key
+      if (e.key !== "z" && e.key !== "Z") return;
+
+      // Suppress when input/textarea/contentEditable has focus
+      const activeEl = document.activeElement;
+      if (
+        activeEl instanceof HTMLInputElement ||
+        activeEl instanceof HTMLTextAreaElement ||
+        (activeEl instanceof HTMLElement && activeEl.isContentEditable)
+      ) {
+        return;
+      }
+
+      // Suppress during generation (read from closure — stable ref via state)
+      if (state.isGenerating) return;
+
+      if (e.shiftKey) {
+        // Cmd/Ctrl+Shift+Z → Redo
+        if (state.redoStack.length === 0) return;
+        e.preventDefault();
+        dispatch({ type: "POP_REDO" });
+      } else {
+        // Cmd/Ctrl+Z → Undo
+        if (state.undoStack.length === 0) return;
+        e.preventDefault();
+        dispatch({ type: "POP_UNDO" });
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [state.isGenerating, state.undoStack, state.redoStack, dispatch]);
 
   return (
     <CanvasDetailContext.Provider value={{ state, dispatch }}>
