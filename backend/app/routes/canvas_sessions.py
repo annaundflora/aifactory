@@ -52,7 +52,7 @@ class CanvasImageContext(BaseModel):
         generation_id: UUID of the generation record.
     """
 
-    image_url: str = Field(..., description="URL of the current image")
+    image_url: HttpUrl = Field(..., description="URL of the current image")
     prompt: str = Field(..., description="Original prompt of the current image")
     model_id: str = Field(..., description="Model ID of the current image")
     model_params: dict = Field(default_factory=dict, description="Model parameters")
@@ -128,7 +128,7 @@ async def create_canvas_session(request: CreateCanvasSessionRequest):
 
 
 @router.post("/canvas/sessions/{session_id}/messages")
-async def send_canvas_message(session_id: str, request: CanvasSendMessageRequest):
+async def send_canvas_message(session_id: UUID, request: CanvasSendMessageRequest):
     """Send a message to the canvas editing agent and stream the response as SSE.
 
     Validates the message, checks rate limits, then streams the canvas agent
@@ -150,7 +150,8 @@ async def send_canvas_message(session_id: str, request: CanvasSendMessageRequest
     AC-9: Agent system prompt includes image_context (via CanvasAssistantService).
 
     Args:
-        session_id: The session UUID (used as LangGraph thread_id).
+        session_id: The session UUID (used as LangGraph thread_id). FastAPI
+            validates UUID format automatically; 422 is returned on invalid input.
         request: The validated CanvasSendMessageRequest body.
 
     Returns:
@@ -158,11 +159,14 @@ async def send_canvas_message(session_id: str, request: CanvasSendMessageRequest
 
     Raises:
         HTTPException 400: Session lifetime limit reached (100 messages).
-        HTTPException 422: Validation error (content length).
+        HTTPException 422: Validation error (content length or invalid UUID).
         HTTPException 429: Rate limit exceeded (30 messages/minute).
     """
+    # Convert UUID to str for internal use (rate limiter + LangGraph thread_id)
+    session_id_str = str(session_id)
+
     # Check rate limits (AC-4, AC-5)
-    limit_result = canvas_rate_limiter.check(session_id)
+    limit_result = canvas_rate_limiter.check(session_id_str)
     if limit_result is not None:
         raise HTTPException(
             status_code=limit_result["status_code"],
@@ -170,14 +174,15 @@ async def send_canvas_message(session_id: str, request: CanvasSendMessageRequest
         )
 
     # Record the message for rate limiting
-    canvas_rate_limiter.record(session_id)
+    canvas_rate_limiter.record(session_id_str)
 
-    # Convert image_context to dict for agent injection
-    image_context_dict = request.image_context.model_dump()
+    # Convert image_context to dict for agent injection.
+    # mode="json" ensures HttpUrl objects are serialized as plain strings.
+    image_context_dict = request.image_context.model_dump(mode="json")
 
     async def event_generator():
         async for sse_event in _service.stream_response(
-            session_id=session_id,
+            session_id=session_id_str,
             content=request.content,
             image_context=image_context_dict,
             model=request.model,

@@ -12,6 +12,10 @@ Graph structure:
 
 The system prompt includes injected image context (image_url, prompt, model_id)
 so the agent can provide context-aware editing suggestions.
+
+Image context is injected at runtime via LangGraph configurable
+(config["configurable"]["image_context"]) so the graph can be compiled once
+and reused across requests.
 """
 
 import json
@@ -19,7 +23,7 @@ import logging
 from typing import Optional
 
 from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
-from langchain_core.runnables import RunnableLambda
+from langchain_core.runnables import RunnableConfig, RunnableLambda
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -249,8 +253,12 @@ WICHTIG:
 """
 
     if image_context:
-        image_url = image_context.get("image_url", "")
+        # Cast image_url to str (may be HttpUrl Pydantic object) and truncate prompt
+        # to max 2000 characters to prevent prompt injection via oversized input.
+        image_url = str(image_context.get("image_url", ""))
         prompt = image_context.get("prompt", "")
+        if len(prompt) > 2000:
+            prompt = prompt[:2000]
         model_id = image_context.get("model_id", "")
         model_params = image_context.get("model_params", {})
 
@@ -278,7 +286,6 @@ Beziehe dich beim Generieren auf diesen Kontext:
 
 def create_canvas_agent(
     checkpointer: Optional[BaseCheckpointSaver] = None,
-    image_context: Optional[dict] = None,
 ):
     """Create a compiled LangGraph canvas agent for image editing.
 
@@ -291,12 +298,14 @@ def create_canvas_agent(
     The graph uses:
     - Custom CanvasAgentState for canvas-specific state fields
     - OpenRouter LLM via ChatOpenAI with base_url override
-    - System prompt with image context injection
+    - System prompt built at runtime from config["configurable"]["image_context"]
     - Optional checkpointer for session persistence
+
+    Image context is injected per-request via config["configurable"]["image_context"],
+    so the compiled graph can be reused across requests (compiled once, run many times).
 
     Args:
         checkpointer: Optional checkpoint saver for state persistence.
-        image_context: Optional image context dict to inject into system prompt.
 
     Returns:
         A compiled LangGraph graph ready for invocation.
@@ -309,8 +318,6 @@ def create_canvas_agent(
         max_tokens=2048,
         streaming=True,
     )
-
-    system_prompt = build_canvas_system_prompt(image_context)
 
     # Bind tools to the LLM
     if CANVAS_TOOLS:
@@ -325,15 +332,27 @@ def create_canvas_agent(
     else:
         llm_with_tools = llm
 
-    def _call_model_sync(state: CanvasAgentState) -> dict:
-        """Sync: Call the LLM with the current messages and system prompt."""
+    def _call_model_sync(state: CanvasAgentState, config: RunnableConfig) -> dict:
+        """Sync: Call the LLM with the current messages and system prompt.
+
+        Reads image_context from config["configurable"]["image_context"] at
+        runtime so the same compiled graph handles all requests.
+        """
+        image_context = config.get("configurable", {}).get("image_context")
+        system_prompt = build_canvas_system_prompt(image_context)
         sys_msg = SystemMessage(content=system_prompt)
         messages = [sys_msg] + list(state["messages"])
         response = llm_with_tools.invoke(messages)
         return {"messages": [response]}
 
-    async def _call_model_async(state: CanvasAgentState) -> dict:
-        """Async: Call the LLM with the current messages and system prompt."""
+    async def _call_model_async(state: CanvasAgentState, config: RunnableConfig) -> dict:
+        """Async: Call the LLM with the current messages and system prompt.
+
+        Reads image_context from config["configurable"]["image_context"] at
+        runtime so the same compiled graph handles all requests.
+        """
+        image_context = config.get("configurable", {}).get("image_context")
+        system_prompt = build_canvas_system_prompt(image_context)
         sys_msg = SystemMessage(content=system_prompt)
         messages = [sys_msg] + list(state["messages"])
         response = await llm_with_tools.ainvoke(messages)

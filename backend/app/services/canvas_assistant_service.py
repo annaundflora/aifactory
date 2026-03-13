@@ -24,7 +24,6 @@ from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 
 from app.agent.canvas_graph import create_canvas_agent
-from app.config import settings
 from app.models.dtos import SessionResponse
 from app.services.session_repository import SessionRepository
 
@@ -118,26 +117,12 @@ class CanvasAssistantService:
     """
 
     def __init__(self):
-        # Create a default agent without image_context (used for session creation)
         self._checkpointer = MemorySaver()
         self._repo = SessionRepository()
-
-    def _get_agent(self, image_context: Optional[dict] = None):
-        """Get or create a canvas agent with the given image context.
-
-        The agent is created with the image_context injected into the system prompt
-        so it can provide context-aware editing suggestions.
-
-        Args:
-            image_context: Optional dict with image editing context.
-
-        Returns:
-            Compiled LangGraph canvas agent.
-        """
-        return create_canvas_agent(
-            checkpointer=self._checkpointer,
-            image_context=image_context,
-        )
+        # Compile the graph once at service initialization.
+        # image_context is injected per-request via config["configurable"]["image_context"]
+        # so the same compiled graph handles all concurrent requests safely.
+        self._agent = create_canvas_agent(checkpointer=self._checkpointer)
 
     async def stream_response(
         self,
@@ -166,8 +151,14 @@ class CanvasAssistantService:
         try:
             human_message = HumanMessage(content=content)
 
-            # LangGraph config with thread_id for session persistence
-            config = {"configurable": {"thread_id": session_id}}
+            # LangGraph config: thread_id for session persistence, image_context
+            # injected at runtime so the compiled graph can be reused across requests.
+            config = {
+                "configurable": {
+                    "thread_id": session_id,
+                    "image_context": image_context,
+                }
+            }
 
             input_state = {
                 "messages": [human_message],
@@ -175,11 +166,8 @@ class CanvasAssistantService:
                 "generate_params": None,
             }
 
-            # Get agent with image_context injected into system prompt
-            agent = self._get_agent(image_context=image_context)
-
-            # Stream events from LangGraph using v2 API
-            async for event in agent.astream_events(
+            # Stream events from the cached LangGraph agent using v2 API
+            async for event in self._agent.astream_events(
                 input_state,
                 config=config,
                 version="v2",
