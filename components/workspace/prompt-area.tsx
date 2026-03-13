@@ -16,7 +16,8 @@ import { useWorkspaceVariation } from "@/lib/workspace-state";
 import { ModeSelector, type GenerationMode } from "@/components/workspace/mode-selector";
 import { ImageDropzone } from "@/components/workspace/image-dropzone";
 import { ReferenceBar, getLowestFreePosition } from "@/components/workspace/reference-bar";
-import { uploadReferenceImage, deleteReferenceImage } from "@/app/actions/references";
+import { uploadReferenceImage, deleteReferenceImage, addGalleryAsReference } from "@/app/actions/references";
+import type { GalleryDragPayload } from "@/lib/constants/drag-types";
 import type {
   ReferenceSlotData,
   ReferenceRole,
@@ -973,6 +974,35 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     [projectId]
   );
 
+  const handleReferenceGalleryDrop = useCallback(
+    (data: GalleryDragPayload, slotPosition: number) => {
+      (async () => {
+        const result = await addGalleryAsReference({
+          projectId,
+          generationId: data.generationId,
+          imageUrl: data.imageUrl,
+        });
+        if ("error" in result) {
+          toast(result.error);
+          return;
+        }
+        setReferenceSlots((prev) => [
+          ...prev,
+          {
+            id: result.id,
+            imageUrl: result.imageUrl,
+            slotPosition,
+            role: "content" as ReferenceRole,
+            strength: "moderate" as ReferenceStrength,
+            width: result.width ?? undefined,
+            height: result.height ?? undefined,
+          },
+        ]);
+      })();
+    },
+    [projectId]
+  );
+
   // ---------------------------------------------------------------------------
   // Generate / Upscale handlers
   // ---------------------------------------------------------------------------
@@ -1165,6 +1195,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
                 onStrengthChange={handleReferenceStrengthChange}
                 onUpload={handleReferenceUpload}
                 onUploadUrl={handleReferenceUploadUrl}
+                onGalleryDrop={handleReferenceGalleryDrop}
               />
             </div>
           )}

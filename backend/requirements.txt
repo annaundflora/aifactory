@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+sse-starlette
+pydantic
+pydantic-settings
+psycopg[binary]
+langchain-core
+langchain-openai
+langgraph
+Pillow
+httpx

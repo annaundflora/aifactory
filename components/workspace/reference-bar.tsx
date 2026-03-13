@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/collapsible";
 import { ReferenceSlot } from "@/components/workspace/reference-slot";
 import { cn } from "@/lib/utils";
+import type { GalleryDragPayload } from "@/lib/constants/drag-types";
 import type {
   ReferenceRole,
   ReferenceStrength,
@@ -59,6 +60,8 @@ export interface ReferenceBarProps {
   onUpload?: (file: File, slotPosition: number) => void;
   /** Called when a URL is pasted for upload */
   onUploadUrl?: (url: string, slotPosition: number) => void;
+  /** Called when a gallery generation is dropped onto a slot */
+  onGalleryDrop?: (data: GalleryDragPayload, slotPosition: number) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -73,6 +76,7 @@ export function ReferenceBar({
   onStrengthChange,
   onUpload,
   onUploadUrl,
+  onGalleryDrop,
 }: ReferenceBarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -149,6 +153,14 @@ export function ReferenceBar({
       onUploadUrl?.(url, trailingPosition);
     },
     [trailingPosition, onUploadUrl]
+  );
+
+  const handleTrailingGalleryDrop = useCallback(
+    (data: GalleryDragPayload) => {
+      if (trailingPosition === -1) return;
+      onGalleryDrop?.(data, trailingPosition);
+    },
+    [trailingPosition, onGalleryDrop]
   );
 
   // ---------------------------------------------------------------------------
@@ -295,6 +307,7 @@ export function ReferenceBar({
               slotPosition={trailingPosition}
               onUpload={handleTrailingUpload}
               onUploadUrl={handleTrailingUploadUrl}
+              onGalleryDrop={handleTrailingGalleryDrop}
             />
           )}
         </div>
