@@ -10,6 +10,8 @@ import { GenerationPlaceholder } from "@/components/workspace/generation-placeho
 import { FilterChips, type FilterValue } from "@/components/workspace/filter-chips";
 import { LightboxModal } from "@/components/lightbox/lightbox-modal";
 import { LightboxNavigation } from "@/components/lightbox/lightbox-navigation";
+import { CanvasDetailView } from "@/components/canvas/canvas-detail-view";
+import { CanvasDetailProvider } from "@/lib/canvas-detail-context";
 
 const POLLING_INTERVAL_MS = 3000;
 
@@ -27,6 +29,10 @@ export function WorkspaceContent({
 
   // ----- Filter state -----
   const [modeFilter, setModeFilter] = useState<FilterValue>("all");
+
+  // ----- Detail-View state -----
+  const [detailViewOpen, setDetailViewOpen] = useState(false);
+  const [selectedGenerationId, setSelectedGenerationId] = useState<string | null>(null);
 
   // ----- Lightbox state -----
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -111,17 +117,19 @@ export function WorkspaceContent({
     [generations]
   );
 
-  // ----- Lightbox handlers -----
+  // ----- Detail-View handlers -----
   const handleSelectGeneration = useCallback(
     (id: string) => {
-      const index = completedGenerations.findIndex((g) => g.id === id);
-      if (index >= 0) {
-        setLightboxIndex(index);
-        setLightboxOpen(true);
-      }
+      setSelectedGenerationId(id);
+      setDetailViewOpen(true);
     },
-    [completedGenerations]
+    []
   );
+
+  const handleDetailViewClose = useCallback(() => {
+    setDetailViewOpen(false);
+    setSelectedGenerationId(null);
+  }, []);
 
   const handleLightboxClose = useCallback(() => {
     setLightboxOpen(false);
@@ -139,8 +147,29 @@ export function WorkspaceContent({
 
   const currentGeneration = completedGenerations[lightboxIndex];
 
+  // Find the selected generation for the detail view
+  const selectedGeneration = selectedGenerationId
+    ? completedGenerations.find((g) => g.id === selectedGenerationId) ?? null
+    : null;
+
+  // ----- Detail-View open -----
+  if (detailViewOpen && selectedGeneration && selectedGenerationId) {
+    return (
+      <div className="flex flex-1 overflow-hidden" data-testid="workspace-detail-view">
+        <CanvasDetailProvider initialGenerationId={selectedGenerationId}>
+          <CanvasDetailView
+            generation={selectedGeneration}
+            allGenerations={completedGenerations}
+            onBack={handleDetailViewClose}
+          />
+        </CanvasDetailProvider>
+      </div>
+    );
+  }
+
+  // ----- Gallery-View -----
   return (
-    <div className="flex flex-1 gap-3 overflow-hidden bg-muted/40 p-3">
+    <div className="flex flex-1 gap-3 overflow-hidden bg-muted/40 p-3" data-testid="workspace-gallery-view">
       {/* Left: Prompt Area */}
       <div className="w-[480px] shrink-0 overflow-y-auto rounded-xl border border-border/80 bg-card p-4 shadow-sm">
         <PromptArea
@@ -151,7 +180,7 @@ export function WorkspaceContent({
 
       {/* Right: Gallery */}
       <div className="flex-1 overflow-y-auto rounded-xl border border-border/80 bg-card p-6 shadow-sm">
-        {/* Pending Placeholders (failed → only toast, no card) */}
+        {/* Pending Placeholders (failed -> only toast, no card) */}
         {pendingGenerations.length > 0 && (
           <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {pendingGenerations.map((gen) => (
