@@ -138,7 +138,6 @@ export function CanvasChatPanel({ generation, projectId }: CanvasChatPanelProps)
       cancelled = true;
     };
   // Run on mount and whenever collapsed state becomes false (first expansion)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collapsed, projectId]);
 
   // ---------------------------------------------------------------------------
@@ -147,7 +146,7 @@ export function CanvasChatPanel({ generation, projectId }: CanvasChatPanelProps)
   // ---------------------------------------------------------------------------
   useEffect(() => {
     imageContextRef.current = buildImageContext(generation);
-  }, [generation.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [generation.id]);
 
   // ---------------------------------------------------------------------------
   // AC-10: Update image_context when currentGenerationId changes
