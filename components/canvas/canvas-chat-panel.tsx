@@ -121,6 +121,34 @@ export function CanvasChatPanel({
   // -------------------------------------------------------------------------
   const panelRef = useRef<HTMLDivElement>(null);
   const isResizing = useRef(false);
+  const rAfRef = useRef<number | null>(null);
+  const mouseMoveRef = useRef<((e: MouseEvent) => void) | null>(null);
+  const mouseUpRef = useRef<(() => void) | null>(null);
+
+  const cleanupResizeListeners = useCallback(() => {
+    if (rAfRef.current !== null) {
+      cancelAnimationFrame(rAfRef.current);
+      rAfRef.current = null;
+    }
+    if (mouseMoveRef.current) {
+      document.removeEventListener("mousemove", mouseMoveRef.current);
+      mouseMoveRef.current = null;
+    }
+    if (mouseUpRef.current) {
+      document.removeEventListener("mouseup", mouseUpRef.current);
+      mouseUpRef.current = null;
+    }
+    isResizing.current = false;
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cleanupResizeListeners();
+    };
+  }, [cleanupResizeListeners]);
 
   const handleResizeStart = useCallback(
     (e: React.MouseEvent) => {
@@ -133,28 +161,32 @@ export function CanvasChatPanel({
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         if (!isResizing.current) return;
+        // Cancel any pending rAF before scheduling a new one
+        if (rAfRef.current !== null) {
+          cancelAnimationFrame(rAfRef.current);
+        }
         // Resize handle is on the left edge, so moving left = wider
         const delta = startX - moveEvent.clientX;
         const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + delta));
-        requestAnimationFrame(() => {
+        rAfRef.current = requestAnimationFrame(() => {
+          rAfRef.current = null;
           setWidth(newWidth);
         });
       };
 
       const handleMouseUp = () => {
-        isResizing.current = false;
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
+        cleanupResizeListeners();
       };
+
+      mouseMoveRef.current = handleMouseMove;
+      mouseUpRef.current = handleMouseUp;
 
       document.body.style.cursor = "col-resize";
       document.body.style.userSelect = "none";
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
-    [collapsed, width]
+    [collapsed, width, cleanupResizeListeners]
   );
 
   // -------------------------------------------------------------------------
@@ -163,7 +195,7 @@ export function CanvasChatPanel({
   const handleSend = useCallback(
     (text: string) => {
       const userMsg: ChatMessage = {
-        id: `user-${Date.now()}`,
+        id: `user-${crypto.randomUUID()}`,
         role: "user",
         content: text,
       };
@@ -182,7 +214,7 @@ export function CanvasChatPanel({
   const handleChipClick = useCallback(
     (chipText: string) => {
       const userMsg: ChatMessage = {
-        id: `user-chip-${Date.now()}`,
+        id: `user-chip-${crypto.randomUUID()}`,
         role: "user",
         content: chipText,
       };
