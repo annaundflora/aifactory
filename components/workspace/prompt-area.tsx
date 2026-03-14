@@ -40,10 +40,7 @@ import { ChatThread } from "@/components/assistant/chat-thread";
 import { PromptCanvas } from "@/components/assistant/prompt-canvas";
 import { SessionList } from "@/components/assistant/session-list";
 import { SessionSwitcher } from "@/components/assistant/session-switcher";
-import {
-  ModelSelector,
-  DEFAULT_MODEL_SLUG,
-} from "@/components/assistant/model-selector";
+import { ModelSelector } from "@/components/assistant/model-selector";
 import {
   PromptAssistantProvider,
   usePromptAssistant,
@@ -146,7 +143,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   const [maxQuality, setMaxQuality] = useState<boolean>(false);
 
   // ----- Model Settings (fetched on mount, cached) -----
-  const [modelSettings, setModelSettings] = useState<ModelSetting[]>([]);
+  const [_modelSettings, setModelSettings] = useState<ModelSetting[]>([]);
 
   // ----- Structured prompt state -----
   const [promptMotiv, setPromptMotiv] = useState("");
