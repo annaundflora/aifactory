@@ -20,9 +20,7 @@ import { ModelCard } from "@/components/models/model-card";
 // @deprecated - This component is no longer used in production.
 // Favorite model functions were removed in slice-13.
 const getFavoriteModels = async (): Promise<string[]> => [];
-const toggleFavoriteModel = async (_input: {
-  modelId: string;
-}): Promise<{ isFavorite: boolean }> => ({ isFavorite: false });
+const toggleFavoriteModel = async (): Promise<{ isFavorite: boolean }> => ({ isFavorite: false });
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -194,7 +192,7 @@ export function ModelBrowserDrawer({
       }
       return next;
     });
-    toggleFavoriteModel({ modelId: key }).catch(() => {
+    toggleFavoriteModel().catch(() => {
       // Revert on error
       setFavoriteIds((prev) => {
         const reverted = new Set(prev);
