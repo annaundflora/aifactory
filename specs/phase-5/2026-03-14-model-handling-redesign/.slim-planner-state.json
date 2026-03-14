@@ -1,0 +1,30 @@
+{
+  "spec_path": "specs/phase-5/2026-03-14-model-handling-redesign",
+  "status": "completed",
+  "phase": "completed",
+  "started_at": "2026-03-14T12:00:00Z",
+  "detected_stack": "TypeScript / Next.js 16 (Python backend)",
+  "total_slices": 13,
+  "current_slice_index": 13,
+  "slices": [
+    { "number": 1, "name": "DB Schema + Migration", "status": "approved", "retries": 0 },
+    { "number": 2, "name": "Model Settings Service", "status": "approved", "retries": 0 },
+    { "number": 3, "name": "Server Actions model-settings", "status": "approved", "retries": 0 },
+    { "number": 4, "name": "Settings Dialog UI", "status": "approved", "retries": 0 },
+    { "number": 5, "name": "Tier Toggle Component", "status": "approved", "retries": 0 },
+    { "number": 6, "name": "Workspace Prompt-Area Tier Toggle", "status": "approved", "retries": 0 },
+    { "number": 7, "name": "Workspace Generation Integration", "status": "approved", "retries": 0 },
+    { "number": 8, "name": "Canvas Context Cleanup", "status": "approved", "retries": 1 },
+    { "number": 9, "name": "Canvas Variation + Img2Img Popover Tier Toggle", "status": "approved", "retries": 0 },
+    { "number": 10, "name": "Canvas Upscale Popover Tier Toggle", "status": "approved", "retries": 0 },
+    { "number": 11, "name": "Canvas Chat Panel Tier Toggle", "status": "approved", "retries": 0 },
+    { "number": 12, "name": "Workspace Cleanup -- Remove Old UI Components", "status": "approved", "retries": 0 },
+    { "number": 13, "name": "Dead Code Cleanup + Deprecation", "status": "approved", "retries": 0 }
+  ],
+  "approved_slices": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+  "failed_slices": [],
+  "gate3_retries": 0,
+  "last_action": "Gate 3 APPROVED - Ready for Orchestration",
+  "completed_at": "2026-03-14T12:30:00Z",
+  "last_updated": "2026-03-14T12:30:00Z"
+}
