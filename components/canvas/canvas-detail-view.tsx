@@ -13,7 +13,6 @@ import { DetailsOverlay } from "@/components/canvas/details-overlay";
 import { VariationPopover } from "@/components/canvas/popovers/variation-popover";
 import { Img2imgPopover } from "@/components/canvas/popovers/img2img-popover";
 import { UpscalePopover } from "@/components/canvas/popovers/upscale-popover";
-import { CanvasModelSelector } from "@/components/canvas/canvas-model-selector";
 import { CanvasChatPanel } from "@/components/canvas/canvas-chat-panel";
 import { generateImages, upscaleImage, fetchGenerations } from "@/app/actions/generations";
 import { deleteGeneration } from "@/app/actions/generations";
@@ -53,7 +52,6 @@ export interface CanvasDetailViewProps {
   onGenerationsCreated?: (newGens: Generation[]) => void;
   toolbarSlot?: ReactNode;
   chatSlot?: ReactNode;
-  modelSelectorSlot?: ReactNode;
   undoRedoSlot?: ReactNode;
 }
 
@@ -68,7 +66,6 @@ export function CanvasDetailView({
   onGenerationsCreated,
   toolbarSlot,
   chatSlot,
-  modelSelectorSlot,
   undoRedoSlot,
 }: CanvasDetailViewProps) {
   const { state, dispatch } = useCanvasDetail();
@@ -435,11 +432,6 @@ export function CanvasDetailView({
   // Render
   // ---------------------------------------------------------------------------
 
-  // Compose the model selector slot: use provided slot or default to CanvasModelSelector
-  const effectiveModelSelectorSlot = modelSelectorSlot ?? (
-    <CanvasModelSelector initialModelId={currentGeneration.modelId} />
-  );
-
   return (
     <div
       className="flex h-full w-full flex-col"
@@ -448,7 +440,6 @@ export function CanvasDetailView({
       {/* Header */}
       <CanvasHeader
         onBack={onBack}
-        modelSelectorSlot={effectiveModelSelectorSlot}
         undoRedoSlot={undoRedoSlot}
       >
         {chatSlot && (
