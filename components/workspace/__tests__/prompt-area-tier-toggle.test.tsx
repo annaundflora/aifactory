@@ -62,6 +62,16 @@ vi.mock("@/app/actions/generations", () => ({
   uploadSourceImage: vi.fn().mockResolvedValue({ url: "https://r2.example.com/uploaded.png" }),
 }));
 
+// Mock server actions: model-settings (slice-07 added getModelSettings to prompt-area)
+vi.mock("@/app/actions/model-settings", () => ({
+  getModelSettings: vi.fn().mockResolvedValue([
+    { id: "ms-1", mode: "txt2img", tier: "draft", modelId: "black-forest-labs/flux-schnell", modelParams: {}, createdAt: new Date(), updatedAt: new Date() },
+    { id: "ms-2", mode: "txt2img", tier: "quality", modelId: "black-forest-labs/flux-2-pro", modelParams: {}, createdAt: new Date(), updatedAt: new Date() },
+    { id: "ms-3", mode: "img2img", tier: "draft", modelId: "black-forest-labs/flux-schnell", modelParams: { prompt_strength: 0.6 }, createdAt: new Date(), updatedAt: new Date() },
+    { id: "ms-4", mode: "upscale", tier: "draft", modelId: "nightmareai/real-esrgan", modelParams: { scale: 2 }, createdAt: new Date(), updatedAt: new Date() },
+  ]),
+}));
+
 // Mock server actions: references
 vi.mock("@/app/actions/references", () => ({
   uploadReferenceImage: vi.fn().mockResolvedValue({ id: "ref-1", imageUrl: "https://example.com/ref.png" }),
