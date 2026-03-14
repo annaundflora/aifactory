@@ -17,8 +17,9 @@ import { CanvasModelSelector } from "@/components/canvas/canvas-model-selector";
 import { CanvasChatPanel } from "@/components/canvas/canvas-chat-panel";
 import { generateImages, upscaleImage, fetchGenerations } from "@/app/actions/generations";
 import { deleteGeneration } from "@/app/actions/generations";
+import { getModelSettings } from "@/app/actions/model-settings";
 import { Button } from "@/components/ui/button";
-import { type Generation } from "@/lib/db/queries";
+import { type Generation, type ModelSetting } from "@/lib/db/queries";
 import type { VariationParams } from "@/components/canvas/popovers/variation-popover";
 import type { Img2imgParams } from "@/components/canvas/popovers/img2img-popover";
 
@@ -80,6 +81,28 @@ export function CanvasDetailView({
   useEffect(() => {
     setLocalGenerations(allGenerations);
   }, [allGenerations]);
+
+  // ---------------------------------------------------------------------------
+  // Model Settings: fetch once on mount, cache in local state
+  // ---------------------------------------------------------------------------
+  const [modelSettings, setModelSettings] = useState<ModelSetting[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getModelSettings()
+      .then((settings) => {
+        if (!cancelled) {
+          setModelSettings(settings);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch model settings:", err);
+        // graceful degradation: modelSettings stays empty, handlers use fallback
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Track pending generation IDs for polling via ref to avoid effect churn.
   // A counter state triggers re-renders when pending list changes.
@@ -232,7 +255,11 @@ export function CanvasDetailView({
     async (params: VariationParams) => {
       if (state.isGenerating) return;
 
-      const selectedModel = state.selectedModelId ?? currentGeneration.modelId;
+      // Resolve model from settings (img2img / draft fallback)
+      const setting = modelSettings.find(
+        (s) => s.mode === "img2img" && s.tier === "draft"
+      );
+      const selectedModel = setting?.modelId ?? currentGeneration.modelId;
       const promptStrength =
         VARIATION_STRENGTH_MAP[params.strength] ?? 0.6;
 
@@ -275,7 +302,7 @@ export function CanvasDetailView({
         toast.error("Generation fehlgeschlagen.");
       }
     },
-    [state.isGenerating, state.selectedModelId, currentGeneration, dispatch, setPendingGenerationIds, onGenerationsCreated]
+    [state.isGenerating, modelSettings, currentGeneration, dispatch, setPendingGenerationIds, onGenerationsCreated]
   );
 
   // ---------------------------------------------------------------------------
@@ -286,7 +313,11 @@ export function CanvasDetailView({
     async (params: Img2imgParams) => {
       if (state.isGenerating) return;
 
-      const selectedModel = state.selectedModelId ?? currentGeneration.modelId;
+      // Resolve model from settings (img2img / draft fallback)
+      const setting = modelSettings.find(
+        (s) => s.mode === "img2img" && s.tier === "draft"
+      );
+      const selectedModel = setting?.modelId ?? currentGeneration.modelId;
 
       dispatch({ type: "SET_GENERATING", isGenerating: true });
 
@@ -336,7 +367,7 @@ export function CanvasDetailView({
         toast.error("Generation fehlgeschlagen.");
       }
     },
-    [state.isGenerating, state.selectedModelId, currentGeneration, dispatch, setPendingGenerationIds, onGenerationsCreated]
+    [state.isGenerating, modelSettings, currentGeneration, dispatch, setPendingGenerationIds, onGenerationsCreated]
   );
 
   // ---------------------------------------------------------------------------
@@ -351,15 +382,23 @@ export function CanvasDetailView({
         return;
       }
 
+      // Resolve model from settings (upscale / draft fallback)
+      const setting = modelSettings.find(
+        (s) => s.mode === "upscale" && s.tier === "draft"
+      );
+      const resolvedModelId = setting?.modelId ?? "nightmareai/real-esrgan";
+      const resolvedModelParams = setting?.modelParams ?? {};
+
       dispatch({ type: "SET_GENERATING", isGenerating: true });
 
       try {
-        // AC-3: Hardcoded model nightmareai/real-esrgan, ignores header selector
         const result = await upscaleImage({
           projectId: currentGeneration.projectId,
           sourceImageUrl: currentGeneration.imageUrl,
           scale: params.scale,
           sourceGenerationId: currentGeneration.id,
+          modelId: resolvedModelId,
+          modelParams: resolvedModelParams as Record<string, unknown>,
         });
 
         if ("error" in result) {
@@ -382,7 +421,7 @@ export function CanvasDetailView({
         toast.error("Upscale fehlgeschlagen.");
       }
     },
-    [state.isGenerating, currentGeneration, dispatch, setPendingGenerationIds, onGenerationsCreated]
+    [state.isGenerating, modelSettings, currentGeneration, dispatch, setPendingGenerationIds, onGenerationsCreated]
   );
 
   // ---------------------------------------------------------------------------

@@ -53,6 +53,7 @@ const {
   mockDeleteGeneration,
   mockGetCollectionModels,
   mockCheckImg2ImgSupport,
+  mockGetModelSettings,
   mockToastFn,
   mockToastError,
   mockToastSuccess,
@@ -63,6 +64,7 @@ const {
   mockDeleteGeneration: vi.fn(),
   mockGetCollectionModels: vi.fn(),
   mockCheckImg2ImgSupport: vi.fn(),
+  mockGetModelSettings: vi.fn(),
   mockToastFn: vi.fn(),
   mockToastError: vi.fn(),
   mockToastSuccess: vi.fn(),
@@ -84,6 +86,11 @@ vi.mock("@/app/actions/generations", () => ({
   fetchGenerations: (...args: unknown[]) => mockFetchGenerations(...args),
   deleteGeneration: (...args: unknown[]) => mockDeleteGeneration(...args),
   getSiblingGenerations: vi.fn().mockResolvedValue([]),
+}));
+
+// Mock model settings server action
+vi.mock("@/app/actions/model-settings", () => ({
+  getModelSettings: (...args: unknown[]) => mockGetModelSettings(...args),
 }));
 
 // Mock model actions
@@ -297,6 +304,8 @@ describe("In-Place Generation Flow", () => {
     );
     // Default: fetchGenerations returns empty
     mockFetchGenerations.mockResolvedValue([]);
+    // Default: getModelSettings returns empty (handlers use fallback)
+    mockGetModelSettings.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -838,6 +847,7 @@ describe("CanvasModelSelector", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     mockGetCollectionModels.mockResolvedValue([]);
     mockCheckImg2ImgSupport.mockResolvedValue(true);
+    mockGetModelSettings.mockResolvedValue([]);
     capturedDrawerOnConfirm = null;
   });
 
@@ -875,14 +885,18 @@ describe("CanvasModelSelector", () => {
   // -------------------------------------------------------------------------
 
   /**
-   * AC-10: GIVEN der User aendert das Model im Header-Selector auf ein anderes
-   *        Model
-   *        WHEN der User danach "Generate" im Variation-Popover klickt
-   *        THEN wird das neu gewaehlte Model an generateImages() uebergeben
-   *        (nicht das Original-Model des Bildes)
+   * AC-10 (updated for slice-08): Model resolution is now settings-based.
+   * GIVEN modelSettings contain an img2img/draft entry with modelId "stability-ai/sdxl"
+   * WHEN the user clicks "Generate" in the Variation-Popover
+   * THEN generateImages is called with the settings-resolved model, not the image's original model.
    */
-  it("AC-10: should pass the user-selected model to generateImages instead of the original image model", async () => {
+  it("AC-10: should pass the settings-resolved model to generateImages instead of the original image model", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    // Provide model settings so the handler resolves from settings
+    mockGetModelSettings.mockResolvedValue([
+      { id: "ms-1", mode: "img2img", tier: "draft", modelId: "stability-ai/sdxl", modelParams: {}, createdAt: new Date(), updatedAt: new Date() },
+    ]);
 
     mockGenerateImages.mockResolvedValue([
       makeGeneration({ id: "gen-new-model", status: "pending" }),
@@ -895,18 +909,11 @@ describe("CanvasModelSelector", () => {
       imageUrl: "https://example.com/img.png",
     });
 
-    // Dispatch SET_SELECTED_MODEL to a different model, simulating user
-    // having changed the model in the header selector before generating.
-    renderDetailView({
-      generation,
-      extraChildren: (
-        <DispatchOnMount
-          action={{
-            type: "SET_SELECTED_MODEL",
-            modelId: "stability-ai/sdxl",
-          }}
-        />
-      ),
+    renderDetailView({ generation });
+
+    // Wait for model settings to be fetched
+    await act(async () => {
+      await Promise.resolve();
     });
 
     // Open variation popover via toolbar click
@@ -921,7 +928,7 @@ describe("CanvasModelSelector", () => {
     const generateBtn = screen.getByTestId("variation-generate-button");
     await user.click(generateBtn);
 
-    // Assert that the user-selected model was used, not the original
+    // Assert that the settings-resolved model was used, not the original
     await waitFor(() => {
       expect(mockGenerateImages).toHaveBeenCalledTimes(1);
     });
@@ -939,10 +946,11 @@ describe("CanvasModelSelector", () => {
   // -------------------------------------------------------------------------
 
   /**
-   * AC-11: GIVEN der User waehlt ein Model das img2img nicht unterstuetzt
-   *        WHEN der Selector das Model akzeptiert
-   *        THEN wird automatisch zum ersten img2img-faehigen Model gewechselt
-   *        und ein Toast-Hinweis angezeigt
+   * AC-11 (updated for slice-08): CanvasModelSelector now uses local state.
+   * GIVEN the user selects a model that doesn't support img2img
+   * WHEN the selector processes the selection
+   * THEN it auto-switches to the first img2img-capable model and shows a toast.
+   * Note: selectedModelId no longer exists in context -- the selector manages state locally.
    */
   it("AC-11: should auto-switch to first img2img-capable model and show toast when incompatible model is selected", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
@@ -979,17 +987,9 @@ describe("CanvasModelSelector", () => {
       .mockResolvedValueOnce(false)  // iteration: bad model again
       .mockResolvedValueOnce(true);  // iteration: good model
 
-    let latestState: ReturnType<typeof useCanvasDetail>["state"] | null =
-      null;
-
     render(
       <CanvasDetailProvider initialGenerationId="gen-autoswitch">
         <CanvasModelSelector initialModelId="black-forest-labs/flux-2-max" />
-        <StateReader
-          onState={(s) => {
-            latestState = s;
-          }}
-        />
       </CanvasDetailProvider>
     );
 
@@ -1031,11 +1031,10 @@ describe("CanvasModelSelector", () => {
       );
     });
 
-    // State should have been updated to the first compatible model
+    // After auto-switch, the selector should display the compatible model name
     await waitFor(() => {
-      expect(latestState!.selectedModelId).toBe(
-        "good-vendor/img2img-model"
-      );
+      const selectorBtn = screen.getByTestId("canvas-model-selector");
+      expect(selectorBtn).toHaveTextContent("img2img-model");
     });
   });
 });

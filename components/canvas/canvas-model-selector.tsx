@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { ChevronDown, Library } from "lucide-react";
 import { toast } from "sonner";
-import { useCanvasDetail } from "@/lib/canvas-detail-context";
 import { getCollectionModels, checkImg2ImgSupport } from "@/app/actions/models";
 import { ModelBrowserDrawer } from "@/components/models/model-browser-drawer";
 import { Button } from "@/components/ui/button";
@@ -41,27 +40,23 @@ function formatModelDisplayName(modelId: string): string {
 // CanvasModelSelector
 // ---------------------------------------------------------------------------
 
+/**
+ * @deprecated This component is scheduled for removal in Slice 12.
+ * Model selection is now handled via settings-based resolution (model_settings table).
+ * The component uses local state only and no longer interacts with CanvasDetailContext.
+ */
 export function CanvasModelSelector({
   initialModelId,
 }: CanvasModelSelectorProps) {
-  const { state, dispatch } = useCanvasDetail();
-
-  // Track previous initialModelId to detect navigation to a different image
+  // Use local state instead of context (selectedModelId removed from context in slice-08)
+  const [selectedModelId, setSelectedModelId] = useState(initialModelId);
   const prevInitialModelIdRef = useRef(initialModelId);
 
-  // Initialize or reset selectedModelId when navigating to a different image
-  useEffect(() => {
-    if (prevInitialModelIdRef.current !== initialModelId) {
-      // Image changed: reset to the new image's model
-      dispatch({ type: "SET_SELECTED_MODEL", modelId: initialModelId });
-      prevInitialModelIdRef.current = initialModelId;
-    } else if (!state.selectedModelId && initialModelId) {
-      // First render: initialize from the image's model
-      dispatch({ type: "SET_SELECTED_MODEL", modelId: initialModelId });
-    }
-  }, [initialModelId, state.selectedModelId, dispatch]);
-
-  const selectedModelId = state.selectedModelId ?? initialModelId;
+  // Reset local model when navigating to a different image
+  if (prevInitialModelIdRef.current !== initialModelId) {
+    setSelectedModelId(initialModelId);
+    prevInitialModelIdRef.current = initialModelId;
+  }
 
   // Collection models state for the browser drawer
   const [collectionModels, setCollectionModels] = useState<CollectionModel[]>(
@@ -147,7 +142,7 @@ export function CanvasModelSelector({
             }
           }
           if (supports) {
-            dispatch({ type: "SET_SELECTED_MODEL", modelId: mId });
+            setSelectedModelId(mId);
             return;
           }
         }
@@ -155,9 +150,9 @@ export function CanvasModelSelector({
         return;
       }
 
-      dispatch({ type: "SET_SELECTED_MODEL", modelId: newModelId });
+      setSelectedModelId(newModelId);
     },
-    [dispatch, img2imgCache, collectionModels]
+    [img2imgCache, collectionModels]
   );
 
   return (

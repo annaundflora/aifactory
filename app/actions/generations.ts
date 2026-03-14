@@ -46,6 +46,10 @@ interface UpscaleImageInput {
   sourceImageUrl: string;
   scale: 2 | 4;
   sourceGenerationId?: string;
+  /** Model ID for upscaling (resolved from settings). Used by slice-07+ generation service. */
+  modelId?: string;
+  /** Model parameters for upscaling (resolved from settings). Used by slice-07+ generation service. */
+  modelParams?: Record<string, unknown>;
 }
 
 interface RetryGenerationInput {

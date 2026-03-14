@@ -30,7 +30,6 @@ function makeInitialState(
     redoStack: [],
     isGenerating: false,
     chatSessionId: null,
-    selectedModelId: null,
     ...overrides,
   };
 }
@@ -49,7 +48,7 @@ describe("canvasDetailReducer", () => {
      *       WHEN der State abgefragt wird
      *       THEN enthaelt er currentGenerationId: "gen-abc-123",
      *       activeToolId: null, undoStack: [], redoStack: [],
-     *       isGenerating: false, chatSessionId: null, selectedModelId: null
+     *       isGenerating: false, chatSessionId: null
      */
     const state = makeInitialState();
 
@@ -59,7 +58,6 @@ describe("canvasDetailReducer", () => {
     expect(state.redoStack).toEqual([]);
     expect(state.isGenerating).toBe(false);
     expect(state.chatSessionId).toBeNull();
-    expect(state.selectedModelId).toBeNull();
   });
 
   // -------------------------------------------------------------------------

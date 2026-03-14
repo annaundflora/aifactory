@@ -18,7 +18,6 @@ const { mockDispatch, mockState } = vi.hoisted(() => ({
     redoStack: [] as string[],
     isGenerating: false,
     chatSessionId: null,
-    selectedModelId: null,
   },
 }));
 
@@ -76,7 +75,6 @@ function makeInitialState(
     redoStack: [],
     isGenerating: false,
     chatSessionId: null,
-    selectedModelId: null,
     ...overrides,
   };
 }
