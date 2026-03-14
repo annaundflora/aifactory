@@ -494,7 +494,6 @@ export function CanvasDetailView({
             onGenerate={handleVariationGenerate}
           />
           <Img2imgPopover
-            generation={currentGeneration}
             onGenerate={handleImg2imgGenerate}
           />
           <UpscalePopover

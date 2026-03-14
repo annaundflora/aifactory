@@ -14,7 +14,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { TierToggle } from "@/components/ui/tier-toggle";
 import { MaxQualityToggle } from "@/components/ui/max-quality-toggle";
-import type { Generation } from "@/lib/db/queries";
 import type {
   ReferenceRole,
   ReferenceStrength,
@@ -54,7 +53,6 @@ const VARIANTS_MAX = 4;
 // ---------------------------------------------------------------------------
 
 export interface Img2imgPopoverProps {
-  generation: Generation;
   onGenerate?: (params: Img2imgParams) => void;
 }
 
@@ -63,7 +61,6 @@ export interface Img2imgPopoverProps {
 // ---------------------------------------------------------------------------
 
 export function Img2imgPopover({
-  generation,
   onGenerate,
 }: Img2imgPopoverProps) {
   const { state, dispatch } = useCanvasDetail();

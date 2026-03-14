@@ -204,7 +204,7 @@ function renderImg2imgPopover(
   const result = render(
     <CanvasDetailProvider initialGenerationId={generation.id}>
       <SetupDispatcher>
-        <Img2imgPopover generation={generation} onGenerate={onGenerate} />
+        <Img2imgPopover onGenerate={onGenerate} />
       </SetupDispatcher>
     </CanvasDetailProvider>
   );
@@ -253,7 +253,7 @@ function renderImg2imgPopoverWithDispatchAccess(
     <CanvasDetailProvider initialGenerationId={generation.id}>
       <DispatchExposer>
         <SetupDispatcher>
-          <Img2imgPopover generation={generation} onGenerate={onGenerate} />
+          <Img2imgPopover onGenerate={onGenerate} />
         </SetupDispatcher>
       </DispatchExposer>
     </CanvasDetailProvider>
