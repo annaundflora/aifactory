@@ -76,8 +76,8 @@ export const ModelSettingsService = {
     try {
       return await ModelSchemaService.supportsImg2Img(modelId);
     } catch {
-      // If schema fetch fails, conservatively return false
-      return false;
+      // If schema fetch fails, fallback: allow selection (no filter)
+      return true;
     }
   },
 };
