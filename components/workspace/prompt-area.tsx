@@ -1216,7 +1216,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
           {/* ── Group: Prompt Composition ── */}
           {showPromptFields && (
             <div className="space-y-3">
-              <hr className="border-border" />
+              <hr className="border-border my-8" />
               <SectionLabel>Prompt</SectionLabel>
 
               {/* Motiv Textarea (required) */}
@@ -1241,17 +1241,16 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
                     isOpen={assistantOpen}
                     onClick={handleAssistantToggle}
                   />
-                  <Button
+                  <button
                     type="button"
-                    variant="secondary"
-                    size="sm"
                     onClick={() => setShowImprove(true)}
                     disabled={!promptMotiv.trim() || showImprove}
                     data-testid="improve-btn"
+                    className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors border-[#E5E5E3] text-foreground dark:border-[#2A2A2A] dark:text-white disabled:pointer-events-none disabled:opacity-50"
                   >
-                    <Sparkles className="mr-1 size-3" />
+                    <Sparkles className="size-3.5 text-primary" />
                     Improve
-                  </Button>
+                  </button>
                 </div>
               </div>
 
@@ -1306,7 +1305,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
           {/* ── Group: Parameters (collapsible, default closed) ── */}
           {showPromptFields && isSingleModel && schema && !schemaLoading && (
             <Collapsible defaultOpen={false} className="group">
-              <hr className="border-border mb-3" />
+              <hr className="border-border my-8" />
               <CollapsibleTrigger className="flex w-full items-center justify-between py-1">
                 <SectionLabel className="pointer-events-none">Parameters</SectionLabel>
                 <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
@@ -1355,7 +1354,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
           {/* ── Action Bar: Variants + Generate ── */}
           <div className="space-y-3">
-            <hr className="border-border" />
+            <hr className="border-border my-8" />
             {/* Variant Count Stepper — hidden in upscale mode, only when single model */}
             {showVariants && isSingleModel && (
               <div className="flex items-center justify-between px-1">

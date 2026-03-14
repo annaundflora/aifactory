@@ -139,10 +139,10 @@
 @layer components {
   /* Gradient primary — top (rose) to bottom (peach), per design spec */
   .bg-primary {
-    background-image: linear-gradient(180deg, #ee3257, #fa9a66);
+    background-image: linear-gradient(90deg, #ee3257, #fa9a66);
   }
   .hover\:bg-primary\/90:hover {
-    background-image: linear-gradient(180deg, #ee3257cc, #fa9a66cc);
+    background-image: linear-gradient(90deg, #ee3257cc, #fa9a66cc);
   }
 
 }

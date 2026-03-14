@@ -45,14 +45,13 @@ export function ToolbarButton({
             aria-pressed={isActive}
             data-testid={testId}
             className={cn(
-              "flex h-10 w-full items-center justify-center transition-colors duration-150",
+              "flex h-10 w-full items-center justify-center rounded-md transition-colors duration-150",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
               disabled && "pointer-events-none opacity-50",
-              isActive &&
-                "bg-accent text-accent-foreground",
+              isActive && "text-primary",
               !isActive &&
                 !disabled &&
-                "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                "text-muted-foreground hover:text-primary"
             )}
           >
             <Icon className="size-4" />

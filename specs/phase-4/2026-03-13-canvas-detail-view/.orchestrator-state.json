@@ -1,0 +1,29 @@
+{
+  "spec_path": "specs/phase-4/2026-03-13-canvas-detail-view",
+  "feature_name": "canvas-detail-view",
+  "status": "completed",
+  "current_state": "feature_complete",
+  "current_slice_id": null,
+  "current_wave": null,
+  "pipeline_step": "DONE",
+  "retry_count": 0,
+  "failed_stage": null,
+  "waves": [
+    { "id": 1, "slices": ["slice-01"], "status": "complete" },
+    { "id": 2, "slices": ["slice-02"], "status": "complete" },
+    { "id": 3, "slices": ["slice-03", "slice-04"], "status": "complete" },
+    { "id": 4, "slices": ["slice-05"], "status": "complete" },
+    { "id": 5, "slices": ["slice-06", "slice-07", "slice-08", "slice-09"], "status": "complete" },
+    { "id": 6, "slices": ["slice-10", "slice-11", "slice-12", "slice-13"], "status": "complete" },
+    { "id": 7, "slices": ["slice-14"], "status": "complete" },
+    { "id": 8, "slices": ["slice-15"], "status": "complete" },
+    { "id": 9, "slices": ["slice-16"], "status": "complete" },
+    { "id": 10, "slices": ["slice-17"], "status": "complete" },
+    { "id": 11, "slices": ["slice-18"], "status": "complete" }
+  ],
+  "completed_slices": ["slice-01","slice-02","slice-03","slice-04","slice-05","slice-06","slice-07","slice-08","slice-09","slice-10","slice-11","slice-12","slice-13","slice-14","slice-15","slice-16","slice-17","slice-18"],
+  "total_tests_passing": 1262,
+  "worktree_path": "worktrees/canvas-detail-view",
+  "branch": "feature/canvas-detail-view",
+  "issue_number": null
+}

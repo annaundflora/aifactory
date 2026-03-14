@@ -43,24 +43,24 @@ export function PromptTabs({
       onValueChange={(value) => onTabChange(value as PromptTab)}
       data-testid="prompt-tabs"
     >
-      <TabsList className="w-full rounded-none border-b border-border bg-transparent p-0 h-auto">
+      <TabsList variant="line" className="w-full rounded-none border-b border-border bg-transparent p-0 h-auto">
         <TabsTrigger
           value="prompt"
-          className="flex-1 rounded-none border-b-2 border-transparent pb-2 pt-0 text-[13px] font-semibold text-muted-foreground transition-colors data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none bg-transparent"
+          className="flex-1 rounded-none border-b-2 border-transparent pb-2 pt-0 text-[13px] font-semibold text-muted-foreground transition-colors data-[state=active]:border-b-primary! data-[state=active]:text-primary data-[state=active]:shadow-none bg-transparent data-[state=active]:bg-transparent after:hidden"
           data-testid="tab-prompt"
         >
           Prompt
         </TabsTrigger>
         <TabsTrigger
           value="history"
-          className="flex-1 rounded-none border-b-2 border-transparent pb-2 pt-0 text-[13px] font-medium text-muted-foreground transition-colors data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none bg-transparent"
+          className="flex-1 rounded-none border-b-2 border-transparent pb-2 pt-0 text-[13px] font-medium text-muted-foreground transition-colors data-[state=active]:border-b-primary! data-[state=active]:text-primary data-[state=active]:shadow-none bg-transparent data-[state=active]:bg-transparent after:hidden"
           data-testid="tab-history"
         >
           History
         </TabsTrigger>
         <TabsTrigger
           value="favorites"
-          className="flex-1 rounded-none border-b-2 border-transparent pb-2 pt-0 text-[13px] font-medium text-muted-foreground transition-colors data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none bg-transparent"
+          className="flex-1 rounded-none border-b-2 border-transparent pb-2 pt-0 text-[13px] font-medium text-muted-foreground transition-colors data-[state=active]:border-b-primary! data-[state=active]:text-primary data-[state=active]:shadow-none bg-transparent data-[state=active]:bg-transparent after:hidden"
           data-testid="tab-favorites"
         >
           Favorites

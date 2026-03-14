@@ -87,6 +87,12 @@ Vision und Phasen definiert. Noch kein Code. Nächster Schritt: Discovery für P
 | Bug | Priority | Status | Log | Phase |
 |-----|----------|--------|-----|-------|
 | Multi-Model Rate Limiting (parallel -> sequentiell) | Hoch | ✅ Behoben | [BUG](specs/phase-2/2026-03-07-model-cards/BUG-multi-model-rate-limit.md) | P2: Model Cards |
+| Detail-View nutzt nicht volle Fensterbreite | 🔴 Hoch | 🔴 Neu | [BUG](specs/phase-4/2026-03-13-canvas-detail-view/BUG-detail-view-width-constraint.md) | P4: Canvas Detail-View |
+| Vertikaler Overflow (Bild + Thumbnails) | 🔴 Hoch | 🔴 Neu | [BUG](specs/phase-4/2026-03-13-canvas-detail-view/BUG-detail-view-vertical-overflow.md) | P4: Canvas Detail-View |
+| Details-Overlay wird nicht gerendert | 🔴 Hoch | 🔴 Neu | [BUG](specs/phase-4/2026-03-13-canvas-detail-view/BUG-details-overlay-not-rendered.md) | P4: Canvas Detail-View |
+| Tool-Popovers falsch positioniert | 🔴 Hoch | 🔴 Neu | [BUG](specs/phase-4/2026-03-13-canvas-detail-view/BUG-popover-positioning.md) | P4: Canvas Detail-View |
+| Chat-Panel nicht eingebunden | 🔴 Hoch | 🔴 Neu | [BUG](specs/phase-4/2026-03-13-canvas-detail-view/BUG-chat-panel-not-wired.md) | P4: Canvas Detail-View |
+| In-Place Generation aktualisiert Bild nicht | 🔴 Hoch | 🔴 Neu | [BUG](specs/phase-4/2026-03-13-canvas-detail-view/BUG-in-place-generation-no-update.md) | P4: Canvas Detail-View |
 
 ## Geparkt (Nicht jetzt)
 
