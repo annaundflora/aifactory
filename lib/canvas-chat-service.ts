@@ -2,9 +2,11 @@
 
 // ---------------------------------------------------------------------------
 // CanvasChatService
-// SSE client for Canvas Agent: session creation (POST), message sending
-// (POST + SSE stream parsing), typed events, 60s timeout.
+// Thin layer over shared SSE utilities for Canvas Agent communication.
+// Session creation (POST) + message sending with canvas-specific event mapping.
 // ---------------------------------------------------------------------------
+
+import { consumeSSEStream } from "@/lib/shared/sse-stream";
 
 // ---------------------------------------------------------------------------
 // DTOs (matching architecture.md API Design > DTOs)
@@ -66,47 +68,11 @@ const SSE_TIMEOUT_MS = 60_000;
 const CANVAS_SESSIONS_URL = "/api/assistant/canvas/sessions";
 
 // ---------------------------------------------------------------------------
-// SSE Line Parser (reuses pattern from use-assistant-runtime.ts)
-// ---------------------------------------------------------------------------
-
-function parseSSEChunk(text: string): Array<{ event: string; data: string }> {
-  const events: Array<{ event: string; data: string }> = [];
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
-
-  let eventType = "";
-  let dataLines: string[] = [];
-
-  const flush = () => {
-    if (eventType && dataLines.length > 0) {
-      events.push({ event: eventType, data: dataLines.join("\n") });
-    }
-    eventType = "";
-    dataLines = [];
-  };
-
-  for (const line of lines) {
-    if (line === "") {
-      flush();
-    } else if (line.startsWith("event:")) {
-      if (eventType && dataLines.length > 0) {
-        flush();
-      }
-      eventType = line.slice(6).trim();
-    } else if (line.startsWith("data:")) {
-      dataLines.push(line.slice(5).trim());
-    }
-  }
-
-  // Do NOT flush here — incomplete events (no trailing \n\n) stay in the
-  // caller's buffer and will be processed in the next chunk or at stream end.
-  return events;
-}
-
-// ---------------------------------------------------------------------------
 // parseSSEEvent — maps raw event type + data string to typed CanvasSSEEvent
+// (Canvas-specific event mapping — stays here, not in shared)
 // ---------------------------------------------------------------------------
 
-function parseSSEEvent(
+export function parseSSEEvent(
   eventType: string,
   rawData: string
 ): CanvasSSEEvent | null {
@@ -164,7 +130,7 @@ function parseSSEEvent(
 
 // ---------------------------------------------------------------------------
 // createSession
-// AC-1: POST /api/assistant/canvas/sessions with project_id + image_context
+// POST /api/assistant/canvas/sessions with project_id + image_context
 // ---------------------------------------------------------------------------
 
 export async function createSession(
@@ -197,16 +163,18 @@ export async function createSession(
 
 // ---------------------------------------------------------------------------
 // sendMessage
-// AC-2: POST /api/assistant/canvas/sessions/{id}/messages
-// AC-3/4/6/8/9: Returns AsyncGenerator yielding typed SSE events with 60s timeout
+// POST /api/assistant/canvas/sessions/{id}/messages
+// Uses shared consumeSSEStream with canvas-specific event mapping.
+// Callback pattern: onEvent is called for each parsed CanvasSSEEvent.
 // ---------------------------------------------------------------------------
 
-export async function* sendMessage(
+export async function sendMessage(
   sessionId: string,
   content: string,
   imageContext: CanvasImageContext,
+  onEvent: (event: CanvasSSEEvent) => void,
   signal?: AbortSignal
-): AsyncGenerator<CanvasSSEEvent> {
+): Promise<void> {
   const response = await fetch(
     `${CANVAS_SESSIONS_URL}/${sessionId}/messages`,
     {
@@ -226,90 +194,14 @@ export async function* sendMessage(
     );
   }
 
-  if (!response.body) {
-    throw new Error("Response body is null");
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder("utf-8");
-  let buffer = "";
-
-  // AC-8: 60s timeout — emits timeout error event when no SSE event received within 60s
-  let timedOut = false;
-  let lastEventAt = Date.now();
-
-  try {
-    // Use a timeout-checked read loop
-    while (true) {
-      // Check for timeout before each read
-      if (Date.now() - lastEventAt >= SSE_TIMEOUT_MS) {
-        timedOut = true;
-        break;
+  await consumeSSEStream(
+    response,
+    (eventType, rawData) => {
+      const parsed = parseSSEEvent(eventType, rawData);
+      if (parsed !== null) {
+        onEvent(parsed);
       }
-
-      // Race the read() against a timeout slice
-      const timeRemaining = SSE_TIMEOUT_MS - (Date.now() - lastEventAt);
-      let timeoutId: ReturnType<typeof setTimeout> | undefined;
-      const timeoutPromise = new Promise<{ done: true; value: undefined }>(
-        (resolve) => {
-          timeoutId = setTimeout(
-            () => resolve({ done: true as const, value: undefined }),
-            timeRemaining
-          );
-        }
-      );
-      const readPromise = reader.read();
-
-      const result = await Promise.race([readPromise, timeoutPromise]);
-      clearTimeout(timeoutId);
-
-      if (result.done) {
-        // Either stream ended or timeout fired
-        if (Date.now() - lastEventAt >= SSE_TIMEOUT_MS) {
-          timedOut = true;
-        }
-        break;
-      }
-
-      buffer += decoder.decode(result.value, { stream: true });
-
-      const normalized = buffer.replace(/\r\n/g, "\n");
-      const lastBoundary = normalized.lastIndexOf("\n\n");
-
-      if (lastBoundary === -1) continue;
-
-      const complete = normalized.slice(0, lastBoundary + 2);
-      buffer = normalized.slice(lastBoundary + 2);
-
-      const rawEvents = parseSSEChunk(complete);
-      for (const { event, data } of rawEvents) {
-        const parsed = parseSSEEvent(event, data);
-        if (parsed !== null) {
-          lastEventAt = Date.now(); // reset timeout on each valid event
-          yield parsed;
-        }
-      }
-    }
-
-    // Process remaining buffer after stream ends
-    if (!timedOut && buffer.trim()) {
-      const rawEvents = parseSSEChunk(buffer);
-      for (const { event, data } of rawEvents) {
-        const parsed = parseSSEEvent(event, data);
-        if (parsed !== null) {
-          yield parsed;
-        }
-      }
-    }
-
-    // AC-8: Emit timeout error event
-    if (timedOut) {
-      yield {
-        type: "error",
-        message: "Keine Antwort. Bitte erneut versuchen.",
-      } satisfies SSEErrorEvent;
-    }
-  } finally {
-    reader.releaseLock();
-  }
+    },
+    { signal, timeoutMs: SSE_TIMEOUT_MS }
+  );
 }

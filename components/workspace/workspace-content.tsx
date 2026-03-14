@@ -141,7 +141,7 @@ export function WorkspaceContent({
   // ----- Detail-View open -----
   if (detailViewOpen && selectedGeneration && selectedGenerationId) {
     return (
-      <div className="flex flex-1 overflow-hidden" data-testid="workspace-detail-view">
+      <div className="fixed inset-0 z-50 flex overflow-hidden bg-background" data-testid="workspace-detail-view">
         <CanvasDetailProvider initialGenerationId={selectedGenerationId}>
           <CanvasDetailView
             generation={selectedGeneration}

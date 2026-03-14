@@ -1,4 +1,4 @@
-import { eq, desc, sql, and, asc } from "drizzle-orm";
+import { eq, desc, sql, and, asc, or } from "drizzle-orm";
 import { db } from "./index";
 import { projects, generations, favoriteModels, projectSelectedModels, assistantSessions, referenceImages, generationReferences } from "./schema";
 
@@ -156,6 +156,46 @@ export async function getSiblingsByBatchId(
     .where(
       and(
         eq(generations.batchId, batchId),
+        eq(generations.status, "completed")
+      )
+    )
+    .orderBy(asc(generations.createdAt));
+}
+
+/**
+ * Returns the "variant family" for a generation: source + all direct variants.
+ *
+ * Logic:
+ * - familyRootId = sourceGenerationId ?? currentGenerationId
+ * - Finds: the root itself + all variants pointing to the root + batch siblings
+ * - Only completed generations, sorted by createdAt ASC.
+ */
+export async function getVariantFamily(
+  batchId: string | null,
+  sourceGenerationId: string | null,
+  currentGenerationId: string
+): Promise<Generation[]> {
+  const familyRootId = sourceGenerationId ?? currentGenerationId;
+
+  const conditions = [];
+
+  // Batch siblings (for txt2img N>1)
+  if (batchId) {
+    conditions.push(eq(generations.batchId, batchId));
+  }
+
+  // The family root (source image) itself
+  conditions.push(eq(generations.id, familyRootId));
+
+  // All direct variants of the family root
+  conditions.push(eq(generations.sourceGenerationId, familyRootId));
+
+  return db
+    .select()
+    .from(generations)
+    .where(
+      and(
+        or(...conditions),
         eq(generations.status, "completed")
       )
     )

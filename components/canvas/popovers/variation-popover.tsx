@@ -108,7 +108,8 @@ export function VariationPopover({
       <PopoverAnchor asChild>
         <span
           data-testid="variation-popover-anchor"
-          className="pointer-events-none absolute"
+          className="pointer-events-none absolute left-0 h-10 w-px"
+          style={{ top: 8 }}
         />
       </PopoverAnchor>
 

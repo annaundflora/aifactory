@@ -1,14 +1,18 @@
 // ---------------------------------------------------------------------------
-// ChatMessage type for Canvas Chat
-// Used by CanvasChatPanel, CanvasChatMessages, CanvasChatInput
-// Consumer: slice-17-canvas-chat-frontend
+// Unified ChatMessage type for Canvas Chat AND Prompt Assistant
+// Shared by: CanvasChatPanel, ChatThread, ChatInput, AssistantContext
 // ---------------------------------------------------------------------------
 
 export interface ChatMessage {
   id: string;
-  role: "user" | "bot" | "system" | "separator";
+  role: "user" | "assistant" | "system" | "separator";
   content: string;
+  /** True when the assistant message is still streaming */
+  isStreaming?: boolean;
+  /** Image URL attached to a user message */
+  imageUrl?: string;
+  /** Clarification chips shown below an assistant message */
   chips?: string[];
-  /** True when this bot message represents an error (SSE error event or timeout) */
+  /** True when this assistant message represents an error */
   isError?: boolean;
 }

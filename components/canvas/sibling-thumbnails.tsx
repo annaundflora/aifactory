@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { getSiblingGenerations } from "@/app/actions/generations";
+import { getVariantFamilyAction } from "@/app/actions/generations";
 import { type Generation } from "@/lib/db/queries";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 
 export interface SiblingThumbnailsProps {
   batchId: string | null;
+  sourceGenerationId: string | null;
   currentGenerationId: string;
   onSelect: (id: string) => void;
 }
@@ -21,33 +22,37 @@ export interface SiblingThumbnailsProps {
 // ---------------------------------------------------------------------------
 
 /**
- * Horizontal thumbnail row showing all sibling images from the same batch.
+ * Horizontal thumbnail row showing the variant family:
+ * source image + all direct variants + batch siblings.
  * The currently active image is visually highlighted with a ring/border.
- * Not rendered when batchId is null (single-image generation).
  */
 export function SiblingThumbnails({
   batchId,
+  sourceGenerationId,
   currentGenerationId,
   onSelect,
 }: SiblingThumbnailsProps) {
   const [siblings, setSiblings] = useState<Generation[]>([]);
   const [isPending, startTransition] = useTransition();
 
-  // Fetch siblings whenever batchId changes
+  // Fetch variant family whenever relevant IDs change
   useEffect(() => {
-    if (!batchId) {
+    if (!batchId && !sourceGenerationId) {
       setSiblings([]);
       return;
     }
 
     startTransition(async () => {
-      const result = await getSiblingGenerations(batchId);
+      const result = await getVariantFamilyAction(batchId, sourceGenerationId, currentGenerationId);
       setSiblings(result);
     });
-  }, [batchId]);
+  }, [batchId, sourceGenerationId, currentGenerationId]);
 
-  // Don't render anything for single-image generations or single siblings
-  if (!batchId || (!isPending && siblings.length <= 1)) {
+  // Don't render anything for single images
+  if (!batchId && !sourceGenerationId) {
+    return null;
+  }
+  if (!isPending && siblings.length <= 1) {
     return null;
   }
 

@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 
 import { ChatThread } from "../chat-thread";
-import type { Message } from "@/lib/assistant/assistant-context";
+import type { ChatMessage as Message } from "@/lib/types/chat-message";
 
 // ---------------------------------------------------------------------------
 // Test data factories
@@ -34,8 +34,9 @@ function createAssistantMessage(
 function createErrorMessage(content: string, id?: string): Message {
   return {
     id: id ?? `error-${Date.now()}-${Math.random()}`,
-    role: "error",
+    role: "assistant",
     content,
+    isError: true,
   };
 }
 

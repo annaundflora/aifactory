@@ -11,6 +11,8 @@ const UNDO_STACK_MAX = 20;
 
 export interface CanvasDetailState {
   currentGenerationId: string;
+  /** Source of the last image change — "navigation" for Prev/Next, "sibling" for sibling click */
+  lastImageChangeSource: "sibling" | "navigation" | null;
   activeToolId: string | null;
   undoStack: string[];
   redoStack: string[];
@@ -24,7 +26,7 @@ export interface CanvasDetailState {
 // ---------------------------------------------------------------------------
 
 export type CanvasDetailAction =
-  | { type: "SET_CURRENT_IMAGE"; generationId: string }
+  | { type: "SET_CURRENT_IMAGE"; generationId: string; source?: "sibling" | "navigation" }
   | { type: "SET_ACTIVE_TOOL"; toolId: string }
   | { type: "PUSH_UNDO"; generationId: string }
   | { type: "POP_UNDO" }
@@ -47,6 +49,7 @@ export function canvasDetailReducer(
       return {
         ...state,
         currentGenerationId: action.generationId,
+        lastImageChangeSource: action.source ?? null,
       };
 
     case "SET_ACTIVE_TOOL":
@@ -155,6 +158,7 @@ export function CanvasDetailProvider({
 }: CanvasDetailProviderProps) {
   const [state, dispatch] = useReducer(canvasDetailReducer, {
     currentGenerationId: initialGenerationId,
+    lastImageChangeSource: null,
     activeToolId: null,
     undoStack: [],
     redoStack: [],

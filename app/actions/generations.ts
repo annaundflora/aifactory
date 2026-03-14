@@ -7,6 +7,7 @@ import {
   getGeneration,
   deleteGeneration as deleteGenerationFromDb,
   getSiblingsByBatchId,
+  getVariantFamily,
   type Generation,
 } from "@/lib/db/queries";
 import { StorageService } from "@/lib/clients/storage";
@@ -26,6 +27,8 @@ interface GenerateImagesInput {
   generationMode?: string;
   sourceImageUrl?: string;
   strength?: number;
+  /** ID of the generation this variant was created from. */
+  sourceGenerationId?: string;
   /** Multi-image references (slice-09+). Passed through for slice-13 to consume. */
   references?: Array<{
     referenceImageId: string;
@@ -129,7 +132,8 @@ export async function generateImages(
       input.generationMode,
       input.sourceImageUrl,
       input.strength,
-      input.references
+      input.references,
+      input.sourceGenerationId
     );
     return generations;
   } catch (error: unknown) {
@@ -268,6 +272,23 @@ export async function getSiblingGenerations(
     return await getSiblingsByBatchId(batchId);
   } catch (error) {
     console.error("getSiblingGenerations error:", error);
+    return [];
+  }
+}
+
+/**
+ * Returns the variant family for a generation:
+ * source image + all direct variants + batch siblings.
+ */
+export async function getVariantFamilyAction(
+  batchId: string | null,
+  sourceGenerationId: string | null,
+  currentGenerationId: string
+): Promise<Generation[]> {
+  try {
+    return await getVariantFamily(batchId, sourceGenerationId, currentGenerationId);
+  } catch (error) {
+    console.error("getVariantFamilyAction error:", error);
     return [];
   }
 }

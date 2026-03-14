@@ -18,14 +18,8 @@ import { useWorkspaceVariation } from "@/lib/workspace-state";
 // Types
 // ---------------------------------------------------------------------------
 
-export interface Message {
-  id: string;
-  role: "user" | "assistant" | "error";
-  content: string;
-  /** Whether the assistant message is still streaming */
-  isStreaming?: boolean;
-  imageUrl?: string;
-}
+export type { ChatMessage as Message } from "@/lib/types/chat-message";
+import type { ChatMessage as Message } from "@/lib/types/chat-message";
 
 export interface DraftPrompt {
   motiv: string;
@@ -201,8 +195,9 @@ function assistantReducer(
           ...state.messages,
           {
             id: `error-${Date.now()}`,
-            role: "error",
+            role: "assistant",
             content: action.content,
+            isError: true,
           },
         ],
         isStreaming: false,

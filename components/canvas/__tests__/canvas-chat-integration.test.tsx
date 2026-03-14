@@ -21,6 +21,15 @@ vi.mock("lucide-react", () => ({
   ArrowUp: (props: Record<string, unknown>) => (
     <span data-testid="arrow-up-icon" {...props} />
   ),
+  Square: (props: Record<string, unknown>) => (
+    <span data-testid="square-icon" {...props} />
+  ),
+}));
+
+// Mock the model selector (uses radix Select which needs complex setup in jsdom)
+vi.mock("@/components/assistant/model-selector", () => ({
+  ModelSelector: () => <div data-testid="model-selector-mock" />,
+  DEFAULT_MODEL_SLUG: "anthropic/claude-sonnet-4.6",
 }));
 
 // Mock canvas-chat-service
@@ -96,15 +105,21 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
 }
 
 /**
- * Creates an AsyncGenerator from a list of SSE events.
- * Can optionally accept a resolve function to delay yielding (for simulating async streams).
+ * Creates a mock implementation for sendMessage that calls onEvent with each event.
+ * sendMessage signature: (sessionId, content, imageContext, onEvent, signal?) => Promise<void>
  */
-function createMockSSEStream(events: CanvasSSEEvent[]): AsyncGenerator<CanvasSSEEvent> {
-  return (async function* () {
+function mockSSEEvents(events: CanvasSSEEvent[]) {
+  return async (
+    _sessionId: string,
+    _content: string,
+    _imageContext: unknown,
+    onEvent: (event: CanvasSSEEvent) => void,
+    _signal?: AbortSignal
+  ) => {
     for (const event of events) {
-      yield event;
+      onEvent(event);
     }
-  })();
+  };
 }
 
 /**
@@ -130,7 +145,6 @@ function renderChatPanel(
 
 /**
  * Helper component that lets us dispatch actions from inside the context.
- * This is used for tests that need to change context state (e.g., isGenerating, currentGenerationId).
  */
 function ContextDispatcher({
   action,
@@ -198,6 +212,7 @@ function SwitchableGeneration({
           dispatch({
             type: "SET_CURRENT_IMAGE",
             generationId: generations[nextIndex].id,
+            source: "navigation",
           });
         }}
       >
@@ -216,19 +231,13 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
     vi.clearAllMocks();
     uuidCounter = 0;
     mockCreateSession.mockResolvedValue("test-session-id");
-    mockSendMessage.mockReturnValue(createMockSSEStream([]));
+    mockSendMessage.mockImplementation(mockSSEEvents([]));
   });
 
   // -------------------------------------------------------------------------
   // AC-1: Auto-Session-Erstellung beim Mount
   // -------------------------------------------------------------------------
 
-  /**
-   * AC-1: GIVEN die CanvasDetailView ist mit einem Bild geoeffnet und das Chat-Panel ist expanded
-   *       WHEN das Panel erstmals rendert
-   *       THEN wird automatisch eine Canvas-Session via POST /api/assistant/canvas/sessions
-   *            erstellt mit der project_id und dem aktuellen image_context
-   */
   it("AC-1: should create canvas session on mount with current image context", async () => {
     const generation = makeGeneration({
       id: "gen-mount-1",
@@ -269,12 +278,6 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
   // AC-2: Send-Button sendet Nachricht an Backend
   // -------------------------------------------------------------------------
 
-  /**
-   * AC-2: GIVEN eine Canvas-Session existiert
-   *       WHEN der User "mach den Hintergrund blauer" eingibt und Send klickt
-   *       THEN wird POST /api/assistant/canvas/sessions/{id}/messages aufgerufen
-   *            mit dem Nachrichten-Text und dem aktuellen image_context
-   */
   it("AC-2: should call sendMessage with text and image_context when user sends message", async () => {
     const user = userEvent.setup();
     const generation = makeGeneration({
@@ -285,18 +288,16 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
       modelParams: {},
     });
 
-    mockSendMessage.mockReturnValue(createMockSSEStream([{ type: "text-done" }]));
+    mockSendMessage.mockImplementation(mockSSEEvents([{ type: "text-done" }]));
 
     renderChatPanel({ generation, projectId: "project-send" });
 
-    // Wait for session creation
     await waitFor(() => {
       expect(mockCreateSession).toHaveBeenCalledTimes(1);
     });
 
-    // Type and send message
-    const textarea = screen.getByTestId("canvas-chat-input-textarea");
-    const sendButton = screen.getByTestId("canvas-chat-send-button");
+    const textarea = screen.getByTestId("chat-input-textarea");
+    const sendButton = screen.getByTestId("send-btn");
 
     await user.type(textarea, "mach den Hintergrund blauer");
     await user.click(sendButton);
@@ -314,6 +315,7 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
         model_id: "model-1",
         generation_id: "gen-send-1",
       }),
+      expect.any(Function), // onEvent callback
       expect.any(AbortSignal)
     );
 
@@ -327,35 +329,35 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
   // AC-3: Streaming-Indicator waehrend text-delta
   // -------------------------------------------------------------------------
 
-  /**
-   * AC-3: GIVEN ein SSE-Stream laeuft
-   *       WHEN text-delta Events empfangen werden
-   *       THEN wird der Bot-Antwort-Text inkrementell in einer neuen Bot-Message-Bubble
-   *            aufgebaut (Streaming-Indicator sichtbar waehrend des Streams)
-   */
   it("AC-3: should show streaming indicator while text-delta events are being received", async () => {
     const user = userEvent.setup();
 
-    // Use a deferred stream to control event timing
+    // Use a deferred callback to control event timing
     let resolveStream!: () => void;
     const streamPromise = new Promise<void>((resolve) => {
       resolveStream = resolve;
     });
 
-    mockSendMessage.mockReturnValue(
-      (async function* () {
-        yield { type: "text-delta", content: "Hello" } as CanvasSSEEvent;
-        // Wait before yielding done — this keeps isStreaming=true
+    mockSendMessage.mockImplementation(
+      async (
+        _sessionId: string,
+        _content: string,
+        _imageContext: unknown,
+        onEvent: (event: CanvasSSEEvent) => void,
+        _signal?: AbortSignal
+      ) => {
+        onEvent({ type: "text-delta", content: "Hello" });
+        // Wait before sending text-done — this keeps isStreaming=true
         await streamPromise;
-        yield { type: "text-done" } as CanvasSSEEvent;
-      })()
+        onEvent({ type: "text-done" });
+      }
     );
 
     renderChatPanel();
     await waitFor(() => expect(mockCreateSession).toHaveBeenCalledTimes(1));
 
-    const textarea = screen.getByTestId("canvas-chat-input-textarea");
-    const sendButton = screen.getByTestId("canvas-chat-send-button");
+    const textarea = screen.getByTestId("chat-input-textarea");
+    const sendButton = screen.getByTestId("send-btn");
 
     await user.type(textarea, "test message");
     await user.click(sendButton);
@@ -367,11 +369,13 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
 
     // Bot message should be building up
     await waitFor(() => {
-      expect(screen.getByTestId("bot-message")).toHaveTextContent("Hello");
+      expect(screen.getByTestId("assistant-message")).toHaveTextContent("Hello");
     });
 
     // Complete the stream
-    resolveStream();
+    await act(async () => {
+      resolveStream();
+    });
 
     // After text-done, streaming indicator should disappear
     await waitFor(() => {
@@ -383,17 +387,11 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
   // AC-4: Streaming-Indicator verschwindet bei text-done
   // -------------------------------------------------------------------------
 
-  /**
-   * AC-4: GIVEN ein SSE-Stream laeuft
-   *       WHEN ein text-done Event empfangen wird
-   *       THEN wird der Streaming-Indicator ausgeblendet und die Bot-Message
-   *            als abgeschlossen markiert
-   */
   it("AC-4: should hide streaming indicator when text-done event is received", async () => {
     const user = userEvent.setup();
 
-    mockSendMessage.mockReturnValue(
-      createMockSSEStream([
+    mockSendMessage.mockImplementation(
+      mockSSEEvents([
         { type: "text-delta", content: "Response complete" },
         { type: "text-done" },
       ])
@@ -402,8 +400,8 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
     renderChatPanel();
     await waitFor(() => expect(mockCreateSession).toHaveBeenCalledTimes(1));
 
-    const textarea = screen.getByTestId("canvas-chat-input-textarea");
-    const sendButton = screen.getByTestId("canvas-chat-send-button");
+    const textarea = screen.getByTestId("chat-input-textarea");
+    const sendButton = screen.getByTestId("send-btn");
 
     await user.type(textarea, "test");
     await user.click(sendButton);
@@ -415,7 +413,7 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
 
     // Bot message should be fully rendered
     await waitFor(() => {
-      expect(screen.getByTestId("bot-message")).toHaveTextContent("Response complete");
+      expect(screen.getByTestId("assistant-message")).toHaveTextContent("Response complete");
     });
   });
 
@@ -423,86 +421,60 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
   // AC-5: Chip-Klick sendet als neue Nachricht
   // -------------------------------------------------------------------------
 
-  /**
-   * AC-5: GIVEN der Agent eine Clarification zurueckgibt mit Chips (z.B. ["Subtil", "Dramatisch"])
-   *       WHEN die Bot-Message gerendert wird
-   *       THEN werden die Chips als klickbare Buttons angezeigt
-   *            und ein Klick auf "Dramatisch" sendet diesen Text als neue Nachricht
-   */
   it("AC-5: should send chip text as new message when clarification chip is clicked", async () => {
     const user = userEvent.setup();
 
     // First call: return a bot message with chips
     let sendCallCount = 0;
-    mockSendMessage.mockImplementation(() => {
-      sendCallCount++;
-      if (sendCallCount === 1) {
-        // First call returns the bot message stream — but we cannot add chips via SSE
-        // because the sendMessage SSE events only support text-delta/text-done/canvas-generate/error.
-        // Chips are part of the ChatMessage model added by the panel.
-        // The test needs a different approach: we need to verify that clicking a chip
-        // calls sendMessage with the chip text.
-        //
-        // Since chips come from bot messages, and the current implementation builds bot
-        // messages from text-delta events (which don't include chips), we need to test
-        // the chip click handler directly. The chip click handler in CanvasChatPanel
-        // (handleChipClick) sends the chip text via sendMessageToBackend.
-        //
-        // For this integration test, we'll render CanvasChatMessages directly with chips
-        // and verify the onChipClick callback, then test that the panel's handleChipClick
-        // calls sendMessage.
-        return createMockSSEStream([
-          { type: "text-delta", content: "Choose style" },
-          { type: "text-done" },
-        ]);
+    mockSendMessage.mockImplementation(
+      async (
+        _sessionId: string,
+        _content: string,
+        _imageContext: unknown,
+        onEvent: (event: CanvasSSEEvent) => void,
+        _signal?: AbortSignal
+      ) => {
+        sendCallCount++;
+        if (sendCallCount === 1) {
+          onEvent({ type: "text-delta", content: "Choose style" });
+          onEvent({ type: "text-done" });
+        } else {
+          onEvent({ type: "text-delta", content: "Applying dramatic style..." });
+          onEvent({ type: "text-done" });
+        }
       }
-      // Second call (from chip click)
-      return createMockSSEStream([
-        { type: "text-delta", content: "Applying dramatic style..." },
-        { type: "text-done" },
-      ]);
-    });
+    );
 
     renderChatPanel();
     await waitFor(() => expect(mockCreateSession).toHaveBeenCalledTimes(1));
 
     // Send initial message to get bot response
-    const textarea = screen.getByTestId("canvas-chat-input-textarea");
-    const sendButton = screen.getByTestId("canvas-chat-send-button");
+    const textarea = screen.getByTestId("chat-input-textarea");
+    const sendButton = screen.getByTestId("send-btn");
     await user.type(textarea, "help");
     await user.click(sendButton);
 
-    // Wait for the first sendMessage to complete
     await waitFor(() => {
       expect(mockSendMessage).toHaveBeenCalledTimes(1);
     });
 
-    // The chip functionality is wired through handleChipClick which calls sendMessageToBackend.
-    // Since the SSE protocol doesn't deliver chips (they would come from application logic),
-    // we verify the chip click mechanism at the CanvasChatMessages level
-    // (already tested in canvas-chat-messages.test.tsx), and here we verify
-    // that the panel's handleChipClick calls sendMessage with the chip text by
-    // testing the integrated flow. We import CanvasChatMessages directly to
-    // verify chip rendering and clicks.
-
-    // For the integration test: verify chip click behavior through the panel.
-    // Since the panel uses handleChipClick which calls sendMessageToBackend,
-    // we verify the plumbing works end-to-end by rendering messages with chips.
-    const { CanvasChatMessages } = await import(
-      "@/components/canvas/canvas-chat-messages"
+    // Verify chip rendering via ChatThread directly
+    const { ChatThread } = await import(
+      "@/components/assistant/chat-thread"
     );
     const chipClickSpy = vi.fn();
 
     const { unmount } = render(
-      <CanvasChatMessages
+      <ChatThread
         messages={[
           {
             id: "bot-chips",
-            role: "bot",
+            role: "assistant",
             content: "Choose style",
             chips: ["Subtil", "Dramatisch"],
           },
         ]}
+        isStreaming={false}
         onChipClick={chipClickSpy}
       />
     );
@@ -510,9 +482,7 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
     const chipButtons = screen.getAllByTestId("chat-chip-button");
     expect(chipButtons).toHaveLength(2);
 
-    // Click "Dramatisch"
     await user.click(chipButtons[1]);
-
     expect(chipClickSpy).toHaveBeenCalledWith("Dramatisch");
 
     unmount();
@@ -522,17 +492,11 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
   // AC-6: canvas-generate Event triggert generateImages
   // -------------------------------------------------------------------------
 
-  /**
-   * AC-6: GIVEN ein SSE-Stream ein canvas-generate Event liefert
-   *       WHEN das Event verarbeitet wird
-   *       THEN wird generateImages() Server Action aufgerufen mit den Parametern
-   *            aus dem Event, isGenerating wird auf true gesetzt
-   */
   it("AC-6: should call generateImages and set isGenerating when canvas-generate event is received", async () => {
     const user = userEvent.setup();
 
-    mockSendMessage.mockReturnValue(
-      createMockSSEStream([
+    mockSendMessage.mockImplementation(
+      mockSSEEvents([
         {
           type: "canvas-generate",
           action: "variation",
@@ -546,13 +510,12 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
     renderChatPanel({ projectId: "project-gen" });
     await waitFor(() => expect(mockCreateSession).toHaveBeenCalledTimes(1));
 
-    const textarea = screen.getByTestId("canvas-chat-input-textarea");
-    const sendButton = screen.getByTestId("canvas-chat-send-button");
+    const textarea = screen.getByTestId("chat-input-textarea");
+    const sendButton = screen.getByTestId("send-btn");
 
     await user.type(textarea, "generate variation");
     await user.click(sendButton);
 
-    // Wait for generateImages to be called
     await waitFor(() => {
       expect(mockGenerateImages).toHaveBeenCalledTimes(1);
     });
@@ -572,8 +535,8 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
   it("AC-6: should set generationMode to img2img when action is img2img", async () => {
     const user = userEvent.setup();
 
-    mockSendMessage.mockReturnValue(
-      createMockSSEStream([
+    mockSendMessage.mockImplementation(
+      mockSSEEvents([
         {
           type: "canvas-generate",
           action: "img2img",
@@ -587,8 +550,8 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
     renderChatPanel({ projectId: "project-img2img" });
     await waitFor(() => expect(mockCreateSession).toHaveBeenCalledTimes(1));
 
-    const textarea = screen.getByTestId("canvas-chat-input-textarea");
-    const sendButton = screen.getByTestId("canvas-chat-send-button");
+    const textarea = screen.getByTestId("chat-input-textarea");
+    const sendButton = screen.getByTestId("send-btn");
 
     await user.type(textarea, "enhance this");
     await user.click(sendButton);
@@ -608,23 +571,17 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
   // AC-7: Chat-Input disabled waehrend Generation
   // -------------------------------------------------------------------------
 
-  /**
-   * AC-7: GIVEN eine Generation via Chat-canvas-generate laeuft
-   *       WHEN das Chat-Panel gerendert wird
-   *       THEN ist der Chat-Input disabled und zeigt keinen weiteren Streaming-Indicator
-   */
   it("AC-7: should disable chat input when isGenerating is true", async () => {
-    // Render with isGenerating set to true via initial action
     renderChatPanelWithDispatcher({
       initialAction: { type: "SET_GENERATING", isGenerating: true },
     });
 
     await waitFor(() => {
-      const textarea = screen.getByTestId("canvas-chat-input-textarea");
+      const textarea = screen.getByTestId("chat-input-textarea");
       expect(textarea).toBeDisabled();
     });
 
-    const sendButton = screen.getByTestId("canvas-chat-send-button");
+    const sendButton = screen.getByTestId("send-btn");
     expect(sendButton).toBeDisabled();
   });
 
@@ -632,19 +589,11 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
   // AC-8: Timeout-Error als Bot-Bubble
   // -------------------------------------------------------------------------
 
-  /**
-   * AC-8: GIVEN der SSE-Stream innerhalb von 60 Sekunden kein Event liefert
-   *       WHEN der Timeout erkannt wird
-   *       THEN wird eine Error-Message als Bot-Bubble angezeigt
-   *            mit "Keine Antwort. Bitte erneut versuchen."
-   *            und der Chat-Input wird wieder enabled
-   */
   it("AC-8: should show error bot message on SSE timeout after 60 seconds", async () => {
     const user = userEvent.setup();
 
-    // Simulate a timeout by emitting an error event (which is what the service does)
-    mockSendMessage.mockReturnValue(
-      createMockSSEStream([
+    mockSendMessage.mockImplementation(
+      mockSSEEvents([
         {
           type: "error",
           message: "Keine Antwort. Bitte erneut versuchen.",
@@ -655,13 +604,12 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
     renderChatPanel();
     await waitFor(() => expect(mockCreateSession).toHaveBeenCalledTimes(1));
 
-    const textarea = screen.getByTestId("canvas-chat-input-textarea");
-    const sendButton = screen.getByTestId("canvas-chat-send-button");
+    const textarea = screen.getByTestId("chat-input-textarea");
+    const sendButton = screen.getByTestId("send-btn");
 
     await user.type(textarea, "test timeout");
     await user.click(sendButton);
 
-    // Error message should appear as a bot bubble
     await waitFor(() => {
       const errorBubble = screen.getByTestId("bot-message-error");
       expect(errorBubble).toBeInTheDocument();
@@ -670,9 +618,8 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
       );
     });
 
-    // Chat input should be re-enabled
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-chat-input-textarea")).not.toBeDisabled();
+      expect(screen.getByTestId("chat-input-textarea")).not.toBeDisabled();
     });
   });
 
@@ -680,17 +627,11 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
   // AC-9: Error-Event als Error-Bubble
   // -------------------------------------------------------------------------
 
-  /**
-   * AC-9: GIVEN der SSE-Stream ein error Event liefert
-   *       WHEN das Event verarbeitet wird
-   *       THEN wird die Fehlerbeschreibung als Error-Bot-Bubble angezeigt
-   *            (visuell als Fehler markiert) und der Chat-Input wird wieder enabled
-   */
   it("AC-9: should show error bot message with description when error SSE event is received", async () => {
     const user = userEvent.setup();
 
-    mockSendMessage.mockReturnValue(
-      createMockSSEStream([
+    mockSendMessage.mockImplementation(
+      mockSSEEvents([
         {
           type: "error",
           message: "Rate limit exceeded. Please wait.",
@@ -701,30 +642,28 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
     renderChatPanel();
     await waitFor(() => expect(mockCreateSession).toHaveBeenCalledTimes(1));
 
-    const textarea = screen.getByTestId("canvas-chat-input-textarea");
-    const sendButton = screen.getByTestId("canvas-chat-send-button");
+    const textarea = screen.getByTestId("chat-input-textarea");
+    const sendButton = screen.getByTestId("send-btn");
 
     await user.type(textarea, "test error");
     await user.click(sendButton);
 
-    // Error message should appear as visually marked error bubble
     await waitFor(() => {
       const errorBubble = screen.getByTestId("bot-message-error");
       expect(errorBubble).toBeInTheDocument();
       expect(errorBubble).toHaveTextContent("Rate limit exceeded. Please wait.");
     });
 
-    // Chat input should be re-enabled (isStreaming set to false after error)
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-chat-input-textarea")).not.toBeDisabled();
+      expect(screen.getByTestId("chat-input-textarea")).not.toBeDisabled();
     });
   });
 
   it("AC-9: should show error bubble with visual error styling (destructive class)", async () => {
     const user = userEvent.setup();
 
-    mockSendMessage.mockReturnValue(
-      createMockSSEStream([
+    mockSendMessage.mockImplementation(
+      mockSSEEvents([
         { type: "error", message: "Something went wrong" },
       ])
     );
@@ -732,8 +671,8 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
     renderChatPanel();
     await waitFor(() => expect(mockCreateSession).toHaveBeenCalledTimes(1));
 
-    const textarea = screen.getByTestId("canvas-chat-input-textarea");
-    const sendButton = screen.getByTestId("canvas-chat-send-button");
+    const textarea = screen.getByTestId("chat-input-textarea");
+    const sendButton = screen.getByTestId("send-btn");
 
     await user.type(textarea, "test");
     await user.click(sendButton);
@@ -741,9 +680,8 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
     await waitFor(() => {
       const errorBubble = screen.getByTestId("bot-message-error");
       expect(errorBubble).toBeInTheDocument();
-      // The error bubble parent (bot-message) should have destructive styling
-      const botMessage = screen.getByTestId("bot-message");
-      expect(botMessage).toBeInTheDocument();
+      const errorMessage = screen.getByTestId("error-message");
+      expect(errorMessage).toBeInTheDocument();
     });
   });
 
@@ -751,12 +689,6 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
   // AC-10: Bild-Kontext-Update bei Prev/Next
   // -------------------------------------------------------------------------
 
-  /**
-   * AC-10: GIVEN der User das Bild via Prev/Next wechselt (neue currentGenerationId)
-   *        WHEN der Bildwechsel erkannt wird
-   *        THEN wird der aktuelle image_context fuer nachfolgende Nachrichten aktualisiert
-   *             (keine neue Session, bestehende Session wird weiterverwendet)
-   */
   it("AC-10: should update image_context for subsequent messages when currentGenerationId changes", async () => {
     const user = userEvent.setup();
 
@@ -774,13 +706,19 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
     });
 
     let sendCallCount = 0;
-    mockSendMessage.mockImplementation(() => {
-      sendCallCount++;
-      return createMockSSEStream([
-        { type: "text-delta", content: `response ${sendCallCount}` },
-        { type: "text-done" },
-      ]);
-    });
+    mockSendMessage.mockImplementation(
+      async (
+        _sessionId: string,
+        _content: string,
+        _imageContext: unknown,
+        onEvent: (event: CanvasSSEEvent) => void,
+        _signal?: AbortSignal
+      ) => {
+        sendCallCount++;
+        onEvent({ type: "text-delta", content: `response ${sendCallCount}` });
+        onEvent({ type: "text-done" });
+      }
+    );
 
     render(
       <CanvasDetailProvider initialGenerationId="gen-nav-1">
@@ -793,23 +731,25 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
 
     await waitFor(() => expect(mockCreateSession).toHaveBeenCalledTimes(1));
 
-    // Switch to the second generation (simulates Prev/Next navigation)
+    // Switch to the second generation (simulates Prev/Next)
     const switchButton = screen.getByTestId("switch-generation-button");
     await user.click(switchButton);
 
-    // Should NOT create a new session (AC-10: "keine neue Session")
-    // createSession was called once on mount, and should not be called again
+    // Init message should be replaced (not appended) with new context
     await waitFor(() => {
-      // A context separator should appear
-      expect(screen.getByTestId("context-separator")).toBeInTheDocument();
+      const initMessage = screen.getByTestId("init-message");
+      expect(initMessage).toHaveTextContent("model-b");
+      expect(initMessage).toHaveTextContent("second image");
     });
 
-    // The session creation count should still be 1 (no new session created)
+    // No separator — replace pattern, not append
+    expect(screen.queryByTestId("context-separator")).not.toBeInTheDocument();
+
     expect(mockCreateSession).toHaveBeenCalledTimes(1);
 
-    // Now send a message with the new context
-    const textarea = screen.getByTestId("canvas-chat-input-textarea");
-    const sendButton = screen.getByTestId("canvas-chat-send-button");
+    // Send a message with the new context
+    const textarea = screen.getByTestId("chat-input-textarea");
+    const sendButton = screen.getByTestId("send-btn");
 
     await user.type(textarea, "enhance this");
     await user.click(sendButton);
@@ -818,7 +758,6 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
       expect(mockSendMessage).toHaveBeenCalledTimes(1);
     });
 
-    // The image_context should be from gen2 (the new generation)
     expect(mockSendMessage).toHaveBeenCalledWith(
       "test-session-id",
       "enhance this",
@@ -828,6 +767,7 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
         model_id: "model-b",
         generation_id: "gen-nav-2",
       }),
+      expect.any(Function), // onEvent callback
       expect.any(AbortSignal)
     );
   });
@@ -836,13 +776,6 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
   // AC-11: Neue-Session-Button erstellt neue Session
   // -------------------------------------------------------------------------
 
-  /**
-   * AC-11: GIVEN der User den [+] Button (Neue-Session) klickt
-   *        WHEN die neue Session erstellt wird
-   *        THEN wird die bestehende Session verworfen, eine neue via
-   *             POST /api/assistant/canvas/sessions erstellt,
-   *             und die Chat-History auf nur die Init-Message zurueckgesetzt
-   */
   it("AC-11: should create new session and reset chat history when new session button is clicked", async () => {
     const user = userEvent.setup();
 
@@ -850,8 +783,8 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
       .mockResolvedValueOnce("session-old")
       .mockResolvedValueOnce("session-new");
 
-    mockSendMessage.mockReturnValue(
-      createMockSSEStream([
+    mockSendMessage.mockImplementation(
+      mockSSEEvents([
         { type: "text-delta", content: "Bot reply" },
         { type: "text-done" },
       ])
@@ -866,19 +799,17 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
 
     renderChatPanel({ generation });
 
-    // Wait for first session creation
     await waitFor(() => {
       expect(mockCreateSession).toHaveBeenCalledTimes(1);
     });
 
     // Send a message to populate history
-    const textarea = screen.getByTestId("canvas-chat-input-textarea");
-    const sendButton = screen.getByTestId("canvas-chat-send-button");
+    const textarea = screen.getByTestId("chat-input-textarea");
+    const sendButton = screen.getByTestId("send-btn");
 
     await user.type(textarea, "Hello world");
     await user.click(sendButton);
 
-    // Wait for user message to appear
     await waitFor(() => {
       expect(screen.getByTestId("user-message")).toBeInTheDocument();
     });
@@ -887,18 +818,13 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
     const newSessionButton = screen.getByTestId("chat-new-session-button");
     await user.click(newSessionButton);
 
-    // Wait for second session creation
     await waitFor(() => {
       expect(mockCreateSession).toHaveBeenCalledTimes(2);
     });
 
-    // User message should be gone (history reset)
     expect(screen.queryByTestId("user-message")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("assistant-message")).not.toBeInTheDocument();
 
-    // Bot message should be gone
-    expect(screen.queryByTestId("bot-message")).not.toBeInTheDocument();
-
-    // Init message should still exist (reset to init-only)
     const initMessage = screen.getByTestId("init-message");
     expect(initMessage).toBeInTheDocument();
     expect(initMessage).toHaveTextContent("model-xyz");
@@ -918,7 +844,6 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
       expect(mockCreateSession).toHaveBeenCalledTimes(1);
     });
 
-    // Click new session button
     const newSessionButton = screen.getByTestId("chat-new-session-button");
     await user.click(newSessionButton);
 
@@ -936,14 +861,12 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
   it("should create a session on-demand if no session exists when sending a message", async () => {
     const user = userEvent.setup();
 
-    // First createSession call fails (simulating it was never set up)
-    // Then sendMessageToBackend will try to create a session on its own
     mockCreateSession
       .mockRejectedValueOnce(new Error("Initial session failed"))
       .mockResolvedValueOnce("recovery-session-id");
 
-    mockSendMessage.mockReturnValue(
-      createMockSSEStream([
+    mockSendMessage.mockImplementation(
+      mockSSEEvents([
         { type: "text-delta", content: "recovered" },
         { type: "text-done" },
       ])
@@ -951,29 +874,26 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
 
     renderChatPanel();
 
-    // Wait for failed initial session attempt
     await waitFor(() => {
       expect(mockCreateSession).toHaveBeenCalledTimes(1);
     });
 
-    // Now try to send a message — it should attempt to create a session again
-    const textarea = screen.getByTestId("canvas-chat-input-textarea");
-    const sendButton = screen.getByTestId("canvas-chat-send-button");
+    const textarea = screen.getByTestId("chat-input-textarea");
+    const sendButton = screen.getByTestId("send-btn");
 
     await user.type(textarea, "retry");
     await user.click(sendButton);
 
-    // Should have attempted a second session creation
     await waitFor(() => {
       expect(mockCreateSession).toHaveBeenCalledTimes(2);
     });
 
-    // And then called sendMessage with the recovered session
     await waitFor(() => {
       expect(mockSendMessage).toHaveBeenCalledWith(
         "recovery-session-id",
         "retry",
         expect.any(Object),
+        expect.any(Function), // onEvent callback
         expect.any(AbortSignal)
       );
     });
@@ -982,31 +902,35 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
   it("should handle network errors during SSE stream gracefully", async () => {
     const user = userEvent.setup();
 
-    // sendMessage throws during iteration (simulates network disconnect)
-    mockSendMessage.mockReturnValue(
-      (async function* () {
-        yield { type: "text-delta", content: "partial" } as CanvasSSEEvent;
+    // sendMessage throws during execution (simulates network disconnect)
+    mockSendMessage.mockImplementation(
+      async (
+        _sessionId: string,
+        _content: string,
+        _imageContext: unknown,
+        onEvent: (event: CanvasSSEEvent) => void,
+        _signal?: AbortSignal
+      ) => {
+        onEvent({ type: "text-delta", content: "partial" });
         throw new Error("Network disconnected");
-      })()
+      }
     );
 
     renderChatPanel();
     await waitFor(() => expect(mockCreateSession).toHaveBeenCalledTimes(1));
 
-    const textarea = screen.getByTestId("canvas-chat-input-textarea");
-    const sendButton = screen.getByTestId("canvas-chat-send-button");
+    const textarea = screen.getByTestId("chat-input-textarea");
+    const sendButton = screen.getByTestId("send-btn");
 
     await user.type(textarea, "test network error");
     await user.click(sendButton);
 
-    // Should show a toast error for network disconnection
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith("Verbindungsfehler");
     });
 
-    // Chat input should be re-enabled
     await waitFor(() => {
-      expect(screen.getByTestId("canvas-chat-input-textarea")).not.toBeDisabled();
+      expect(screen.getByTestId("chat-input-textarea")).not.toBeDisabled();
     });
   });
 
@@ -1015,8 +939,8 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
 
     mockGenerateImages.mockRejectedValueOnce(new Error("API error"));
 
-    mockSendMessage.mockReturnValue(
-      createMockSSEStream([
+    mockSendMessage.mockImplementation(
+      mockSSEEvents([
         {
           type: "canvas-generate",
           action: "variation",
@@ -1030,8 +954,8 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
     renderChatPanel();
     await waitFor(() => expect(mockCreateSession).toHaveBeenCalledTimes(1));
 
-    const textarea = screen.getByTestId("canvas-chat-input-textarea");
-    const sendButton = screen.getByTestId("canvas-chat-send-button");
+    const textarea = screen.getByTestId("chat-input-textarea");
+    const sendButton = screen.getByTestId("send-btn");
 
     await user.type(textarea, "generate fail");
     await user.click(sendButton);

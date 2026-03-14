@@ -9,10 +9,12 @@ import { CanvasImage } from "@/components/canvas/canvas-image";
 import { CanvasNavigation } from "@/components/canvas/canvas-navigation";
 import { SiblingThumbnails } from "@/components/canvas/sibling-thumbnails";
 import { CanvasToolbar } from "@/components/canvas/canvas-toolbar";
+import { DetailsOverlay } from "@/components/canvas/details-overlay";
 import { VariationPopover } from "@/components/canvas/popovers/variation-popover";
 import { Img2imgPopover } from "@/components/canvas/popovers/img2img-popover";
 import { UpscalePopover } from "@/components/canvas/popovers/upscale-popover";
 import { CanvasModelSelector } from "@/components/canvas/canvas-model-selector";
+import { CanvasChatPanel } from "@/components/canvas/canvas-chat-panel";
 import { generateImages, upscaleImage, fetchGenerations } from "@/app/actions/generations";
 import { deleteGeneration } from "@/app/actions/generations";
 import { Button } from "@/components/ui/button";
@@ -68,6 +70,15 @@ export function CanvasDetailView({
   const { state, dispatch } = useCanvasDetail();
   const [chatOpen, setChatOpen] = useState(true);
 
+  // Local copy of allGenerations — updated by polling so new generations
+  // are immediately visible without waiting for a parent re-render.
+  const [localGenerations, setLocalGenerations] = useState<Generation[]>(allGenerations);
+
+  // Keep localGenerations in sync when parent prop changes (e.g. new gallery data)
+  useEffect(() => {
+    setLocalGenerations(allGenerations);
+  }, [allGenerations]);
+
   // Track pending generation IDs for polling via ref to avoid effect churn.
   // A counter state triggers re-renders when pending list changes.
   const pendingGenerationIdsRef = useRef<string[]>([]);
@@ -86,10 +97,10 @@ export function CanvasDetailView({
   // Find the current generation from context to display the correct image
   const currentGeneration = useMemo(() => {
     return (
-      allGenerations.find((g) => g.id === state.currentGenerationId) ??
+      localGenerations.find((g) => g.id === state.currentGenerationId) ??
       generation
     );
-  }, [allGenerations, state.currentGenerationId, generation]);
+  }, [localGenerations, state.currentGenerationId, generation]);
 
   // ---------------------------------------------------------------------------
   // Navigation handlers
@@ -97,14 +108,14 @@ export function CanvasDetailView({
 
   const handleNavigate = useCallback(
     (id: string) => {
-      dispatch({ type: "SET_CURRENT_IMAGE", generationId: id });
+      dispatch({ type: "SET_CURRENT_IMAGE", generationId: id, source: "navigation" });
     },
     [dispatch]
   );
 
   const handleSiblingSelect = useCallback(
     (id: string) => {
-      dispatch({ type: "SET_CURRENT_IMAGE", generationId: id });
+      dispatch({ type: "SET_CURRENT_IMAGE", generationId: id, source: "sibling" });
     },
     [dispatch]
   );
@@ -159,6 +170,12 @@ export function CanvasDetailView({
           if (!gen) continue;
 
           if (gen.status === "completed") {
+            // Add newly completed generation to local state so
+            // currentGeneration memo can find it immediately
+            setLocalGenerations(prev => {
+              if (prev.some(g => g.id === gen.id)) return prev;
+              return [gen, ...prev];
+            });
             // AC-6 + AC-7: Replace image, push old to undo stack
             dispatch({
               type: "PUSH_UNDO",
@@ -229,6 +246,7 @@ export function CanvasDetailView({
           generationMode: "img2img",
           sourceImageUrl: currentGeneration.imageUrl ?? undefined,
           strength: promptStrength,
+          sourceGenerationId: currentGeneration.id,
         });
 
         if ("error" in result) {
@@ -285,6 +303,7 @@ export function CanvasDetailView({
           params: {},
           count: params.variants,
           generationMode: "img2img",
+          sourceGenerationId: currentGeneration.id,
           references:
             references.length > 0 ? references : undefined,
         });
@@ -372,7 +391,7 @@ export function CanvasDetailView({
 
   return (
     <div
-      className="flex h-full flex-col"
+      className="flex h-full w-full flex-col"
       data-testid="canvas-detail-view"
     >
       {/* Header */}
@@ -381,20 +400,22 @@ export function CanvasDetailView({
         modelSelectorSlot={effectiveModelSelectorSlot}
         undoRedoSlot={undoRedoSlot}
       >
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => setChatOpen((prev) => !prev)}
-          aria-label={chatOpen ? "Close chat panel" : "Open chat panel"}
-          data-testid="chat-toggle-button"
-          disabled={state.isGenerating}
-        >
-          {chatOpen ? (
-            <PanelRightClose className="size-4" />
-          ) : (
-            <PanelRightOpen className="size-4" />
-          )}
-        </Button>
+        {chatSlot && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => setChatOpen((prev) => !prev)}
+            aria-label={chatOpen ? "Close chat panel" : "Open chat panel"}
+            data-testid="chat-toggle-button"
+            disabled={state.isGenerating}
+          >
+            {chatOpen ? (
+              <PanelRightClose className="size-4" />
+            ) : (
+              <PanelRightOpen className="size-4" />
+            )}
+          </Button>
+        )}
       </CanvasHeader>
 
       {/* Body: 3-column layout */}
@@ -410,8 +431,14 @@ export function CanvasDetailView({
               onDelete={handleDelete}
             />
           )}
+        </aside>
 
-          {/* Popovers anchored to the toolbar area */}
+        {/* Center: Canvas area (flex: 1) */}
+        <main
+          className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-muted/40"
+          data-testid="canvas-area"
+        >
+          {/* Popovers anchored to left edge of canvas (next to toolbar) */}
           <VariationPopover
             generation={currentGeneration}
             onGenerate={handleVariationGenerate}
@@ -424,20 +451,18 @@ export function CanvasDetailView({
             onUpscale={handleUpscale}
             isUpscaleDisabled={isUpscaleDisabled}
           />
-        </aside>
+          {/* Details overlay (push-down layout) */}
+          <DetailsOverlay generation={currentGeneration} />
 
-        {/* Center: Canvas area (flex: 1) */}
-        <main
-          className="relative flex flex-1 flex-col overflow-hidden bg-muted/40"
-          data-testid="canvas-area"
-        >
-          {/* Image + Navigation overlay */}
-          <div className="relative flex flex-1 items-center justify-center p-4">
-            <CanvasNavigation
-              allGenerations={allGenerations}
-              currentGenerationId={state.currentGenerationId}
-              onNavigate={handleNavigate}
-            />
+          {/* Prev/Next navigation — positioned relative to <main> for stable centering */}
+          <CanvasNavigation
+            allGenerations={localGenerations}
+            currentGenerationId={state.currentGenerationId}
+            onNavigate={handleNavigate}
+          />
+
+          {/* Image */}
+          <div className="relative flex min-h-0 flex-1 items-center justify-center p-4">
             <CanvasImage
               generation={currentGeneration}
               isLoading={state.isGenerating}
@@ -447,15 +472,22 @@ export function CanvasDetailView({
           {/* Sibling thumbnails below the image */}
           <SiblingThumbnails
             batchId={currentGeneration.batchId}
+            sourceGenerationId={currentGeneration.sourceGenerationId}
             currentGenerationId={state.currentGenerationId}
             onSelect={handleSiblingSelect}
           />
         </main>
 
-        {/* Right: Chat slot (panel manages its own collapse/expand + width) */}
+        {/* Right: Chat panel — uses currentGeneration so context updates on Prev/Next */}
         {chatOpen && (
-          <aside data-testid="chat-slot">
-            {chatSlot}
+          <aside className="flex shrink-0 overflow-hidden" data-testid="chat-slot">
+            {chatSlot ?? (
+              <CanvasChatPanel
+                generation={currentGeneration}
+                projectId={currentGeneration.projectId}
+                onPendingGenerations={setPendingGenerationIds}
+              />
+            )}
           </aside>
         )}
       </div>

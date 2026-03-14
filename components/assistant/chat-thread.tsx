@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useMemo } from "react";
 import { cn } from "@/lib/utils";
-import type { Message } from "@/lib/assistant/assistant-context";
+import type { ChatMessage } from "@/lib/types/chat-message";
 import { StreamingIndicator } from "./streaming-indicator";
 import { ImagePreview } from "./image-preview";
 
@@ -22,17 +22,60 @@ const WORKSPACE_CONTEXT_PATTERN = /\n\n\[Aktueller Prompt: .+\]$/;
 // ---------------------------------------------------------------------------
 
 export interface ChatThreadProps {
-  messages: Message[];
+  messages: ChatMessage[];
   isStreaming: boolean;
+  /** Callback when a clarification chip is clicked (canvas chat) */
+  onChipClick?: (text: string) => void;
+}
+
+// ---------------------------------------------------------------------------
+// InitMessageBubble (system context — canvas chat)
+// ---------------------------------------------------------------------------
+
+function InitMessageBubble({ message }: { message: ChatMessage }) {
+  return (
+    <div className="flex w-full justify-start" data-testid="init-message">
+      <div className="max-w-[90%] rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground leading-relaxed">
+        <div className="whitespace-pre-wrap break-words font-mono">
+          {message.content}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ContextSeparator (canvas chat)
+// ---------------------------------------------------------------------------
+
+function ContextSeparator({ message }: { message: ChatMessage }) {
+  return (
+    <div
+      className="flex items-center gap-2 py-2"
+      data-testid="context-separator"
+    >
+      <div className="h-px flex-1 bg-border" />
+      <span className="shrink-0 text-xs text-muted-foreground">
+        {message.content}
+      </span>
+      <div className="h-px flex-1 bg-border" />
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
 // MessageBubble
 // ---------------------------------------------------------------------------
 
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({
+  message,
+  onChipClick,
+}: {
+  message: ChatMessage;
+  onChipClick?: (text: string) => void;
+}) {
   const isUser = message.role === "user";
-  const isError = message.role === "error";
+  const isError = message.isError === true;
 
   // Slice-19 AC-8: Split workspace context from user message for styled display
   const { mainContent, workspaceContext } = useMemo(() => {
@@ -73,6 +116,7 @@ function MessageBubble({ message }: { message: Message }) {
           isError &&
             "bg-destructive/10 text-destructive border border-destructive/20 rounded-bl-md"
         )}
+        data-testid={isError ? "bot-message-error" : undefined}
       >
         {/* AC-6: Thumbnail inline in user message bubble (120x120, rounded) */}
         {isUser && message.imageUrl && (
@@ -98,6 +142,26 @@ function MessageBubble({ message }: { message: Message }) {
             {workspaceContext}
           </div>
         )}
+
+        {/* Clarification chips below assistant text (canvas chat) */}
+        {!isUser && message.chips && message.chips.length > 0 && (
+          <div
+            className="mt-2 flex flex-wrap gap-1.5"
+            data-testid="chat-chips"
+          >
+            {message.chips.map((chip) => (
+              <button
+                key={chip}
+                type="button"
+                className="rounded-full border border-border/80 bg-background px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                onClick={() => onChipClick?.(chip)}
+                data-testid="chat-chip-button"
+              >
+                {chip}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -107,7 +171,7 @@ function MessageBubble({ message }: { message: Message }) {
 // ChatThread
 // ---------------------------------------------------------------------------
 
-export function ChatThread({ messages, isStreaming }: ChatThreadProps) {
+export function ChatThread({ messages, isStreaming, onChipClick }: ChatThreadProps) {
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
 
   // AC-10: Auto-scroll to bottom when new messages arrive or content updates
@@ -126,9 +190,25 @@ export function ChatThread({ messages, isStreaming }: ChatThreadProps) {
       className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4"
       data-testid="chat-thread"
     >
-      {messages.map((message) => (
-        <MessageBubble key={message.id} message={message} />
-      ))}
+      {messages.map((message) => {
+        switch (message.role) {
+          case "system":
+            return <InitMessageBubble key={message.id} message={message} />;
+          case "separator":
+            return <ContextSeparator key={message.id} message={message} />;
+          case "user":
+          case "assistant":
+            return (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                onChipClick={onChipClick}
+              />
+            );
+          default:
+            return null;
+        }
+      })}
 
       {/* AC-1/AC-2: Streaming indicator below last assistant message */}
       <StreamingIndicator visible={isStreaming} />

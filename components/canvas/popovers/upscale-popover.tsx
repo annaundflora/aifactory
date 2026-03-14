@@ -101,7 +101,11 @@ export function UpscalePopover({
   return (
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
       <PopoverAnchor asChild>
-        <span data-testid="upscale-popover-anchor" />
+        <span
+          data-testid="upscale-popover-anchor"
+          className="pointer-events-none absolute left-0 h-10 w-px"
+          style={{ top: 88 }}
+        />
       </PopoverAnchor>
 
       <PopoverContent

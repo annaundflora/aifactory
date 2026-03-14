@@ -8,10 +8,10 @@ import "@testing-library/jest-dom/vitest";
 // Mocks (mock_external strategy — only external server action)
 // ---------------------------------------------------------------------------
 
-// Mock the getSiblingGenerations server action (runs on server, cannot call in jsdom)
-const mockGetSiblingGenerations = vi.fn();
+// Mock the getVariantFamilyAction server action (runs on server, cannot call in jsdom)
+const mockGetVariantFamilyAction = vi.fn();
 vi.mock("@/app/actions/generations", () => ({
-  getSiblingGenerations: (...args: unknown[]) => mockGetSiblingGenerations(...args),
+  getVariantFamilyAction: (...args: unknown[]) => mockGetVariantFamilyAction(...args),
 }));
 
 // Mock lucide-react icons
@@ -89,11 +89,12 @@ describe("SiblingThumbnails", () => {
       makeGeneration({ id: "sib-3", imageUrl: "https://example.com/sib3.png", batchId: "batch-xyz" }),
     ];
 
-    mockGetSiblingGenerations.mockResolvedValue(siblings);
+    mockGetVariantFamilyAction.mockResolvedValue(siblings);
 
     render(
       <SiblingThumbnails
         batchId="batch-xyz"
+        sourceGenerationId={null}
         currentGenerationId="sib-2"
         onSelect={onSelect}
       />
@@ -144,11 +145,12 @@ describe("SiblingThumbnails", () => {
       makeGeneration({ id: "sib-3", imageUrl: "https://example.com/sib3.png", batchId: "batch-xyz" }),
     ];
 
-    mockGetSiblingGenerations.mockResolvedValue(siblings);
+    mockGetVariantFamilyAction.mockResolvedValue(siblings);
 
     render(
       <SiblingThumbnails
         batchId="batch-xyz"
+        sourceGenerationId={null}
         currentGenerationId="sib-2"
         onSelect={onSelect}
       />
@@ -177,6 +179,7 @@ describe("SiblingThumbnails", () => {
     render(
       <SiblingThumbnails
         batchId={null}
+        sourceGenerationId={null}
         currentGenerationId="gen-solo"
         onSelect={onSelect}
       />
@@ -187,6 +190,6 @@ describe("SiblingThumbnails", () => {
     expect(screen.queryByTestId("sibling-thumbnails-loading")).not.toBeInTheDocument();
 
     // Server action should NOT have been called
-    expect(mockGetSiblingGenerations).not.toHaveBeenCalled();
+    expect(mockGetVariantFamilyAction).not.toHaveBeenCalled();
   });
 });

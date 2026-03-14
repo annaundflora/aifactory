@@ -317,7 +317,8 @@ async function generate(
   generationMode?: string,
   sourceImageUrl?: string,
   strength?: number,
-  references?: ReferenceInput[]
+  references?: ReferenceInput[],
+  sourceGenerationId?: string
 ): Promise<Generation[]> {
   // Validate
   if (!promptMotiv || promptMotiv.trim().length === 0) {
@@ -407,6 +408,7 @@ async function generate(
         promptStyle: styleTrimmed,
         generationMode: effectiveMode,
         sourceImageUrl: sourceImageUrl ?? null,
+        sourceGenerationId: sourceGenerationId ?? null,
         batchId,
       });
       pendingGenerations.push(gen);
@@ -443,6 +445,7 @@ async function generate(
       promptStyle: styleTrimmed,
       generationMode: effectiveMode,
       sourceImageUrl: sourceImageUrl ?? null,
+      sourceGenerationId: sourceGenerationId ?? null,
       batchId,
     });
     pendingGenerations.push(gen);

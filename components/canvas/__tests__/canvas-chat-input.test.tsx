@@ -12,6 +12,9 @@ vi.mock("lucide-react", () => ({
   ArrowUp: (props: Record<string, unknown>) => (
     <span data-testid="arrow-up-icon" {...props} />
   ),
+  Square: (props: Record<string, unknown>) => (
+    <span data-testid="square-icon" {...props} />
+  ),
   MessageSquare: (props: Record<string, unknown>) => (
     <span data-testid="message-square-icon" {...props} />
   ),
@@ -39,6 +42,17 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
 
+// Mock the model selector
+vi.mock("@/components/assistant/model-selector", () => ({
+  ModelSelector: () => <div data-testid="model-selector-mock" />,
+  DEFAULT_MODEL_SLUG: "anthropic/claude-sonnet-4.6",
+}));
+
+// Mock the image upload button (not used in canvas chat)
+vi.mock("@/components/assistant/image-upload-button", () => ({
+  ImageUploadButton: () => null,
+}));
+
 // Stable crypto.randomUUID for deterministic test IDs
 let uuidCounter = 0;
 vi.stubGlobal("crypto", {
@@ -49,7 +63,7 @@ vi.stubGlobal("crypto", {
 Element.prototype.scrollIntoView = vi.fn();
 
 // Import AFTER mocks
-import { CanvasChatInput } from "@/components/canvas/canvas-chat-input";
+import { ChatInput } from "@/components/assistant/chat-input";
 import { CanvasChatPanel } from "@/components/canvas/canvas-chat-panel";
 import { CanvasDetailProvider } from "@/lib/canvas-detail-context";
 import { type Generation } from "@/lib/db/queries";
@@ -85,7 +99,7 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
 }
 
 /**
- * Renders the full CanvasChatPanel (includes CanvasChatInput) in CanvasDetailProvider.
+ * Renders the full CanvasChatPanel (includes ChatInput) in CanvasDetailProvider.
  * Used for integration-level input tests where we verify messages appear in the chat.
  */
 function renderChatPanel(
@@ -115,7 +129,7 @@ function renderChatPanel(
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("CanvasChatInput", () => {
+describe("CanvasChatInput (via ChatInput)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     uuidCounter = 0;
@@ -129,16 +143,16 @@ describe("CanvasChatInput", () => {
    */
   it('AC-10: should render text input with placeholder "Describe changes..." and send button', () => {
     const onSend = vi.fn();
-    render(<CanvasChatInput onSend={onSend} />);
+    render(<ChatInput onSend={onSend} hideImageUpload placeholder="Describe changes..." />);
 
     // Textarea with correct placeholder
-    const textarea = screen.getByTestId("canvas-chat-input-textarea");
+    const textarea = screen.getByTestId("chat-input-textarea");
     expect(textarea).toBeInTheDocument();
     expect(textarea.tagName).toBe("TEXTAREA");
     expect(textarea).toHaveAttribute("placeholder", "Describe changes...");
 
     // Send button exists
-    const sendButton = screen.getByTestId("canvas-chat-send-button");
+    const sendButton = screen.getByTestId("send-btn");
     expect(sendButton).toBeInTheDocument();
     expect(sendButton).toHaveAttribute("aria-label", "Send message");
   });
@@ -149,9 +163,9 @@ describe("CanvasChatInput", () => {
    */
   it("AC-10: should have send button disabled when input is empty", () => {
     const onSend = vi.fn();
-    render(<CanvasChatInput onSend={onSend} />);
+    render(<ChatInput onSend={onSend} hideImageUpload />);
 
-    const sendButton = screen.getByTestId("canvas-chat-send-button");
+    const sendButton = screen.getByTestId("send-btn");
     expect(sendButton).toBeDisabled();
   });
 
@@ -166,8 +180,8 @@ describe("CanvasChatInput", () => {
 
     renderChatPanel();
 
-    const textarea = screen.getByTestId("canvas-chat-input-textarea");
-    const sendButton = screen.getByTestId("canvas-chat-send-button");
+    const textarea = screen.getByTestId("chat-input-textarea");
+    const sendButton = screen.getByTestId("send-btn");
 
     // Type a message
     await user.type(textarea, "Make the sky more blue");
@@ -198,7 +212,7 @@ describe("CanvasChatInput", () => {
 
     renderChatPanel();
 
-    const textarea = screen.getByTestId("canvas-chat-input-textarea");
+    const textarea = screen.getByTestId("chat-input-textarea");
 
     // Type and press Enter
     await user.type(textarea, "Adjust contrast{enter}");
@@ -220,9 +234,9 @@ describe("CanvasChatInput", () => {
     const user = userEvent.setup();
     const onSend = vi.fn();
 
-    render(<CanvasChatInput onSend={onSend} />);
+    render(<ChatInput onSend={onSend} hideImageUpload />);
 
-    const textarea = screen.getByTestId("canvas-chat-input-textarea");
+    const textarea = screen.getByTestId("chat-input-textarea");
 
     // Type text, then Shift+Enter
     await user.type(textarea, "line one{shift>}{enter}{/shift}line two");
@@ -241,10 +255,10 @@ describe("CanvasChatInput", () => {
     const user = userEvent.setup();
     const onSend = vi.fn();
 
-    render(<CanvasChatInput onSend={onSend} />);
+    render(<ChatInput onSend={onSend} hideImageUpload />);
 
-    const textarea = screen.getByTestId("canvas-chat-input-textarea");
-    const sendButton = screen.getByTestId("canvas-chat-send-button");
+    const textarea = screen.getByTestId("chat-input-textarea");
+    const sendButton = screen.getByTestId("send-btn");
 
     // Try clicking send with empty input
     await user.click(sendButton);
@@ -261,12 +275,12 @@ describe("CanvasChatInput", () => {
    */
   it("AC-10: should disable textarea and send button when disabled prop is true", () => {
     const onSend = vi.fn();
-    render(<CanvasChatInput onSend={onSend} disabled={true} />);
+    render(<ChatInput onSend={onSend} disabled={true} hideImageUpload />);
 
-    const textarea = screen.getByTestId("canvas-chat-input-textarea");
+    const textarea = screen.getByTestId("chat-input-textarea");
     expect(textarea).toBeDisabled();
 
-    const sendButton = screen.getByTestId("canvas-chat-send-button");
+    const sendButton = screen.getByTestId("send-btn");
     expect(sendButton).toBeDisabled();
   });
 });

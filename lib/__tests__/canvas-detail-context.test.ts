@@ -24,6 +24,7 @@ function makeInitialState(
 ): CanvasDetailState {
   return {
     currentGenerationId: "gen-abc-123",
+    lastImageChangeSource: null,
     activeToolId: null,
     undoStack: [],
     redoStack: [],

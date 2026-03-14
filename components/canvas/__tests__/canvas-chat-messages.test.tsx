@@ -21,6 +21,9 @@ vi.mock("lucide-react", () => ({
   ArrowUp: (props: Record<string, unknown>) => (
     <span data-testid="arrow-up-icon" {...props} />
   ),
+  Square: (props: Record<string, unknown>) => (
+    <span data-testid="square-icon" {...props} />
+  ),
 }));
 
 // Mock the canvas chat service (backend calls)
@@ -39,6 +42,12 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
 
+// Mock the model selector (uses radix Select which needs complex setup in jsdom)
+vi.mock("@/components/assistant/model-selector", () => ({
+  ModelSelector: () => <div data-testid="model-selector-mock" />,
+  DEFAULT_MODEL_SLUG: "anthropic/claude-sonnet-4.6",
+}));
+
 // Stable crypto.randomUUID for deterministic test IDs
 let uuidCounter = 0;
 vi.stubGlobal("crypto", {
@@ -50,7 +59,7 @@ Element.prototype.scrollIntoView = vi.fn();
 
 // Import AFTER mocks
 import { CanvasChatPanel } from "@/components/canvas/canvas-chat-panel";
-import { CanvasChatMessages } from "@/components/canvas/canvas-chat-messages";
+import { ChatThread } from "@/components/assistant/chat-thread";
 import {
   CanvasDetailProvider,
   type CanvasDetailAction,
@@ -89,9 +98,9 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
 }
 
 /**
- * Renders the full CanvasChatPanel (which includes CanvasChatMessages internally)
+ * Renders the full CanvasChatPanel (which includes ChatThread internally)
  * wrapped in CanvasDetailProvider. This is needed because CanvasChatPanel manages
- * the messages state and passes it to CanvasChatMessages.
+ * the messages state and passes it to ChatThread.
  */
 function renderChatPanel(
   options: {
@@ -117,14 +126,14 @@ function renderChatPanel(
 }
 
 /**
- * Renders CanvasChatMessages directly with explicit messages (for isolated tests).
+ * Renders ChatThread directly with explicit messages (for isolated tests).
  */
 function renderMessages(
   messages: ChatMessage[],
   onChipClick?: (text: string) => void
 ) {
   return render(
-    <CanvasChatMessages messages={messages} onChipClick={onChipClick} />
+    <ChatThread messages={messages} isStreaming={false} onChipClick={onChipClick} />
   );
 }
 
@@ -132,7 +141,7 @@ function renderMessages(
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("CanvasChatMessages", () => {
+describe("CanvasChatMessages (via ChatThread)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     uuidCounter = 0;
@@ -197,10 +206,10 @@ describe("CanvasChatMessages", () => {
    *       THEN werden User-Messages rechtsbuendig und Bot-Messages linksbuendig
    *            als Bubbles dargestellt
    */
-  it("AC-6: should render user messages right-aligned and bot messages left-aligned", () => {
+  it("AC-6: should render user messages right-aligned and assistant messages left-aligned", () => {
     const messages: ChatMessage[] = [
       { id: "msg-1", role: "user", content: "Hello" },
-      { id: "msg-2", role: "bot", content: "Hi there!" },
+      { id: "msg-2", role: "assistant", content: "Hi there!" },
     ];
 
     renderMessages(messages);
@@ -210,10 +219,10 @@ describe("CanvasChatMessages", () => {
     expect(userMsg).toBeInTheDocument();
     expect(userMsg.className).toMatch(/justify-end/);
 
-    // Bot message should be left-aligned (justify-start)
-    const botMsg = screen.getByTestId("bot-message");
-    expect(botMsg).toBeInTheDocument();
-    expect(botMsg.className).toMatch(/justify-start/);
+    // Assistant message should be left-aligned (justify-start)
+    const assistantMsg = screen.getByTestId("assistant-message");
+    expect(assistantMsg).toBeInTheDocument();
+    expect(assistantMsg.className).toMatch(/justify-start/);
   });
 
   /**
@@ -221,11 +230,11 @@ describe("CanvasChatMessages", () => {
    *       WHEN der Nachrichten-Bereich geprueft wird
    *       THEN werden die Chips als klickbare Buttons unterhalb des Bot-Texts angezeigt
    */
-  it("AC-7: should render clickable chip buttons below bot message text", () => {
+  it("AC-7: should render clickable chip buttons below assistant message text", () => {
     const messages: ChatMessage[] = [
       {
         id: "msg-bot-chips",
-        role: "bot",
+        role: "assistant",
         content: "Choose an option:",
         chips: ["Subtil", "Dramatisch"],
       },
@@ -233,10 +242,10 @@ describe("CanvasChatMessages", () => {
 
     renderMessages(messages);
 
-    // Bot message should be present
-    const botMsg = screen.getByTestId("bot-message");
-    expect(botMsg).toBeInTheDocument();
-    expect(botMsg).toHaveTextContent("Choose an option:");
+    // Assistant message should be present
+    const assistantMsg = screen.getByTestId("assistant-message");
+    expect(assistantMsg).toBeInTheDocument();
+    expect(assistantMsg).toHaveTextContent("Choose an option:");
 
     // Chips container should exist
     const chipsContainer = screen.getByTestId("chat-chips");
@@ -281,16 +290,11 @@ describe("CanvasChatMessages", () => {
    */
   it("AC-8: should add chip text as new user message when chip is clicked", async () => {
     const user = userEvent.setup();
-    const generation = makeGeneration({ id: "gen-chip-test" });
-
-    // We need to use the full panel to test the integrated chip->message flow.
-    // First, we render CanvasChatMessages directly with an onChipClick spy
-    // to verify the click triggers the callback with the correct text.
     const onChipClick = vi.fn();
     const messages: ChatMessage[] = [
       {
         id: "msg-bot",
-        role: "bot",
+        role: "assistant",
         content: "Pick one:",
         chips: ["Subtil", "Dramatisch"],
       },
@@ -310,16 +314,11 @@ describe("CanvasChatMessages", () => {
    */
   it("AC-8: should insert chip text as user message in full panel integration", async () => {
     const user = userEvent.setup();
-
-    // We need to render CanvasChatMessages with a bot message that has chips,
-    // but the CanvasChatPanel starts with only an init message.
-    // Instead, test the direct CanvasChatMessages + onChipClick flow which
-    // is how the panel wires it: onChipClick -> adds user message.
     const onChipClick = vi.fn();
     const messages: ChatMessage[] = [
       {
         id: "msg-bot-2",
-        role: "bot",
+        role: "assistant",
         content: "Choose style:",
         chips: ["Dramatisch"],
       },
@@ -381,8 +380,8 @@ describe("CanvasChatMessages", () => {
     renderChatPanel({ generation });
 
     // First, send a message to add to history
-    const textarea = screen.getByTestId("canvas-chat-input-textarea");
-    const sendButton = screen.getByTestId("canvas-chat-send-button");
+    const textarea = screen.getByTestId("chat-input-textarea");
+    const sendButton = screen.getByTestId("send-btn");
 
     await user.type(textarea, "Hello world");
     await user.click(sendButton);
@@ -422,8 +421,8 @@ describe("CanvasChatMessages", () => {
     (Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>).mockClear();
 
     // Add a message via the input
-    const textarea = screen.getByTestId("canvas-chat-input-textarea");
-    const sendButton = screen.getByTestId("canvas-chat-send-button");
+    const textarea = screen.getByTestId("chat-input-textarea");
+    const sendButton = screen.getByTestId("send-btn");
 
     await user.type(textarea, "New message");
     await user.click(sendButton);

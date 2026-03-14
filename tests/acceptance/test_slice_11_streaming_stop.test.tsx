@@ -16,7 +16,7 @@ import "@testing-library/jest-dom/vitest";
 import { StreamingIndicator } from "@/components/assistant/streaming-indicator";
 import { ChatInput } from "@/components/assistant/chat-input";
 import { ChatThread } from "@/components/assistant/chat-thread";
-import type { Message } from "@/lib/assistant/assistant-context";
+import type { ChatMessage as Message } from "@/lib/types/chat-message";
 
 // ---------------------------------------------------------------------------
 // Test data factories

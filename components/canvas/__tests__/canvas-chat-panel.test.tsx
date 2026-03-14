@@ -21,6 +21,15 @@ vi.mock("lucide-react", () => ({
   ArrowUp: (props: Record<string, unknown>) => (
     <span data-testid="arrow-up-icon" {...props} />
   ),
+  Square: (props: Record<string, unknown>) => (
+    <span data-testid="square-icon" {...props} />
+  ),
+}));
+
+// Mock the model selector (uses radix Select which needs complex setup in jsdom)
+vi.mock("@/components/assistant/model-selector", () => ({
+  ModelSelector: () => <div data-testid="model-selector-mock" />,
+  DEFAULT_MODEL_SLUG: "anthropic/claude-sonnet-4.6",
 }));
 
 // Mock the canvas chat service (backend calls)

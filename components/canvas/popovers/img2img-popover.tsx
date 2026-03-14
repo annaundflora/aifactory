@@ -292,7 +292,11 @@ export function Img2imgPopover({
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
       {/* Anchor is invisible -- positioned where the toolbar icon is */}
       <PopoverAnchor asChild>
-        <span className="sr-only" />
+        <span
+          data-testid="img2img-popover-anchor"
+          className="pointer-events-none absolute left-0 h-10 w-px"
+          style={{ top: 48 }}
+        />
       </PopoverAnchor>
 
       <PopoverContent

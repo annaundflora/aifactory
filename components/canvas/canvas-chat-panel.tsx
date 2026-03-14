@@ -10,14 +10,16 @@ import { MessageSquare, Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useCanvasDetail } from "@/lib/canvas-detail-context";
-import { CanvasChatMessages } from "./canvas-chat-messages";
-import { CanvasChatInput } from "./canvas-chat-input";
+import { ChatThread } from "@/components/assistant/chat-thread";
+import { ChatInput } from "@/components/assistant/chat-input";
+import { ModelSelector, DEFAULT_MODEL_SLUG } from "@/components/assistant/model-selector";
 import { type Generation } from "@/lib/db/queries";
 import { type ChatMessage } from "@/lib/types/chat-message";
 import {
   createSession,
   sendMessage as sendCanvasMessage,
   type CanvasImageContext,
+  type CanvasSSEEvent,
   type SSECanvasGenerateEvent,
 } from "@/lib/canvas-chat-service";
 import { generateImages } from "@/app/actions/generations";
@@ -38,6 +40,8 @@ const COLLAPSED_WIDTH = 48;
 export interface CanvasChatPanelProps {
   generation: Generation;
   projectId: string;
+  /** Called with pending generation IDs so the parent can start polling. */
+  onPendingGenerations?: (pendingIds: string[]) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -54,7 +58,7 @@ function buildInitMessage(generation: Generation): ChatMessage {
       : generation.prompt ?? "";
 
   return {
-    id: `init-${generation.id}`,
+    id: `init-${generation.id}-${crypto.randomUUID()}`,
     role: "system",
     content: `Model: ${generation.modelId}\nPrompt: "${promptDisplay}"\nSteps: ${steps}, CFG: ${cfg}`,
   };
@@ -82,12 +86,13 @@ function buildImageContext(generation: Generation): CanvasImageContext {
 // CanvasChatPanel
 // ---------------------------------------------------------------------------
 
-export function CanvasChatPanel({ generation, projectId }: CanvasChatPanelProps) {
+export function CanvasChatPanel({ generation, projectId, onPendingGenerations }: CanvasChatPanelProps) {
   const { state, dispatch } = useCanvasDetail();
 
   // Local UI state
   const [collapsed, setCollapsed] = useState(false);
   const [width, setWidth] = useState(DEFAULT_WIDTH);
+  const [chatModelSlug, setChatModelSlug] = useState(DEFAULT_MODEL_SLUG);
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
     buildInitMessage(generation),
   ]);
@@ -149,27 +154,33 @@ export function CanvasChatPanel({ generation, projectId }: CanvasChatPanelProps)
   }, [generation.id]);
 
   // ---------------------------------------------------------------------------
-  // AC-10: Update image_context when currentGenerationId changes
+  // AC-10: Update context when currentGenerationId changes.
+  // Replace (not append) the init message at position 0 so the chat doesn't
+  // fill up with context blocks during Prev/Next navigation.
+  // Sibling clicks only update image context silently (no visual change).
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (state.currentGenerationId !== lastGenerationIdRef.current) {
       lastGenerationIdRef.current = state.currentGenerationId;
 
-      // Update the image context ref for subsequent messages
+      // Always update image context for subsequent messages
       imageContextRef.current = buildImageContext(generation);
 
-      // Build identifier from whatever info we have
-      const identifier = generation.prompt
-        ? generation.prompt.slice(0, 40) + (generation.prompt.length > 40 ? "..." : "")
-        : state.currentGenerationId.slice(0, 8);
-
-      setMessages((prev) => [
-        ...prev,
-        buildSeparatorMessage(identifier),
-        buildInitMessage(generation),
-      ]);
+      // Replace the first init message with updated context (Prev/Next + Sibling)
+      setMessages((prev) => {
+        const newInit = buildInitMessage(generation);
+        // Find and replace the first system (init) message
+        const firstInitIndex = prev.findIndex((m) => m.role === "system");
+        if (firstInitIndex >= 0) {
+          const updated = [...prev];
+          updated[firstInitIndex] = newInit;
+          return updated;
+        }
+        // Fallback: prepend if no init found
+        return [newInit, ...prev];
+      });
     }
-  }, [state.currentGenerationId, generation]);
+  }, [state.currentGenerationId]);
 
   // ---------------------------------------------------------------------------
   // AC-2 / AC-3: Collapse / Expand
@@ -267,23 +278,46 @@ export function CanvasChatPanel({ generation, projectId }: CanvasChatPanelProps)
       dispatch({ type: "SET_GENERATING", isGenerating: true });
 
       try {
-        await generateImages({
+        const result = await generateImages({
           projectId,
           promptMotiv: event.prompt,
           modelIds: [event.model_id],
           params: event.params ?? {},
           count: 1,
           generationMode: event.action === "img2img" ? "img2img" : "txt2img",
+          sourceImageUrl:
+            event.action === "img2img"
+              ? imageContextRef.current.image_url
+              : undefined,
         });
-        // Polling in WorkspaceContent will detect completion and replace image
+
+        // Check for validation/server errors returned as { error: string }
+        if (result && "error" in result) {
+          console.error("[CanvasChatPanel] generateImages returned error:", result.error);
+          toast.error(result.error);
+          dispatch({ type: "SET_GENERATING", isGenerating: false });
+          return;
+        }
+
+        // Notify parent (CanvasDetailView) about pending IDs so it can
+        // start polling and replace the image once completed.
+        const pendingIds = (result as Generation[])
+          .filter((g) => g.status === "pending")
+          .map((g) => g.id);
+
+        if (pendingIds.length > 0 && onPendingGenerations) {
+          onPendingGenerations(pendingIds);
+          // Don't clear SET_GENERATING — polling in CanvasDetailView handles that
+        } else {
+          dispatch({ type: "SET_GENERATING", isGenerating: false });
+        }
       } catch (error) {
         console.error("[CanvasChatPanel] generateImages failed:", error);
         toast.error("Generierung fehlgeschlagen.");
-      } finally {
         dispatch({ type: "SET_GENERATING", isGenerating: false });
       }
     },
-    [dispatch, projectId]
+    [dispatch, projectId, onPendingGenerations]
   );
 
   // ---------------------------------------------------------------------------
@@ -318,76 +352,76 @@ export function CanvasChatPanel({ generation, projectId }: CanvasChatPanelProps)
       let botBubbleInserted = false;
 
       try {
-        const stream = sendCanvasMessage(
+        await sendCanvasMessage(
           sessionIdRef.current,
           text,
           imageContextRef.current,
+          (event: CanvasSSEEvent) => {
+            switch (event.type) {
+              case "text-delta": {
+                // AC-3: Append delta to the bot message.
+                // Insert the bubble on the first non-empty delta (MEDIUM-1).
+                if (!botBubbleInserted && event.content) {
+                  botBubbleInserted = true;
+                  setMessages((prev) => [
+                    ...prev,
+                    { id: botMsgId, role: "assistant", content: event.content },
+                  ]);
+                } else if (botBubbleInserted) {
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === botMsgId
+                        ? { ...msg, content: msg.content + event.content }
+                        : msg
+                    )
+                  );
+                }
+                break;
+              }
+
+              case "text-done": {
+                // AC-4: Mark message as done (streaming indicator will hide)
+                setIsStreaming(false);
+                break;
+              }
+
+              case "canvas-generate": {
+                // AC-6: Trigger generation via server action (fire-and-forget)
+                setIsStreaming(false);
+                handleCanvasGenerate(event).catch((err) =>
+                  console.error("[CanvasChatPanel] generate failed:", err)
+                );
+                break;
+              }
+
+              case "error": {
+                // AC-8 / AC-9: Show error in the bot bubble and re-enable input.
+                if (!botBubbleInserted) {
+                  botBubbleInserted = true;
+                  setMessages((prev) => [
+                    ...prev,
+                    { id: botMsgId, role: "assistant", content: event.message, isError: true },
+                  ]);
+                } else {
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === botMsgId
+                        ? {
+                            ...msg,
+                            content: event.message,
+                            isError: true,
+                          }
+                        : msg
+                    )
+                  );
+                }
+                setIsStreaming(false);
+                break;
+              }
+            }
+          },
           abortControllerRef.current.signal
         );
-
-        for await (const event of stream) {
-          switch (event.type) {
-            case "text-delta": {
-              // AC-3: Append delta to the bot message.
-              // Insert the bubble on the first non-empty delta (MEDIUM-1).
-              if (!botBubbleInserted && event.content) {
-                botBubbleInserted = true;
-                setMessages((prev) => [
-                  ...prev,
-                  { id: botMsgId, role: "bot", content: event.content },
-                ]);
-              } else if (botBubbleInserted) {
-                setMessages((prev) =>
-                  prev.map((msg) =>
-                    msg.id === botMsgId
-                      ? { ...msg, content: msg.content + event.content }
-                      : msg
-                  )
-                );
-              }
-              break;
-            }
-
-            case "text-done": {
-              // AC-4: Mark message as done (streaming indicator will hide)
-              setIsStreaming(false);
-              break;
-            }
-
-            case "canvas-generate": {
-              // AC-6: Trigger generation via server action
-              setIsStreaming(false);
-              await handleCanvasGenerate(event);
-              break;
-            }
-
-            case "error": {
-              // AC-8 / AC-9: Show error in the bot bubble and re-enable input.
-              // If the bubble was not inserted yet, add it now.
-              if (!botBubbleInserted) {
-                botBubbleInserted = true;
-                setMessages((prev) => [
-                  ...prev,
-                  { id: botMsgId, role: "bot", content: event.message, isError: true },
-                ]);
-              } else {
-                setMessages((prev) =>
-                  prev.map((msg) =>
-                    msg.id === botMsgId
-                      ? {
-                          ...msg,
-                          content: event.message,
-                          isError: true,
-                        }
-                      : msg
-                  )
-                );
-              }
-              setIsStreaming(false);
-              break;
-            }
-          }
-        }
       } catch (error) {
         console.error("[CanvasChatPanel] SSE stream error:", error);
         toast.error("Verbindungsfehler");
@@ -397,7 +431,7 @@ export function CanvasChatPanel({ generation, projectId }: CanvasChatPanelProps)
             ...prev,
             {
               id: botMsgId,
-              role: "bot",
+              role: "assistant",
               content: "Verbindung unterbrochen. Bitte erneut versuchen.",
               isError: true,
             },
@@ -523,7 +557,7 @@ export function CanvasChatPanel({ generation, projectId }: CanvasChatPanelProps)
   return (
     <div
       ref={panelRef}
-      className="relative flex shrink-0 flex-col border-l border-border/80 bg-card"
+      className="relative flex h-full shrink-0 flex-col overflow-hidden border-l border-border/80 bg-card"
       style={{ width }}
       data-testid="canvas-chat-panel"
     >
@@ -541,6 +575,7 @@ export function CanvasChatPanel({ generation, projectId }: CanvasChatPanelProps)
         <div className="flex items-center gap-1.5">
           <MessageSquare className="size-4 text-muted-foreground" />
           <span className="text-sm font-medium">Chat</span>
+          <ModelSelector value={chatModelSlug} onChange={setChatModelSlug} />
         </div>
         <div className="flex items-center gap-1">
           <Button
@@ -565,14 +600,20 @@ export function CanvasChatPanel({ generation, projectId }: CanvasChatPanelProps)
       </div>
 
       {/* Messages area */}
-      <CanvasChatMessages
+      <ChatThread
         messages={messages}
         isStreaming={isStreaming}
         onChipClick={handleChipClick}
       />
 
       {/* Input — disabled while generating or streaming */}
-      <CanvasChatInput onSend={handleSend} disabled={inputDisabled} />
+      <ChatInput
+        onSend={handleSend}
+        disabled={inputDisabled}
+        isStreaming={isStreaming}
+        hideImageUpload
+        placeholder="Describe changes..."
+      />
     </div>
   );
 }

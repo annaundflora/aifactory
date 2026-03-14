@@ -17,7 +17,7 @@ import "@testing-library/jest-dom/vitest";
 
 import { getWorkspaceFieldsForChip } from "@/lib/assistant/assistant-context";
 import { ChatThread } from "../chat-thread";
-import type { Message } from "@/lib/assistant/assistant-context";
+import type { ChatMessage as Message } from "@/lib/types/chat-message";
 
 // jsdom does not implement scrollIntoView -- mock it globally
 beforeEach(() => {
