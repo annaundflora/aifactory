@@ -317,7 +317,8 @@ async function generate(
   generationMode?: string,
   sourceImageUrl?: string,
   strength?: number,
-  references?: ReferenceInput[]
+  references?: ReferenceInput[],
+  sourceGenerationId?: string
 ): Promise<Generation[]> {
   // Validate
   if (!promptMotiv || promptMotiv.trim().length === 0) {
@@ -388,6 +389,9 @@ async function generate(
       ? { ...params, prompt_strength: strength ?? 0.6 }
       : params;
 
+  // Generate a shared batchId for all generations in this request
+  const batchId = crypto.randomUUID();
+
   const isMultiModel = modelIds.length > 1;
 
   if (isMultiModel) {
@@ -404,6 +408,8 @@ async function generate(
         promptStyle: styleTrimmed,
         generationMode: effectiveMode,
         sourceImageUrl: sourceImageUrl ?? null,
+        sourceGenerationId: sourceGenerationId ?? null,
+        batchId,
       });
       pendingGenerations.push(gen);
     }
@@ -439,6 +445,8 @@ async function generate(
       promptStyle: styleTrimmed,
       generationMode: effectiveMode,
       sourceImageUrl: sourceImageUrl ?? null,
+      sourceGenerationId: sourceGenerationId ?? null,
+      batchId,
     });
     pendingGenerations.push(gen);
   }

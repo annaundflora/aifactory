@@ -50,6 +50,18 @@ export async function saveProjectSelectedModels(input: {
   await saveProjectSelectedModelIds(input.projectId, input.modelIds);
 }
 
+export async function checkImg2ImgSupport(input: {
+  modelId: string;
+}): Promise<boolean> {
+  const { modelId } = input;
+  if (!modelId || !modelId.includes("/")) return false;
+  try {
+    return await ModelSchemaService.supportsImg2Img(modelId);
+  } catch {
+    return false;
+  }
+}
+
 export async function getModelSchema(input: {
   modelId: string;
 }): Promise<{ properties: Record<string, unknown> } | { error: string }> {

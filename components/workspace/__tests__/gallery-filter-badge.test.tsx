@@ -26,11 +26,41 @@ Object.defineProperty(window, 'matchMedia', {
 // GenerationCard components are tested with their actual implementations.
 // ---------------------------------------------------------------------------
 
-vi.mock("lucide-react", () => ({
-  ImageIcon: (props: Record<string, unknown>) => (
-    <span data-testid="image-icon" {...props} />
-  ),
-}));
+vi.mock("lucide-react", () => {
+  const stub = (name: string) => {
+    const Comp = (props: Record<string, unknown>) => (
+      <span data-testid={`${name}-icon`} {...props} />
+    );
+    Comp.displayName = name;
+    return Comp;
+  };
+  return {
+    ImageIcon: stub("ImageIcon"),
+    ArrowLeft: stub("ArrowLeft"),
+    ArrowUp: stub("ArrowUp"),
+    ChevronLeft: stub("ChevronLeft"),
+    ChevronRight: stub("ChevronRight"),
+    ChevronDown: stub("ChevronDown"),
+    ChevronUp: stub("ChevronUp"),
+    Copy: stub("Copy"),
+    ArrowRightLeft: stub("ArrowRightLeft"),
+    ZoomIn: stub("ZoomIn"),
+    Download: stub("Download"),
+    Trash2: stub("Trash2"),
+    Info: stub("Info"),
+    ImageOff: stub("ImageOff"),
+    Loader2: stub("Loader2"),
+    PanelRightClose: stub("PanelRightClose"),
+    PanelRightOpen: stub("PanelRightOpen"),
+    MessageSquare: stub("MessageSquare"),
+    Minus: stub("Minus"),
+    Plus: stub("Plus"),
+    Sparkles: stub("Sparkles"),
+    Library: stub("Library"),
+    Undo2: stub("Undo2"),
+    Redo2: stub("Redo2"),
+  };
+});
 
 // PromptArea imports server actions — stub the entire component
 vi.mock("@/components/workspace/prompt-area", () => ({
@@ -56,9 +86,36 @@ vi.mock("@/components/lightbox/lightbox-navigation", () => ({
   ),
 }));
 
+// Mock db/queries to prevent DATABASE_URL error at module scope
+vi.mock("@/lib/db/queries", () => ({
+  updateProjectThumbnail: vi.fn(),
+}));
+
+// Mock model actions (used by CanvasModelSelector in CanvasDetailView)
+vi.mock("@/app/actions/models", () => ({
+  getCollectionModels: vi.fn().mockResolvedValue([]),
+  checkImg2ImgSupport: vi.fn().mockResolvedValue(true),
+}));
+
+// Mock ModelBrowserDrawer
+vi.mock("@/components/models/model-browser-drawer", () => ({
+  ModelBrowserDrawer: () => null,
+}));
+
+// Mock lib/utils
+vi.mock("@/lib/utils", () => ({
+  cn: (...args: unknown[]) => args.filter(Boolean).join(" "),
+  downloadImage: vi.fn().mockResolvedValue(undefined),
+  generateDownloadFilename: vi.fn().mockReturnValue("image.png"),
+}));
+
 // fetchGenerations is a server action used by WorkspaceContent polling
 vi.mock("@/app/actions/generations", () => ({
   fetchGenerations: vi.fn().mockResolvedValue([]),
+  getSiblingGenerations: vi.fn().mockResolvedValue([]),
+  generateImages: vi.fn().mockResolvedValue([]),
+  upscaleImage: vi.fn().mockResolvedValue({}),
+  deleteGeneration: vi.fn().mockResolvedValue({ success: true }),
 }));
 
 // sonner toast used by WorkspaceContent

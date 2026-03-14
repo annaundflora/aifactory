@@ -27,6 +27,10 @@ export interface ChatInputProps {
   autoFocus?: boolean;
   /** Project ID for image upload to R2 */
   projectId?: string;
+  /** Hide the image upload button (e.g. for canvas chat) */
+  hideImageUpload?: boolean;
+  /** Custom placeholder text (default: "Nachricht eingeben...") */
+  placeholder?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -40,6 +44,8 @@ export function ChatInput({
   disabled = false,
   autoFocus = false,
   projectId,
+  hideImageUpload = false,
+  placeholder = "Nachricht eingeben...",
 }: ChatInputProps) {
   const [value, setValue] = useState("");
   const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
@@ -134,11 +140,13 @@ export function ChatInput({
 
       <div className="flex items-end gap-2 border-t px-4 py-3">
         {/* AC-1: Image Upload Button with file picker */}
-        <ImageUploadButton
-          onUploadComplete={handleUploadComplete}
-          projectId={projectId ?? ""}
-          disabled={disabled || isStreaming || !!pendingImageUrl}
-        />
+        {!hideImageUpload && (
+          <ImageUploadButton
+            onUploadComplete={handleUploadComplete}
+            projectId={projectId ?? ""}
+            disabled={disabled || isStreaming || !!pendingImageUrl}
+          />
+        )}
 
         {/* Textarea -- stays enabled during streaming (AC-7) */}
         <textarea
@@ -146,7 +154,7 @@ export function ChatInput({
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          placeholder="Nachricht eingeben..."
+          placeholder={placeholder}
           rows={1}
           disabled={disabled}
           className="flex-1 resize-none border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"

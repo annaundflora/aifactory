@@ -43,6 +43,13 @@
       "when": 1773316993696,
       "tag": "0005_simple_human_torch",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1773317100000,
+      "tag": "0006_add_batch_id",
+      "breakpoints": true
     }
   ]
 }

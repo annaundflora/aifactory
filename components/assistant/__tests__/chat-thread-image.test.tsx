@@ -3,7 +3,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { ChatThread } from "../chat-thread";
-import type { Message } from "@/lib/assistant/assistant-context";
+import type { ChatMessage as Message } from "@/lib/types/chat-message";
 
 // ---------------------------------------------------------------------------
 // jsdom does not implement scrollIntoView -- provide a no-op stub

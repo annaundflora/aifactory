@@ -4,6 +4,9 @@ const ASSISTANT_BACKEND_URL =
   process.env.ASSISTANT_BACKEND_URL || "http://localhost:8000";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    viewTransition: true,
+  },
   images: {
     remotePatterns: [
       {

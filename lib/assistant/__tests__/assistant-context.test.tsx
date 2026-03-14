@@ -457,7 +457,8 @@ describe("PromptAssistantContext", () => {
     });
 
     expect(capturedValue!.messages).toHaveLength(1);
-    expect(capturedValue!.messages[0].role).toBe("error");
+    expect(capturedValue!.messages[0].role).toBe("assistant");
+    expect(capturedValue!.messages[0].isError).toBe(true);
     expect(capturedValue!.messages[0].content).toBe("Connection lost");
     expect(capturedValue!.isStreaming).toBe(false);
   });
