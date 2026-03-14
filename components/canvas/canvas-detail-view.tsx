@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { type Generation, type ModelSetting } from "@/lib/db/queries";
 import type { VariationParams } from "@/components/canvas/popovers/variation-popover";
 import type { Img2imgParams } from "@/components/canvas/popovers/img2img-popover";
+import type { Tier } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -375,18 +376,18 @@ export function CanvasDetailView({
   // ---------------------------------------------------------------------------
 
   const handleUpscale = useCallback(
-    async (params: { scale: 2 | 4 }) => {
+    async (params: { scale: 2 | 4; tier: Tier }) => {
       if (state.isGenerating) return;
       if (!currentGeneration.imageUrl) {
         toast.error("Kein Bild zum Hochskalieren vorhanden.");
         return;
       }
 
-      // Resolve model from settings (upscale / draft fallback)
+      // Resolve model from settings using the tier from params
       const setting = modelSettings.find(
-        (s) => s.mode === "upscale" && s.tier === "draft"
+        (s) => s.mode === "upscale" && s.tier === params.tier
       );
-      const resolvedModelId = setting?.modelId ?? "nightmareai/real-esrgan";
+      const resolvedModelId = setting?.modelId ?? currentGeneration.modelId;
       const resolvedModelParams = setting?.modelParams ?? {};
 
       dispatch({ type: "SET_GENERATING", isGenerating: true });

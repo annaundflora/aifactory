@@ -663,9 +663,9 @@ describe("Fallback bei fehlgeschlagenem Settings-fetch", () => {
   /**
    * AC-9 (upscale fallback): GIVEN modelSettings fetch fails
    *       WHEN handleUpscale is called
-   *       THEN upscaleImage uses the hardcoded fallback "nightmareai/real-esrgan"
+   *       THEN upscaleImage uses currentGeneration.modelId as fallback
    */
-  it('AC-9: should fall back to hardcoded upscale model when modelSettings fetch fails', async () => {
+  it('AC-9: should fall back to currentGeneration.modelId when modelSettings fetch fails', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
     // Simulate network failure
@@ -719,8 +719,8 @@ describe("Fallback bei fehlgeschlagenem Settings-fetch", () => {
     });
 
     const callArgs = mockUpscaleImage.mock.calls[0][0];
-    // AC-9: Upscale should fall back to hardcoded "nightmareai/real-esrgan"
-    expect(callArgs.modelId).toBe("nightmareai/real-esrgan");
+    // AC-9: Upscale should fall back to currentGeneration.modelId
+    expect(callArgs.modelId).toBe("black-forest-labs/flux-2-max");
     // Empty modelParams when settings are not available
     expect(callArgs.modelParams).toEqual({});
 

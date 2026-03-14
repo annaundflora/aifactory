@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { ZoomIn } from "lucide-react";
 import { useCanvasDetail } from "@/lib/canvas-detail-context";
 import {
@@ -17,13 +17,15 @@ import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
+import { TierToggle } from "@/components/ui/tier-toggle";
+import type { Tier } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
 
 export interface UpscalePopoverProps {
-  onUpscale: (params: { scale: 2 | 4 }) => void;
+  onUpscale: (params: { scale: 2 | 4; tier: Tier }) => void;
   isUpscaleDisabled: boolean;
 }
 
@@ -37,6 +39,16 @@ export function UpscalePopover({
 }: UpscalePopoverProps) {
   const { state, dispatch } = useCanvasDetail();
   const isOpen = state.activeToolId === "upscale";
+
+  // Local tier state -- defaults to "draft", resets when popover reopens
+  const [tier, setTier] = useState<Tier>("draft");
+
+  // Reset tier to draft whenever the popover opens
+  useEffect(() => {
+    if (isOpen) {
+      setTier("draft");
+    }
+  }, [isOpen]);
 
   // -------------------------------------------------------------------------
   // Handlers
@@ -54,11 +66,11 @@ export function UpscalePopover({
 
   const handleUpscale = useCallback(
     (scale: 2 | 4) => {
-      onUpscale({ scale });
+      onUpscale({ scale, tier });
       // Close the popover after action
       dispatch({ type: "SET_ACTIVE_TOOL", toolId: "upscale" });
     },
-    [onUpscale, dispatch]
+    [onUpscale, tier, dispatch]
   );
 
   // -------------------------------------------------------------------------
@@ -117,6 +129,15 @@ export function UpscalePopover({
         <PopoverHeader>
           <PopoverTitle>Upscale</PopoverTitle>
         </PopoverHeader>
+
+        {/* Tier Toggle -- above scale buttons, no MaxQualityToggle for upscale */}
+        <div className="mt-3" data-testid="upscale-tier-section">
+          <TierToggle
+            tier={tier}
+            onTierChange={setTier}
+            disabled={state.isGenerating}
+          />
+        </div>
 
         <div className="mt-3 flex flex-col gap-2">
           <Button
