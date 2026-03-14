@@ -537,6 +537,7 @@ export function CanvasDetailView({
                 projectId={currentGeneration.projectId}
                 onPendingGenerations={setPendingGenerationIds}
                 onGenerationsCreated={onGenerationsCreated}
+                modelSettings={modelSettings}
               />
             )}
           </aside>
