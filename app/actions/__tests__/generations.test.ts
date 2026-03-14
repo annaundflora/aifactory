@@ -736,6 +736,8 @@ describe("upscaleImage Server Action", () => {
       sourceImageUrl: "https://r2.example.com/img.png",
       scale: 2,
       sourceGenerationId: undefined,
+      modelId: undefined,
+      modelParams: undefined,
     });
     expect(result).toEqual(mockGeneration);
   });
@@ -767,6 +769,8 @@ describe("upscaleImage Server Action", () => {
       sourceImageUrl: "https://r2.example.com/img.png",
       scale: 4,
       sourceGenerationId: "uuid-123",
+      modelId: undefined,
+      modelParams: undefined,
     });
     expect(result).toEqual(mockGeneration);
   });

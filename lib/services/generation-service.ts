@@ -23,6 +23,10 @@ export interface UpscaleInput {
   sourceImageUrl: string;
   scale: 2 | 4;
   sourceGenerationId?: string;
+  /** Model ID for upscaling (resolved from settings). Falls back to UPSCALE_MODEL when omitted. */
+  modelId?: string;
+  /** Model parameters for upscaling (resolved from settings). Merged with scale when provided. */
+  modelParams?: Record<string, unknown>;
 }
 
 /**
@@ -503,7 +507,10 @@ async function retry(generationId: string): Promise<Generation> {
  * Returns the pending generation immediately for optimistic UI.
  */
 async function upscale(input: UpscaleInput): Promise<Generation> {
-  const { projectId, sourceImageUrl, scale, sourceGenerationId } = input;
+  const { projectId, sourceImageUrl, scale, sourceGenerationId, modelId: inputModelId, modelParams: inputModelParams } = input;
+
+  // Resolve upscale model: use provided modelId or fall back to hardcoded UPSCALE_MODEL
+  const effectiveModelId = inputModelId ?? UPSCALE_MODEL;
 
   // Validate scale: only 2 and 4 allowed
   if (scale !== 2 && scale !== 4) {
@@ -521,7 +528,7 @@ async function upscale(input: UpscaleInput): Promise<Generation> {
   const generation = await createGeneration({
     projectId,
     prompt,
-    modelId: UPSCALE_MODEL,
+    modelId: effectiveModelId,
     generationMode: "upscale",
     sourceImageUrl,
     sourceGenerationId: sourceGenerationId ?? null,
@@ -533,10 +540,13 @@ async function upscale(input: UpscaleInput): Promise<Generation> {
 
     try {
       // Call Replicate with upscale-specific input (image + scale, no prompt)
-      const result = await ReplicateClient.run(UPSCALE_MODEL, {
+      // Merge any model-specific params from settings, with image/scale taking precedence
+      const replicateInput: Record<string, unknown> = {
+        ...(inputModelParams ?? {}),
         image: sourceImageUrl,
         scale,
-      });
+      };
+      const result = await ReplicateClient.run(effectiveModelId, replicateInput);
 
       // Convert stream to PNG buffer + get dimensions
       const { buffer, width, height } = await streamToPngBuffer(result.output);

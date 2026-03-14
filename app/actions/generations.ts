@@ -205,6 +205,8 @@ export async function upscaleImage(
       sourceImageUrl: input.sourceImageUrl,
       scale: input.scale,
       sourceGenerationId: input.sourceGenerationId,
+      modelId: input.modelId,
+      modelParams: input.modelParams,
     });
     return generation;
   } catch (error: unknown) {
