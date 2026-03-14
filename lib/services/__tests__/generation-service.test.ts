@@ -62,8 +62,11 @@ import {
 } from "@/lib/db/queries";
 import type { Generation } from "@/lib/db/queries";
 import { ModelSchemaService } from "@/lib/services/model-schema-service";
-import { UPSCALE_MODEL } from "@/lib/models";
 import sharp from "sharp";
+
+// Previously imported from @/lib/models — module deleted in slice-13 cleanup.
+// Constant inlined here for backwards-compatible test assertions.
+const UPSCALE_MODEL = "nightmareai/real-esrgan";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -492,13 +495,14 @@ describe("GenerationService", () => {
 
   // AC-2: GIVEN generation-service.ts nach dem Refactoring
   //       WHEN die Datei inspiziert wird
-  //       THEN existiert KEIN Import von @/lib/models (kein getModelById)
-  it("Slice04-AC-2: should not import getModelById from lib/models (UPSCALE_MODEL import is allowed)", () => {
+  //       THEN existiert KEIN Import von @/lib/models
+  it("Slice04-AC-2: should not import from lib/models", () => {
     const filePath = path.resolve(__dirname, "..", "generation-service.ts");
     const source = fs.readFileSync(filePath, "utf-8");
 
-    // getModelById whitelist check must be removed, but UPSCALE_MODEL import is allowed
+    // Neither getModelById nor UPSCALE_MODEL should be imported (lib/models.ts deleted in slice-13)
     expect(source).not.toContain("getModelById");
+    expect(source).not.toMatch(/@\/lib\/models/);
   });
 
   // AC-8 (slice-04): GIVEN generation-service.ts nach dem Refactoring

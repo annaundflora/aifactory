@@ -22,10 +22,6 @@ vi.mock("@/lib/db/queries", () => ({
   updateGeneration: vi.fn(),
 }));
 
-vi.mock("@/lib/models", () => ({
-  UPSCALE_MODEL: "test/upscale-model",
-}));
-
 vi.mock("@/lib/services/model-schema-service", () => ({
   ModelSchemaService: { getSchema: vi.fn() },
   getImg2ImgFieldName: vi.fn(),

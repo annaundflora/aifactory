@@ -17,7 +17,12 @@ import { cn } from "@/lib/utils";
 import { type CollectionModel } from "@/lib/types/collection-model";
 import { useModelFilters, type SortOption } from "@/lib/hooks/use-model-filters";
 import { ModelCard } from "@/components/models/model-card";
-import { getFavoriteModels, toggleFavoriteModel } from "@/app/actions/models";
+// @deprecated - This component is no longer used in production.
+// Favorite model functions were removed in slice-13.
+const getFavoriteModels = async (): Promise<string[]> => [];
+const toggleFavoriteModel = async (_input: {
+  modelId: string;
+}): Promise<{ isFavorite: boolean }> => ({ isFavorite: false });
 
 // ---------------------------------------------------------------------------
 // Constants

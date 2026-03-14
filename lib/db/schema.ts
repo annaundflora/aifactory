@@ -93,6 +93,10 @@ export const generations = pgTable(
 // -----------------------------------------------
 // favorite_models
 // -----------------------------------------------
+/**
+ * @deprecated Use `model_settings` table instead. This table is no longer
+ * read or written by any production code and will be removed in a future migration.
+ */
 export const favoriteModels = pgTable(
   "favorite_models",
   {
@@ -110,6 +114,10 @@ export const favoriteModels = pgTable(
 // -----------------------------------------------
 // project_selected_models
 // -----------------------------------------------
+/**
+ * @deprecated Use `model_settings` table instead. This table is no longer
+ * read or written by any production code and will be removed in a future migration.
+ */
 export const projectSelectedModels = pgTable(
   "project_selected_models",
   {

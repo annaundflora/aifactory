@@ -82,11 +82,6 @@ vi.mock('@/lib/services/model-schema-service', () => ({
   getImg2ImgFieldName: vi.fn().mockReturnValue(null),
 }))
 
-// Mock models
-vi.mock('@/lib/models', () => ({
-  UPSCALE_MODEL: 'nightmareai/real-esrgan',
-}))
-
 // UUID v4 regex pattern
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
