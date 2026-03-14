@@ -244,7 +244,7 @@ describe("consumeSSEStream", () => {
   it("resets timeout timer on each received event", async () => {
     // Two events with a gap shorter than timeout
     const encoder = new TextEncoder();
-    let resolvers: Array<() => void> = [];
+    const resolvers: Array<() => void> = [];
 
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
