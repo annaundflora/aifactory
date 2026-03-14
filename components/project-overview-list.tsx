@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ProjectCard } from "@/components/project-card";
+import { ThemeToggle } from "@/components/shared/theme-toggle";
 import {
   createProject,
   renameProject,
@@ -121,10 +122,13 @@ export function ProjectOverviewList({ projects }: ProjectOverviewListProps) {
       {/* Header with New Project button */}
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold">Projects</h1>
-        <Button onClick={() => setIsCreating(true)} disabled={isPending}>
-          <Plus className="mr-2 size-4" />
-          New Project
-        </Button>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Button onClick={() => setIsCreating(true)} disabled={isPending}>
+            <Plus className="mr-2 size-4" />
+            New Project
+          </Button>
+        </div>
       </div>
 
       {/* Grid */}

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/shared/theme-toggle";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -115,6 +116,10 @@ export function WorkspaceHeader({ project }: WorkspaceHeaderProps) {
             {project.name}
           </h1>
         )}
+
+        <div className="ml-auto flex items-center gap-1">
+          <ThemeToggle />
+        </div>
 
         {/* Kebab menu for delete / thumbnail refresh */}
         <DropdownMenu>

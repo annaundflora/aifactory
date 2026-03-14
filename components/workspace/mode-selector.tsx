@@ -46,7 +46,7 @@ export function ModeSelector({
     <div
       role="group"
       aria-label="Generation mode"
-      className="inline-flex w-full rounded-md border border-border bg-muted p-1 gap-1"
+      className="inline-flex w-full rounded-lg border border-border-subtle bg-input p-1 gap-1"
       data-testid="mode-selector"
     >
       {SEGMENTS.map((segment) => {
@@ -67,10 +67,10 @@ export function ModeSelector({
               }
             }}
             className={cn(
-              "flex-1 rounded-sm px-3 py-1.5 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+              "flex-1 rounded-md px-3 py-1.5 text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
               isActive
-                ? "bg-primary text-primary-foreground shadow-md shadow-primary/25"
-                : "text-muted-foreground hover:bg-background hover:text-foreground",
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground",
               isDisabled && "cursor-not-allowed opacity-50",
             )}
           >

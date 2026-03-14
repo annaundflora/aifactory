@@ -36,6 +36,7 @@ import { type CollectionModel } from "@/lib/types/collection-model";
 import { ModelTrigger } from "@/components/models/model-trigger";
 import { ModelBrowserDrawer } from "@/components/models/model-browser-drawer";
 import { AssistantTrigger } from "@/components/assistant/assistant-trigger";
+import { SectionLabel } from "@/components/shared/section-label";
 import { AssistantSheet } from "@/components/assistant/assistant-sheet";
 import { Startscreen } from "@/components/assistant/startscreen";
 import { ChatInput } from "@/components/assistant/chat-input";
@@ -1136,7 +1137,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
   // Shared textarea class
   const textareaClass =
-    "flex w-full rounded-md border border-input bg-background px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm resize-none overflow-hidden";
+    "flex w-full rounded-md border border-border bg-card px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm resize-none overflow-hidden";
 
   return (
     <div className="space-y-3" data-testid="prompt-area">
@@ -1155,13 +1156,11 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
         promptStyle={promptStyle}
         negativePrompt={negativePrompt}
       >
-        <div className="space-y-3 pt-2">
+        <div className="space-y-5 pt-3">
           {/* ── Group: Model Selection ── */}
           {showModelSelector && (
-            <div className="space-y-2 rounded-lg border border-border/60 bg-muted/30 p-3">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Model
-              </Label>
+            <div className="space-y-3">
+              <SectionLabel>Model</SectionLabel>
               <ModelTrigger
                 models={selectedModels}
                 onRemove={handleModelRemove}
@@ -1203,10 +1202,8 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
           {/* ── Group: Source Input (upscale only) ── */}
           {showImageDropzone && (
-            <div className="space-y-3 rounded-lg border border-border/60 bg-muted/30 p-3">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Source Image
-              </Label>
+            <div className="space-y-2">
+              <SectionLabel>Source Image</SectionLabel>
               <ImageDropzone
                 projectId={projectId}
                 onUpload={handleUpscaleUpload}
@@ -1218,14 +1215,13 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
           {/* ── Group: Prompt Composition ── */}
           {showPromptFields && (
-            <div className="space-y-3 rounded-lg border border-border/60 bg-muted/30 p-3">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Prompt
-              </Label>
+            <div className="space-y-3">
+              <hr className="border-border" />
+              <SectionLabel>Prompt</SectionLabel>
 
               {/* Motiv Textarea (required) */}
               <div className="space-y-2">
-                <Label htmlFor="prompt-motiv-textarea" className="text-sm">
+                <Label htmlFor="prompt-motiv-textarea" className="text-sm font-bold font-display [letter-spacing:-0.5px]">
                   Motiv <span aria-hidden="true" className="text-destructive">*</span>
                 </Label>
                 <textarea
@@ -1261,7 +1257,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
               {/* Style / Modifier Textarea (optional) */}
               <div className="space-y-2">
-                <Label htmlFor="prompt-style-textarea" className="text-sm">Style / Modifier</Label>
+                <Label htmlFor="prompt-style-textarea" className="text-sm font-bold font-display [letter-spacing:-0.5px]">Style / Modifier</Label>
                 <textarea
                   id="prompt-style-textarea"
                   data-testid="prompt-style-textarea"
@@ -1309,11 +1305,10 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
           {/* ── Group: Parameters (collapsible, default closed) ── */}
           {showPromptFields && isSingleModel && schema && !schemaLoading && (
-            <Collapsible defaultOpen={false} className="group rounded-lg border border-border/60 bg-muted/30">
-              <CollapsibleTrigger className="flex w-full items-center justify-between p-3">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground pointer-events-none">
-                  Parameters
-                </Label>
+            <Collapsible defaultOpen={false} className="group">
+              <hr className="border-border mb-3" />
+              <CollapsibleTrigger className="flex w-full items-center justify-between py-1">
+                <SectionLabel className="pointer-events-none">Parameters</SectionLabel>
                 <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
               </CollapsibleTrigger>
               <CollapsibleContent className="px-3 pb-3">
@@ -1339,10 +1334,8 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
           {/* Upscale mode: Scale selector */}
           {currentMode === "upscale" && (
-            <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 p-3">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
-                Scale
-              </Label>
+            <div className="flex items-center gap-3">
+              <SectionLabel className="whitespace-nowrap">Scale</SectionLabel>
               <div className="flex gap-1" data-testid="scale-selector">
                 {([2, 4] as const).map((s) => (
                   <Button
@@ -1361,11 +1354,12 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
           )}
 
           {/* ── Action Bar: Variants + Generate ── */}
-          <div className="space-y-2.5">
+          <div className="space-y-3">
+            <hr className="border-border" />
             {/* Variant Count Stepper — hidden in upscale mode, only when single model */}
             {showVariants && isSingleModel && (
-              <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
-                <Label className="text-xs text-muted-foreground">
+              <div className="flex items-center justify-between px-1">
+                <Label className="text-sm text-muted-foreground">
                   Variants
                 </Label>
                 <div className="flex items-center" data-testid="variant-count-selector">
@@ -1406,7 +1400,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
               type="button"
               onClick={handleGenerate}
               disabled={isButtonDisabled}
-              className="w-full h-11 text-base font-semibold tracking-wide"
+              className="w-full h-12 text-base font-semibold tracking-wide"
               data-testid="generate-button"
             >
               {isGenerating ? (
