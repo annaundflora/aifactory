@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
@@ -344,8 +344,8 @@ describe("CanvasDetailView - handleUpscale with Tier", () => {
     const popover = await screen.findByTestId("upscale-popover");
     expect(popover).toBeInTheDocument();
 
-    // Default tier is "draft" -- verify Draft is active
-    const draftButton = screen.getByText("Draft");
+    // Default tier is "draft" -- verify Draft is active (scoped to popover)
+    const draftButton = within(popover).getByText("Draft");
     expect(draftButton).toHaveAttribute("aria-pressed", "true");
 
     // Click 2x Upscale button (with draft tier)
@@ -433,8 +433,8 @@ describe("CanvasDetailView - handleUpscale with Tier", () => {
     const popover = await screen.findByTestId("upscale-popover");
     expect(popover).toBeInTheDocument();
 
-    // Switch tier to "Quality" by clicking the Quality segment
-    const qualityButton = screen.getByText("Quality");
+    // Switch tier to "Quality" by clicking the Quality segment (scoped to popover)
+    const qualityButton = within(popover).getByText("Quality");
     await user.click(qualityButton);
 
     // Verify Quality is now active
