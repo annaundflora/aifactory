@@ -801,10 +801,16 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
   // ----- Model trigger handlers -----
   const handleModelRemove = useCallback((model: CollectionModel) => {
-    setSelectedModels((prev) =>
-      prev.filter((m) => !(m.owner === model.owner && m.name === model.name)),
-    );
-  }, []);
+    setSelectedModels((prev) => {
+      const updated = prev.filter((m) => !(m.owner === model.owner && m.name === model.name));
+      // Persist outside updater to avoid setState-during-render (server actions trigger router refresh)
+      const modelIds = updated.map((m) => `${m.owner}/${m.name}`);
+      queueMicrotask(() => {
+        saveProjectSelectedModels({ projectId, modelIds }).catch(() => {});
+      });
+      return updated;
+    });
+  }, [projectId]);
 
   const handleBrowse = useCallback(() => {
     setDrawerOpen(true);

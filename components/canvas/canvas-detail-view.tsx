@@ -48,6 +48,7 @@ export interface CanvasDetailViewProps {
   generation: Generation;
   allGenerations: Generation[];
   onBack: () => void;
+  onGenerationsCreated?: (newGens: Generation[]) => void;
   toolbarSlot?: ReactNode;
   chatSlot?: ReactNode;
   modelSelectorSlot?: ReactNode;
@@ -62,6 +63,7 @@ export function CanvasDetailView({
   generation,
   allGenerations,
   onBack,
+  onGenerationsCreated,
   toolbarSlot,
   chatSlot,
   modelSelectorSlot,
@@ -255,6 +257,9 @@ export function CanvasDetailView({
           return;
         }
 
+        // Notify parent so gallery state stays in sync
+        onGenerationsCreated?.(result);
+
         // Start polling for the first pending generation
         const pendingIds = result
           .filter((g) => g.status === "pending")
@@ -270,7 +275,7 @@ export function CanvasDetailView({
         toast.error("Generation fehlgeschlagen.");
       }
     },
-    [state.isGenerating, state.selectedModelId, currentGeneration, dispatch, setPendingGenerationIds]
+    [state.isGenerating, state.selectedModelId, currentGeneration, dispatch, setPendingGenerationIds, onGenerationsCreated]
   );
 
   // ---------------------------------------------------------------------------
@@ -314,6 +319,9 @@ export function CanvasDetailView({
           return;
         }
 
+        // Notify parent so gallery state stays in sync
+        onGenerationsCreated?.(result);
+
         const pendingIds = result
           .filter((g) => g.status === "pending")
           .map((g) => g.id);
@@ -328,7 +336,7 @@ export function CanvasDetailView({
         toast.error("Generation fehlgeschlagen.");
       }
     },
-    [state.isGenerating, state.selectedModelId, currentGeneration, dispatch, setPendingGenerationIds]
+    [state.isGenerating, state.selectedModelId, currentGeneration, dispatch, setPendingGenerationIds, onGenerationsCreated]
   );
 
   // ---------------------------------------------------------------------------
@@ -360,6 +368,9 @@ export function CanvasDetailView({
           return;
         }
 
+        // Notify parent so gallery state stays in sync
+        onGenerationsCreated?.([result]);
+
         if (result.status === "pending") {
           setPendingGenerationIds([result.id]);
         } else {
@@ -371,7 +382,7 @@ export function CanvasDetailView({
         toast.error("Upscale fehlgeschlagen.");
       }
     },
-    [state.isGenerating, currentGeneration, dispatch, setPendingGenerationIds]
+    [state.isGenerating, currentGeneration, dispatch, setPendingGenerationIds, onGenerationsCreated]
   );
 
   // ---------------------------------------------------------------------------
@@ -486,6 +497,7 @@ export function CanvasDetailView({
                 generation={currentGeneration}
                 projectId={currentGeneration.projectId}
                 onPendingGenerations={setPendingGenerationIds}
+                onGenerationsCreated={onGenerationsCreated}
               />
             )}
           </aside>

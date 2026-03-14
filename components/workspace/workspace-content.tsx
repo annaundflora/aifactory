@@ -138,56 +138,64 @@ export function WorkspaceContent({
     ? completedGenerations.find((g) => g.id === selectedGenerationId) ?? null
     : null;
 
-  // ----- Detail-View open -----
-  if (detailViewOpen && selectedGeneration && selectedGenerationId) {
-    return (
-      <div className="fixed inset-0 z-50 flex overflow-hidden bg-background" data-testid="workspace-detail-view">
-        <CanvasDetailProvider initialGenerationId={selectedGenerationId}>
-          <CanvasDetailView
-            generation={selectedGeneration}
-            allGenerations={completedGenerations}
-            onBack={handleDetailViewClose}
-          />
-        </CanvasDetailProvider>
-      </div>
-    );
-  }
+  const showDetailView = detailViewOpen && selectedGeneration && selectedGenerationId;
 
-  // ----- Gallery-View -----
+  // ----- Render both views, hide gallery when detail is open -----
+  // This prevents PromptArea from unmounting (and losing state) during canvas roundtrip.
   return (
-    <div className="flex flex-1 gap-3 overflow-hidden bg-muted/40 p-3" data-testid="workspace-gallery-view">
-      {/* Left: Prompt Area */}
-      <div className="w-[480px] shrink-0 overflow-y-auto rounded-xl border border-border/80 bg-card p-4 shadow-sm">
-        <PromptArea
-          projectId={projectId}
-          onGenerationsCreated={handleGenerationsCreated}
-        />
-      </div>
+    <>
+      {showDetailView && (
+        <div className="fixed inset-0 z-50 flex overflow-hidden bg-background" data-testid="workspace-detail-view">
+          <CanvasDetailProvider initialGenerationId={selectedGenerationId}>
+            <CanvasDetailView
+              generation={selectedGeneration}
+              allGenerations={completedGenerations}
+              onBack={handleDetailViewClose}
+              onGenerationsCreated={handleGenerationsCreated}
+            />
+          </CanvasDetailProvider>
+        </div>
+      )}
 
-      {/* Right: Gallery */}
-      <div className="flex-1 overflow-y-auto rounded-xl border border-border/80 bg-card p-6 shadow-sm">
-        {/* Pending Placeholders (failed -> only toast, no card) */}
-        {pendingGenerations.length > 0 && (
-          <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {pendingGenerations.map((gen) => (
-              <GenerationPlaceholder key={gen.id} generation={gen} />
-            ))}
-          </div>
-        )}
-
-        {/* Filter Chips */}
-        <div className="mb-4">
-          <FilterChips value={modeFilter} onChange={setModeFilter} />
+      {/* Gallery-View: hidden (not unmounted) when detail view is open */}
+      <div
+        className="flex flex-1 gap-3 overflow-hidden bg-muted/40 p-3"
+        data-testid="workspace-gallery-view"
+        style={showDetailView ? { display: "none" } : undefined}
+      >
+        {/* Left: Prompt Area */}
+        <div className="w-[480px] shrink-0 overflow-y-auto rounded-xl border border-border/80 bg-card p-4 shadow-sm">
+          <PromptArea
+            projectId={projectId}
+            onGenerationsCreated={handleGenerationsCreated}
+          />
         </div>
 
-        {/* Completed Gallery */}
-        <GalleryGrid
-          generations={generations}
-          onSelectGeneration={handleSelectGeneration}
-          modeFilter={modeFilter}
-        />
-      </div>
+        {/* Right: Gallery */}
+        <div className="flex-1 overflow-y-auto rounded-xl border border-border/80 bg-card p-6 shadow-sm">
+          {/* Pending Placeholders (failed -> only toast, no card) */}
+          {pendingGenerations.length > 0 && (
+            <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {pendingGenerations.map((gen) => (
+                <GenerationPlaceholder key={gen.id} generation={gen} />
+              ))}
+            </div>
+          )}
 
-    </div>
+          {/* Filter Chips */}
+          <div className="mb-4">
+            <FilterChips value={modeFilter} onChange={setModeFilter} />
+          </div>
+
+          {/* Completed Gallery */}
+          <GalleryGrid
+            generations={generations}
+            onSelectGeneration={handleSelectGeneration}
+            modeFilter={modeFilter}
+          />
+        </div>
+
+      </div>
+    </>
   );
 }

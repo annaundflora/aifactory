@@ -1,7 +1,7 @@
 ---
 title: Phasen-Definition
 created: 2026-03-02
-updated: 2026-03-02
+updated: 2026-03-14
 ---
 
 # Phasen-Definition: POD Design Studio
@@ -10,116 +10,124 @@ updated: 2026-03-02
 
 | Phase | Name | Kernfrage | Status |
 |-------|------|-----------|--------|
-| 0 | E2E Generate & Persist | Kann ich Designs generieren, iterieren und alles wird gespeichert? | ⬜ |
-| 1 | Edit & Refine | Kann ich Designs direkt im Tool bearbeiten? | ⬜ |
-| 2 | Export & Produce | Kommt ein POD-ready 4000x4000 Design raus? | ⬜ |
-| 3 | Power Features | Wird der Workflow schneller als Kittl? | ⬜ |
+| 0 | E2E Generate & Persist | Kann ich Designs generieren, iterieren und alles wird gespeichert? | ✅ |
+| 1 | Quality Improvements | Ist die Codebasis sauber, Sidebar richtig, DB-Schema stabil? | ✅ |
+| 2 | Generation UI & Model Cards | Sind UI und Multi-Model-Workflow production-ready? | ✅ |
+| 3 | Multi-Image & Prompt Assistant | Kann ich mit mehreren Bildern referenzieren und Prompts assistiert verbessern? | ✅ |
+| 4 | Canvas Detail-View & UI Redesign | Ist die Detail-Ansicht und das UI-Redesign umgesetzt? | ✅ |
+| 5 | Draft/Quality Mode | Einfach zwischen Draft und Quality wechseln statt Modelle manuell wählen? | 🔄 |
+| 6 | Security & Hetzner-Optimierung | Ist die App sicher und ready für Hetzner? | ⬜ |
+| 7 | Deployment | Läuft die App produktiv auf Hetzner? | ⬜ |
 
 ---
 
-## Phase 0: E2E Generate & Persist (AKTUELL)
+## Phase 0: E2E Generate & Persist ✅
 
-**Frage:** Kann ich Designs generieren, iterieren und alles persistent speichern – ein kompletter E2E-Durchstich?
+**Frage:** Kann ich Designs generieren, iterieren und alles persistent speichern?
+
+**Features:** Next.js App, PostgreSQL, Cloudflare R2, Replicate API, Prompt Builder, LLM Prompt-Assistent, Galerie, Prompt-History, Projekte
+
+**Abgeschlossen:** 2026-03-07
+
+---
+
+## Phase 1: Quality Improvements ✅
+
+**Frage:** Ist die Codebasis sauber und stabil?
+
+**Features:** DB-Schema-Refactoring, shadcn Sidebar, Structured Prompts, Prompt History, Thumbnail Service, Lightbox Fullscreen, OpenRouter Timeout
+
+**Abgeschlossen:** 2026-03-07
+
+---
+
+## Phase 2: Generation UI & Model Cards ✅
+
+**Frage:** Sind UI und Multi-Model-Workflow production-ready?
+
+**Features:** Generation UI Improvements, Model Cards, Multi-Mode Generation
+
+**Abgeschlossen:** 2026-03-11
+
+---
+
+## Phase 3: Multi-Image & Prompt Assistant ✅
+
+**Frage:** Kann ich mehrere Bilder referenzieren und Prompts assistiert verbessern?
+
+**Features:** Multi-Image Referencing, Prompt Assistant
+
+**Abgeschlossen:** 2026-03-13
+
+---
+
+## Phase 4: Canvas Detail-View & UI Redesign ✅
+
+**Frage:** Ist die Detail-Ansicht und das UI-Redesign umgesetzt?
+
+**Features:** Canvas Detail-View, UI Redesign (Swiss Dark Warm Design System)
+
+**Abgeschlossen:** 2026-03-14
+
+---
+
+## Phase 5: Draft/Quality Mode (AKTUELL)
+
+**Frage:** Kann ich einfach zwischen Draft (schnell/günstig) und Quality (beste Ergebnisse) wechseln, statt Modelle manuell auszuwählen?
 
 ### Kriterien
-
-**Infrastruktur:**
-- [ ] Next.js App (App Router, Tailwind v4, TypeScript)
-- [ ] PostgreSQL (Docker): Projekte, Generierungen, Prompts, Einstellungen
-- [ ] Cloudflare R2: Bild-Storage (generierte Bilder persistent speichern)
-- [ ] Replicate API-Anbindung (Webhook oder Polling für async Generation)
-
-**Generation:**
-- [ ] Modell-Auswahl (mind. FLUX Schnell, FLUX Pro, SDXL)
-- [ ] Prompt-Eingabe mit Live-Preview der generierten Bilder
-- [ ] Model-Parameter: Guidance Scale, Steps, Aspect Ratio konfigurierbar
-- [ ] Variations: Schnell Varianten generieren (gleicher Prompt, anderer Seed)
-
-**Prompt Builder (Kittl-Style):**
-- [ ] Visueller Baukasten mit 6 Kategorien: Style, Perspective, Effects, Colors, Environment, Lighting
-- [ ] Je 9 Optionen mit Bild-Preview (3x3 Grid)
-- [ ] Freitext-Ergänzung + "Add to your prompt"
-- [ ] "Surprise me" Zufalls-Kombination
-- [ ] Prompt-Komposition: Auswahl → fertiger Prompt-String
-
-**LLM Prompt-Assistent:**
-- [ ] Prompt-Verbesserung via LLM (grob → detailliert)
-- [ ] Negativ-Prompt-Vorschläge
-
-**Persistenz & Galerie:**
-- [ ] Bild-Galerie: Alle Generierungen sichtbar, persistent gespeichert
-- [ ] Prompt-History: Vorherige Prompts wiederverwenden/anpassen
-- [ ] Projekte: Generierungen in Projekten organisieren
+- [ ] Draft/Quality Toggle im Workspace (ersetzt direkte Modell-Auswahl)
+- [ ] Settings-Page: Modell-Zuordnung für Draft und Quality (global scope)
+- [ ] Bestehende Modell-Auswahl UI durch Draft/Quality ersetzen
+- [ ] Default-Modelle vorkonfiguriert (z.B. Draft = FLUX Schnell, Quality = FLUX Pro)
 
 ### Exit-Kriterium
-> "Ich kann mit dem Prompt Builder visuell einen Prompt zusammenklicken, zwischen Modellen wechseln, schnell iterieren – und alles wird in DB + R2 gespeichert. Beim nächsten Öffnen ist alles noch da."
+> "Ich wähle nur Draft oder Quality – das richtige Modell wird automatisch verwendet. In Settings kann ich jederzeit ändern, welches Modell hinter Draft/Quality steckt."
 
 ### Nicht in dieser Phase
-- Bildbearbeitung / Editor (kommt Phase 1)
-- Export / Upscaling (kommt Phase 2)
-- User Auth (nur für mich, kein Login nötig)
+- Security-Härtung (kommt Phase 6)
+- Deployment (kommt Phase 7)
 
 ---
 
-## Phase 1: Edit & Refine
+## Phase 6: Security & Hetzner-Optimierung
 
-**Frage:** Kann ich ein generiertes Design direkt im Tool bearbeiten?
+**Frage:** Ist die App sicher und bereit für Produktiv-Betrieb auf Hetzner?
 
 ### Kriterien
-- [ ] Background Removal (via Replicate-Modell)
-- [ ] Inpainting: Teile des Bildes mit AI neu generieren (FLUX Fill Pro / Kontext)
-- [ ] Farbanpassungen (Helligkeit, Kontrast, Sättigung)
-- [ ] Text-Overlay: Text auf Design platzieren (Schriftart, Größe, Farbe)
-- [ ] Layer-System: Mehrere Elemente übereinander (Bild + Text + Grafik)
-- [ ] Canvas: Feste Arbeitsfläche mit Zoom/Pan
+- [ ] Security Review: OWASP Top 10, API-Keys, Environment Variables
+- [ ] Rate Limiting & Input Validation
+- [ ] Hetzner-spezifische Optimierungen (Docker Compose, Reverse Proxy, SSL)
+- [ ] Monitoring & Logging Basics
+- [ ] Backup-Strategie für PostgreSQL & R2
 
 ### Exit-Kriterium
-> "Ich kann ein generiertes Bild direkt im Tool verfeinern, ohne in Photoshop wechseln zu müssen."
+> "Die App ist sicherheitstechnisch geprüft und für Hetzner-Deployment vorbereitet."
 
 ### Nicht in dieser Phase
-- 4000x4000 Export (kommt Phase 2)
-- Batch-Export
-- Vorlagen/Templates
+- Tatsächliches Deployment (kommt Phase 7)
+- Multi-User Auth
 
 ---
 
-## Phase 2: Export & Produce
+## Phase 7: Deployment
 
-**Frage:** Kommt am Ende ein POD-ready Design in der richtigen Qualität raus?
+**Frage:** Läuft die App produktiv auf Hetzner?
 
 ### Kriterien
-- [ ] AI-Upscaling auf 4000x4000px (via Replicate Upscaler)
-- [ ] PNG-Export mit Transparenz
-- [ ] Spreadshirt-Preset: Korrekte DPI, Farbprofil, Dateigröße
-- [ ] Export-Preview: Mockup auf T-Shirt/Hoodie vor dem Export
+- [ ] CI/CD Pipeline (GitHub Actions → Hetzner)
+- [ ] Docker Compose Production Setup
+- [ ] Domain & SSL (Let's Encrypt)
+- [ ] PostgreSQL Production (Hetzner oder managed)
+- [ ] Health Checks & Basic Monitoring
+- [ ] Dokumentation: Deployment-Runbook
 
 ### Exit-Kriterium
-> "Ich kann ein Design erstellen, bearbeiten und als druckfertiges 4000x4000px PNG exportieren, das direkt zu Spreadshirt hochgeladen werden kann."
+> "Die App läuft stabil auf Hetzner, ich kann von überall darauf zugreifen und Designs generieren."
 
 ### Nicht in dieser Phase
-- Direkter Spreadshirt-Upload via API
-- Batch-Verarbeitung
+- Auto-Scaling
+- CDN für Bilder (R2 reicht)
 
 ---
-
-## Phase 3: Power Features
-
-**Frage:** Wird der Workflow wirklich schneller und besser als mit Kittl?
-
-### Kriterien
-- [ ] Prompt-Templates: Bewährte Prompts als Vorlagen speichern
-- [ ] Style-Presets: Häufig genutzte Stil-Kombinationen (Modell + Parameter)
-- [ ] Batch-Generation: Mehrere Varianten gleichzeitig generieren
-- [ ] Direkter Spreadshirt-Upload via API (optional)
-- [ ] Design-History: Alle vergangenen Designs durchsuchbar
-- [ ] Custom Fine-Tunes: Eigene Modelle über Replicate trainieren und nutzen
-
-### Exit-Kriterium
-> "Mein Workflow ist messbar schneller und flexibler als mit Kittl."
-
-### Nicht in dieser Phase
-- Multi-User Support
-- Monetarisierung
-
----
-*Letzte Aktualisierung: 2026-03-02*
+*Letzte Aktualisierung: 2026-03-14*

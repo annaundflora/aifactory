@@ -16,7 +16,10 @@ vi.mock("replicate", () => {
   return { default: MockReplicate };
 });
 
-import { replicateRun, ReplicateClient } from "../replicate";
+import { replicateRun, ReplicateClient, _config, _resetQueue } from "../replicate";
+
+// Store original config values
+const origConfig = { ..._config };
 
 describe("ReplicateClient", () => {
   const originalEnv = process.env;
@@ -24,10 +27,19 @@ describe("ReplicateClient", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env = { ...originalEnv, REPLICATE_API_TOKEN: "test-token-123" };
+    // Reset queue state and disable delays for fast tests
+    _resetQueue();
+    _config.maxConcurrent = 1;
+    _config.maxRetries = 3;
+    _config.baseDelayMs = 0;
+    _config.interRequestDelayMs = 0;
   });
 
   afterEach(() => {
     process.env = originalEnv;
+    // Restore original config
+    Object.assign(_config, origConfig);
+    _resetQueue();
   });
 
   /**
@@ -123,6 +135,9 @@ describe("ReplicateClient", () => {
       replicateRun("model/test", { wrong_param: "test" })
     ).rejects.toThrow(/Replicate API Fehler/);
 
+    // Non-429 errors should NOT be retried
+    expect(mockPredictionsCreate).toHaveBeenCalledTimes(1);
+
     // Reset and verify original error details are included
     mockPredictionsCreate.mockRejectedValue(
       new Error("Invalid input: prompt is required")
@@ -157,9 +172,9 @@ describe("ReplicateClient", () => {
   /**
    * AC-4: GIVEN die Replicate API antwortet mit Rate Limit (429)
    * WHEN ReplicateClient.run() aufgerufen wird
-   * THEN wird ein Error mit der Nachricht "Zu viele Anfragen. Bitte kurz warten." geworfen
+   * THEN wird nach Retries ein Error mit der Nachricht "Zu viele Anfragen. Bitte kurz warten." geworfen
    */
-  it("AC-4: should throw error with rate limit message on 429 response", async () => {
+  it("AC-4: should retry on 429 and throw rate limit message after all retries exhausted", async () => {
     const rateLimitError = Object.assign(new Error("Rate limit exceeded"), {
       status: 429,
     });
@@ -169,12 +184,15 @@ describe("ReplicateClient", () => {
     await expect(
       replicateRun("model/test", { prompt: "test" })
     ).rejects.toThrow("Zu viele Anfragen. Bitte kurz warten.");
+
+    // Should have retried: 1 initial + 3 retries = 4 calls
+    expect(mockPredictionsCreate).toHaveBeenCalledTimes(4);
   });
 
   /**
    * AC-4 (variant): Rate limit during wait phase
    */
-  it("AC-4 (variant): should throw rate limit error when 429 occurs during wait", async () => {
+  it("AC-4 (variant): should retry and throw rate limit error when 429 occurs during wait", async () => {
     mockPredictionsCreate.mockResolvedValue({
       id: "pred-rl",
       status: "starting",
@@ -187,6 +205,10 @@ describe("ReplicateClient", () => {
     await expect(
       replicateRun("model/test", { prompt: "test" })
     ).rejects.toThrow("Zu viele Anfragen. Bitte kurz warten.");
+
+    // Should have retried: 1 initial + 3 retries = 4 calls
+    expect(mockPredictionsCreate).toHaveBeenCalledTimes(4);
+    expect(mockWait).toHaveBeenCalledTimes(4);
   });
 
   /**
@@ -259,5 +281,77 @@ describe("ReplicateClient", () => {
     const result = await replicateRun("model/test", { prompt: "test" });
     expect(result.output).toBeInstanceOf(ReadableStream);
     expect(result.predictionId).toBe("pred-arr");
+  });
+
+  // -------------------------------------------------------------------------
+  // Retry & Concurrency Tests
+  // -------------------------------------------------------------------------
+
+  it("should retry on 429 and succeed on subsequent attempt", async () => {
+    const rateLimitError = Object.assign(new Error("Rate limit"), {
+      status: 429,
+    });
+    const mockStream = new ReadableStream({
+      start(controller) {
+        controller.close();
+      },
+    });
+
+    mockPredictionsCreate
+      .mockRejectedValueOnce(rateLimitError)
+      .mockResolvedValueOnce({ id: "pred-retry", status: "starting" });
+    mockWait.mockResolvedValue({
+      id: "pred-retry",
+      status: "succeeded",
+      output: mockStream,
+      logs: null,
+    });
+
+    const result = await replicateRun("model/test", { prompt: "test" });
+
+    expect(result.predictionId).toBe("pred-retry");
+    // 1 failed + 1 successful = 2 calls
+    expect(mockPredictionsCreate).toHaveBeenCalledTimes(2);
+  });
+
+  it("should serialize concurrent requests (concurrency = 1)", async () => {
+    let callCount = 0;
+
+    mockPredictionsCreate.mockImplementation(async () => {
+      const count = ++callCount;
+      return { id: `pred-${count}`, status: "starting" };
+    });
+
+    mockWait.mockImplementation(async (pred: { id: string }) => {
+      return {
+        ...pred,
+        status: "succeeded",
+        output: new ReadableStream({ start(c) { c.close(); } }),
+        logs: null,
+      };
+    });
+
+    // Start two calls concurrently
+    const p1 = replicateRun("model/a", { prompt: "a" });
+    const p2 = replicateRun("model/b", { prompt: "b" });
+
+    const [r1, r2] = await Promise.all([p1, p2]);
+
+    // Both completed successfully
+    expect(r1.predictionId).toBe("pred-1");
+    expect(r2.predictionId).toBe("pred-2");
+    // Total 2 create calls
+    expect(mockPredictionsCreate).toHaveBeenCalledTimes(2);
+  });
+
+  it("should not retry non-429 errors", async () => {
+    mockPredictionsCreate.mockRejectedValue(new Error("Server error"));
+
+    await expect(
+      replicateRun("model/test", { prompt: "test" })
+    ).rejects.toThrow(/Replicate API Fehler/);
+
+    // Only 1 call, no retries
+    expect(mockPredictionsCreate).toHaveBeenCalledTimes(1);
   });
 });

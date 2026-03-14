@@ -1,124 +1,106 @@
 ---
 title: Roadmap
 created: 2026-03-02
-updated: 2026-03-11
+updated: 2026-03-14
 ---
 
 # Roadmap: POD Design Studio
 
 ## Aktueller Stand
 
-**Phase:** 0 – E2E Generate & Persist
-**Status:** ⬜ Noch nicht gestartet
-**Letztes Check-in:** 2026-03-02
+**Phase:** 5 – Draft/Quality Mode
+**Status:** 🔄 Discovery in Arbeit
+**Letztes Check-in:** 2026-03-14
 
 ### Wo stehe ich?
-Vision und Phasen definiert. Noch kein Code. Nächster Schritt: Discovery für P0.1 starten.
+Phasen 0-4 sind abgeschlossen. Die App hat: E2E Generation, Prompt Builder, LLM Prompt-Assistent, Multi-Model Support, Model Cards, Multi-Image Referencing, Canvas Detail-View und Swiss Dark Warm Design System. Nächster Schritt: Modell-Auswahl durch Draft/Quality-Modus vereinfachen.
 
 ## Aktuelle Prioritäten
 
-### P0.1: Infrastruktur & erste Generation
-**Warum zuerst?** Das technische Fundament: Next.js + Replicate + PostgreSQL (Docker) + R2. Ohne das geht nichts.
+### 🔴 P5.1: Draft/Quality Mode
+**Warum zuerst?** Vereinfacht den Workflow massiv: Statt Modell-Details zu kennen, wählt man nur "schnell" oder "gut". Modell-Zuordnung in Settings (global).
+
+**Status:** Discovery in Arbeit
 
 **Nächste Schritte:**
-1. [ ] Discovery: Replicate API evaluieren (Pricing, Rate Limits, Webhook vs. Polling)
-2. [ ] Next.js Projekt aufsetzen (App Router, Tailwind v4, TypeScript)
-3. [ ] PostgreSQL (Docker) Schema: Projekte, Generierungen, Prompts
-4. [ ] Cloudflare R2 Setup: Bucket, Upload/Download via signed URLs
-5. [ ] API Route: Replicate → Bild generieren → R2 speichern → DB eintragen
-6. [ ] Einfaches UI: Prompt-Input + Bild-Anzeige + Galerie
+1. [x] Discovery starten
+2. [ ] Architecture
+3. [ ] Slices planen & implementieren
+4. [ ] Settings-Page für Modell-Zuordnung
+5. [ ] Draft/Quality Toggle im Workspace
 
-### P0.2: Prompt Builder (Kittl-Style)
-**Warum als zweites?** Der Prompt Builder ist der Kern-Differenziator – visueller Baukasten statt Blind-Tippen.
-
-**Referenz:** Kittl Prompt Builder (Screenshots dokumentiert)
-
-**Kategorien (je 9 Optionen mit Bild-Preview):**
-- Style: Oil Painting, Drawing, Comic, Flat Vector, Anime, Watercolor, Low Poly, Glossy 3D, Photography
-- Perspective: Worms Eye, Birds Eye, POV, Extreme Long, Long, Medium, Medium Close, Close Up, Extreme Close
-- Effects: Grunge, Retro Film, Duotone, Motion Blur, Glitch, Chromatic Aberration, Fisheye, Bokeh, High Contrast
-- Colors: Clay, B&W, Ice, Citrus, Berries, Desert, Dark Forest, Pink & Purple, Natural
-- Environment: Desert, Studio, Florals, Retro Setting, Jungle, Interior, Street, Nature, Beach
-- Lighting: Soft, Cinematic, Golden Hour, Under, Top, Side, Backlight, Hard, Studio
-
-**UX-Pattern:**
-- Kategorie-Nav links, 3x3 Bild-Grid rechts
-- Freitext-Feld + "Add to your prompt"
-- "Surprise me" Button
-- Alle Kategorien optional, Auswahl wird kumulativ zum Prompt hinzugefügt
+### 🟡 P6.1: Security Review & Hetzner-Optimierung
+**Warum als nächstes?** Vor dem Deployment muss die App sicher sein und für Hetzner optimiert werden.
 
 **Nächste Schritte:**
-1. [ ] Prompt Builder UI (Modal/Panel mit Kategorie-Navigation)
-2. [ ] Kategorie-Daten als JSON (Label + Prompt-Snippet pro Option)
-3. [ ] Preview-Bilder generieren (einmalig, je Kategorie gleiches Basis-Motiv)
-4. [ ] Prompt-Komposition: Auswahl → fertiger Prompt
-5. [ ] "Surprise me" Zufalls-Kombination
-6. [ ] Freitext-Ergänzung
+1. [ ] OWASP Top 10 Audit (API Routes, Environment Variables, Input Validation)
+2. [ ] Rate Limiting
+3. [ ] Docker Compose für Production (Hetzner-optimiert)
+4. [ ] Reverse Proxy Setup (Caddy/Nginx)
+5. [ ] SSL & Backup-Strategie
 
-### P0.3: LLM Prompt-Assistent
-**Warum nach dem Builder?** Der Builder gibt Struktur, der LLM-Assistent gibt Intelligenz.
-
-**Nächste Schritte:**
-1. [ ] LLM-basierte Prompt-Verbesserung (groben Prompt → detaillierten Prompt)
-2. [ ] Negativ-Prompt-Vorschläge
-3. [ ] Prompt-History und Favoriten
-
-### P0.4: Multi-Model & Iteration
-**Warum als viertes?** Verschiedene Modelle für verschiedene Stile. Schnelles Wechseln ist der Turbo.
+### 🟢 P7.1: Deployment auf Hetzner
+**Warum als letztes?** Alles muss stehen, bevor es live geht.
 
 **Nächste Schritte:**
-1. [ ] Modell-Selector UI
-2. [ ] Parameter-Panel (Guidance, Steps, Aspect Ratio)
-3. [ ] Bild-Galerie mit Vergleich
-4. [ ] Variation-Generator (gleicher Prompt, verschiedene Seeds)
+1. [ ] CI/CD Pipeline (GitHub Actions → Hetzner)
+2. [ ] Domain & SSL (Let's Encrypt)
+3. [ ] PostgreSQL Production Setup
+4. [ ] Health Checks & Monitoring
+5. [ ] Deployment-Runbook dokumentieren
 
 ## Offene Entscheidungen
 
 | Entscheidung | Status | Deadline | Notizen |
 |--------------|--------|----------|---------|
-| Replicate Pricing Model | ⏳ Research | Vor P0.1 | Kosten pro Generation verstehen |
-| Replicate: Webhook vs. Polling | ⏳ Research | P0.1 | Webhook braucht öffentliche URL → Cloudflare Worker? |
-| LLM für Prompt-Assistent | ✅ Entschieden | P0.3 | OpenRouter API, Default: openai/gpt-oss-120b:exacto |
-| PostgreSQL ORM: Prisma vs. Drizzle | ⏳ Entscheiden | P0.1 | Drizzle = leichter, Prisma = mehr Ecosystem |
-| R2 Zugriff: Signed URLs vs. Public | ⏳ Entscheiden | P0.1 | Nur für eigenen Gebrauch → Public Bucket reicht? |
+| Default-Modelle für Draft/Quality | ⏳ Discovery | P5.1 | Welche Modelle als Default für Draft vs. Quality? |
+| Hetzner Server-Typ | ⏳ Research | P6.1 | CPX vs. CX, RAM/CPU für Next.js + PostgreSQL |
+| Reverse Proxy | ⏳ Entscheiden | P6.1 | Caddy (einfacher) vs. Nginx (bewährter) |
 
-## Offene Bugs
+## Gelöste Bugs
 
-| Bug | Priority | Status | Log | Phase |
-|-----|----------|--------|-----|-------|
-| Multi-Model Rate Limiting (parallel -> sequentiell) | Hoch | ✅ Behoben | [BUG](specs/phase-2/2026-03-07-model-cards/BUG-multi-model-rate-limit.md) | P2: Model Cards |
-| Detail-View nutzt nicht volle Fensterbreite | 🔴 Hoch | 🔴 Neu | [BUG](specs/phase-4/2026-03-13-canvas-detail-view/BUG-detail-view-width-constraint.md) | P4: Canvas Detail-View |
-| Vertikaler Overflow (Bild + Thumbnails) | 🔴 Hoch | 🔴 Neu | [BUG](specs/phase-4/2026-03-13-canvas-detail-view/BUG-detail-view-vertical-overflow.md) | P4: Canvas Detail-View |
-| Details-Overlay wird nicht gerendert | 🔴 Hoch | 🔴 Neu | [BUG](specs/phase-4/2026-03-13-canvas-detail-view/BUG-details-overlay-not-rendered.md) | P4: Canvas Detail-View |
-| Tool-Popovers falsch positioniert | 🔴 Hoch | 🔴 Neu | [BUG](specs/phase-4/2026-03-13-canvas-detail-view/BUG-popover-positioning.md) | P4: Canvas Detail-View |
-| Chat-Panel nicht eingebunden | 🔴 Hoch | 🔴 Neu | [BUG](specs/phase-4/2026-03-13-canvas-detail-view/BUG-chat-panel-not-wired.md) | P4: Canvas Detail-View |
-| In-Place Generation aktualisiert Bild nicht | 🔴 Hoch | 🔴 Neu | [BUG](specs/phase-4/2026-03-13-canvas-detail-view/BUG-in-place-generation-no-update.md) | P4: Canvas Detail-View |
+| Bug | Status | Phase |
+|-----|--------|-------|
+| Multi-Model Rate Limiting | ✅ Behoben | P2: Model Cards |
+| Detail-View Fensterbreite | ✅ Behoben | P4: Canvas Detail-View |
+| Vertikaler Overflow | ✅ Behoben | P4: Canvas Detail-View |
+| Details-Overlay nicht gerendert | ✅ Behoben | P4: Canvas Detail-View |
+| Tool-Popovers Positionierung | ✅ Behoben | P4: Canvas Detail-View |
+| Chat-Panel nicht eingebunden | ✅ Behoben | P4: Canvas Detail-View |
+| In-Place Generation Update | ✅ Behoben | P4: Canvas Detail-View |
 
 ## Geparkt (Nicht jetzt)
 
 | Was | Grund |
 |-----|-------|
 | User Authentication | Nur für eigenen Gebrauch |
-| Spreadshirt Direct Upload | Phase 3, erst wenn Workflow steht |
-| Fine-Tuning eigener Modelle | Phase 3, fortgeschritten |
-| Bildbearbeitung / Editor | Phase 1 |
-| Export / Upscaling | Phase 2 |
+| Spreadshirt Direct Upload | Erst wenn Workflow produktiv läuft |
+| Fine-Tuning eigener Modelle | Fortgeschritten, nach Deployment |
+| Bildbearbeitung / Editor (Phase 1 alt) | Scope geändert, nicht mehr im Fokus |
+| Export / Upscaling (Phase 2 alt) | Scope geändert, nicht mehr im Fokus |
 
 ## Erledigtes
 
 | Datum | Was |
 |-------|-----|
 | 2026-03-02 | Vision, Phasen und Roadmap definiert |
-| 2026-03-02 | Kittl Prompt Builder analysiert (6 Kategorien, je 9 Optionen) |
+| 2026-03-02 | Kittl Prompt Builder analysiert |
+| 2026-03-07 | **Phase 0:** E2E Generate & Persist (21 Slices) |
+| 2026-03-07 | **Phase 1:** Quality Improvements (DB, Sidebar, Prompts, Thumbnails) |
+| 2026-03-11 | **Phase 2:** Generation UI, Model Cards, Multi-Mode Generation |
+| 2026-03-13 | **Phase 3:** Multi-Image Referencing, Prompt Assistant |
+| 2026-03-14 | **Phase 4:** Canvas Detail-View, UI Redesign (Swiss Dark Warm) |
+| 2026-03-14 | Alle P4 Canvas-Bugs gefixt |
+| 2026-03-14 | Roadmap neu definiert: Phase 5-7 |
 
 ## Nächste Roadmap-Session
 
-**Wann:** Nach Abschluss von P0.1 (erste Bild-Generierung + R2 Storage funktioniert)
+**Wann:** Nach Abschluss von P5.1 (Draft/Quality Mode implementiert)
 **Agenda:**
-- Replicate API Erfahrungen auswerten (Kosten, Latenz, Webhook-Setup)
-- R2 Storage Performance bewerten
-- Prompt Builder Scope finalisieren
-- Phase 0 Progress bewerten
+- Draft/Quality Erfahrungen auswerten
+- Security Review Scope finalisieren
+- Hetzner Server-Auswahl treffen
+- Deployment-Timeline festlegen
 
 ---
-*Letzte Aktualisierung: 2026-03-02*
+*Letzte Aktualisierung: 2026-03-14*

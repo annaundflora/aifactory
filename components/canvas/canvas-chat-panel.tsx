@@ -42,6 +42,8 @@ export interface CanvasChatPanelProps {
   projectId: string;
   /** Called with pending generation IDs so the parent can start polling. */
   onPendingGenerations?: (pendingIds: string[]) => void;
+  /** Called with newly created generations so the gallery state stays in sync. */
+  onGenerationsCreated?: (newGens: Generation[]) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -86,7 +88,7 @@ function buildImageContext(generation: Generation): CanvasImageContext {
 // CanvasChatPanel
 // ---------------------------------------------------------------------------
 
-export function CanvasChatPanel({ generation, projectId, onPendingGenerations }: CanvasChatPanelProps) {
+export function CanvasChatPanel({ generation, projectId, onPendingGenerations, onGenerationsCreated }: CanvasChatPanelProps) {
   const { state, dispatch } = useCanvasDetail();
 
   // Local UI state
@@ -299,6 +301,9 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations }:
           return;
         }
 
+        // Notify gallery state about new generations
+        onGenerationsCreated?.(result as Generation[]);
+
         // Notify parent (CanvasDetailView) about pending IDs so it can
         // start polling and replace the image once completed.
         const pendingIds = (result as Generation[])
@@ -317,7 +322,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations }:
         dispatch({ type: "SET_GENERATING", isGenerating: false });
       }
     },
-    [dispatch, projectId, onPendingGenerations]
+    [dispatch, projectId, onPendingGenerations, onGenerationsCreated]
   );
 
   // ---------------------------------------------------------------------------

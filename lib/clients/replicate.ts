@@ -6,6 +6,60 @@ export interface ReplicateRunResult {
   seed: number | null;
 }
 
+// ---------------------------------------------------------------------------
+// Configuration (exported for test overrides)
+// ---------------------------------------------------------------------------
+
+export const _config = {
+  maxConcurrent: 1,
+  maxRetries: 3,
+  baseDelayMs: 2000,
+  interRequestDelayMs: 500,
+};
+
+// ---------------------------------------------------------------------------
+// Global concurrency limiter
+// Serializes Replicate API calls to prevent 429 rate limit errors.
+// All callers (generate, retry, upscale) go through replicateRun() and
+// are automatically serialized by this queue.
+// ---------------------------------------------------------------------------
+
+let activeRequests = 0;
+const waitQueue: (() => void)[] = [];
+
+function acquireSlot(): Promise<void> {
+  if (activeRequests < _config.maxConcurrent) {
+    activeRequests++;
+    return Promise.resolve();
+  }
+  return new Promise<void>((resolve) => {
+    waitQueue.push(() => {
+      activeRequests++;
+      resolve();
+    });
+  });
+}
+
+function releaseSlot(): void {
+  activeRequests--;
+  const next = waitQueue.shift();
+  if (next) next();
+}
+
+/** Reset queue state between tests. */
+export function _resetQueue(): void {
+  activeRequests = 0;
+  waitQueue.length = 0;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// ---------------------------------------------------------------------------
+// Replicate client
+// ---------------------------------------------------------------------------
+
 function getClient(): Replicate {
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) {
@@ -16,7 +70,60 @@ function getClient(): Replicate {
   return new Replicate({ auth: token });
 }
 
+/**
+ * Run a Replicate model with global concurrency control and retry-on-429.
+ *
+ * - Only _config.maxConcurrent predictions run at a time (across all callers)
+ * - 429 errors trigger exponential backoff retry (up to _config.maxRetries)
+ * - A small inter-request delay prevents burst behavior
+ */
 export async function replicateRun(
+  modelId: string,
+  input: Record<string, unknown>
+): Promise<ReplicateRunResult> {
+  await acquireSlot();
+  try {
+    return await replicateRunWithRetry(modelId, input);
+  } finally {
+    if (_config.interRequestDelayMs > 0) {
+      await delay(_config.interRequestDelayMs);
+    }
+    releaseSlot();
+  }
+}
+
+async function replicateRunWithRetry(
+  modelId: string,
+  input: Record<string, unknown>
+): Promise<ReplicateRunResult> {
+  for (let attempt = 0; attempt <= _config.maxRetries; attempt++) {
+    try {
+      return await replicateRunCore(modelId, input);
+    } catch (error: unknown) {
+      const isRL = isRateLimitError(error);
+      if (isRL && attempt < _config.maxRetries) {
+        const waitMs = _config.baseDelayMs * Math.pow(2, attempt);
+        if (waitMs > 0) {
+          console.warn(
+            `[Replicate] 429 for ${modelId}, retry ${attempt + 1}/${_config.maxRetries} in ${waitMs}ms`
+          );
+          await delay(waitMs);
+        }
+        continue;
+      }
+      if (isRL) {
+        throw new Error("Zu viele Anfragen. Bitte kurz warten.", {
+          cause: error,
+        });
+      }
+      // Non-rate-limit errors propagate immediately (no retry)
+      throw error;
+    }
+  }
+  throw new Error("Replicate retry limit exceeded");
+}
+
+async function replicateRunCore(
   modelId: string,
   input: Record<string, unknown>
 ): Promise<ReplicateRunResult> {
@@ -24,14 +131,9 @@ export async function replicateRun(
 
   let prediction;
   try {
-    prediction = await client.predictions.create({
-      model: modelId,
-      input,
-    });
+    prediction = await client.predictions.create({ model: modelId, input });
   } catch (error: unknown) {
-    if (isRateLimitError(error)) {
-      throw new Error("Zu viele Anfragen. Bitte kurz warten.", { cause: error });
-    }
+    if (isRateLimitError(error)) throw error;
     throw new Error(
       `Replicate API Fehler: ${error instanceof Error ? error.message : String(error)}`,
       { cause: error }
@@ -41,9 +143,7 @@ export async function replicateRun(
   try {
     prediction = await client.wait(prediction);
   } catch (error: unknown) {
-    if (isRateLimitError(error)) {
-      throw new Error("Zu viele Anfragen. Bitte kurz warten.", { cause: error });
-    }
+    if (isRateLimitError(error)) throw error;
     throw new Error(
       `Replicate API Fehler beim Warten: ${error instanceof Error ? error.message : String(error)}`,
       { cause: error }
@@ -104,6 +204,10 @@ export async function replicateRun(
     seed,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function isRateLimitError(error: unknown): boolean {
   if (error && typeof error === "object") {
