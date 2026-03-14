@@ -542,6 +542,7 @@ describe("Img2imgPopover", () => {
       motiv: "",
       style: "",
       variants: 1,
+      tier: "draft",
     });
   });
 
@@ -612,6 +613,7 @@ describe("Img2imgPopover", () => {
       motiv: "sunflowers",
       style: "oil painting",
       variants: 2,
+      tier: "draft",
     });
   });
 });

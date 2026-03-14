@@ -255,9 +255,9 @@ export function CanvasDetailView({
     async (params: VariationParams) => {
       if (state.isGenerating) return;
 
-      // Resolve model from settings (img2img / draft fallback)
+      // Resolve model from settings using the tier from params
       const setting = modelSettings.find(
-        (s) => s.mode === "img2img" && s.tier === "draft"
+        (s) => s.mode === "img2img" && s.tier === params.tier
       );
       const selectedModel = setting?.modelId ?? currentGeneration.modelId;
       const promptStrength =
@@ -313,9 +313,9 @@ export function CanvasDetailView({
     async (params: Img2imgParams) => {
       if (state.isGenerating) return;
 
-      // Resolve model from settings (img2img / draft fallback)
+      // Resolve model from settings using the tier from params
       const setting = modelSettings.find(
-        (s) => s.mode === "img2img" && s.tier === "draft"
+        (s) => s.mode === "img2img" && s.tier === params.tier
       );
       const selectedModel = setting?.modelId ?? currentGeneration.modelId;
 

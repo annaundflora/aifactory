@@ -19,7 +19,10 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { TierToggle } from "@/components/ui/tier-toggle";
+import { MaxQualityToggle } from "@/components/ui/max-quality-toggle";
 import type { Generation } from "@/lib/db/queries";
+import type { Tier } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Types (exported for slice-14)
@@ -31,6 +34,7 @@ export interface VariationParams {
   prompt: string;
   strength: VariationStrength;
   count: number;
+  tier: Tier;
 }
 
 // ---------------------------------------------------------------------------
@@ -70,6 +74,8 @@ export function VariationPopover({
   const [prompt, setPrompt] = useState(generation.prompt ?? "");
   const [strength, setStrength] = useState<VariationStrength>("balanced");
   const [count, setCount] = useState<number>(1);
+  const [tier, setTier] = useState<Tier>("draft");
+  const [maxQuality, setMaxQuality] = useState(false);
 
   // Reset form state when generation changes or popover reopens
   useEffect(() => {
@@ -77,6 +83,8 @@ export function VariationPopover({
       setPrompt(generation.prompt ?? "");
       setStrength("balanced");
       setCount(1);
+      setTier("draft");
+      setMaxQuality(false);
     }
   }, [isOpen, generation.id]);
 
@@ -91,16 +99,28 @@ export function VariationPopover({
     [dispatch]
   );
 
+  // Handle tier change: reset maxQuality when switching to draft
+  const handleTierChange = useCallback((newTier: Tier) => {
+    setTier(newTier);
+    if (newTier === "draft") {
+      setMaxQuality(false);
+    }
+  }, []);
+
   // Handle generate action
   const handleGenerate = useCallback(() => {
+    // Resolve effective tier: quality + maxQuality=on -> "max"
+    const effectiveTier: Tier = tier === "quality" && maxQuality ? "max" : tier;
+
     onGenerate({
       prompt,
       strength,
       count,
+      tier: effectiveTier,
     });
     // Close the popover by setting activeToolId to null via toggle
     dispatch({ type: "SET_ACTIVE_TOOL", toolId: "variation" });
-  }, [onGenerate, prompt, strength, count, dispatch]);
+  }, [onGenerate, prompt, strength, count, tier, maxQuality, dispatch]);
 
   return (
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
@@ -209,6 +229,22 @@ export function VariationPopover({
                 </Button>
               ))}
             </div>
+          </div>
+
+          {/* Tier Toggle */}
+          <div className="space-y-2" data-testid="variation-tier-section">
+            <TierToggle
+              tier={tier}
+              onTierChange={handleTierChange}
+              disabled={state.isGenerating}
+            />
+            {tier === "quality" && (
+              <MaxQualityToggle
+                maxQuality={maxQuality}
+                onMaxQualityChange={setMaxQuality}
+                disabled={state.isGenerating}
+              />
+            )}
           </div>
 
           {/* Generate Button */}
