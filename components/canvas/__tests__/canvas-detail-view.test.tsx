@@ -7,9 +7,18 @@ import "@testing-library/jest-dom/vitest";
 // Mocks (mock_external strategy)
 // ---------------------------------------------------------------------------
 
+// Polyfill scrollIntoView for jsdom (used by ChatThread)
+Element.prototype.scrollIntoView = vi.fn();
+
 // Mock db/queries to prevent DATABASE_URL error at module scope
 vi.mock("@/lib/db/queries", () => ({
   updateProjectThumbnail: vi.fn(),
+}));
+
+// Mock canvas-chat-service (used by CanvasChatPanel which is rendered as default chatSlot)
+vi.mock("@/lib/canvas-chat-service", () => ({
+  createSession: vi.fn().mockResolvedValue("test-session-id"),
+  sendMessage: vi.fn(),
 }));
 
 // Mock server actions that reach the database
@@ -19,6 +28,16 @@ vi.mock("@/app/actions/generations", () => ({
   upscaleImage: vi.fn().mockResolvedValue({}),
   fetchGenerations: vi.fn().mockResolvedValue([]),
   deleteGeneration: vi.fn().mockResolvedValue({ success: true }),
+}));
+
+// Mock model settings server action (used by CanvasDetailView for tier-based model resolution)
+vi.mock("@/app/actions/model-settings", () => ({
+  getModelSettings: vi.fn().mockResolvedValue([]),
+}));
+
+// Mock references server action (transitive dep via details-overlay -> provenance-row)
+vi.mock("@/app/actions/references", () => ({
+  getProvenanceData: vi.fn().mockResolvedValue([]),
 }));
 
 // Mock lib/utils to avoid real download/image utilities
@@ -37,6 +56,12 @@ vi.mock("@/app/actions/models", () => ({
 // Mock ModelBrowserDrawer (complex external component)
 vi.mock("@/components/models/model-browser-drawer", () => ({
   ModelBrowserDrawer: () => null,
+}));
+
+// Mock ModelSelector (used by CanvasChatPanel in its header)
+vi.mock("@/components/assistant/model-selector", () => ({
+  ModelSelector: () => null,
+  DEFAULT_MODEL_SLUG: "anthropic/claude-sonnet-4.6",
 }));
 
 // Mock sonner (used by canvas-toolbar and other canvas components)
@@ -77,6 +102,9 @@ vi.mock("lucide-react", () => {
     Undo2: stub("Undo2"),
     Redo2: stub("Redo2"),
     ChevronUp: stub("ChevronUp"),
+    ChevronDownIcon: stub("ChevronDownIcon"),
+    ChevronUpIcon: stub("ChevronUpIcon"),
+    CheckIcon: stub("CheckIcon"),
   };
 });
 
@@ -220,9 +248,8 @@ describe("CanvasDetailView", () => {
     // Image uses object-contain for max-fit display
     expect(canvasImage.className).toMatch(/object-contain/);
 
-    // Canvas area's inner wrapper uses centering classes
-    const canvasArea = screen.getByTestId("canvas-area");
-    const innerWrapper = canvasArea.querySelector(":scope > div");
+    // The image's parent wrapper uses centering classes
+    const innerWrapper = canvasImage.closest("div");
     expect(innerWrapper).not.toBeNull();
     expect(innerWrapper!.className).toMatch(/items-center/);
     expect(innerWrapper!.className).toMatch(/justify-center/);

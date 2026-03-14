@@ -28,9 +28,18 @@ beforeAll(() => {
 // Mocks (mock_external strategy — only external deps and heavy siblings)
 // ---------------------------------------------------------------------------
 
+// Polyfill scrollIntoView for jsdom (used by ChatThread)
+Element.prototype.scrollIntoView = vi.fn();
+
 // Mock db/queries to prevent DATABASE_URL error at module scope
 vi.mock("@/lib/db/queries", () => ({
   updateProjectThumbnail: vi.fn(),
+}));
+
+// Mock canvas-chat-service (used by CanvasChatPanel)
+vi.mock("@/lib/canvas-chat-service", () => ({
+  createSession: vi.fn().mockResolvedValue("test-session-id"),
+  sendMessage: vi.fn(),
 }));
 
 // Mock server action (external)
@@ -42,6 +51,16 @@ vi.mock("@/app/actions/generations", () => ({
   deleteGeneration: vi.fn().mockResolvedValue({ success: true }),
 }));
 
+// Mock model settings server action (used by CanvasDetailView for tier-based model resolution)
+vi.mock("@/app/actions/model-settings", () => ({
+  getModelSettings: vi.fn().mockResolvedValue([]),
+}));
+
+// Mock references server action (transitive dep via details-overlay -> provenance-row)
+vi.mock("@/app/actions/references", () => ({
+  getProvenanceData: vi.fn().mockResolvedValue([]),
+}));
+
 // Mock model actions (used by CanvasModelSelector)
 vi.mock("@/app/actions/models", () => ({
   getCollectionModels: vi.fn().mockResolvedValue([]),
@@ -51,6 +70,12 @@ vi.mock("@/app/actions/models", () => ({
 // Mock ModelBrowserDrawer
 vi.mock("@/components/models/model-browser-drawer", () => ({
   ModelBrowserDrawer: () => null,
+}));
+
+// Mock ModelSelector (used by CanvasChatPanel in its header)
+vi.mock("@/components/assistant/model-selector", () => ({
+  ModelSelector: () => null,
+  DEFAULT_MODEL_SLUG: "anthropic/claude-sonnet-4.6",
 }));
 
 // Mock lib/utils
@@ -93,6 +118,9 @@ vi.mock("lucide-react", () => {
     Library: stub("Library"),
     Undo2: stub("Undo2"),
     Redo2: stub("Redo2"),
+    ChevronDownIcon: stub("ChevronDownIcon"),
+    ChevronUpIcon: stub("ChevronUpIcon"),
+    CheckIcon: stub("CheckIcon"),
   };
 });
 
@@ -539,7 +567,10 @@ describe("WorkspaceContent — View Transition Integration", () => {
     await waitFor(() => {
       expect(screen.getByTestId("workspace-detail-view")).toBeInTheDocument();
     });
-    expect(screen.queryByTestId("workspace-gallery-view")).not.toBeInTheDocument();
+    // Gallery view stays in DOM (hidden, not unmounted) to preserve PromptArea state
+    const galleryView = screen.getByTestId("workspace-gallery-view");
+    expect(galleryView).toBeInTheDocument();
+    expect(galleryView.style.display).toBe("none");
   });
 
   /**
