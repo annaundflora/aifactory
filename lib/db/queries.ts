@@ -1,6 +1,6 @@
 import { eq, desc, sql, and, asc, or } from "drizzle-orm";
 import { db } from "./index";
-import { projects, generations, favoriteModels, projectSelectedModels, assistantSessions, referenceImages, generationReferences } from "./schema";
+import { projects, generations, favoriteModels, projectSelectedModels, assistantSessions, referenceImages, generationReferences, modelSettings } from "./schema";
 
 // ---------------------------------------------------------------------------
 // Types (inferred from schema)
@@ -10,6 +10,7 @@ export type Generation = typeof generations.$inferSelect;
 export type AssistantSession = typeof assistantSessions.$inferSelect;
 export type ReferenceImage = typeof referenceImages.$inferSelect;
 export type GenerationReference = typeof generationReferences.$inferSelect;
+export type ModelSetting = typeof modelSettings.$inferSelect;
 
 // ---------------------------------------------------------------------------
 // Project Queries
@@ -494,4 +495,84 @@ export async function getGenerationReferences(
     .from(generationReferences)
     .where(eq(generationReferences.generationId, generationId))
     .orderBy(asc(generationReferences.slotPosition));
+}
+
+// ---------------------------------------------------------------------------
+// Model Settings Queries
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns all model settings rows.
+ */
+export async function getAllModelSettings(): Promise<ModelSetting[]> {
+  return db.select().from(modelSettings);
+}
+
+/**
+ * Returns the model setting for a given mode+tier combination,
+ * or undefined if no match exists.
+ */
+export async function getModelSettingByModeTier(
+  mode: string,
+  tier: string
+): Promise<ModelSetting | undefined> {
+  const [row] = await db
+    .select()
+    .from(modelSettings)
+    .where(and(eq(modelSettings.mode, mode), eq(modelSettings.tier, tier)));
+  return row;
+}
+
+/**
+ * Inserts or updates a model setting for the given mode+tier combination.
+ * Uses ON CONFLICT DO UPDATE on the (mode, tier) unique constraint.
+ */
+export async function upsertModelSetting(
+  mode: string,
+  tier: string,
+  modelId: string,
+  modelParams: Record<string, unknown>
+): Promise<ModelSetting> {
+  const [row] = await db
+    .insert(modelSettings)
+    .values({
+      mode,
+      tier,
+      modelId,
+      modelParams,
+    })
+    .onConflictDoUpdate({
+      target: [modelSettings.mode, modelSettings.tier],
+      set: {
+        modelId,
+        modelParams,
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+  return row;
+}
+
+/**
+ * Seeds the 8 default model settings rows.
+ * Uses ON CONFLICT DO NOTHING for idempotency — existing rows are not overwritten.
+ */
+export async function seedModelSettingsDefaults(): Promise<void> {
+  const defaults = [
+    { mode: "txt2img", tier: "draft", modelId: "black-forest-labs/flux-schnell", modelParams: {} },
+    { mode: "txt2img", tier: "quality", modelId: "black-forest-labs/flux-2-pro", modelParams: {} },
+    { mode: "txt2img", tier: "max", modelId: "black-forest-labs/flux-2-max", modelParams: {} },
+    { mode: "img2img", tier: "draft", modelId: "black-forest-labs/flux-schnell", modelParams: { prompt_strength: 0.6 } },
+    { mode: "img2img", tier: "quality", modelId: "black-forest-labs/flux-2-pro", modelParams: { prompt_strength: 0.6 } },
+    { mode: "img2img", tier: "max", modelId: "black-forest-labs/flux-2-max", modelParams: { prompt_strength: 0.6 } },
+    { mode: "upscale", tier: "draft", modelId: "nightmareai/real-esrgan", modelParams: { scale: 2 } },
+    { mode: "upscale", tier: "quality", modelId: "philz1337x/crystal-upscaler", modelParams: { scale: 4 } },
+  ];
+
+  await db
+    .insert(modelSettings)
+    .values(defaults)
+    .onConflictDoNothing({
+      target: [modelSettings.mode, modelSettings.tier],
+    });
 }
