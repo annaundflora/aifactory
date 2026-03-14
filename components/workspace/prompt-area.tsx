@@ -11,6 +11,8 @@ import {
 } from "react";
 import { PromptTabs, type PromptTab } from "@/components/workspace/prompt-tabs";
 import { generateImages, upscaleImage } from "@/app/actions/generations";
+import { getModelSettings } from "@/app/actions/model-settings";
+import type { ModelSetting } from "@/lib/db/queries";
 import { useWorkspaceVariation } from "@/lib/workspace-state";
 import { ModeSelector, type GenerationMode } from "@/components/workspace/mode-selector";
 import { ImageDropzone } from "@/components/workspace/image-dropzone";
@@ -124,6 +126,35 @@ function createInitialModeStates(): ModeStates {
 }
 
 // ---------------------------------------------------------------------------
+// Model Resolution Helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve model ID and params from cached model settings based on mode, tier,
+ * and maxQuality flag.
+ *
+ * effectiveTier = maxQuality ? "max" : tier
+ *
+ * Returns { modelId, modelParams } or undefined if no matching setting found.
+ */
+function resolveModel(
+  settings: ModelSetting[],
+  mode: GenerationMode,
+  tier: Tier,
+  maxQuality: boolean
+): { modelId: string; modelParams: Record<string, unknown> } | undefined {
+  const effectiveTier = maxQuality ? "max" : tier;
+  const setting = settings.find(
+    (s) => s.mode === mode && s.tier === effectiveTier
+  );
+  if (!setting) return undefined;
+  return {
+    modelId: setting.modelId,
+    modelParams: (setting.modelParams ?? {}) as Record<string, unknown>,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -139,6 +170,18 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   // ----- Tier state (Draft/Quality) -----
   const [tier, setTier] = useState<Tier>("draft");
   const [maxQuality, setMaxQuality] = useState<boolean>(false);
+
+  // ----- Model settings (cached from DB) -----
+  const [modelSettings, setModelSettings] = useState<ModelSetting[]>([]);
+
+  // Fetch model settings on mount
+  useEffect(() => {
+    getModelSettings().then((settings) => {
+      setModelSettings(settings);
+    }).catch((err) => {
+      console.error("Failed to load model settings:", err);
+    });
+  }, []);
 
   // ----- Structured prompt state -----
   const [promptMotiv, setPromptMotiv] = useState("");
@@ -621,19 +664,24 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   // ---------------------------------------------------------------------------
 
   const handleGenerate = useCallback(() => {
+    // AC-10: Prevent generation when model settings are not loaded
+    if (modelSettings.length === 0) return;
+
     if (currentMode === "txt2img") {
       if (!promptMotiv.trim()) return;
 
+      // Resolve model from settings based on tier + maxQuality
+      const resolved = resolveModel(modelSettings, "txt2img", tier, maxQuality);
+      if (!resolved) return;
+
       startGeneration(async () => {
-        // Model resolution will be implemented in Slice 7.
-        // For now, pass empty modelIds — generation will be non-functional until Slice 7.
         const result = await generateImages({
           projectId,
           promptMotiv: promptMotiv.trim(),
           promptStyle: promptStyle.trim() || undefined,
           negativePrompt: negativePrompt.trim() || undefined,
-          modelIds: [],
-          params: {},
+          modelIds: [resolved.modelId],
+          params: resolved.modelParams,
           count: variantCount,
           generationMode: "txt2img",
         });
@@ -643,6 +691,10 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
       });
     } else if (currentMode === "img2img") {
       if (!promptMotiv.trim()) return;
+
+      // Resolve model from settings based on tier + maxQuality
+      const resolved = resolveModel(modelSettings, "img2img", tier, maxQuality);
+      if (!resolved) return;
 
       // Pass referenceSlots data to generateImages
       const filledSlots = referenceSlots.filter((s) => s.imageUrl);
@@ -659,14 +711,13 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
       const sourceImageUrl = filledSlots.length > 0 ? filledSlots[0].imageUrl : undefined;
 
       startGeneration(async () => {
-        // Model resolution will be implemented in Slice 7.
         const result = await generateImages({
           projectId,
           promptMotiv: promptMotiv.trim(),
           promptStyle: promptStyle.trim() || undefined,
           negativePrompt: negativePrompt.trim() || undefined,
-          modelIds: [],
-          params: {},
+          modelIds: [resolved.modelId],
+          params: resolved.modelParams,
           count: variantCount,
           generationMode: "img2img",
           sourceImageUrl,
@@ -679,11 +730,17 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     } else if (currentMode === "upscale") {
       if (!upscaleSourceImageUrl) return;
 
+      // Resolve upscale model from settings (upscale has no max tier)
+      const resolved = resolveModel(modelSettings, "upscale", tier, false);
+      if (!resolved) return;
+
       startGeneration(async () => {
         const result = await upscaleImage({
           projectId,
           sourceImageUrl: upscaleSourceImageUrl,
           scale: upscaleScale,
+          modelId: resolved.modelId,
+          modelParams: resolved.modelParams,
         });
         if (result && !("error" in result)) {
           onGenerationsCreated?.([result]);
@@ -701,6 +758,9 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     upscaleScale,
     projectId,
     onGenerationsCreated,
+    modelSettings,
+    tier,
+    maxQuality,
   ]);
 
   // ----- Keyboard shortcut (Cmd/Ctrl+Enter) on Motiv field -----
@@ -720,6 +780,8 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
   const isButtonDisabled = (() => {
     if (isGenerating) return true;
+    // AC-10: Disable when model settings not loaded
+    if (modelSettings.length === 0) return true;
     if (currentMode === "txt2img") return !promptMotiv.trim();
     if (currentMode === "img2img") return !promptMotiv.trim();
     if (currentMode === "upscale") return !upscaleSourceImageUrl;

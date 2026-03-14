@@ -1270,6 +1270,8 @@ describe("GenerationService", () => {
         projectId: "proj-001",
         sourceImageUrl: SOURCE_IMAGE_URL,
         scale: 2,
+        modelId: UPSCALE_MODEL,
+        modelParams: { scale: 2 },
       });
 
       // Verify createGeneration was called with correct prompt
@@ -1311,6 +1313,8 @@ describe("GenerationService", () => {
         projectId: "proj-001",
         sourceImageUrl: SOURCE_IMAGE_URL,
         scale: 4,
+        modelId: UPSCALE_MODEL,
+        modelParams: { scale: 4 },
       });
 
       expect(createGeneration).toHaveBeenCalledWith(
@@ -1347,6 +1351,8 @@ describe("GenerationService", () => {
         sourceImageUrl: SOURCE_IMAGE_URL,
         scale: 2,
         sourceGenerationId: "gen-source",
+        modelId: UPSCALE_MODEL,
+        modelParams: { scale: 2 },
       });
 
       // Verify getGeneration was called with sourceGenerationId
@@ -1383,6 +1389,8 @@ describe("GenerationService", () => {
         sourceImageUrl: SOURCE_IMAGE_URL,
         scale: 2,
         sourceGenerationId: "gen-source-4",
+        modelId: UPSCALE_MODEL,
+        modelParams: { scale: 2 },
       });
 
       // Verify createGeneration received correct fields
@@ -1416,6 +1424,8 @@ describe("GenerationService", () => {
         projectId: "proj-001",
         sourceImageUrl: SOURCE_IMAGE_URL,
         scale: 2,
+        modelId: UPSCALE_MODEL,
+        modelParams: { scale: 2 },
       });
 
       expect(createGeneration).toHaveBeenCalledWith(
@@ -1449,6 +1459,8 @@ describe("GenerationService", () => {
         projectId: "proj-001",
         sourceImageUrl: SOURCE_IMAGE_URL,
         scale: 2,
+        modelId: UPSCALE_MODEL,
+        modelParams: { scale: 2 },
       });
 
       // Must be a single object, not an array
@@ -1477,6 +1489,8 @@ describe("GenerationService", () => {
         projectId: "proj-001",
         sourceImageUrl: SOURCE_IMAGE_URL,
         scale: 2,
+        modelId: UPSCALE_MODEL,
+        modelParams: {},
       });
 
       // Wait for fire-and-forget to call ReplicateClient.run
@@ -1514,6 +1528,8 @@ describe("GenerationService", () => {
         projectId: "proj-001",
         sourceImageUrl: SOURCE_IMAGE_URL,
         scale: 2,
+        modelId: UPSCALE_MODEL,
+        modelParams: { scale: 2 },
       });
 
       // The returned record is still pending (returned before fire-and-forget completes)
@@ -1541,6 +1557,8 @@ describe("GenerationService", () => {
           projectId: "proj-001",
           sourceImageUrl: SOURCE_IMAGE_URL,
           scale: 3 as unknown as 2 | 4,
+          modelId: UPSCALE_MODEL,
+          modelParams: { scale: 2 },
         })
       ).rejects.toThrow();
 

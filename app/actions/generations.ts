@@ -46,10 +46,10 @@ interface UpscaleImageInput {
   sourceImageUrl: string;
   scale: 2 | 4;
   sourceGenerationId?: string;
-  /** Model ID for upscaling (resolved from settings). Used by slice-07+ generation service. */
-  modelId?: string;
-  /** Model parameters for upscaling (resolved from settings). Used by slice-07+ generation service. */
-  modelParams?: Record<string, unknown>;
+  /** Model ID for upscaling (resolved from settings). */
+  modelId: string;
+  /** Model parameters for upscaling (resolved from settings). */
+  modelParams: Record<string, unknown>;
 }
 
 interface RetryGenerationInput {
@@ -197,6 +197,12 @@ export async function upscaleImage(
   // Validate scale: only 2 and 4 allowed
   if (input.scale !== 2 && input.scale !== 4) {
     return { error: "Scale muss 2 oder 4 sein" };
+  }
+
+  // Validate modelId format
+  const MODEL_ID_UPSCALE_REGEX = /^[a-z0-9-]+\/[a-z0-9._-]+$/;
+  if (!input.modelId || !MODEL_ID_UPSCALE_REGEX.test(input.modelId)) {
+    return { error: "Unbekanntes Modell" };
   }
 
   try {

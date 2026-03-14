@@ -691,6 +691,8 @@ describe("upscaleImage Server Action", () => {
       projectId: "proj-001",
       sourceImageUrl: "https://r2.example.com/img.png",
       scale: 3 as 2 | 4,  // intentionally invalid
+      modelId: "nightmareai/real-esrgan",
+      modelParams: { scale: 2 },
     });
 
     expect(result).toEqual({ error: "Scale muss 2 oder 4 sein" });
@@ -708,6 +710,8 @@ describe("upscaleImage Server Action", () => {
       projectId: "proj-001",
       sourceImageUrl: "",  // empty = missing
       scale: 2,
+      modelId: "nightmareai/real-esrgan",
+      modelParams: { scale: 2 },
     });
 
     expect(result).toEqual({ error: "Source-Image ist erforderlich fuer img2img" });
@@ -729,6 +733,8 @@ describe("upscaleImage Server Action", () => {
       projectId: "proj-001",
       sourceImageUrl: "https://r2.example.com/img.png",
       scale: 2,
+      modelId: "nightmareai/real-esrgan",
+      modelParams: { scale: 2 },
     });
 
     expect(GenerationService.upscale).toHaveBeenCalledWith({
@@ -736,8 +742,8 @@ describe("upscaleImage Server Action", () => {
       sourceImageUrl: "https://r2.example.com/img.png",
       scale: 2,
       sourceGenerationId: undefined,
-      modelId: undefined,
-      modelParams: undefined,
+      modelId: "nightmareai/real-esrgan",
+      modelParams: { scale: 2 },
     });
     expect(result).toEqual(mockGeneration);
   });
@@ -757,6 +763,8 @@ describe("upscaleImage Server Action", () => {
       sourceImageUrl: "https://r2.example.com/img.png",
       scale: 4,
       sourceGenerationId: "uuid-123",
+      modelId: "nightmareai/real-esrgan",
+      modelParams: { scale: 2 },
     });
 
     expect(GenerationService.upscale).toHaveBeenCalledWith(
@@ -769,8 +777,8 @@ describe("upscaleImage Server Action", () => {
       sourceImageUrl: "https://r2.example.com/img.png",
       scale: 4,
       sourceGenerationId: "uuid-123",
-      modelId: undefined,
-      modelParams: undefined,
+      modelId: "nightmareai/real-esrgan",
+      modelParams: { scale: 2 },
     });
     expect(result).toEqual(mockGeneration);
   });
@@ -790,6 +798,8 @@ describe("upscaleImage Server Action", () => {
       projectId: "proj-001",
       sourceImageUrl: "https://r2.example.com/img.png",
       scale: 2,
+      modelId: "nightmareai/real-esrgan",
+      modelParams: { scale: 2 },
     });
 
     expect(result).toEqual({ error: "Replicate API unavailable" });
