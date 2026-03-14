@@ -11,7 +11,6 @@ import {
 } from "react";
 import { PromptTabs, type PromptTab } from "@/components/workspace/prompt-tabs";
 import { generateImages, upscaleImage } from "@/app/actions/generations";
-import { getModelSettings } from "@/app/actions/model-settings";
 import { useWorkspaceVariation } from "@/lib/workspace-state";
 import { ModeSelector, type GenerationMode } from "@/components/workspace/mode-selector";
 import { ImageDropzone } from "@/components/workspace/image-dropzone";
@@ -28,7 +27,6 @@ import { Label } from "@/components/ui/label";
 import { TierToggle } from "@/components/ui/tier-toggle";
 import { MaxQualityToggle } from "@/components/ui/max-quality-toggle";
 import type { Tier } from "@/lib/types";
-import type { ModelSetting } from "@/lib/db/queries";
 import { Loader2, Sparkles, Minus, Plus } from "lucide-react";
 import { LLMComparison } from "@/components/prompt-improve/llm-comparison";
 import { AssistantTrigger } from "@/components/assistant/assistant-trigger";
@@ -142,9 +140,6 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   const [tier, setTier] = useState<Tier>("draft");
   const [maxQuality, setMaxQuality] = useState<boolean>(false);
 
-  // ----- Model Settings (fetched on mount, cached) -----
-  const [_modelSettings, setModelSettings] = useState<ModelSetting[]>([]);
-
   // ----- Structured prompt state -----
   const [promptMotiv, setPromptMotiv] = useState("");
   const [promptStyle, setPromptStyle] = useState("");
@@ -183,22 +178,6 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
   // ----- Variation state consumption -----
   const { variationData, clearVariation } = useWorkspaceVariation();
-
-  // ----- Fetch model settings on mount -----
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const settings = await getModelSettings();
-        if (!cancelled) {
-          setModelSettings(settings);
-        }
-      } catch {
-        // AC-9: remain functional even if fetch fails — modelSettings stays []
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
 
   // ---------------------------------------------------------------------------
   // Save current state into modeStates
