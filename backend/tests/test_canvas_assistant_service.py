@@ -526,6 +526,102 @@ class TestServiceImageContextInjection:
     """
 
     @pytest.mark.asyncio
+    async def test_multimodal_message_with_image_context(self):
+        """When image_context has image_url, HumanMessage must be multimodal."""
+        service = _make_canvas_service()
+
+        captured_input = {}
+
+        async def capture_astream_events(input_state, config, version="v2"):
+            captured_input.update(input_state)
+            return
+            yield  # pragma: no cover
+
+        service._agent.astream_events = capture_astream_events
+
+        events = []
+        async for event in service.stream_response(
+            session_id="test-multimodal",
+            content="Beschreibe was du siehst",
+            image_context={
+                "image_url": "https://example.com/img.png",
+                "prompt": "A sunset",
+                "model_id": "flux-2-max",
+                "model_params": {},
+            },
+        ):
+            events.append(event)
+
+        messages = captured_input["messages"]
+        assert len(messages) == 1
+        msg = messages[0]
+        # Content must be a list (multimodal), not a plain string
+        assert isinstance(msg.content, list), (
+            f"HumanMessage content must be a list when image_url is present, "
+            f"got {type(msg.content).__name__}"
+        )
+        assert len(msg.content) == 2
+        assert msg.content[0] == {"type": "text", "text": "Beschreibe was du siehst"}
+        assert msg.content[1]["type"] == "image_url"
+        assert msg.content[1]["image_url"]["url"] == "https://example.com/img.png"
+
+    @pytest.mark.asyncio
+    async def test_plain_message_without_image_context(self):
+        """Without image_context, HumanMessage must be plain text."""
+        service = _make_canvas_service()
+
+        captured_input = {}
+
+        async def capture_astream_events(input_state, config, version="v2"):
+            captured_input.update(input_state)
+            return
+            yield  # pragma: no cover
+
+        service._agent.astream_events = capture_astream_events
+
+        events = []
+        async for event in service.stream_response(
+            session_id="test-plain",
+            content="Hello",
+        ):
+            events.append(event)
+
+        messages = captured_input["messages"]
+        msg = messages[0]
+        assert isinstance(msg.content, str), (
+            "HumanMessage content must be a string without image_context"
+        )
+        assert msg.content == "Hello"
+
+    @pytest.mark.asyncio
+    async def test_plain_message_with_empty_image_url(self):
+        """image_context without image_url should produce plain text message."""
+        service = _make_canvas_service()
+
+        captured_input = {}
+
+        async def capture_astream_events(input_state, config, version="v2"):
+            captured_input.update(input_state)
+            return
+            yield  # pragma: no cover
+
+        service._agent.astream_events = capture_astream_events
+
+        events = []
+        async for event in service.stream_response(
+            session_id="test-no-url",
+            content="Hello",
+            image_context={"prompt": "A sunset", "model_id": "flux-2-max"},
+        ):
+            events.append(event)
+
+        messages = captured_input["messages"]
+        msg = messages[0]
+        assert isinstance(msg.content, str), (
+            "HumanMessage content must be a string when image_url is missing"
+        )
+
+    @pytest.mark.asyncio
     async def test_ac9_image_context_passed_to_agent_config(self):
         """AC-9: stream_response passes image_context in LangGraph config."""
         service = _make_canvas_service()
@@ -559,6 +655,32 @@ class TestServiceImageContextInjection:
         )
         assert captured_config["configurable"]["image_context"] == image_context, (
             "Config must contain the image_context passed to stream_response"
+        )
+
+    @pytest.mark.asyncio
+    async def test_model_override_passed_in_config(self):
+        """When model is specified, it must be passed in config['configurable']['model']."""
+        service = _make_canvas_service()
+
+        captured_config = {}
+
+        async def capture_astream_events(input_state, config, version="v2"):
+            captured_config.update(config)
+            return
+            yield  # pragma: no cover
+
+        service._agent.astream_events = capture_astream_events
+
+        events = []
+        async for event in service.stream_response(
+            session_id="test-model-override",
+            content="Test",
+            model="openai/gpt-5.4",
+        ):
+            events.append(event)
+
+        assert captured_config["configurable"]["model"] == "openai/gpt-5.4", (
+            "Config must contain the model override"
         )
 
     @pytest.mark.asyncio

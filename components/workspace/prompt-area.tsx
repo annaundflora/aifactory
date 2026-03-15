@@ -390,7 +390,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
                 id: `var-${Date.now()}`,
                 imageUrl: variationData.sourceImageUrl!,
                 slotPosition: pos,
-                role: "content" as ReferenceRole,
+                role: "general" as ReferenceRole,
                 strength: "moderate" as ReferenceStrength,
               },
             ]);
@@ -437,7 +437,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
           id: generationId ?? `ref-${Date.now()}`,
           imageUrl,
           slotPosition: pos,
-          role: "content" as ReferenceRole,
+          role: "general" as ReferenceRole,
           strength: "moderate" as ReferenceStrength,
         },
       ];
@@ -511,7 +511,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
             id: result.id,
             imageUrl: result.imageUrl,
             slotPosition: position,
-            role: "content" as ReferenceRole,
+            role: "general" as ReferenceRole,
             strength: "moderate" as ReferenceStrength,
             width: result.width,
             height: result.height,
@@ -585,7 +585,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
               id: result.id,
               imageUrl: result.imageUrl,
               slotPosition,
-              role: "content" as ReferenceRole,
+              role: "general" as ReferenceRole,
               strength: "moderate" as ReferenceStrength,
               width: result.width,
               height: result.height,
@@ -626,7 +626,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
               id: result.id,
               imageUrl: result.imageUrl,
               slotPosition,
-              role: "content" as ReferenceRole,
+              role: "general" as ReferenceRole,
               strength: "moderate" as ReferenceStrength,
               width: result.width,
               height: result.height,
@@ -656,7 +656,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
             id: result.id,
             imageUrl: result.imageUrl,
             slotPosition,
-            role: "content" as ReferenceRole,
+            role: "general" as ReferenceRole,
             strength: "moderate" as ReferenceStrength,
             width: result.width ?? undefined,
             height: result.height ?? undefined,
@@ -901,20 +901,22 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
                 />
               </div>
 
-              {/* Negative Prompt */}
-              <div className="space-y-2">
-                <Label htmlFor="negative-prompt-textarea" className="text-sm font-bold font-display [letter-spacing:-0.5px]">Negative Prompt</Label>
-                <textarea
-                  id="negative-prompt-textarea"
-                  data-testid="negative-prompt-textarea"
-                  ref={negativeRef}
-                  value={negativePrompt}
-                  onChange={handleNegativePromptChange}
-                  placeholder="What to avoid in the image..."
-                  rows={2}
-                  className={textareaClass}
-                />
-              </div>
+              {/* Negative Prompt (conditionally visible based on model schema) */}
+              {hasNegativePrompt && (
+                <div className="space-y-2">
+                  <Label htmlFor="negative-prompt-textarea" className="text-sm font-bold font-display [letter-spacing:-0.5px]">Negative Prompt</Label>
+                  <textarea
+                    id="negative-prompt-textarea"
+                    data-testid="negative-prompt-textarea"
+                    ref={negativeRef}
+                    value={negativePrompt}
+                    onChange={handleNegativePromptChange}
+                    placeholder="What to avoid in the image..."
+                    rows={2}
+                    className={textareaClass}
+                  />
+                </div>
+              )}
 
               {/* Prompt Tools */}
               <div className="flex gap-2">

@@ -181,9 +181,16 @@ export function composeMultiReferencePrompt(
     (a, b) => a.slotPosition - b.slotPosition
   );
 
-  const guidanceEntries = sortedRefs.map((ref) => {
-    return `@image${ref.slotPosition} provides ${ref.role} reference with ${ref.strength} influence`;
-  });
+  const guidanceEntries = sortedRefs
+    .filter((ref) => ref.role !== "general")
+    .map((ref) => {
+      return `@image${ref.slotPosition} provides ${ref.role} reference with ${ref.strength} influence`;
+    });
+
+  // Skip guidance entirely when all references are "general"
+  if (guidanceEntries.length === 0) {
+    return mappedPrompt;
+  }
 
   const guidance = `Reference guidance: ${guidanceEntries.join(". ")}.`;
 

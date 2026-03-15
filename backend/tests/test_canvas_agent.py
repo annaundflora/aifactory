@@ -224,6 +224,31 @@ class TestCanvasSystemPrompt:
             "System prompt must contain the model_id"
         )
 
+    def test_system_prompt_mentions_visual_capability(self):
+        """System prompt must tell the agent it can see the image."""
+        from app.agent.canvas_graph import build_canvas_system_prompt
+
+        prompt = build_canvas_system_prompt(None)
+        assert "SEHEN" in prompt or "sehen" in prompt, (
+            "Base system prompt must mention visual capability"
+        )
+
+    def test_system_prompt_with_context_has_visual_feedback_section(self):
+        """System prompt with image_context must contain VISUELLES FEEDBACK section."""
+        from app.agent.canvas_graph import build_canvas_system_prompt
+
+        image_context = {
+            "image_url": "https://example.com/img.png",
+            "prompt": "A sunset",
+            "model_id": "flux-2-max",
+            "model_params": {},
+        }
+
+        prompt = build_canvas_system_prompt(image_context)
+        assert "VISUELLES FEEDBACK" in prompt, (
+            "System prompt with image_context must contain 'VISUELLES FEEDBACK' section"
+        )
+
     def test_ac9_system_prompt_without_context_has_base_prompt(self):
         """AC-9: System prompt without image_context still has base instructions."""
         from app.agent.canvas_graph import build_canvas_system_prompt

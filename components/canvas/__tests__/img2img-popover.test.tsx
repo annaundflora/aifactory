@@ -335,10 +335,10 @@ describe("Img2imgPopover", () => {
     // Counter should update to 1/5
     expect(header).toHaveTextContent("References [1/5]");
 
-    // A mock slot should be rendered with default role "style" and strength "moderate"
+    // A mock slot should be rendered with default role "general" and strength "moderate"
     const slot = screen.getByTestId("mock-slot-1");
     expect(slot).toBeInTheDocument();
-    expect(slot).toHaveAttribute("data-role", "style");
+    expect(slot).toHaveAttribute("data-role", "general");
     expect(slot).toHaveAttribute("data-strength", "moderate");
   });
 

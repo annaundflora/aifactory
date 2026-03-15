@@ -42,6 +42,13 @@ interface RoleColorConfig {
 }
 
 export const ROLE_COLORS: Record<ReferenceRole, RoleColorConfig> = {
+  general: {
+    border: "border-[#6B728050]",
+    badgeBg: "bg-[#F3F4F6]",
+    text: "text-[#4B5563]",
+    dotColor: "#6B7280",
+    label: "General",
+  },
   style: {
     border: "border-[#C084FC50]",
     badgeBg: "bg-[#F3E8FF]",
@@ -80,6 +87,7 @@ export const ROLE_COLORS: Record<ReferenceRole, RoleColorConfig> = {
 };
 
 const ROLE_OPTIONS: ReferenceRole[] = [
+  "general",
   "style",
   "content",
   "structure",

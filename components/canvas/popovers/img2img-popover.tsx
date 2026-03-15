@@ -113,7 +113,7 @@ export function Img2imgPopover({
         id: `ref-${crypto.randomUUID()}`,
         imageUrl: objectUrl,
         slotPosition: position,
-        role: "style" as ReferenceRole,
+        role: "general" as ReferenceRole,
         strength: "moderate" as ReferenceStrength,
         originalFilename: file.name,
       };
@@ -173,7 +173,7 @@ export function Img2imgPopover({
         id: `ref-${crypto.randomUUID()}`,
         imageUrl: objectUrl,
         slotPosition,
-        role: "style" as ReferenceRole,
+        role: "general" as ReferenceRole,
         strength: "moderate" as ReferenceStrength,
         originalFilename: file.name,
       };
@@ -207,7 +207,7 @@ export function Img2imgPopover({
         id: `ref-${crypto.randomUUID()}`,
         imageUrl: url,
         slotPosition,
-        role: "style" as ReferenceRole,
+        role: "general" as ReferenceRole,
         strength: "moderate" as ReferenceStrength,
       };
 
@@ -235,7 +235,7 @@ export function Img2imgPopover({
         id: `ref-${crypto.randomUUID()}`,
         imageUrl: data.imageUrl,
         slotPosition,
-        role: "style" as ReferenceRole,
+        role: "general" as ReferenceRole,
         strength: "moderate" as ReferenceStrength,
       };
 

@@ -7,6 +7,7 @@
  * Determines how the AI model interprets the reference.
  */
 export type ReferenceRole =
+  | "general"
   | "style"
   | "content"
   | "structure"

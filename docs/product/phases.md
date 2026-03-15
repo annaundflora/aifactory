@@ -15,9 +15,8 @@ updated: 2026-03-14
 | 2 | Generation UI & Model Cards | Sind UI und Multi-Model-Workflow production-ready? | ✅ |
 | 3 | Multi-Image & Prompt Assistant | Kann ich mit mehreren Bildern referenzieren und Prompts assistiert verbessern? | ✅ |
 | 4 | Canvas Detail-View & UI Redesign | Ist die Detail-Ansicht und das UI-Redesign umgesetzt? | ✅ |
-| 5 | Draft/Quality Mode | Einfach zwischen Draft und Quality wechseln statt Modelle manuell wählen? | 🔄 |
-| 6 | Security & Hetzner-Optimierung | Ist die App sicher und ready für Hetzner? | ⬜ |
-| 7 | Deployment | Läuft die App produktiv auf Hetzner? | ⬜ |
+| 5 | Draft/Quality Mode | Einfach zwischen Draft und Quality wechseln statt Modelle manuell wählen? | ✅ |
+| 6 | Security, Hetzner & Deployment | Ist die App sicher und läuft produktiv auf Hetzner? | 🔄 |
 
 ---
 
@@ -71,63 +70,60 @@ updated: 2026-03-14
 
 ---
 
-## Phase 5: Draft/Quality Mode (AKTUELL)
+## Phase 5: Draft/Quality Mode ✅
 
 **Frage:** Kann ich einfach zwischen Draft (schnell/günstig) und Quality (beste Ergebnisse) wechseln, statt Modelle manuell auszuwählen?
 
-### Kriterien
-- [ ] Draft/Quality Toggle im Workspace (ersetzt direkte Modell-Auswahl)
-- [ ] Settings-Page: Modell-Zuordnung für Draft und Quality (global scope)
-- [ ] Bestehende Modell-Auswahl UI durch Draft/Quality ersetzen
-- [ ] Default-Modelle vorkonfiguriert (z.B. Draft = FLUX Schnell, Quality = FLUX Pro)
+**Features:** Draft/Quality Toggle im Workspace, Settings-Page für Modell-Zuordnung (global scope)
 
-### Exit-Kriterium
-> "Ich wähle nur Draft oder Quality – das richtige Modell wird automatisch verwendet. In Settings kann ich jederzeit ändern, welches Modell hinter Draft/Quality steckt."
-
-### Nicht in dieser Phase
-- Security-Härtung (kommt Phase 6)
-- Deployment (kommt Phase 7)
+**Abgeschlossen:** 2026-03-15
 
 ---
 
-## Phase 6: Security & Hetzner-Optimierung
+## Phase 6: Security, Hetzner & Deployment (AKTUELL)
 
-**Frage:** Ist die App sicher und bereit für Produktiv-Betrieb auf Hetzner?
+**Frage:** Ist die App sicher und läuft produktiv auf Hetzner?
 
 ### Kriterien
 - [ ] Security Review: OWASP Top 10, API-Keys, Environment Variables
 - [ ] Rate Limiting & Input Validation
-- [ ] Hetzner-spezifische Optimierungen (Docker Compose, Reverse Proxy, SSL)
-- [ ] Monitoring & Logging Basics
-- [ ] Backup-Strategie für PostgreSQL & R2
-
-### Exit-Kriterium
-> "Die App ist sicherheitstechnisch geprüft und für Hetzner-Deployment vorbereitet."
-
-### Nicht in dieser Phase
-- Tatsächliches Deployment (kommt Phase 7)
-- Multi-User Auth
-
----
-
-## Phase 7: Deployment
-
-**Frage:** Läuft die App produktiv auf Hetzner?
-
-### Kriterien
+- [ ] Docker Compose Production Setup (Hetzner-optimiert)
+- [ ] Reverse Proxy & SSL (Let's Encrypt)
+- [ ] PostgreSQL Production Setup
 - [ ] CI/CD Pipeline (GitHub Actions → Hetzner)
-- [ ] Docker Compose Production Setup
-- [ ] Domain & SSL (Let's Encrypt)
-- [ ] PostgreSQL Production (Hetzner oder managed)
-- [ ] Health Checks & Basic Monitoring
-- [ ] Dokumentation: Deployment-Runbook
+- [ ] Health Checks, Monitoring & Logging
+- [ ] Backup-Strategie für PostgreSQL & R2
+- [ ] Domain-Setup
+- [ ] Deployment-Runbook
 
 ### Exit-Kriterium
-> "Die App läuft stabil auf Hetzner, ich kann von überall darauf zugreifen und Designs generieren."
+> "Die App läuft sicher und stabil auf Hetzner, ich kann von überall darauf zugreifen und Designs generieren."
 
 ### Nicht in dieser Phase
 - Auto-Scaling
+- Multi-User Auth
 - CDN für Bilder (R2 reicht)
 
 ---
-*Letzte Aktualisierung: 2026-03-14*
+
+## Phase 7: Image Collections
+
+**Frage:** Kann ich zusammengehoerige Bilder (Design-Evolutionen) als Collections gruppieren und verwalten?
+
+### Kriterien
+- [ ] Automatische Collection-Bildung bei img2img/Variation im Canvas
+- [ ] Sichtbare Collection-Indikatoren im Canvas
+- [ ] Collection starten/aufheben/bearbeiten im Canvas
+- [ ] Collections in Workspace-Galerie anzeigen und verwalten
+- [ ] Interaktionsmuster (Drag&Drop, Kontextmenue, etc.)
+
+### Exit-Kriterium
+> "Wenn ich im Canvas eine Variation generiere, sehe ich sofort dass die Bilder zusammengehoeren. In der Galerie kann ich Collections als Einheit sehen und verwalten."
+
+### Nicht in dieser Phase
+- Collection-Export als ZIP/Bundle
+- Collection-Sharing/Collaboration
+- Cross-Project Collections
+
+---
+*Letzte Aktualisierung: 2026-03-15*
