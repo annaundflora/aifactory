@@ -24,6 +24,9 @@ vi.mock("lucide-react", () => ({
   Plus: (props: Record<string, unknown>) => (
     <span data-testid="plus-icon" {...props} />
   ),
+  PanelRightClose: (props: Record<string, unknown>) => (
+    <span data-testid="panel-right-close-icon" {...props} />
+  ),
 }));
 
 // Mock the canvas chat service (backend calls)

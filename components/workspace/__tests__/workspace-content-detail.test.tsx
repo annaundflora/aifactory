@@ -9,6 +9,24 @@ import "@testing-library/jest-dom/vitest";
 // ---------------------------------------------------------------------------
 
 beforeAll(() => {
+  if (typeof globalThis.ResizeObserver === "undefined") {
+    globalThis.ResizeObserver = class ResizeObserver {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver;
+  }
+
+  if (typeof Element.prototype.hasPointerCapture === "undefined") {
+    Element.prototype.hasPointerCapture = () => false;
+    Element.prototype.setPointerCapture = () => {};
+    Element.prototype.releasePointerCapture = () => {};
+  }
+
+  if (typeof Element.prototype.scrollIntoView === "undefined") {
+    Element.prototype.scrollIntoView = () => {};
+  }
+
   Object.defineProperty(window, "matchMedia", {
     writable: true,
     value: vi.fn().mockImplementation((query: string) => ({
@@ -31,6 +49,27 @@ beforeAll(() => {
 // Mock db/queries to prevent DATABASE_URL error at module scope
 vi.mock("@/lib/db/queries", () => ({
   updateProjectThumbnail: vi.fn(),
+}));
+
+// Mock db/index to prevent DATABASE_URL error from reference-service transitive imports
+vi.mock("@/lib/db/index", () => ({
+  db: {},
+}));
+
+// Mock reference-service to prevent DATABASE_URL crash
+vi.mock("@/lib/services/reference-service", () => ({
+  ReferenceService: {
+    create: vi.fn().mockResolvedValue({}),
+    delete: vi.fn().mockResolvedValue(false),
+    getAll: vi.fn().mockResolvedValue([]),
+  },
+}));
+
+// Mock references actions (depends on reference-service)
+vi.mock("@/app/actions/references", () => ({
+  uploadReferenceImage: vi.fn().mockResolvedValue({ id: "ref-1", imageUrl: "https://example.com/ref.png" }),
+  deleteReferenceImage: vi.fn().mockResolvedValue(undefined),
+  addGalleryAsReference: vi.fn().mockResolvedValue({ id: "ref-1", imageUrl: "https://example.com/ref.png" }),
 }));
 
 // Mock server action (external)
@@ -65,40 +104,111 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
 
+// Mock workspace-state (needed by PromptAssistantProvider -> useWorkspaceVariation)
+vi.mock("@/lib/workspace-state", () => ({
+  useWorkspaceVariation: () => ({
+    variationData: null,
+    setVariation: vi.fn(),
+    clearVariation: vi.fn(),
+  }),
+  useWorkspaceVariationOptional: () => null,
+  WorkspaceStateProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+// Mock assistant context (needed by AssistantPanelContent)
+vi.mock("@/lib/assistant/assistant-context", () => ({
+  PromptAssistantProvider: ({ children }: { children: React.ReactNode }) => children,
+  usePromptAssistant: () => ({
+    messages: [],
+    isStreaming: false,
+    hasCanvas: false,
+    selectedModel: "gpt-4",
+    setSelectedModel: vi.fn(),
+    cancelStream: vi.fn(),
+    activeView: "startscreen" as const,
+    setActiveView: vi.fn(),
+    loadSession: vi.fn(),
+    sessionId: null,
+    dispatch: vi.fn(),
+    sessionIdRef: { current: null },
+    sendMessageRef: { current: null },
+    cancelStreamRef: { current: null },
+  }),
+  getWorkspaceFieldsForChip: () => null,
+}));
+
+vi.mock("@/lib/assistant/use-assistant-runtime", () => ({
+  useAssistantRuntime: () => ({
+    sendMessage: vi.fn(),
+  }),
+}));
+
+vi.mock("@/lib/assistant/use-sessions", () => ({
+  useSessions: () => ({
+    sessions: [],
+    isLoading: false,
+    error: null,
+    refresh: vi.fn(),
+  }),
+}));
+
+// Mock assistant panel component (prevent deep import chains)
+vi.mock("@/components/assistant/assistant-panel", () => ({
+  AssistantPanelContent: () => null,
+}));
+
+// Mock upload action (used by assistant chat-input)
+vi.mock("@/app/actions/upload", () => ({
+  uploadSourceImage: vi.fn().mockResolvedValue({ url: "https://r2.example.com/uploaded.png" }),
+}));
+
+// Mock model-settings (used by PromptArea)
+vi.mock("@/app/actions/model-settings", () => ({
+  getModelSettings: vi.fn().mockResolvedValue([]),
+}));
+
+// Mock snippet-service to prevent DATABASE_URL crash
+vi.mock("@/lib/services/snippet-service", () => ({
+  SnippetService: {
+    create: vi.fn().mockResolvedValue({}),
+    update: vi.fn().mockResolvedValue(null),
+    delete: vi.fn().mockResolvedValue(false),
+    getAll: vi.fn().mockResolvedValue({}),
+  },
+}));
+
+// Mock storage client
+vi.mock("@/lib/clients/storage", () => ({
+  StorageService: {
+    upload: vi.fn().mockResolvedValue("https://r2.example.com/uploaded.png"),
+    delete: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 // Mock lucide-react icons used across the component tree
 vi.mock("lucide-react", () => {
   const stub = (name: string) => {
-    const Comp = (props: Record<string, unknown>) => (
-      <span data-testid={`${name}-icon`} {...props} />
-    );
+    const id = name.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+    const Comp = (props: Record<string, unknown>) => <span data-testid={`${id}-icon`} {...props} />;
     Comp.displayName = name;
     return Comp;
   };
   return {
-    ArrowLeft: stub("ArrowLeft"),
-    ArrowUp: stub("ArrowUp"),
-    ChevronLeft: stub("ChevronLeft"),
-    ChevronRight: stub("ChevronRight"),
-    ChevronDown: stub("ChevronDown"),
-    ChevronUp: stub("ChevronUp"),
-    Copy: stub("Copy"),
-    ArrowRightLeft: stub("ArrowRightLeft"),
-    ZoomIn: stub("ZoomIn"),
-    Download: stub("Download"),
-    Trash2: stub("Trash2"),
-    Info: stub("Info"),
-    ImageOff: stub("ImageOff"),
-    Loader2: stub("Loader2"),
-    PanelRightClose: stub("PanelRightClose"),
-    PanelRightOpen: stub("PanelRightOpen"),
-    MessageSquare: stub("MessageSquare"),
-    Minus: stub("Minus"),
-    Plus: stub("Plus"),
-    Sparkles: stub("Sparkles"),
-    Library: stub("Library"),
-    Undo2: stub("Undo2"),
-    Redo2: stub("Redo2"),
-    ImageIcon: stub("ImageIcon"),
+    MessageSquare: stub("MessageSquare"), Minus: stub("Minus"), Plus: stub("Plus"),
+    ArrowUp: stub("ArrowUp"), Square: stub("Square"), PanelRightClose: stub("PanelRightClose"),
+    Image: stub("Image"), Loader2: stub("Loader2"), ImageOff: stub("ImageOff"),
+    PanelRightOpen: stub("PanelRightOpen"), PanelLeftIcon: stub("PanelLeftIcon"),
+    PanelLeftClose: stub("PanelLeftClose"), PenLine: stub("PenLine"),
+    ChevronDown: stub("ChevronDown"), Check: stub("Check"), Type: stub("Type"),
+    ImagePlus: stub("ImagePlus"), Scaling: stub("Scaling"), X: stub("X"),
+    ArrowLeft: stub("ArrowLeft"), Undo2: stub("Undo2"), Redo2: stub("Redo2"),
+    ChevronUp: stub("ChevronUp"), ChevronDownIcon: stub("ChevronDownIcon"),
+    ChevronUpIcon: stub("ChevronUpIcon"), CheckIcon: stub("CheckIcon"),
+    Info: stub("Info"), Copy: stub("Copy"), ArrowRightLeft: stub("ArrowRightLeft"),
+    ZoomIn: stub("ZoomIn"), Download: stub("Download"), Trash2: stub("Trash2"),
+    Sparkles: stub("Sparkles"), Library: stub("Library"), Star: stub("Star"),
+    ChevronLeft: stub("ChevronLeft"), ChevronRight: stub("ChevronRight"),
+    PanelLeftOpen: stub("PanelLeftOpen"),
   };
 });
 
@@ -232,11 +342,10 @@ describe("WorkspaceContent — Detail-View integration", () => {
     const cardButton = screen.getByTestId("gallery-card-gen-abc-123");
     await user.click(cardButton);
 
-    // Gallery should disappear
+    // Gallery should be hidden (display: none, not unmounted, to preserve PromptArea state)
     await waitFor(() => {
-      expect(screen.queryByTestId("workspace-gallery-view")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("prompt-area")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("gallery-grid")).not.toBeInTheDocument();
+      const galleryView = screen.getByTestId("workspace-gallery-view");
+      expect(galleryView).toHaveStyle({ display: "none" });
     });
 
     // Detail view should appear
@@ -336,18 +445,20 @@ describe("WorkspaceContent — Detail-View integration", () => {
     await waitFor(() => {
       expect(screen.getByTestId("workspace-detail-view")).toBeInTheDocument();
     });
-    expect(screen.queryByTestId("workspace-gallery-view")).not.toBeInTheDocument();
+    // Gallery is hidden (not unmounted) when detail view is open
+    expect(screen.getByTestId("workspace-gallery-view")).toHaveStyle({ display: "none" });
 
     // Click the back button in the header
     const backButton = screen.getByTestId("canvas-back-button");
     await user.click(backButton);
 
-    // Gallery should reappear
+    // Gallery should reappear (visible, no display:none)
     await waitFor(() => {
-      expect(screen.getByTestId("workspace-gallery-view")).toBeInTheDocument();
-      expect(screen.getByTestId("prompt-area")).toBeInTheDocument();
-      expect(screen.getByTestId("gallery-grid")).toBeInTheDocument();
+      const galleryView = screen.getByTestId("workspace-gallery-view");
+      expect(galleryView).not.toHaveStyle({ display: "none" });
     });
+    expect(screen.getByTestId("prompt-area")).toBeInTheDocument();
+    expect(screen.getByTestId("gallery-grid")).toBeInTheDocument();
 
     // Detail view should be gone
     expect(screen.queryByTestId("workspace-detail-view")).not.toBeInTheDocument();
@@ -383,9 +494,10 @@ describe("WorkspaceContent — Detail-View integration", () => {
     // Press ESC
     fireEvent.keyDown(document, { key: "Escape" });
 
-    // Gallery should reappear
+    // Gallery should reappear (visible, no display:none)
     await waitFor(() => {
-      expect(screen.getByTestId("workspace-gallery-view")).toBeInTheDocument();
+      const galleryView = screen.getByTestId("workspace-gallery-view");
+      expect(galleryView).not.toHaveStyle({ display: "none" });
     });
 
     // Detail view should be gone

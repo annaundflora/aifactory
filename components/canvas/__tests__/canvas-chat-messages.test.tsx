@@ -8,23 +8,31 @@ import "@testing-library/jest-dom/vitest";
 // Mocks (mock_external strategy -- only icons and crypto)
 // ---------------------------------------------------------------------------
 
-vi.mock("lucide-react", () => ({
-  MessageSquare: (props: Record<string, unknown>) => (
-    <span data-testid="message-square-icon" {...props} />
-  ),
-  Minus: (props: Record<string, unknown>) => (
-    <span data-testid="minus-icon" {...props} />
-  ),
-  Plus: (props: Record<string, unknown>) => (
-    <span data-testid="plus-icon" {...props} />
-  ),
-  ArrowUp: (props: Record<string, unknown>) => (
-    <span data-testid="arrow-up-icon" {...props} />
-  ),
-  Square: (props: Record<string, unknown>) => (
-    <span data-testid="square-icon" {...props} />
-  ),
-}));
+vi.mock("lucide-react", () => {
+  const stub = (name: string) => {
+    const id = name.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+    const Comp = (props: Record<string, unknown>) => <span data-testid={`${id}-icon`} {...props} />;
+    Comp.displayName = name;
+    return Comp;
+  };
+  return {
+    MessageSquare: stub("MessageSquare"), Minus: stub("Minus"), Plus: stub("Plus"),
+    ArrowUp: stub("ArrowUp"), Square: stub("Square"), PanelRightClose: stub("PanelRightClose"),
+    Image: stub("Image"), Loader2: stub("Loader2"), ImageOff: stub("ImageOff"),
+    PanelRightOpen: stub("PanelRightOpen"), PanelLeftIcon: stub("PanelLeftIcon"),
+    PanelLeftClose: stub("PanelLeftClose"), PenLine: stub("PenLine"),
+    ChevronDown: stub("ChevronDown"), Check: stub("Check"), Type: stub("Type"),
+    ImagePlus: stub("ImagePlus"), Scaling: stub("Scaling"), X: stub("X"),
+    ArrowLeft: stub("ArrowLeft"), Undo2: stub("Undo2"), Redo2: stub("Redo2"),
+    ChevronUp: stub("ChevronUp"), ChevronDownIcon: stub("ChevronDownIcon"),
+    ChevronUpIcon: stub("ChevronUpIcon"), CheckIcon: stub("CheckIcon"),
+    Info: stub("Info"), Copy: stub("Copy"), ArrowRightLeft: stub("ArrowRightLeft"),
+    ZoomIn: stub("ZoomIn"), Download: stub("Download"), Trash2: stub("Trash2"),
+    Sparkles: stub("Sparkles"), Library: stub("Library"), Star: stub("Star"),
+    ChevronLeft: stub("ChevronLeft"), ChevronRight: stub("ChevronRight"),
+    PanelLeftOpen: stub("PanelLeftOpen"),
+  };
+});
 
 // Mock the canvas chat service (backend calls)
 vi.mock("@/lib/canvas-chat-service", () => ({
@@ -153,7 +161,7 @@ describe("CanvasChatMessages (via ChatThread)", () => {
    *       THEN zeigt die erste Nachricht eine Init-Message mit Bild-Kontext:
    *            Model-Name, Prompt (gekuerzt), und Key-Parameter (Steps, CFG)
    */
-  it("AC-5: should render init message with image context including model, prompt, and params", () => {
+  it("AC-5: should render init message with helper text on mount", () => {
     const generation = makeGeneration({
       id: "gen-init-test",
       modelId: "stable-diffusion-xl",
@@ -166,25 +174,18 @@ describe("CanvasChatMessages (via ChatThread)", () => {
 
     renderChatPanel({ generation });
 
-    // The init message should be rendered
+    // The init message should be rendered with generic helper text
     const initMessage = screen.getByTestId("init-message");
     expect(initMessage).toBeInTheDocument();
 
-    // Should contain model name
-    expect(initMessage).toHaveTextContent("stable-diffusion-xl");
-
-    // Should contain the prompt text
-    expect(initMessage).toHaveTextContent("a beautiful sunset over the ocean");
-
-    // Should contain steps and CFG
-    expect(initMessage).toHaveTextContent("Steps: 50");
-    expect(initMessage).toHaveTextContent("CFG: 7.5");
+    // Init message now shows a generic help text instead of model/prompt data
+    expect(initMessage).toHaveTextContent("Beschreibe");
   });
 
   /**
    * AC-5 (long prompt truncation): Prompts longer than 120 chars should be truncated.
    */
-  it("AC-5: should truncate long prompts in init message", () => {
+  it("AC-5: should render init message regardless of prompt length", () => {
     const longPrompt = "a".repeat(150);
     const generation = makeGeneration({
       id: "gen-long-prompt",
@@ -195,9 +196,9 @@ describe("CanvasChatMessages (via ChatThread)", () => {
 
     renderChatPanel({ generation });
 
+    // Init message is now a generic help text, not derived from prompt
     const initMessage = screen.getByTestId("init-message");
-    // Prompt should be truncated to 120 chars + "..."
-    expect(initMessage).toHaveTextContent("a".repeat(120) + "...");
+    expect(initMessage).toBeInTheDocument();
   });
 
   /**
@@ -396,11 +397,9 @@ describe("CanvasChatMessages (via ChatThread)", () => {
     // User message should be gone
     expect(screen.queryByTestId("user-message")).not.toBeInTheDocument();
 
-    // Init message should still be present
+    // Init message should still be present (generic help text, no longer includes model/prompt data)
     const initMessage = screen.getByTestId("init-message");
     expect(initMessage).toBeInTheDocument();
-    expect(initMessage).toHaveTextContent("model-xyz");
-    expect(initMessage).toHaveTextContent("test prompt for session");
   });
 
   /**

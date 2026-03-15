@@ -8,23 +8,31 @@ import "@testing-library/jest-dom/vitest";
 // Mocks (mock_external strategy)
 // ---------------------------------------------------------------------------
 
-vi.mock("lucide-react", () => ({
-  MessageSquare: (props: Record<string, unknown>) => (
-    <span data-testid="message-square-icon" {...props} />
-  ),
-  Minus: (props: Record<string, unknown>) => (
-    <span data-testid="minus-icon" {...props} />
-  ),
-  Plus: (props: Record<string, unknown>) => (
-    <span data-testid="plus-icon" {...props} />
-  ),
-  ArrowUp: (props: Record<string, unknown>) => (
-    <span data-testid="arrow-up-icon" {...props} />
-  ),
-  Square: (props: Record<string, unknown>) => (
-    <span data-testid="square-icon" {...props} />
-  ),
-}));
+vi.mock("lucide-react", () => {
+  const stub = (name: string) => {
+    const id = name.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+    const Comp = (props: Record<string, unknown>) => <span data-testid={`${id}-icon`} {...props} />;
+    Comp.displayName = name;
+    return Comp;
+  };
+  return {
+    MessageSquare: stub("MessageSquare"), Minus: stub("Minus"), Plus: stub("Plus"),
+    ArrowUp: stub("ArrowUp"), Square: stub("Square"), PanelRightClose: stub("PanelRightClose"),
+    Image: stub("Image"), Loader2: stub("Loader2"), ImageOff: stub("ImageOff"),
+    PanelRightOpen: stub("PanelRightOpen"), PanelLeftIcon: stub("PanelLeftIcon"),
+    PanelLeftClose: stub("PanelLeftClose"), PenLine: stub("PenLine"),
+    ChevronDown: stub("ChevronDown"), Check: stub("Check"), Type: stub("Type"),
+    ImagePlus: stub("ImagePlus"), Scaling: stub("Scaling"), X: stub("X"),
+    ArrowLeft: stub("ArrowLeft"), Undo2: stub("Undo2"), Redo2: stub("Redo2"),
+    ChevronUp: stub("ChevronUp"), ChevronDownIcon: stub("ChevronDownIcon"),
+    ChevronUpIcon: stub("ChevronUpIcon"), CheckIcon: stub("CheckIcon"),
+    Info: stub("Info"), Copy: stub("Copy"), ArrowRightLeft: stub("ArrowRightLeft"),
+    ZoomIn: stub("ZoomIn"), Download: stub("Download"), Trash2: stub("Trash2"),
+    Sparkles: stub("Sparkles"), Library: stub("Library"), Star: stub("Star"),
+    ChevronLeft: stub("ChevronLeft"), ChevronRight: stub("ChevronRight"),
+    PanelLeftOpen: stub("PanelLeftOpen"),
+  };
+});
 
 // Mock the model selector (uses radix Select which needs complex setup in jsdom)
 vi.mock("@/components/assistant/model-selector", () => ({
@@ -316,7 +324,9 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
         generation_id: "gen-send-1",
       }),
       expect.any(Function), // onEvent callback
-      expect.any(AbortSignal)
+      expect.any(AbortSignal),
+      expect.any(String), // chatModelSlug
+      undefined, // imageUrl
     );
 
     // User message should appear in chat
@@ -736,11 +746,10 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
     const switchButton = screen.getByTestId("switch-generation-button");
     await user.click(switchButton);
 
-    // Init message should be replaced (not appended) with new context
+    // Init message should still be present (replaced, not appended)
     await waitFor(() => {
       const initMessage = screen.getByTestId("init-message");
-      expect(initMessage).toHaveTextContent("model-b");
-      expect(initMessage).toHaveTextContent("second image");
+      expect(initMessage).toBeInTheDocument();
     });
 
     // No separator — replace pattern, not append
@@ -769,7 +778,9 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
         generation_id: "gen-nav-2",
       }),
       expect.any(Function), // onEvent callback
-      expect.any(AbortSignal)
+      expect.any(AbortSignal),
+      expect.any(String), // chatModelSlug
+      undefined, // imageUrl
     );
   });
 
@@ -826,10 +837,9 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
     expect(screen.queryByTestId("user-message")).not.toBeInTheDocument();
     expect(screen.queryByTestId("assistant-message")).not.toBeInTheDocument();
 
+    // Init message should still be present (generic help text, no longer includes model/prompt data)
     const initMessage = screen.getByTestId("init-message");
     expect(initMessage).toBeInTheDocument();
-    expect(initMessage).toHaveTextContent("model-xyz");
-    expect(initMessage).toHaveTextContent("test prompt for session");
   });
 
   it("AC-11: should show toast error when new session creation fails", async () => {
@@ -895,7 +905,9 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
         "retry",
         expect.any(Object),
         expect.any(Function), // onEvent callback
-        expect.any(AbortSignal)
+        expect.any(AbortSignal),
+        expect.any(String), // chatModelSlug
+        undefined, // imageUrl
       );
     });
   });

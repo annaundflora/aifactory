@@ -65,12 +65,15 @@ function SheetResumeHarness({ sheetOpen }: { sheetOpen: boolean }) {
   const ctx = usePromptAssistant();
   latestCtx = ctx;
 
+  // hasCanvas is derived from draftPrompt presence (not a direct context property)
+  const hasCanvas = !!ctx.draftPrompt;
+
   return (
     <div>
       <AssistantSheet
         open={sheetOpen}
         onOpenChange={() => {}}
-        hasCanvas={ctx.hasCanvas}
+        hasCanvas={hasCanvas}
         onOpen={() => {
           // AC-1: When sheet opens with active sessionId, load the session
           if (ctx.sessionId) {
@@ -78,7 +81,7 @@ function SheetResumeHarness({ sheetOpen }: { sheetOpen: boolean }) {
           }
         }}
         canvasSlot={
-          ctx.hasCanvas ? (
+          hasCanvas ? (
             <div data-testid="canvas-slot">Canvas visible</div>
           ) : null
         }
@@ -99,7 +102,7 @@ function SheetResumeHarness({ sheetOpen }: { sheetOpen: boolean }) {
       <span data-testid="ctx-session-id">{ctx.sessionId ?? "null"}</span>
       <span data-testid="ctx-active-view">{ctx.activeView}</span>
       <span data-testid="ctx-is-applied">{String(ctx.isApplied)}</span>
-      <span data-testid="ctx-has-canvas">{String(ctx.hasCanvas)}</span>
+      <span data-testid="ctx-has-canvas">{String(hasCanvas)}</span>
       <span data-testid="ctx-messages-count">{ctx.messages.length}</span>
     </div>
   );
@@ -298,8 +301,8 @@ describe("AssistantSheet - Session Resume", () => {
       style: "warm, bright tones",
       negativePrompt: "dark, gloomy",
     });
-    expect(latestCtx!.hasCanvas).toBe(true);
-    expect(latestCtx!.canvasHighlight).toBe(true);
+    // hasCanvas is derived from draftPrompt presence
+    expect(latestCtx!.draftPrompt).not.toBeNull();
   });
 
   // ---------------------------------------------------------------------------
@@ -337,15 +340,11 @@ describe("AssistantSheet - Session Resume", () => {
       });
     });
 
-    // isApplied should be false after refine (reset by REFINE_DRAFT)
-    expect(latestCtx!.isApplied).toBe(false);
+    // Auto-apply fires via useEffect when draftVersion increments from REFINE_DRAFT,
+    // so setVariation is already called and isApplied is true
+    expect(latestCtx!.isApplied).toBe(true);
 
-    // Now re-apply
-    act(() => {
-      latestCtx!.applyToWorkspace();
-    });
-
-    // setVariation should be called with the refined values
+    // setVariation should have been called with the refined values (via auto-apply)
     expect(mockSetVariation).toHaveBeenCalledWith(
       expect.objectContaining({
         promptMotiv: "Refined sunset motif",
@@ -353,9 +352,6 @@ describe("AssistantSheet - Session Resume", () => {
         negativePrompt: "blurry, dark",
       })
     );
-
-    // isApplied should be true
-    expect(latestCtx!.isApplied).toBe(true);
 
     // Undo-Toast should appear
     expect(mockToast).toHaveBeenCalledWith(

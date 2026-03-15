@@ -105,34 +105,31 @@ vi.mock("@/app/actions/references", () => ({
 }));
 
 // Mock lucide-react icons
-vi.mock("lucide-react", () => ({
-  ChevronDown: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "chevron-down", ...props }),
-  ChevronRight: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "chevron-right", ...props }),
-  Loader2: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "loader-icon", ...props }),
-  Wand2: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "wand-icon", ...props }),
-  Sparkles: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "sparkles-icon", ...props }),
-  Minus: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "minus-icon", ...props }),
-  Plus: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "plus-icon", ...props }),
-  X: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "x-icon", ...props }),
-  Search: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "search-icon", ...props }),
-  AlertCircle: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "alert-circle-icon", ...props }),
-  CheckIcon: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "check-icon", ...props }),
-  ChevronUpIcon: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "chevron-up-icon", ...props }),
-  ChevronDownIcon: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "chevron-down-icon", ...props }),
-}));
+vi.mock("lucide-react", () => {
+  const stub = (name: string) => {
+    const id = name.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+    const Comp = (props: Record<string, unknown>) => <span data-testid={`${id}-icon`} {...props} />;
+    Comp.displayName = name;
+    return Comp;
+  };
+  return {
+    MessageSquare: stub("MessageSquare"), Minus: stub("Minus"), Plus: stub("Plus"),
+    ArrowUp: stub("ArrowUp"), Square: stub("Square"), PanelRightClose: stub("PanelRightClose"),
+    Image: stub("Image"), Loader2: stub("Loader2"), ImageOff: stub("ImageOff"),
+    PanelRightOpen: stub("PanelRightOpen"), PanelLeftIcon: stub("PanelLeftIcon"),
+    PanelLeftClose: stub("PanelLeftClose"), PenLine: stub("PenLine"),
+    ChevronDown: stub("ChevronDown"), Check: stub("Check"), Type: stub("Type"),
+    ImagePlus: stub("ImagePlus"), Scaling: stub("Scaling"), X: stub("X"),
+    ArrowLeft: stub("ArrowLeft"), Undo2: stub("Undo2"), Redo2: stub("Redo2"),
+    ChevronUp: stub("ChevronUp"), ChevronDownIcon: stub("ChevronDownIcon"),
+    ChevronUpIcon: stub("ChevronUpIcon"), CheckIcon: stub("CheckIcon"),
+    Info: stub("Info"), Copy: stub("Copy"), ArrowRightLeft: stub("ArrowRightLeft"),
+    ZoomIn: stub("ZoomIn"), Download: stub("Download"), Trash2: stub("Trash2"),
+    Sparkles: stub("Sparkles"), Library: stub("Library"), Star: stub("Star"),
+    ChevronLeft: stub("ChevronLeft"), ChevronRight: stub("ChevronRight"),
+    PanelLeftOpen: stub("PanelLeftOpen"),
+  };
+});
 
 // Mock BuilderDrawer (external component, not under test)
 vi.mock("@/components/prompt-builder/builder-drawer", () => ({
@@ -274,15 +271,11 @@ async function clickModeSegment(
   user: ReturnType<typeof userEvent.setup>,
   label: string
 ) {
-  const segment = screen.getByText(label);
-  await user.click(segment);
-  // Allow async mode change to settle
-  await waitFor(() => {
-    expect(
-      segment.closest("[data-active='true']") ||
-        segment.getAttribute("data-active")
-    ).toBeDefined();
-  });
+  // ModeSelector is now a DropdownMenu -- click trigger to open, then click item
+  const trigger = screen.getByTestId("mode-selector");
+  await user.click(trigger);
+  const item = await screen.findByRole("menuitem", { name: new RegExp(label, "i") });
+  await user.click(item);
 }
 
 // ---------------------------------------------------------------------------
@@ -423,9 +416,9 @@ describe("PromptArea - ReferenceBar Integration", () => {
       });
 
       // Verify both slots exist before switching
-      expect(screen.getByTestId("ref-slot-1")).toHaveAttribute("data-role", "content");
+      expect(screen.getByTestId("ref-slot-1")).toHaveAttribute("data-role", "general");
       expect(screen.getByTestId("ref-slot-1")).toHaveAttribute("data-strength", "moderate");
-      expect(screen.getByTestId("ref-slot-3")).toHaveAttribute("data-role", "content");
+      expect(screen.getByTestId("ref-slot-3")).toHaveAttribute("data-role", "general");
       expect(screen.getByTestId("ref-slot-3")).toHaveAttribute("data-strength", "moderate");
 
       // Switch to txt2img
@@ -438,10 +431,10 @@ describe("PromptArea - ReferenceBar Integration", () => {
       await waitFor(() => {
         expect(screen.getByTestId("ref-slot-1")).toBeInTheDocument();
       });
-      expect(screen.getByTestId("ref-slot-1")).toHaveAttribute("data-role", "content");
+      expect(screen.getByTestId("ref-slot-1")).toHaveAttribute("data-role", "general");
       expect(screen.getByTestId("ref-slot-1")).toHaveAttribute("data-strength", "moderate");
       expect(screen.getByTestId("ref-slot-3")).toBeInTheDocument();
-      expect(screen.getByTestId("ref-slot-3")).toHaveAttribute("data-role", "content");
+      expect(screen.getByTestId("ref-slot-3")).toHaveAttribute("data-role", "general");
       expect(screen.getByTestId("ref-slot-3")).toHaveAttribute("data-strength", "moderate");
     });
   });
@@ -489,7 +482,7 @@ describe("PromptArea - ReferenceBar Integration", () => {
 
       // Verify defaults
       const slot = screen.getByTestId("ref-slot-1");
-      expect(slot).toHaveAttribute("data-role", "content");
+      expect(slot).toHaveAttribute("data-role", "general");
       expect(slot).toHaveAttribute("data-strength", "moderate");
       expect(slot).toHaveAttribute("data-image-url", "https://r2.example.com/new-reference.png");
     });
@@ -538,7 +531,7 @@ describe("PromptArea - ReferenceBar Integration", () => {
           id: "ref-schema-test",
           imageUrl: "https://r2.example.com/schema-test.png",
           slotPosition: 1,
-          role: "content",
+          role: "general",
           strength: "moderate",
         });
       });
@@ -596,7 +589,7 @@ describe("PromptArea - ReferenceBar Integration", () => {
       expect(callArgs.references[0]).toMatchObject({
         referenceImageId: "ref-gen-1",
         imageUrl: "https://r2.example.com/gen-ref.png",
-        role: "content",
+        role: "general",
         strength: "moderate",
         slotPosition: 1,
       });
@@ -733,7 +726,7 @@ describe("WorkspaceState - addReference", () => {
     await waitFor(() => {
       const refSlot = screen.getByTestId("ref-slot-1");
       expect(refSlot).toBeInTheDocument();
-      expect(refSlot).toHaveAttribute("data-role", "content");
+      expect(refSlot).toHaveAttribute("data-role", "general");
       expect(refSlot).toHaveAttribute("data-strength", "moderate");
       expect(refSlot).toHaveAttribute("data-image-url", "https://r2.example/img.png");
     });

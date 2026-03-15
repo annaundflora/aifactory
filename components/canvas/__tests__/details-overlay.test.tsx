@@ -13,6 +13,9 @@ vi.mock("lucide-react", () => ({
   ChevronUp: (props: Record<string, unknown>) => (
     <span data-testid="icon-chevron-up" {...props} />
   ),
+  ChevronRight: (props: Record<string, unknown>) => (
+    <span data-testid="icon-chevron-right" {...props} />
+  ),
 }));
 
 // Mock ProvenanceRow — it fetches data via server action (external dependency).

@@ -120,8 +120,9 @@ describe("Slice 11: Streaming-Anzeige + Stop-Button Acceptance", () => {
       <ChatThread messages={step0} isStreaming={true} />
     );
 
-    // Placeholder "..." shown for empty streaming message
-    expect(screen.getByTestId("assistant-message")).toHaveTextContent("...");
+    // Empty streaming assistant messages are hidden — StreamingIndicator handles this state
+    expect(screen.queryByTestId("assistant-message")).not.toBeInTheDocument();
+    expect(screen.getByTestId("streaming-indicator")).toBeInTheDocument();
 
     // First delta arrives: "Ein"
     const step1: Message[] = [

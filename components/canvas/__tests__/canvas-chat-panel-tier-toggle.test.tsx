@@ -39,23 +39,31 @@ const {
 // Mocks (mock_external strategy)
 // ---------------------------------------------------------------------------
 
-vi.mock("lucide-react", () => ({
-  MessageSquare: (props: Record<string, unknown>) => (
-    <span data-testid="message-square-icon" {...props} />
-  ),
-  Minus: (props: Record<string, unknown>) => (
-    <span data-testid="minus-icon" {...props} />
-  ),
-  Plus: (props: Record<string, unknown>) => (
-    <span data-testid="plus-icon" {...props} />
-  ),
-  ArrowUp: (props: Record<string, unknown>) => (
-    <span data-testid="arrow-up-icon" {...props} />
-  ),
-  Square: (props: Record<string, unknown>) => (
-    <span data-testid="square-icon" {...props} />
-  ),
-}));
+vi.mock("lucide-react", () => {
+  const stub = (name: string) => {
+    const id = name.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+    const Comp = (props: Record<string, unknown>) => <span data-testid={`${id}-icon`} {...props} />;
+    Comp.displayName = name;
+    return Comp;
+  };
+  return {
+    MessageSquare: stub("MessageSquare"), Minus: stub("Minus"), Plus: stub("Plus"),
+    ArrowUp: stub("ArrowUp"), Square: stub("Square"), PanelRightClose: stub("PanelRightClose"),
+    Image: stub("Image"), Loader2: stub("Loader2"), ImageOff: stub("ImageOff"),
+    PanelRightOpen: stub("PanelRightOpen"), PanelLeftIcon: stub("PanelLeftIcon"),
+    PanelLeftClose: stub("PanelLeftClose"), PenLine: stub("PenLine"),
+    ChevronDown: stub("ChevronDown"), Check: stub("Check"), Type: stub("Type"),
+    ImagePlus: stub("ImagePlus"), Scaling: stub("Scaling"), X: stub("X"),
+    ArrowLeft: stub("ArrowLeft"), Undo2: stub("Undo2"), Redo2: stub("Redo2"),
+    ChevronUp: stub("ChevronUp"), ChevronDownIcon: stub("ChevronDownIcon"),
+    ChevronUpIcon: stub("ChevronUpIcon"), CheckIcon: stub("CheckIcon"),
+    Info: stub("Info"), Copy: stub("Copy"), ArrowRightLeft: stub("ArrowRightLeft"),
+    ZoomIn: stub("ZoomIn"), Download: stub("Download"), Trash2: stub("Trash2"),
+    Sparkles: stub("Sparkles"), Library: stub("Library"), Star: stub("Star"),
+    ChevronLeft: stub("ChevronLeft"), ChevronRight: stub("ChevronRight"),
+    PanelLeftOpen: stub("PanelLeftOpen"),
+  };
+});
 
 // Mock the model selector (uses radix Select which needs complex setup in jsdom)
 vi.mock("@/components/assistant/model-selector", () => ({
@@ -286,23 +294,22 @@ describe("CanvasChatPanel TierToggle rendering", () => {
     const qualityButton = screen.getByText("Quality");
     expect(qualityButton).toHaveAttribute("aria-pressed", "false");
 
-    // MaxQualityToggle should NOT be visible in draft mode
-    expect(screen.queryByTestId("max-quality-toggle")).not.toBeInTheDocument();
+    // Max button should also be present but not active (TierToggle is now 3-segment)
+    const maxButton = screen.getByText("Max");
+    expect(maxButton).toHaveAttribute("aria-pressed", "false");
   });
 
   /**
    * AC-2: GIVEN der Tier-State steht auf "draft"
    *       WHEN der User auf "Quality" im TierToggle klickt
-   *       THEN wechselt der Tier-State zu "quality" und eine MaxQualityToggle-Komponente
-   *            wird neben/unter dem TierToggle sichtbar
+   *       THEN wechselt der Tier-State zu "quality"
    */
-  it("AC-2: should show MaxQualityToggle when tier switches to quality", async () => {
+  it("AC-2: should switch to quality tier when Quality is clicked", async () => {
     const user = userEvent.setup();
     renderChatPanel();
 
     // Verify draft is active initially
     expect(screen.getByText("Draft")).toHaveAttribute("aria-pressed", "true");
-    expect(screen.queryByTestId("max-quality-toggle")).not.toBeInTheDocument();
 
     // Click Quality
     const qualityButton = screen.getByText("Quality");
@@ -311,57 +318,47 @@ describe("CanvasChatPanel TierToggle rendering", () => {
     // Quality should now be active
     expect(qualityButton).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("Draft")).toHaveAttribute("aria-pressed", "false");
-
-    // MaxQualityToggle should now be visible
-    const maxQualityToggle = screen.getByTestId("max-quality-toggle");
-    expect(maxQualityToggle).toBeInTheDocument();
+    expect(screen.getByText("Max")).toHaveAttribute("aria-pressed", "false");
   });
 
   /**
    * AC-3: GIVEN der Tier-State steht auf "quality"
    *       WHEN der User auf "Draft" im TierToggle klickt
-   *       THEN wechselt der Tier-State zu "draft" und die MaxQualityToggle-Komponente
-   *            wird ausgeblendet
+   *       THEN wechselt der Tier-State zu "draft"
    */
-  it("AC-3: should hide MaxQualityToggle when tier switches back to draft", async () => {
+  it("AC-3: should switch back to draft when Draft is clicked", async () => {
     const user = userEvent.setup();
     renderChatPanel();
 
     // Switch to quality first
     await user.click(screen.getByText("Quality"));
-    expect(screen.getByTestId("max-quality-toggle")).toBeInTheDocument();
+    expect(screen.getByText("Quality")).toHaveAttribute("aria-pressed", "true");
 
     // Switch back to draft
     await user.click(screen.getByText("Draft"));
 
     // Draft should be active
     expect(screen.getByText("Draft")).toHaveAttribute("aria-pressed", "true");
-
-    // MaxQualityToggle should be hidden
-    expect(screen.queryByTestId("max-quality-toggle")).not.toBeInTheDocument();
+    expect(screen.getByText("Quality")).toHaveAttribute("aria-pressed", "false");
   });
 
   /**
-   * AC-4: GIVEN der Tier-State steht auf "quality" und maxQuality ist false
-   *       WHEN der User den MaxQualityToggle aktiviert
-   *       THEN wird maxQuality auf true gesetzt (effektiver Tier fuer Model-Resolution: "max")
+   * AC-4: GIVEN the TierToggle has 3 segments (Draft / Quality / Max)
+   *       WHEN der User auf "Max" klickt
+   *       THEN wird der Tier-State auf "max" gesetzt
    */
-  it("AC-4: should set maxQuality to true when MaxQualityToggle is activated", async () => {
+  it("AC-4: should set tier to max when Max segment is clicked", async () => {
     const user = userEvent.setup();
     renderChatPanel();
 
-    // Switch to quality
-    await user.click(screen.getByText("Quality"));
+    // Click Max directly
+    const maxButton = screen.getByText("Max");
+    await user.click(maxButton);
 
-    // MaxQualityToggle should be visible and initially off
-    const maxQualityToggle = screen.getByTestId("max-quality-toggle");
-    expect(maxQualityToggle).toHaveAttribute("aria-pressed", "false");
-
-    // Click to activate
-    await user.click(maxQualityToggle);
-
-    // MaxQuality should now be on
-    expect(maxQualityToggle).toHaveAttribute("aria-pressed", "true");
+    // Max should now be active
+    expect(maxButton).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Draft")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("Quality")).toHaveAttribute("aria-pressed", "false");
   });
 });
 
@@ -495,13 +492,9 @@ describe("CanvasChatPanel handleCanvasGenerate model resolution", () => {
 
     await waitFor(() => expect(mockCreateSession).toHaveBeenCalledTimes(1));
 
-    // Switch tier to Quality
-    await user.click(screen.getByText("Quality"));
-
-    // Enable MaxQuality
-    const maxQualityToggle = screen.getByTestId("max-quality-toggle");
-    await user.click(maxQualityToggle);
-    expect(maxQualityToggle).toHaveAttribute("aria-pressed", "true");
+    // Switch tier to Max directly (TierToggle now has 3 segments: Draft/Quality/Max)
+    await user.click(screen.getByText("Max"));
+    expect(screen.getByText("Max")).toHaveAttribute("aria-pressed", "true");
 
     // Send message to trigger canvas-generate
     const textarea = screen.getByTestId("chat-input-textarea");
@@ -526,12 +519,12 @@ describe("CanvasChatPanel handleCanvasGenerate model resolution", () => {
   });
 
   /**
-   * AC-7: GIVEN Tier ist "quality" und maxQuality ist false
+   * AC-7: GIVEN Tier ist "quality"
    *       WHEN handleCanvasGenerate() ausgefuehrt wird
    *       THEN wird generateImages mit modelIds: [img2img-quality-modelId] aufgerufen
    *            (z.B. "black-forest-labs/flux-2-pro")
    */
-  it("AC-7: should call generateImages with img2img/quality model when tier is quality and maxQuality is false", async () => {
+  it("AC-7: should call generateImages with img2img/quality model when tier is quality", async () => {
     const user = userEvent.setup();
 
     mockSendMessage.mockImplementation(
@@ -559,12 +552,9 @@ describe("CanvasChatPanel handleCanvasGenerate model resolution", () => {
 
     await waitFor(() => expect(mockCreateSession).toHaveBeenCalledTimes(1));
 
-    // Switch tier to Quality (maxQuality remains false by default)
+    // Switch tier to Quality (TierToggle now has 3 segments)
     await user.click(screen.getByText("Quality"));
-    expect(screen.getByTestId("max-quality-toggle")).toHaveAttribute(
-      "aria-pressed",
-      "false"
-    );
+    expect(screen.getByText("Quality")).toHaveAttribute("aria-pressed", "true");
 
     // Send message to trigger canvas-generate
     const textarea = screen.getByTestId("chat-input-textarea");
@@ -747,9 +737,9 @@ describe("CanvasChatPanel TierToggle interaction states", () => {
     expect(qualityButton).toHaveAttribute("aria-pressed", "true");
     expect(draftButton).toHaveAttribute("aria-pressed", "false");
 
-    // MaxQualityToggle should also appear and be interactive during streaming
-    const maxQualityToggle = screen.getByTestId("max-quality-toggle");
-    expect(maxQualityToggle).not.toBeDisabled();
+    // Max button should also be interactive during streaming (TierToggle is now 3-segment)
+    const maxButton = screen.getByText("Max");
+    expect(maxButton).not.toBeDisabled();
 
     // Switch back to Draft
     await user.click(draftButton);
@@ -763,29 +753,12 @@ describe("CanvasChatPanel TierToggle interaction states", () => {
 
   /**
    * AC-9: GIVEN eine Generation laeuft (state.isGenerating === true)
-   *       WHEN der User den TierToggle oder MaxQualityToggle bedienen will
-   *       THEN sind beide Toggles disabled (nicht klickbar)
+   *       WHEN der User den TierToggle bedienen will
+   *       THEN sind alle Toggle-Buttons disabled (nicht klickbar)
    */
-  it("AC-9: should disable TierToggle and MaxQualityToggle while isGenerating is true", async () => {
+  it("AC-9: should disable TierToggle while isGenerating is true", async () => {
     const user = userEvent.setup();
-
-    // First render without isGenerating so we can switch to quality
-    // to make MaxQualityToggle visible, then set isGenerating
     const generation = makeGeneration({ id: "gen-ac9" });
-
-    const { unmount } = renderChatPanel({ generation });
-
-    // Switch to quality first to make MaxQualityToggle appear
-    await user.click(screen.getByText("Quality"));
-    expect(screen.getByTestId("max-quality-toggle")).toBeInTheDocument();
-
-    unmount();
-
-    // Now render with isGenerating=true via ContextDispatcher and quality tier
-    // We need to pre-set tier to quality so MaxQualityToggle is visible
-    // Since tier is internal state, we render fresh and set isGenerating
-    // The tier resets to draft on remount, so we need a different approach:
-    // Render, switch to quality, then dispatch SET_GENERATING
 
     const ControlledPanel = () => {
       const { dispatch } = useCanvasDetail();
@@ -818,9 +791,9 @@ describe("CanvasChatPanel TierToggle interaction states", () => {
       </CanvasDetailProvider>
     );
 
-    // Switch to quality to make MaxQualityToggle visible
+    // Switch to quality first
     await user.click(screen.getByText("Quality"));
-    expect(screen.getByTestId("max-quality-toggle")).toBeInTheDocument();
+    expect(screen.getByText("Quality")).toHaveAttribute("aria-pressed", "true");
 
     // Now set isGenerating=true
     await user.click(screen.getByTestId("set-generating"));
@@ -829,13 +802,11 @@ describe("CanvasChatPanel TierToggle interaction states", () => {
     await waitFor(() => {
       const draftButton = screen.getByText("Draft");
       const qualityButton = screen.getByText("Quality");
+      const maxButton = screen.getByText("Max");
       expect(draftButton).toBeDisabled();
       expect(qualityButton).toBeDisabled();
+      expect(maxButton).toBeDisabled();
     });
-
-    // MaxQualityToggle should also be disabled
-    const maxQualityToggle = screen.getByTestId("max-quality-toggle");
-    expect(maxQualityToggle).toBeDisabled();
 
     // Verify clicking does not change state
     await user.click(screen.getByText("Draft"));

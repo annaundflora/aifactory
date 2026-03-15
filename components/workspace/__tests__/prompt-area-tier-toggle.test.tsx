@@ -80,24 +80,31 @@ vi.mock("@/app/actions/references", () => ({
 }));
 
 // Mock lucide-react icons
-vi.mock("lucide-react", () => ({
-  ChevronDown: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "chevron-down", ...props }),
-  ChevronRight: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "chevron-right", ...props }),
-  Loader2: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "loader-icon", ...props }),
-  Sparkles: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "sparkles-icon", ...props }),
-  Minus: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "minus-icon", ...props }),
-  Plus: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "plus-icon", ...props }),
-  X: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "x-icon", ...props }),
-  Search: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "search-icon", ...props }),
-}));
+vi.mock("lucide-react", () => {
+  const stub = (name: string) => {
+    const id = name.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+    const Comp = (props: Record<string, unknown>) => <span data-testid={`${id}-icon`} {...props} />;
+    Comp.displayName = name;
+    return Comp;
+  };
+  return {
+    MessageSquare: stub("MessageSquare"), Minus: stub("Minus"), Plus: stub("Plus"),
+    ArrowUp: stub("ArrowUp"), Square: stub("Square"), PanelRightClose: stub("PanelRightClose"),
+    Image: stub("Image"), Loader2: stub("Loader2"), ImageOff: stub("ImageOff"),
+    PanelRightOpen: stub("PanelRightOpen"), PanelLeftIcon: stub("PanelLeftIcon"),
+    PanelLeftClose: stub("PanelLeftClose"), PenLine: stub("PenLine"),
+    ChevronDown: stub("ChevronDown"), Check: stub("Check"), Type: stub("Type"),
+    ImagePlus: stub("ImagePlus"), Scaling: stub("Scaling"), X: stub("X"),
+    ArrowLeft: stub("ArrowLeft"), Undo2: stub("Undo2"), Redo2: stub("Redo2"),
+    ChevronUp: stub("ChevronUp"), ChevronDownIcon: stub("ChevronDownIcon"),
+    ChevronUpIcon: stub("ChevronUpIcon"), CheckIcon: stub("CheckIcon"),
+    Info: stub("Info"), Copy: stub("Copy"), ArrowRightLeft: stub("ArrowRightLeft"),
+    ZoomIn: stub("ZoomIn"), Download: stub("Download"), Trash2: stub("Trash2"),
+    Sparkles: stub("Sparkles"), Library: stub("Library"), Star: stub("Star"),
+    ChevronLeft: stub("ChevronLeft"), ChevronRight: stub("ChevronRight"),
+    PanelLeftOpen: stub("PanelLeftOpen"),
+  };
+});
 
 // Mock LLMComparison (external component, not under test)
 vi.mock("@/components/prompt-improve/llm-comparison", () => ({
@@ -222,8 +229,11 @@ async function switchToMode(
   user: ReturnType<typeof userEvent.setup>,
   label: string,
 ) {
-  const segment = screen.getByText(label);
-  await user.click(segment);
+  // ModeSelector is now a DropdownMenu -- click trigger to open, then click item
+  const trigger = screen.getByTestId("mode-selector");
+  await user.click(trigger);
+  const item = await screen.findByRole("menuitem", { name: new RegExp(label, "i") });
+  await user.click(item);
 }
 
 // ---------------------------------------------------------------------------
@@ -302,16 +312,12 @@ describe("PromptArea - Tier Toggle Integration", () => {
   // --------------------------------------------------------------------------
   // AC-3: GIVEN der TierToggle steht auf "draft" (txt2img oder img2img Mode)
   //        WHEN der User auf "Quality" klickt
-  //        THEN wechselt der TierToggle zu tier="quality" und ein
-  //             MaxQualityToggle erscheint unterhalb des TierToggles
-  //             mit maxQuality={false}
+  //        THEN wechselt der TierToggle zu tier="quality"
+  //        NOTE: MaxQualityToggle was removed; "Max" is now a TierToggle segment
   // --------------------------------------------------------------------------
-  it("AC-3: should show MaxQualityToggle when tier is switched to quality in txt2img mode", async () => {
+  it("AC-3: should switch to quality tier and show Max segment in txt2img mode", async () => {
     const user = userEvent.setup();
     renderPromptArea();
-
-    // MaxQualityToggle should NOT be visible initially (draft tier)
-    expect(screen.queryByTestId("max-quality-toggle")).not.toBeInTheDocument();
 
     // Click Quality segment
     await user.click(screen.getByText("Quality"));
@@ -320,50 +326,47 @@ describe("PromptArea - Tier Toggle Integration", () => {
     expect(screen.getByText("Quality")).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("Draft")).toHaveAttribute("aria-pressed", "false");
 
-    // MaxQualityToggle should now be visible
-    const maxQualityToggle = screen.getByTestId("max-quality-toggle");
-    expect(maxQualityToggle).toBeInTheDocument();
-
-    // maxQuality defaults to false (aria-pressed="false")
-    expect(maxQualityToggle).toHaveAttribute("aria-pressed", "false");
+    // Max segment should be visible in the TierToggle (txt2img mode shows all tiers)
+    const maxButton = screen.getByText("Max");
+    expect(maxButton).toBeInTheDocument();
+    expect(maxButton).toHaveAttribute("aria-pressed", "false");
   });
 
   // --------------------------------------------------------------------------
   // AC-4: GIVEN der TierToggle steht auf "quality"
   //        WHEN der User auf "Draft" klickt
-  //        THEN wechselt der TierToggle zu tier="draft" und der
-  //             MaxQualityToggle ist nicht mehr sichtbar
+  //        THEN wechselt der TierToggle zu tier="draft"
   // --------------------------------------------------------------------------
-  it("AC-4: should hide MaxQualityToggle when tier is switched back to draft", async () => {
+  it("AC-4: should switch back to draft tier", async () => {
     const user = userEvent.setup();
     renderPromptArea();
 
     // Switch to quality first
     await user.click(screen.getByText("Quality"));
-    expect(screen.getByTestId("max-quality-toggle")).toBeInTheDocument();
+    expect(screen.getByText("Quality")).toHaveAttribute("aria-pressed", "true");
 
     // Switch back to draft
     await user.click(screen.getByText("Draft"));
 
     // Draft is active again
     expect(screen.getByText("Draft")).toHaveAttribute("aria-pressed", "true");
-
-    // MaxQualityToggle should be gone
-    expect(screen.queryByTestId("max-quality-toggle")).not.toBeInTheDocument();
+    expect(screen.getByText("Quality")).toHaveAttribute("aria-pressed", "false");
   });
 
   // --------------------------------------------------------------------------
   // AC-5: GIVEN der TierToggle steht auf "quality" im Upscale-Mode
   //        WHEN der Render abgeschlossen ist
-  //        THEN wird KEIN MaxQualityToggle angezeigt (Upscale hat keinen Max-Tier)
+  //        THEN wird der "Max" Segment NICHT angezeigt (Upscale hat keinen Max-Tier)
   // --------------------------------------------------------------------------
-  it("AC-5: should not render MaxQualityToggle when in upscale mode even with quality tier", async () => {
+  it("AC-5: should hide Max segment in TierToggle when in upscale mode", async () => {
     const user = userEvent.setup();
     renderPromptArea();
 
     // Switch to quality tier first (in txt2img mode)
     await user.click(screen.getByText("Quality"));
-    expect(screen.getByTestId("max-quality-toggle")).toBeInTheDocument();
+
+    // Max segment should be visible in txt2img mode
+    expect(screen.getByText("Max")).toBeInTheDocument();
 
     // Now switch to upscale mode
     await switchToMode(user, "Upscale");
@@ -371,8 +374,8 @@ describe("PromptArea - Tier Toggle Integration", () => {
     // Quality tier is still selected
     expect(screen.getByText("Quality")).toHaveAttribute("aria-pressed", "true");
 
-    // But MaxQualityToggle should NOT be visible in upscale mode
-    expect(screen.queryByTestId("max-quality-toggle")).not.toBeInTheDocument();
+    // Max segment should NOT be visible in upscale mode (hiddenValues=["max"])
+    expect(screen.queryByText("Max")).not.toBeInTheDocument();
   });
 
   // --------------------------------------------------------------------------

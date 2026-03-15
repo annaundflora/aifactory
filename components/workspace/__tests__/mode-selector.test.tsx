@@ -1,8 +1,32 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeAll } from "vitest";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
+
+// ---------------------------------------------------------------------------
+// Polyfills for jsdom (Radix DropdownMenu needs ResizeObserver + pointer events)
+// ---------------------------------------------------------------------------
+
+beforeAll(() => {
+  if (typeof globalThis.ResizeObserver === "undefined") {
+    globalThis.ResizeObserver = class ResizeObserver {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver;
+  }
+
+  if (typeof Element.prototype.hasPointerCapture === "undefined") {
+    Element.prototype.hasPointerCapture = () => false;
+    Element.prototype.setPointerCapture = () => {};
+    Element.prototype.releasePointerCapture = () => {};
+  }
+
+  if (typeof Element.prototype.scrollIntoView === "undefined") {
+    Element.prototype.scrollIntoView = () => {};
+  }
+});
 
 import { ModeSelector } from "../mode-selector";
 
@@ -10,67 +34,62 @@ describe("ModeSelector Acceptance", () => {
   // --------------------------------------------------------------------------
   // AC-1: GIVEN ModeSelector mit value="txt2img" gerendert wird
   //        WHEN die Komponente im DOM erscheint
-  //        THEN sind alle drei Segmente sichtbar mit den Labels "Text to Image",
-  //             "Image to Image" und "Upscale" — und exakt das Segment mit Wert
-  //             "txt2img" traegt das aktive Styling (aria-pressed="true")
+  //        THEN zeigt der Trigger-Button das Label "Text to Image" an.
+  //             Die drei Optionen sind nur im geoffneten Dropdown sichtbar.
   // --------------------------------------------------------------------------
-  it("AC-1: should render all three segments with txt2img active when value is txt2img", () => {
+  it("AC-1: should render trigger with txt2img label when value is txt2img", () => {
     const onChange = vi.fn();
     render(<ModeSelector value="txt2img" onChange={onChange} />);
 
-    // All three segments visible
-    expect(screen.getByText("Text to Image")).toBeInTheDocument();
-    expect(screen.getByText("Image to Image")).toBeInTheDocument();
-    expect(screen.getByText("Upscale")).toBeInTheDocument();
-
-    // txt2img is active
-    const txt2imgBtn = screen.getByText("Text to Image");
-    expect(txt2imgBtn).toHaveAttribute("aria-pressed", "true");
-
-    // Others are not active
-    expect(screen.getByText("Image to Image")).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByText("Upscale")).toHaveAttribute("aria-pressed", "false");
+    // Trigger button should show the current mode label
+    const trigger = screen.getByTestId("mode-selector");
+    expect(trigger).toBeInTheDocument();
+    expect(trigger).toHaveTextContent("Text to Image");
   });
 
   // --------------------------------------------------------------------------
   // AC-2: GIVEN ModeSelector mit value="img2img" gerendert wird
   //        WHEN die Komponente im DOM erscheint
-  //        THEN ist exakt das Segment mit Wert "img2img" aktiv markiert
+  //        THEN zeigt der Trigger-Button das Label "Image to Image" an
   // --------------------------------------------------------------------------
-  it("AC-2: should mark img2img segment as active when value is img2img", () => {
+  it("AC-2: should show img2img label on trigger when value is img2img", () => {
     const onChange = vi.fn();
     render(<ModeSelector value="img2img" onChange={onChange} />);
 
-    expect(screen.getByText("Image to Image")).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("Text to Image")).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByText("Upscale")).toHaveAttribute("aria-pressed", "false");
+    const trigger = screen.getByTestId("mode-selector");
+    expect(trigger).toHaveTextContent("Image to Image");
   });
 
   // --------------------------------------------------------------------------
   // AC-3: GIVEN ModeSelector mit value="upscale" gerendert wird
   //        WHEN die Komponente im DOM erscheint
-  //        THEN ist exakt das Segment mit Wert "upscale" aktiv markiert
+  //        THEN zeigt der Trigger-Button das Label "Upscale" an
   // --------------------------------------------------------------------------
-  it("AC-3: should mark upscale segment as active when value is upscale", () => {
+  it("AC-3: should show upscale label on trigger when value is upscale", () => {
     const onChange = vi.fn();
     render(<ModeSelector value="upscale" onChange={onChange} />);
 
-    expect(screen.getByText("Upscale")).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("Text to Image")).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByText("Image to Image")).toHaveAttribute("aria-pressed", "false");
+    const trigger = screen.getByTestId("mode-selector");
+    expect(trigger).toHaveTextContent("Upscale");
   });
 
   // --------------------------------------------------------------------------
   // AC-4: GIVEN ModeSelector mit value="txt2img" und einem onChange-Spy
-  //        WHEN der Nutzer auf das Segment "Image to Image" klickt
+  //        WHEN der Nutzer das Dropdown oeffnet und auf "Image to Image" klickt
   //        THEN wird onChange einmal mit dem Argument "img2img" aufgerufen
   // --------------------------------------------------------------------------
-  it('AC-4: should call onChange with "img2img" when Image to Image segment is clicked', async () => {
+  it('AC-4: should call onChange with "img2img" when Image to Image item is clicked', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<ModeSelector value="txt2img" onChange={onChange} />);
 
-    await user.click(screen.getByText("Image to Image"));
+    // Open the dropdown
+    const trigger = screen.getByTestId("mode-selector");
+    await user.click(trigger);
+
+    // Find and click the "Image to Image" menu item
+    const img2imgItem = await screen.findByRole("menuitem", { name: /Image to Image/i });
+    await user.click(img2imgItem);
 
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(onChange).toHaveBeenCalledWith("img2img");
@@ -78,15 +97,21 @@ describe("ModeSelector Acceptance", () => {
 
   // --------------------------------------------------------------------------
   // AC-5: GIVEN ModeSelector mit value="txt2img" und einem onChange-Spy
-  //        WHEN der Nutzer auf das Segment "Upscale" klickt
+  //        WHEN der Nutzer das Dropdown oeffnet und auf "Upscale" klickt
   //        THEN wird onChange einmal mit dem Argument "upscale" aufgerufen
   // --------------------------------------------------------------------------
-  it('AC-5: should call onChange with "upscale" when Upscale segment is clicked', async () => {
+  it('AC-5: should call onChange with "upscale" when Upscale item is clicked', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<ModeSelector value="txt2img" onChange={onChange} />);
 
-    await user.click(screen.getByText("Upscale"));
+    // Open the dropdown
+    const trigger = screen.getByTestId("mode-selector");
+    await user.click(trigger);
+
+    // Find and click the "Upscale" menu item
+    const upscaleItem = await screen.findByRole("menuitem", { name: /Upscale/i });
+    await user.click(upscaleItem);
 
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(onChange).toHaveBeenCalledWith("upscale");
@@ -94,31 +119,34 @@ describe("ModeSelector Acceptance", () => {
 
   // --------------------------------------------------------------------------
   // AC-6: GIVEN ModeSelector mit value="img2img" und einem onChange-Spy
-  //        WHEN der Nutzer auf das bereits aktive Segment "Image to Image" klickt
-  //        THEN wird onChange nicht aufgerufen oder mit "img2img" aufgerufen
-  //             — konsistentes Verhalten, kein Fehler
+  //        WHEN der Nutzer das Dropdown oeffnet und auf das bereits aktive
+  //        "Image to Image" klickt
+  //        THEN wird onChange aufgerufen oder nicht — kein Fehler
   // --------------------------------------------------------------------------
-  it("AC-6: should not throw when clicking the already active segment", async () => {
+  it("AC-6: should not throw when clicking the already active item", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<ModeSelector value="img2img" onChange={onChange} />);
 
-    // Must not throw
-    await expect(
-      user.click(screen.getByText("Image to Image"))
-    ).resolves.not.toThrow();
+    // Open the dropdown
+    const trigger = screen.getByTestId("mode-selector");
+    await user.click(trigger);
 
-    // onChange may or may not be called — both are acceptable per spec.
+    // Find and click the already-active "Image to Image" menu item
+    const img2imgItem = await screen.findByRole("menuitem", { name: /Image to Image/i });
+    await expect(user.click(img2imgItem)).resolves.not.toThrow();
+
+    // onChange may or may not be called -- both are acceptable per spec.
     // We just verify no error occurred (implicit via test not throwing).
   });
 
   // --------------------------------------------------------------------------
   // AC-7: GIVEN ModeSelector mit value="txt2img" und disabledModes=["img2img"]
-  //        WHEN das Segment "Image to Image" disabled ist
-  //        THEN ist das Segment nicht anklickbar und onChange wird beim Klick
+  //        WHEN das Dropdown geoeffnet wird und "Image to Image" disabled ist
+  //        THEN ist das Item nicht anklickbar und onChange wird beim Klick
   //             nicht aufgerufen
   // --------------------------------------------------------------------------
-  it("AC-7: should not call onChange when a disabled segment is clicked", async () => {
+  it("AC-7: should not call onChange when a disabled item is clicked", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(
@@ -129,13 +157,16 @@ describe("ModeSelector Acceptance", () => {
       />
     );
 
-    const img2imgBtn = screen.getByText("Image to Image");
+    // Open the dropdown
+    const trigger = screen.getByTestId("mode-selector");
+    await user.click(trigger);
 
-    // aria-disabled signals the disabled state (not the HTML disabled attribute)
-    expect(img2imgBtn).toHaveAttribute("aria-disabled", "true");
+    // The disabled menu item should have data-disabled attribute (Radix convention)
+    const img2imgItem = await screen.findByRole("menuitem", { name: /Image to Image/i });
+    expect(img2imgItem).toHaveAttribute("data-disabled");
 
-    // Click on the disabled segment should not trigger onChange
-    await user.click(img2imgBtn);
+    // Click on the disabled item should not trigger onChange
+    await user.click(img2imgItem);
     expect(onChange).not.toHaveBeenCalled();
   });
 });

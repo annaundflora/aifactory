@@ -219,7 +219,7 @@ describe("ChatInput (Image Integration)", () => {
     await user.click(sendBtn);
 
     expect(defaultProps.onSend).toHaveBeenCalledWith(
-      "",
+      "Analysiere dieses Bild",
       "https://r2.example.com/uploads/photo.jpg"
     );
   });
