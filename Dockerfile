@@ -25,6 +25,10 @@ COPY . .
 # Set Next.js telemetry to disabled during build
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Dummy env vars needed at build time (Next.js page data collection)
+ENV DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy
+ENV AUTH_SECRET=dummy-build-secret
+
 # Build the Next.js application (standalone output)
 RUN pnpm build
 
