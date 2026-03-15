@@ -46,9 +46,14 @@ export async function uploadSourceImage(
     }
 
     // URL path: server-side fetch and proxy through R2
+    // - redirect: 'error' prevents SSRF via open-redirect to private IPs
+    // - AbortSignal.timeout prevents hanging on slow/unresponsive hosts
     let response: Response;
     try {
-      response = await fetch(input.url);
+      response = await fetch(input.url, {
+        redirect: "error",
+        signal: AbortSignal.timeout(15_000),
+      });
     } catch {
       return { error: "Bild konnte nicht geladen werden" };
     }

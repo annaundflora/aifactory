@@ -95,6 +95,20 @@ export async function deleteReferenceImage(
     return { error: "Ungueltige Referenz-ID" };
   }
 
+  // Ownership check: load reference image, resolve projectId, verify project belongs to user
+  try {
+    const [refImage] = await db
+      .select({ projectId: referenceImages.projectId })
+      .from(referenceImages)
+      .where(eq(referenceImages.id, input.id));
+    if (!refImage) {
+      return { success: false };
+    }
+    await getProjectQuery(refImage.projectId, auth.userId);
+  } catch {
+    return { error: "Not found" };
+  }
+
   try {
     // AC-7: Delegate to ReferenceService.delete
     await ReferenceService.delete(input.id);
@@ -203,6 +217,14 @@ export async function getProvenanceData(
   const auth = await requireAuth();
   if ("error" in auth) {
     return { error: auth.error };
+  }
+
+  // Ownership check: load generation, resolve projectId, verify project belongs to user
+  try {
+    const gen = await getGeneration(generationId);
+    await getProjectQuery(gen.projectId, auth.userId);
+  } catch {
+    return { error: "Not found" };
   }
 
   const refs = await getGenerationReferences(generationId);

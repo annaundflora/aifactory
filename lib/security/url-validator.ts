@@ -57,8 +57,54 @@ function isPrivateIPv4(ip: string): boolean {
 }
 
 /**
+ * Check whether an IPv6 address (without brackets) is private/reserved.
+ *
+ * Blocked IPv6 ranges:
+ *   ::1              -- loopback
+ *   ::               -- unspecified
+ *   ::ffff:x.x.x.x  -- IPv4-mapped (delegates to isPrivateIPv4)
+ *   fc00::/7         -- unique local (fc00:: - fdff::)
+ *   fe80::/10        -- link-local  (fe80:: - febf::)
+ */
+function isPrivateIPv6(addr: string): boolean {
+  // Normalize: lowercase, strip brackets if present
+  const a = addr.toLowerCase().replace(/^\[|\]$/g, "");
+
+  // Loopback
+  if (a === "::1") return true;
+
+  // Unspecified
+  if (a === "::") return true;
+
+  // IPv4-mapped IPv6 -- ::ffff:a.b.c.d
+  // URL.hostname normalizes these, so we may see "::ffff:127.0.0.1"
+  const v4MappedMatch = a.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+  if (v4MappedMatch) {
+    return isPrivateIPv4(v4MappedMatch[1]);
+  }
+
+  // Expand the first hex group to check prefix-based ranges.
+  // For addresses like "fc00::1" or "fe80::1", the first segment determines the range.
+  const firstSegment = a.split(":")[0];
+  if (firstSegment) {
+    const val = parseInt(firstSegment, 16);
+    if (!isNaN(val)) {
+      // fc00::/7 -- unique local: first byte 0xfc or 0xfd (val >> 8 gives first byte for 16-bit segment)
+      // For a /7, the top 7 bits of the first byte must be 1111110x => 0xfc or 0xfd
+      const firstByte = val >> 8;
+      if (firstByte === 0xfc || firstByte === 0xfd) return true;
+
+      // fe80::/10 -- link-local: first 10 bits = 1111111010 => fe80-febf
+      if (val >= 0xfe80 && val <= 0xfebf) return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Check whether a hostname should be treated as private/reserved.
- * Handles: "localhost", IPv4 addresses, IPv6 loopback [::1].
+ * Handles: "localhost", IPv4 addresses, IPv6 loopback/mapped/private.
  */
 function isPrivateHost(hostname: string): boolean {
   // Lowercase for case-insensitive comparison
@@ -67,8 +113,11 @@ function isPrivateHost(hostname: string): boolean {
   // localhost
   if (h === "localhost") return true;
 
-  // IPv6 loopback -- URL.hostname strips brackets, so we get "::1"
-  if (h === "::1" || h === "[::1]") return true;
+  // IPv6 address check (URL.hostname strips brackets for IPv6, so we get bare "::1" etc.)
+  // Detect IPv6: contains ":" which is not valid in IPv4 or domain names
+  if (h.includes(":")) {
+    return isPrivateIPv6(h);
+  }
 
   // IPv4 address check
   if (isPrivateIPv4(h)) return true;
