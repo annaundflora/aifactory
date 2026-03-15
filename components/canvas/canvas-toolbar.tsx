@@ -8,7 +8,9 @@ import {
   Download,
   Trash2,
   Info,
+  PanelLeftIcon,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useCanvasDetail } from "@/lib/canvas-detail-context";
 import { ToolbarButton } from "@/components/canvas/toolbar-button";
@@ -66,6 +68,7 @@ export function CanvasToolbar({ generation, onDelete }: CanvasToolbarProps) {
   const { state, dispatch } = useCanvasDetail();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [expanded, setExpanded] = useState(true);
 
   const isDisabled = state.isGenerating;
 
@@ -125,15 +128,77 @@ export function CanvasToolbar({ generation, onDelete }: CanvasToolbarProps) {
   return (
     <TooltipProvider delayDuration={300}>
       <nav
-        className="flex flex-col items-center py-2 w-12"
+        className={cn(
+          "flex flex-1 flex-col py-2 transition-all duration-200",
+          expanded ? "w-40 items-stretch" : "w-14 items-center"
+        )}
         aria-label="Canvas tools"
         data-testid="canvas-toolbar"
       >
-        {TOOLS.map((tool) => (
+        {/* Expand / Collapse toggle (top, same pattern as workspace sidebar) */}
+        <button
+          type="button"
+          onClick={() => setExpanded((prev) => !prev)}
+          className={cn(
+            "flex h-10 shrink-0 items-center rounded-md text-muted-foreground hover:text-foreground transition-colors duration-150",
+            expanded ? "justify-start gap-2 px-3" : "justify-center"
+          )}
+          aria-label={expanded ? "Collapse toolbar" : "Expand toolbar"}
+          data-testid="toolbar-toggle"
+        >
+          <PanelLeftIcon className="size-5 shrink-0" />
+          {expanded && (
+            <span className="text-sm whitespace-nowrap">Collapse</span>
+          )}
+        </button>
+
+        {/* Separator below toggle */}
+        <div className="mx-2 border-t border-border/60 mb-1" />
+
+        {/* Generation tools: Variation, img2img, Upscale */}
+        {TOOLS.slice(0, 3).map((tool) => (
           <ToolbarButton
             key={tool.id}
             icon={tool.icon}
             tooltip={tool.tooltip}
+            label={tool.tooltip}
+            expanded={expanded}
+            isActive={tool.toggle && state.activeToolId === tool.id}
+            disabled={isDisabled}
+            onClick={() => handleToolClick(tool)}
+            data-testid={`toolbar-${tool.id}`}
+          />
+        ))}
+
+        {/* Separator between Upscale and Download */}
+        <div className="mx-2 my-1 border-t border-border/60" />
+
+        {/* Action tools: Download, Delete */}
+        {TOOLS.slice(3, 5).map((tool) => (
+          <ToolbarButton
+            key={tool.id}
+            icon={tool.icon}
+            tooltip={tool.tooltip}
+            label={tool.tooltip}
+            expanded={expanded}
+            isActive={tool.toggle && state.activeToolId === tool.id}
+            disabled={isDisabled}
+            onClick={() => handleToolClick(tool)}
+            data-testid={`toolbar-${tool.id}`}
+          />
+        ))}
+
+        {/* Separator between Delete and Details */}
+        <div className="mx-2 my-1 border-t border-border/60" />
+
+        {/* Info tools: Details */}
+        {TOOLS.slice(5).map((tool) => (
+          <ToolbarButton
+            key={tool.id}
+            icon={tool.icon}
+            tooltip={tool.tooltip}
+            label={tool.tooltip}
+            expanded={expanded}
             isActive={tool.toggle && state.activeToolId === tool.id}
             disabled={isDisabled}
             onClick={() => handleToolClick(tool)}

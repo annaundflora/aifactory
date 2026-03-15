@@ -220,6 +220,7 @@ def build_canvas_system_prompt(image_context: Optional[dict] = None) -> str:
 
 ROLLE:
 - Du hilfst dem User, das aktuell angezeigte Bild zu iterieren und zu verbessern
+- Du kannst das aktuelle Bild SEHEN und visuell analysieren (es wird als Anhang zur User-Nachricht mitgeschickt)
 - Du sprichst Deutsch mit dem User, aber erstellst Prompts immer auf Englisch
 - Du erkennst Bearbeitungs-Absichten (Editing-Intents) aus Nachrichten des Users
 - Du bist ein kreativer Partner fuer visuelle Bildbearbeitung
@@ -264,10 +265,15 @@ WICHTIG:
 
         context_section = f"""
 AKTUELLES BILD (Editing-Kontext):
-- Bild-URL: {image_url}
+- Du siehst das aktuelle Bild als Anhang zur User-Nachricht
 - Original-Prompt: {prompt}
 - Modell: {model_id}
 - Modell-Parameter: {json.dumps(model_params, ensure_ascii=False)}
+
+VISUELLES FEEDBACK:
+- Beschreibe was du im Bild siehst, wenn der User danach fragt
+- Nutze deine visuelle Analyse fuer gezielte Verbesserungsvorschlaege
+- Beziehe dich auf konkrete visuelle Elemente (Farben, Komposition, Objekte, Stimmung)
 
 Beziehe dich beim Generieren auf diesen Kontext:
 - Nutze "{model_id}" als model_id (ausser der User wechselt explizit)
@@ -310,52 +316,60 @@ def create_canvas_agent(
     Returns:
         A compiled LangGraph graph ready for invocation.
     """
-    llm = ChatOpenAI(
-        model=settings.assistant_model_default,
-        api_key=settings.openrouter_api_key,
-        base_url="https://openrouter.ai/api/v1",
-        temperature=0.7,
-        max_tokens=2048,
-        streaming=True,
-    )
+    def _make_llm(model_slug: Optional[str] = None):
+        """Create a ChatOpenAI instance, optionally with a model override."""
+        llm = ChatOpenAI(
+            model=model_slug or settings.assistant_model_default,
+            api_key=settings.openrouter_api_key,
+            base_url="https://openrouter.ai/api/v1",
+            temperature=0.7,
+            max_tokens=2048,
+            streaming=True,
+        )
+        if CANVAS_TOOLS:
+            try:
+                return llm.bind_tools(CANVAS_TOOLS)
+            except NotImplementedError:
+                logger.warning(
+                    "LLM does not support bind_tools. "
+                    "Canvas tools will not be available for this agent instance."
+                )
+        return llm
 
-    # Bind tools to the LLM
-    if CANVAS_TOOLS:
-        try:
-            llm_with_tools = llm.bind_tools(CANVAS_TOOLS)
-        except NotImplementedError:
-            logger.warning(
-                "LLM does not support bind_tools. "
-                "Canvas tools will not be available for this agent instance."
-            )
-            llm_with_tools = llm
-    else:
-        llm_with_tools = llm
+    # Default LLM (reused when no model override is specified)
+    _default_llm = _make_llm()
+
+    def _get_llm(config: RunnableConfig):
+        """Return the LLM for this request — default or per-request override."""
+        model = config.get("configurable", {}).get("model")
+        if model and model != settings.assistant_model_default:
+            return _make_llm(model)
+        return _default_llm
 
     def _call_model_sync(state: CanvasAgentState, config: RunnableConfig) -> dict:
         """Sync: Call the LLM with the current messages and system prompt.
 
-        Reads image_context from config["configurable"]["image_context"] at
+        Reads image_context and model from config["configurable"] at
         runtime so the same compiled graph handles all requests.
         """
         image_context = config.get("configurable", {}).get("image_context")
         system_prompt = build_canvas_system_prompt(image_context)
         sys_msg = SystemMessage(content=system_prompt)
         messages = [sys_msg] + list(state["messages"])
-        response = llm_with_tools.invoke(messages)
+        response = _get_llm(config).invoke(messages)
         return {"messages": [response]}
 
     async def _call_model_async(state: CanvasAgentState, config: RunnableConfig) -> dict:
         """Async: Call the LLM with the current messages and system prompt.
 
-        Reads image_context from config["configurable"]["image_context"] at
+        Reads image_context and model from config["configurable"] at
         runtime so the same compiled graph handles all requests.
         """
         image_context = config.get("configurable", {}).get("image_context")
         system_prompt = build_canvas_system_prompt(image_context)
         sys_msg = SystemMessage(content=system_prompt)
         messages = [sys_msg] + list(state["messages"])
-        response = await llm_with_tools.ainvoke(messages)
+        response = await _get_llm(config).ainvoke(messages)
         return {"messages": [response]}
 
     assistant_node = RunnableLambda(_call_model_sync, afunc=_call_model_async)

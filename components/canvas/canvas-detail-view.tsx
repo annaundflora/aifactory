@@ -17,6 +17,7 @@ import { CanvasChatPanel } from "@/components/canvas/canvas-chat-panel";
 import { generateImages, upscaleImage, fetchGenerations } from "@/app/actions/generations";
 import { deleteGeneration } from "@/app/actions/generations";
 import { getModelSettings } from "@/app/actions/model-settings";
+import { uploadReferenceImage, addGalleryAsReference } from "@/app/actions/references";
 import { Button } from "@/components/ui/button";
 import { type Generation, type ModelSetting } from "@/lib/db/queries";
 import type { VariationParams } from "@/components/canvas/popovers/variation-popover";
@@ -85,22 +86,23 @@ export function CanvasDetailView({
   // ---------------------------------------------------------------------------
   const [modelSettings, setModelSettings] = useState<ModelSetting[]>([]);
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadModelSettings = useCallback(() => {
     getModelSettings()
       .then((settings) => {
-        if (!cancelled) {
-          setModelSettings(settings);
-        }
+        setModelSettings(settings);
       })
       .catch((err) => {
         console.error("Failed to fetch model settings:", err);
-        // graceful degradation: modelSettings stays empty, handlers use fallback
       });
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    loadModelSettings();
+    window.addEventListener("model-settings-changed", loadModelSettings);
+    return () => {
+      window.removeEventListener("model-settings-changed", loadModelSettings);
+    };
+  }, [loadModelSettings]);
 
   // Track pending generation IDs for polling via ref to avoid effect churn.
   // A counter state triggers re-renders when pending list changes.
@@ -320,14 +322,63 @@ export function CanvasDetailView({
       dispatch({ type: "SET_GENERATING", isGenerating: true });
 
       try {
-        // Map references to the server action format
-        const references = params.references.map((ref, index) => ({
-          referenceImageId: `ref-${index}`,
+        // Upload blob: URLs to R2 before sending to Replicate.
+        // The img2img popover creates blob: URLs for local file uploads,
+        // but Replicate requires publicly accessible https: URLs.
+        const resolvedRefs = await Promise.all(
+          params.references.map(async (ref) => {
+            if (ref.imageUrl.startsWith("blob:")) {
+              const response = await fetch(ref.imageUrl);
+              const blob = await response.blob();
+              const file = new File([blob], "reference.png", { type: blob.type || "image/png" });
+              const uploadResult = await uploadReferenceImage({
+                projectId: currentGeneration.projectId,
+                file,
+              });
+              if ("error" in uploadResult) {
+                throw new Error(uploadResult.error);
+              }
+              return { ...ref, imageUrl: uploadResult.imageUrl, uploadedId: uploadResult.id };
+            }
+            return ref;
+          })
+        );
+
+        // Map references to the server action format, using real IDs from upload.
+        // Auto-include the current canvas image as the first reference (slot 0),
+        // so img2img in the canvas always uses the displayed image as context.
+        const manualRefs = resolvedRefs.map((ref, index) => ({
+          referenceImageId: ("uploadedId" in ref && ref.uploadedId) ? ref.uploadedId : `ref-${index + 1}`,
           imageUrl: ref.imageUrl,
           role: ref.role,
           strength: ref.strength,
-          slotPosition: index,
+          slotPosition: index + 1,
         }));
+
+        // Create a reference_images DB record for the current canvas image
+        // so the FK constraint on generation_references is satisfied.
+        let canvasRef: typeof manualRefs | undefined;
+        if (currentGeneration.imageUrl) {
+          const galleryResult = await addGalleryAsReference({
+            projectId: currentGeneration.projectId,
+            generationId: currentGeneration.id,
+            imageUrl: currentGeneration.imageUrl,
+          });
+          if (!("error" in galleryResult)) {
+            canvasRef = [{
+              referenceImageId: galleryResult.id,
+              imageUrl: currentGeneration.imageUrl,
+              role: "content",
+              strength: "strong",
+              slotPosition: 0,
+            }];
+          }
+        }
+
+        const references = [
+          ...(canvasRef ?? []),
+          ...manualRefs,
+        ];
 
         const result = await generateImages({
           projectId: currentGeneration.projectId,
@@ -462,9 +513,9 @@ export function CanvasDetailView({
 
       {/* Body: 3-column layout */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left: Toolbar slot (48px wide) */}
+        {/* Left: Toolbar slot */}
         <aside
-          className="relative flex w-12 shrink-0 flex-col border-r border-border/80 bg-card"
+          className="relative flex h-full shrink-0 flex-col border-r border-border/80 bg-card"
           data-testid="toolbar-slot"
         >
           {toolbarSlot ?? (

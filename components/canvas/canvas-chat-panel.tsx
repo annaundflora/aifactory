@@ -441,7 +441,8 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
               }
             }
           },
-          abortControllerRef.current.signal
+          abortControllerRef.current.signal,
+          chatModelSlug
         );
       } catch (error) {
         console.error("[CanvasChatPanel] SSE stream error:", error);
@@ -475,7 +476,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
         abortControllerRef.current = null;
       }
     },
-    [projectId, dispatch, handleCanvasGenerate]
+    [projectId, dispatch, handleCanvasGenerate, chatModelSlug]
   );
 
   // ---------------------------------------------------------------------------

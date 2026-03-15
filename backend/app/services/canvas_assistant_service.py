@@ -149,14 +149,24 @@ class CanvasAssistantService:
             Dicts with 'event' and 'data' keys for SSE formatting.
         """
         try:
-            human_message = HumanMessage(content=content)
+            # Build multimodal HumanMessage: attach the image so the LLM
+            # can visually analyse it (same pattern as AssistantService).
+            if image_context and image_context.get("image_url"):
+                message_content = [
+                    {"type": "text", "text": content},
+                    {"type": "image_url", "image_url": {"url": str(image_context["image_url"])}},
+                ]
+                human_message = HumanMessage(content=message_content)
+            else:
+                human_message = HumanMessage(content=content)
 
             # LangGraph config: thread_id for session persistence, image_context
-            # injected at runtime so the compiled graph can be reused across requests.
+            # and model injected at runtime so the compiled graph can be reused.
             config = {
                 "configurable": {
                     "thread_id": session_id,
                     "image_context": image_context,
+                    "model": model,
                 }
             }
 

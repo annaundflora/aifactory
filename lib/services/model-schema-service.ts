@@ -10,10 +10,12 @@ const FETCH_TIMEOUT_MS = 5000;
  * Returns the field name and whether it expects an array, or undefined if not supported.
  *
  * Priority:
- * 1. `input_images` (Flux 2 Pro, GPT Image 1.5) — array
+ * 1. `input_images` (Flux 2 Pro/Flex/Max, GPT Image 1.5) — array
  * 2. `image_input` (Nano Banana Pro, Seedream, Gemini) — array
- * 3. `image_prompt` / `init_image` — single string (legacy, kept for future models)
- * 4. `image` is ONLY used if `mask` is NOT also present (mask = inpainting, not img2img)
+ * 3. `images` (Flux 2 Klein 4B) — array
+ * 4. `input_image` (Flux Kontext Pro/Max) — single string
+ * 5. `image_prompt` / `init_image` — single string (legacy, kept for future models)
+ * 6. `image` is ONLY used if `mask` is NOT also present (mask = inpainting, not img2img)
  */
 export function getImg2ImgFieldName(
   schema: SchemaProperties
@@ -23,6 +25,12 @@ export function getImg2ImgFieldName(
   }
   if ("image_input" in schema) {
     return { field: "image_input", isArray: true };
+  }
+  if ("images" in schema) {
+    return { field: "images", isArray: true };
+  }
+  if ("input_image" in schema) {
+    return { field: "input_image", isArray: false };
   }
   if ("image_prompt" in schema) {
     return { field: "image_prompt", isArray: false };

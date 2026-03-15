@@ -142,4 +142,31 @@ describe('getMaxImageCount', () => {
 
     expect(result).toBe(Infinity)
   })
+
+  // "images" field (Flux 2 Klein 4B) — array without maxItems
+  it('should return Infinity for "images" array field without maxItems', () => {
+    const schema: SchemaProperties = {
+      prompt: { type: 'string' },
+      images: {
+        type: 'array',
+        items: { type: 'string', format: 'uri' },
+      },
+    }
+
+    const result = getMaxImageCount(schema)
+
+    expect(result).toBe(Infinity)
+  })
+
+  // "input_image" field (Flux Kontext Pro/Max) — single string
+  it('should return 1 for "input_image" single-value field', () => {
+    const schema: SchemaProperties = {
+      prompt: { type: 'string' },
+      input_image: { type: 'string', format: 'uri', nullable: true },
+    }
+
+    const result = getMaxImageCount(schema)
+
+    expect(result).toBe(1)
+  })
 })

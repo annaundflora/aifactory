@@ -173,7 +173,8 @@ export async function sendMessage(
   content: string,
   imageContext: CanvasImageContext,
   onEvent: (event: CanvasSSEEvent) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  model?: string
 ): Promise<void> {
   const response = await fetch(
     `${CANVAS_SESSIONS_URL}/${sessionId}/messages`,
@@ -183,6 +184,7 @@ export async function sendMessage(
       body: JSON.stringify({
         content,
         image_context: imageContext,
+        ...(model ? { model } : {}),
       }),
       signal,
     }

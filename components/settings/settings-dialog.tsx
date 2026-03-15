@@ -119,6 +119,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         }
         return updated;
       });
+
+      // Notify other components (e.g. PromptArea) that settings changed
+      window.dispatchEvent(new Event("model-settings-changed"));
     },
     [loadSettings]
   );

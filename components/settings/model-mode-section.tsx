@@ -108,26 +108,29 @@ export function ModelModeSection({
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {collectionModels.map((model) => {
-                      const modelId = `${model.owner}/${model.name}`;
-                      const isIncompatible =
-                        mode === "img2img" && compatibilityMap[modelId] === false;
+                    {collectionModels
+                      .filter((model) => {
+                        if (mode !== "img2img") return true;
+                        const modelId = `${model.owner}/${model.name}`;
+                        return compatibilityMap[modelId] !== false;
+                      })
+                      .map((model) => {
+                        const modelId = `${model.owner}/${model.name}`;
 
-                      return (
-                        <SelectItem
-                          key={modelId}
-                          value={modelId}
-                          disabled={isIncompatible}
-                        >
-                          <span className="flex flex-col">
-                            <span className="font-medium">{model.name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {model.owner}
+                        return (
+                          <SelectItem
+                            key={modelId}
+                            value={modelId}
+                          >
+                            <span className="flex flex-col">
+                              <span className="font-medium">{model.name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {model.owner}
+                              </span>
                             </span>
-                          </span>
-                        </SelectItem>
-                      );
-                    })}
+                          </SelectItem>
+                        );
+                      })}
                   </SelectContent>
                 </Select>
               )}

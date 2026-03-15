@@ -210,9 +210,9 @@ describe("ModelModeSection", () => {
   /**
    * AC-7: GIVEN ein Dropdown in der img2img-Section wird geoeffnet
    *       WHEN ein Model in der Liste keinen img2img-Support hat
-   *       THEN ist dieses Model ausgegraut und nicht selektierbar
+   *       THEN wird dieses Model nicht angezeigt (ausgeblendet, nicht ausgegraut)
    */
-  it("AC-7: should disable incompatible models in img2img dropdown", async () => {
+  it("AC-7: should hide incompatible models in img2img dropdown", async () => {
     const user = userEvent.setup();
 
     // Mark real-esrgan as incompatible for img2img
@@ -239,21 +239,17 @@ describe("ModelModeSection", () => {
     const triggers = screen.getAllByRole("combobox");
     await user.click(triggers[0]);
 
-    // Wait for options to appear
+    // Wait for options to appear — should only show compatible models (4 of 5)
     await waitFor(() => {
       const options = screen.getAllByRole("option");
-      expect(options.length).toBe(COLLECTION_MODELS.length);
+      expect(options.length).toBe(4);
     });
 
-    // Find the incompatible model option -- it should have data-disabled
-    const options = screen.getAllByRole("option");
-    const incompatibleOption = options.find((opt) =>
-      opt.textContent?.includes("real-esrgan")
-    );
+    // The incompatible model should NOT be in the DOM at all
+    expect(screen.queryByText("real-esrgan")).not.toBeInTheDocument();
 
-    expect(incompatibleOption).toBeDefined();
-    // Radix Select renders disabled items with aria-disabled="true"
-    // and the data-disabled attribute
-    expect(incompatibleOption).toHaveAttribute("data-disabled");
+    // Compatible models should still be visible
+    expect(screen.getByText("flux-schnell")).toBeInTheDocument();
+    expect(screen.getByText("flux-1.1-pro")).toBeInTheDocument();
   });
 });

@@ -174,14 +174,22 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   // ----- Model settings (cached from DB) -----
   const [modelSettings, setModelSettings] = useState<ModelSetting[]>([]);
 
-  // Fetch model settings on mount
-  useEffect(() => {
+  // Fetch model settings on mount and when settings change
+  const loadModelSettings = useCallback(() => {
     getModelSettings().then((settings) => {
       setModelSettings(settings);
     }).catch((err) => {
       console.error("Failed to load model settings:", err);
     });
   }, []);
+
+  useEffect(() => {
+    loadModelSettings();
+    window.addEventListener("model-settings-changed", loadModelSettings);
+    return () => {
+      window.removeEventListener("model-settings-changed", loadModelSettings);
+    };
+  }, [loadModelSettings]);
 
   // ----- Structured prompt state -----
   const [promptMotiv, setPromptMotiv] = useState("");
@@ -876,23 +884,6 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
                   rows={3}
                   className={textareaClass}
                 />
-                {/* Prompt Tools */}
-                <div className="flex gap-2">
-                  <AssistantTrigger
-                    isOpen={assistantOpen}
-                    onClick={handleAssistantToggle}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowImprove(true)}
-                    disabled={!promptMotiv.trim() || showImprove}
-                    data-testid="improve-btn"
-                    className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors border-[#E5E5E3] text-foreground dark:border-[#2A2A2A] dark:text-white disabled:pointer-events-none disabled:opacity-50"
-                  >
-                    <Sparkles className="size-3.5 text-primary" />
-                    Improve
-                  </button>
-                </div>
               </div>
 
               {/* Style / Modifier Textarea (optional) */}
@@ -910,6 +901,39 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
                 />
               </div>
 
+              {/* Negative Prompt */}
+              <div className="space-y-2">
+                <Label htmlFor="negative-prompt-textarea" className="text-sm font-bold font-display [letter-spacing:-0.5px]">Negative Prompt</Label>
+                <textarea
+                  id="negative-prompt-textarea"
+                  data-testid="negative-prompt-textarea"
+                  ref={negativeRef}
+                  value={negativePrompt}
+                  onChange={handleNegativePromptChange}
+                  placeholder="What to avoid in the image..."
+                  rows={2}
+                  className={textareaClass}
+                />
+              </div>
+
+              {/* Prompt Tools */}
+              <div className="flex gap-2">
+                <AssistantTrigger
+                  isOpen={assistantOpen}
+                  onClick={handleAssistantToggle}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowImprove(true)}
+                  disabled={!promptMotiv.trim() || showImprove}
+                  data-testid="improve-btn"
+                  className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors border-[#E5E5E3] text-foreground dark:border-[#2A2A2A] dark:text-white disabled:pointer-events-none disabled:opacity-50"
+                >
+                  <Sparkles className="size-3.5 text-primary" />
+                  Improve
+                </button>
+              </div>
+
               {/* LLM Prompt Improvement */}
               {showImprove && (
                 <LLMComparison
@@ -923,21 +947,6 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
                   onDiscard={() => setShowImprove(false)}
                 />
               )}
-
-              {/* Negative Prompt */}
-              <div className="space-y-2">
-                <Label htmlFor="negative-prompt-textarea" className="text-sm">Negative Prompt</Label>
-                <textarea
-                  id="negative-prompt-textarea"
-                  data-testid="negative-prompt-textarea"
-                  ref={negativeRef}
-                  value={negativePrompt}
-                  onChange={handleNegativePromptChange}
-                  placeholder="What to avoid in the image..."
-                  rows={2}
-                  className={textareaClass}
-                />
-              </div>
             </div>
           )}
 
