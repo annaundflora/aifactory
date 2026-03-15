@@ -12,13 +12,15 @@ import { ReferenceBar } from "@/components/workspace/reference-bar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import type { Generation } from "@/lib/db/queries";
+import { TierToggle } from "@/components/ui/tier-toggle";
+import { MaxQualityToggle } from "@/components/ui/max-quality-toggle";
 import type {
   ReferenceRole,
   ReferenceStrength,
   ReferenceSlotData,
 } from "@/lib/types/reference";
 import type { GalleryDragPayload } from "@/lib/constants/drag-types";
+import type { Tier } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Img2imgParams type (exported for slice-14 consumer)
@@ -35,6 +37,7 @@ export interface Img2imgParams {
   motiv: string;
   style: string;
   variants: number;
+  tier: Tier;
 }
 
 // ---------------------------------------------------------------------------
@@ -50,7 +53,6 @@ const VARIANTS_MAX = 4;
 // ---------------------------------------------------------------------------
 
 export interface Img2imgPopoverProps {
-  generation: Generation;
   onGenerate?: (params: Img2imgParams) => void;
 }
 
@@ -59,7 +61,6 @@ export interface Img2imgPopoverProps {
 // ---------------------------------------------------------------------------
 
 export function Img2imgPopover({
-  generation,
   onGenerate,
 }: Img2imgPopoverProps) {
   const { state, dispatch } = useCanvasDetail();
@@ -69,6 +70,8 @@ export function Img2imgPopover({
   const [motiv, setMotiv] = useState("");
   const [style, setStyle] = useState("");
   const [variants, setVariants] = useState(1);
+  const [tier, setTier] = useState<Tier>("draft");
+  const [maxQuality, setMaxQuality] = useState(false);
 
   // Track all blob URLs we create so we can revoke them on unmount
   const blobUrlsRef = useRef<Set<string>>(new Set());
@@ -267,10 +270,24 @@ export function Img2imgPopover({
   }, []);
 
   // -------------------------------------------------------------------------
+  // Tier change handler: reset maxQuality when switching to draft
+  // -------------------------------------------------------------------------
+
+  const handleTierChange = useCallback((newTier: Tier) => {
+    setTier(newTier);
+    if (newTier === "draft") {
+      setMaxQuality(false);
+    }
+  }, []);
+
+  // -------------------------------------------------------------------------
   // Generate
   // -------------------------------------------------------------------------
 
   const handleGenerate = useCallback(() => {
+    // Resolve effective tier: quality + maxQuality=on -> "max"
+    const effectiveTier: Tier = tier === "quality" && maxQuality ? "max" : tier;
+
     const params: Img2imgParams = {
       references: slots.map((s) => ({
         imageUrl: s.imageUrl,
@@ -280,9 +297,10 @@ export function Img2imgPopover({
       motiv,
       style,
       variants,
+      tier: effectiveTier,
     };
     onGenerate?.(params);
-  }, [slots, motiv, style, variants, onGenerate]);
+  }, [slots, motiv, style, variants, tier, maxQuality, onGenerate]);
 
   // -------------------------------------------------------------------------
   // Render
@@ -398,6 +416,24 @@ export function Img2imgPopover({
               >
                 <Plus className="size-3" />
               </Button>
+            </div>
+          </section>
+
+          {/* ---- Tier Toggle ---- */}
+          <section data-testid="tier-section">
+            <div className="space-y-2">
+              <TierToggle
+                tier={tier}
+                onTierChange={handleTierChange}
+                disabled={state.isGenerating}
+              />
+              {tier === "quality" && (
+                <MaxQualityToggle
+                  maxQuality={maxQuality}
+                  onMaxQualityChange={setMaxQuality}
+                  disabled={state.isGenerating}
+                />
+              )}
             </div>
           </section>
 

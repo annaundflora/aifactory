@@ -89,12 +89,19 @@ vi.mock("@/app/actions/generations", () => ({
   uploadSourceImage: vi.fn().mockResolvedValue({ url: "https://r2.example.com/uploaded.png" }),
 }));
 
+// Mock server actions: model-settings (used by PromptArea for tier-based model resolution)
+const mockGetModelSettings = vi.fn();
+vi.mock("@/app/actions/model-settings", () => ({
+  getModelSettings: (...args: unknown[]) => mockGetModelSettings(...args),
+}));
+
 // Mock server actions: references
 const mockUploadReferenceImage = vi.fn();
 const mockDeleteReferenceImage = vi.fn();
 vi.mock("@/app/actions/references", () => ({
   uploadReferenceImage: (...args: unknown[]) => mockUploadReferenceImage(...args),
   deleteReferenceImage: (...args: unknown[]) => mockDeleteReferenceImage(...args),
+  addGalleryAsReference: vi.fn().mockResolvedValue({ id: "ref-gallery", imageUrl: "https://r2.example.com/gallery.png" }),
 }));
 
 // Mock lucide-react icons
@@ -238,20 +245,26 @@ const schemaWithImg2Img = {
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** Default model settings for tests — enables model resolution for txt2img, img2img, and upscale */
+const DEFAULT_MODEL_SETTINGS = [
+  { id: "ms-1", mode: "txt2img", tier: "draft", modelId: "stability-ai/sdxl", modelParams: {}, createdAt: new Date(), updatedAt: new Date() },
+  { id: "ms-2", mode: "img2img", tier: "draft", modelId: "stability-ai/sdxl", modelParams: {}, createdAt: new Date(), updatedAt: new Date() },
+  { id: "ms-3", mode: "upscale", tier: "draft", modelId: "nightmareai/real-esrgan", modelParams: {}, createdAt: new Date(), updatedAt: new Date() },
+];
+
 async function renderPromptArea() {
-  mockGetModelSchema.mockResolvedValue(schemaWithImg2Img);
-  mockGetCollectionModels.mockResolvedValue(COLLECTION_MODELS);
-  mockGetProjectSelectedModels.mockResolvedValue([]);
-  mockSaveProjectSelectedModels.mockResolvedValue(undefined);
+  mockGetModelSettings.mockResolvedValue(DEFAULT_MODEL_SETTINGS);
 
   const result = render(<PromptArea projectId="proj-test" />);
 
-  // Wait for collection models to load and model-trigger to appear
+  // Wait for model settings to be loaded (PromptArea calls getModelSettings on mount)
   await waitFor(() => {
-    expect(mockGetCollectionModels).toHaveBeenCalled();
+    expect(mockGetModelSettings).toHaveBeenCalled();
   });
+
+  // Wait for the prompt area to be fully rendered
   await waitFor(() => {
-    expect(screen.getByTestId("model-trigger")).toBeInTheDocument();
+    expect(screen.getByTestId("prompt-area")).toBeInTheDocument();
   });
 
   return result;
@@ -691,16 +704,13 @@ describe("WorkspaceState - addReference", () => {
       },
     };
 
-    mockGetModelSchema.mockResolvedValue(schemaWithImg2Img);
-    mockGetCollectionModels.mockResolvedValue(COLLECTION_MODELS);
-    mockGetProjectSelectedModels.mockResolvedValue([]);
-    mockSaveProjectSelectedModels.mockResolvedValue(undefined);
+    mockGetModelSettings.mockResolvedValue(DEFAULT_MODEL_SETTINGS);
 
     render(<PromptArea projectId="proj-test" />);
 
-    // Wait for initialization
+    // Wait for initialization (model settings loaded)
     await waitFor(() => {
-      expect(mockGetCollectionModels).toHaveBeenCalled();
+      expect(mockGetModelSettings).toHaveBeenCalled();
     });
 
     // The addReference useEffect should have fired:

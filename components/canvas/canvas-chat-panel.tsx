@@ -9,12 +9,15 @@ import {
 import { MessageSquare, Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { TierToggle } from "@/components/ui/tier-toggle";
+import { MaxQualityToggle } from "@/components/ui/max-quality-toggle";
 import { useCanvasDetail } from "@/lib/canvas-detail-context";
 import { ChatThread } from "@/components/assistant/chat-thread";
 import { ChatInput } from "@/components/assistant/chat-input";
 import { ModelSelector, DEFAULT_MODEL_SLUG } from "@/components/assistant/model-selector";
-import { type Generation } from "@/lib/db/queries";
+import { type Generation, type ModelSetting } from "@/lib/db/queries";
 import { type ChatMessage } from "@/lib/types/chat-message";
+import type { Tier } from "@/lib/types";
 import {
   createSession,
   sendMessage as sendCanvasMessage,
@@ -44,6 +47,8 @@ export interface CanvasChatPanelProps {
   onPendingGenerations?: (pendingIds: string[]) => void;
   /** Called with newly created generations so the gallery state stays in sync. */
   onGenerationsCreated?: (newGens: Generation[]) => void;
+  /** Model settings for tier-based model resolution. Falls back to generation.modelId if empty. */
+  modelSettings?: ModelSetting[];
 }
 
 // ---------------------------------------------------------------------------
@@ -66,14 +71,6 @@ function buildInitMessage(generation: Generation): ChatMessage {
   };
 }
 
-function buildSeparatorMessage(identifier: string): ChatMessage {
-  return {
-    id: `sep-${identifier}-${crypto.randomUUID()}`,
-    role: "separator",
-    content: `Kontext: ${identifier}`,
-  };
-}
-
 function buildImageContext(generation: Generation): CanvasImageContext {
   return {
     image_url: generation.imageUrl ?? "",
@@ -88,7 +85,7 @@ function buildImageContext(generation: Generation): CanvasImageContext {
 // CanvasChatPanel
 // ---------------------------------------------------------------------------
 
-export function CanvasChatPanel({ generation, projectId, onPendingGenerations, onGenerationsCreated }: CanvasChatPanelProps) {
+export function CanvasChatPanel({ generation, projectId, onPendingGenerations, onGenerationsCreated, modelSettings = [] }: CanvasChatPanelProps) {
   const { state, dispatch } = useCanvasDetail();
 
   // Local UI state
@@ -99,6 +96,10 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
     buildInitMessage(generation),
   ]);
   const [isStreaming, setIsStreaming] = useState(false);
+
+  // Tier state for chat panel model resolution (independent from popovers)
+  const [tier, setTier] = useState<Tier>("draft");
+  const [maxQuality, setMaxQuality] = useState(false);
 
   // Session state — local to the chat panel (not in Context per spec constraint)
   const sessionIdRef = useRef<string | null>(null);
@@ -274,17 +275,32 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
 
   // ---------------------------------------------------------------------------
   // AC-6: Handle canvas-generate event -> call generateImages()
+  // Model resolution: ignore event.model_id, resolve from settings + tier.
+  // Fallback: generation.modelId if settings are empty (AC-10).
   // ---------------------------------------------------------------------------
   const handleCanvasGenerate = useCallback(
     async (event: SSECanvasGenerateEvent) => {
       dispatch({ type: "SET_GENERATING", isGenerating: true });
 
+      // Resolve effective tier: maxQuality + quality => "max"
+      const effectiveTier: Tier = maxQuality && tier === "quality" ? "max" : tier;
+
+      // Resolve model from settings (img2img mode for chat panel)
+      const setting = modelSettings.find(
+        (s) => s.mode === "img2img" && s.tier === effectiveTier
+      );
+      // Use setting model + params, or fall back to generation.modelId (AC-10)
+      const resolvedModelId = setting?.modelId ?? generation.modelId;
+      const resolvedParams = setting?.modelParams
+        ? { ...(setting.modelParams as Record<string, unknown>), ...(event.params ?? {}) }
+        : (event.params ?? {});
+
       try {
         const result = await generateImages({
           projectId,
           promptMotiv: event.prompt,
-          modelIds: [event.model_id],
-          params: event.params ?? {},
+          modelIds: [resolvedModelId],
+          params: resolvedParams,
           count: 1,
           generationMode: event.action === "img2img" ? "img2img" : "txt2img",
           sourceImageUrl:
@@ -322,7 +338,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
         dispatch({ type: "SET_GENERATING", isGenerating: false });
       }
     },
-    [dispatch, projectId, onPendingGenerations, onGenerationsCreated]
+    [dispatch, projectId, onPendingGenerations, onGenerationsCreated, tier, maxQuality, modelSettings, generation.modelId]
   );
 
   // ---------------------------------------------------------------------------
@@ -425,7 +441,8 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
               }
             }
           },
-          abortControllerRef.current.signal
+          abortControllerRef.current.signal,
+          chatModelSlug
         );
       } catch (error) {
         console.error("[CanvasChatPanel] SSE stream error:", error);
@@ -459,7 +476,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
         abortControllerRef.current = null;
       }
     },
-    [projectId, dispatch, handleCanvasGenerate]
+    [projectId, dispatch, handleCanvasGenerate, chatModelSlug]
   );
 
   // ---------------------------------------------------------------------------
@@ -610,6 +627,25 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
         isStreaming={isStreaming}
         onChipClick={handleChipClick}
       />
+
+      {/* Tier toggle bar between ChatThread and ChatInput */}
+      <div
+        className="flex shrink-0 items-center gap-2 border-t border-border/60 px-3 py-1.5"
+        data-testid="chat-tier-bar"
+      >
+        <TierToggle
+          tier={tier}
+          onTierChange={setTier}
+          disabled={state.isGenerating}
+        />
+        {tier === "quality" && (
+          <MaxQualityToggle
+            maxQuality={maxQuality}
+            onMaxQualityChange={setMaxQuality}
+            disabled={state.isGenerating}
+          />
+        )}
+      </div>
 
       {/* Input — disabled while generating or streaming */}
       <ChatInput

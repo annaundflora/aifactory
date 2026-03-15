@@ -46,6 +46,10 @@ interface UpscaleImageInput {
   sourceImageUrl: string;
   scale: 2 | 4;
   sourceGenerationId?: string;
+  /** Model ID for upscaling (resolved from settings). */
+  modelId: string;
+  /** Model parameters for upscaling (resolved from settings). */
+  modelParams: Record<string, unknown>;
 }
 
 interface RetryGenerationInput {
@@ -195,12 +199,20 @@ export async function upscaleImage(
     return { error: "Scale muss 2 oder 4 sein" };
   }
 
+  // Validate modelId format
+  const MODEL_ID_UPSCALE_REGEX = /^[a-z0-9-]+\/[a-z0-9._-]+$/;
+  if (!input.modelId || !MODEL_ID_UPSCALE_REGEX.test(input.modelId)) {
+    return { error: "Unbekanntes Modell" };
+  }
+
   try {
     const generation = await GenerationService.upscale({
       projectId: input.projectId,
       sourceImageUrl: input.sourceImageUrl,
       scale: input.scale,
       sourceGenerationId: input.sourceGenerationId,
+      modelId: input.modelId,
+      modelParams: input.modelParams,
     });
     return generation;
   } catch (error: unknown) {

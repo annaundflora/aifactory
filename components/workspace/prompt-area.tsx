@@ -10,8 +10,9 @@ import {
   type ChangeEvent,
 } from "react";
 import { PromptTabs, type PromptTab } from "@/components/workspace/prompt-tabs";
-import { getModelSchema, getCollectionModels, getProjectSelectedModels, saveProjectSelectedModels } from "@/app/actions/models";
 import { generateImages, upscaleImage } from "@/app/actions/generations";
+import { getModelSettings } from "@/app/actions/model-settings";
+import type { ModelSetting } from "@/lib/db/queries";
 import { useWorkspaceVariation } from "@/lib/workspace-state";
 import { ModeSelector, type GenerationMode } from "@/components/workspace/mode-selector";
 import { ImageDropzone } from "@/components/workspace/image-dropzone";
@@ -25,16 +26,11 @@ import type {
 } from "@/lib/types/reference";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import {
-  ParameterPanel,
-  type SchemaProperties,
-} from "@/components/workspace/parameter-panel";
-import { Loader2, Sparkles, Minus, Plus, ChevronDown } from "lucide-react";
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+import { TierToggle } from "@/components/ui/tier-toggle";
+import { MaxQualityToggle } from "@/components/ui/max-quality-toggle";
+import type { Tier } from "@/lib/types";
+import { Loader2, Sparkles, Minus, Plus } from "lucide-react";
 import { LLMComparison } from "@/components/prompt-improve/llm-comparison";
-import { type CollectionModel } from "@/lib/types/collection-model";
-import { ModelTrigger } from "@/components/models/model-trigger";
-import { ModelBrowserDrawer } from "@/components/models/model-browser-drawer";
 import { AssistantTrigger } from "@/components/assistant/assistant-trigger";
 import { SectionLabel } from "@/components/shared/section-label";
 import { AssistantSheet } from "@/components/assistant/assistant-sheet";
@@ -44,10 +40,7 @@ import { ChatThread } from "@/components/assistant/chat-thread";
 import { PromptCanvas } from "@/components/assistant/prompt-canvas";
 import { SessionList } from "@/components/assistant/session-list";
 import { SessionSwitcher } from "@/components/assistant/session-switcher";
-import {
-  ModelSelector,
-  DEFAULT_MODEL_SLUG,
-} from "@/components/assistant/model-selector";
+import { ModelSelector } from "@/components/assistant/model-selector";
 import {
   PromptAssistantProvider,
   usePromptAssistant,
@@ -76,8 +69,6 @@ interface Txt2ImgState {
   promptMotiv: string;
   promptStyle: string;
   negativePrompt: string;
-  modelId: string;
-  paramValues: Record<string, unknown>;
   variantCount: number;
 }
 
@@ -85,8 +76,6 @@ interface Img2ImgState {
   promptMotiv: string;
   promptStyle: string;
   negativePrompt: string;
-  modelId: string;
-  paramValues: Record<string, unknown>;
   variantCount: number;
   referenceSlots: ReferenceSlotData[];
 }
@@ -114,36 +103,18 @@ function autoResize(el: HTMLTextAreaElement) {
   el.style.height = `${el.scrollHeight}px`;
 }
 
-/**
- * Check if a schema supports img2img by looking for image input params.
- * Excludes `image` when `mask` is also present (inpainting, not img2img).
- */
-function schemaSupportsImg2Img(schema: SchemaProperties | null): boolean {
-  if (!schema) return false;
-  if ("input_images" in schema) return true;
-  if ("image_input" in schema) return true;
-  if ("image_prompt" in schema) return true;
-  if ("init_image" in schema) return true;
-  if ("image" in schema && !("mask" in schema)) return true;
-  return false;
-}
-
-function createInitialModeStates(modelId: string): ModeStates {
+function createInitialModeStates(): ModeStates {
   return {
     txt2img: {
       promptMotiv: "",
       promptStyle: "",
       negativePrompt: "",
-      modelId,
-      paramValues: {},
       variantCount: 1,
     },
     img2img: {
       promptMotiv: "",
       promptStyle: "",
       negativePrompt: "",
-      modelId,
-      paramValues: {},
       variantCount: 1,
       referenceSlots: [],
     },
@@ -151,6 +122,35 @@ function createInitialModeStates(modelId: string): ModeStates {
       sourceImageUrl: null,
       scale: DEFAULT_SCALE,
     },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Model Resolution Helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve model ID and params from cached model settings based on mode, tier,
+ * and maxQuality flag.
+ *
+ * effectiveTier = maxQuality ? "max" : tier
+ *
+ * Returns { modelId, modelParams } or undefined if no matching setting found.
+ */
+function resolveModel(
+  settings: ModelSetting[],
+  mode: GenerationMode,
+  tier: Tier,
+  maxQuality: boolean
+): { modelId: string; modelParams: Record<string, unknown> } | undefined {
+  const effectiveTier = maxQuality ? "max" : tier;
+  const setting = settings.find(
+    (s) => s.mode === mode && s.tier === effectiveTier
+  );
+  if (!setting) return undefined;
+  return {
+    modelId: setting.modelId,
+    modelParams: (setting.modelParams ?? {}) as Record<string, unknown>,
   };
 }
 
@@ -164,21 +164,32 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
   // ----- Per-mode state (State Persistence Matrix) -----
   const [modeStates, setModeStates] = useState<ModeStates>(() =>
-    createInitialModeStates("")
+    createInitialModeStates()
   );
 
-  // ----- Model state (multi-model from model-cards) -----
-  const [selectedModels, setSelectedModels] = useState<CollectionModel[]>([]);
+  // ----- Tier state (Draft/Quality) -----
+  const [tier, setTier] = useState<Tier>("draft");
+  const [maxQuality, setMaxQuality] = useState<boolean>(false);
 
-  // ----- Collection state (for drawer) -----
-  const [collectionModels, setCollectionModels] = useState<CollectionModel[]>([]);
-  const [collectionError, setCollectionError] = useState<string | undefined>(undefined);
-  const [collectionLoading, setCollectionLoading] = useState(true);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  // ----- Model settings (cached from DB) -----
+  const [modelSettings, setModelSettings] = useState<ModelSetting[]>([]);
 
-  // ----- Schema state -----
-  const [schema, setSchema] = useState<SchemaProperties | null>(null);
-  const [schemaLoading, setSchemaLoading] = useState(true);
+  // Fetch model settings on mount and when settings change
+  const loadModelSettings = useCallback(() => {
+    getModelSettings().then((settings) => {
+      setModelSettings(settings);
+    }).catch((err) => {
+      console.error("Failed to load model settings:", err);
+    });
+  }, []);
+
+  useEffect(() => {
+    loadModelSettings();
+    window.addEventListener("model-settings-changed", loadModelSettings);
+    return () => {
+      window.removeEventListener("model-settings-changed", loadModelSettings);
+    };
+  }, [loadModelSettings]);
 
   // ----- Structured prompt state -----
   const [promptMotiv, setPromptMotiv] = useState("");
@@ -187,9 +198,6 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   const motivRef = useRef<HTMLTextAreaElement>(null);
   const styleRef = useRef<HTMLTextAreaElement>(null);
   const negativeRef = useRef<HTMLTextAreaElement>(null);
-
-  // ----- Parameter state -----
-  const [paramValues, setParamValues] = useState<Record<string, unknown>>({});
 
   // ----- Variant count -----
   const [variantCount, setVariantCount] = useState(1);
@@ -221,98 +229,6 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
   // ----- Variation state consumption -----
   const { variationData, clearVariation } = useWorkspaceVariation();
-  const pendingVariationParamsRef = useRef<Record<string, unknown> | null>(null);
-
-  // ----- Derived: current model ID (for schema, LLM comparison, generate) -----
-  const selectedModelId =
-    selectedModels.length > 0
-      ? `${selectedModels[0].owner}/${selectedModels[0].name}`
-      : "";
-  const selectedModelIdRef = useRef(selectedModelId);
-  selectedModelIdRef.current = selectedModelId;
-
-  // ----- Derived: single model mode -----
-  const isSingleModel = selectedModels.length === 1;
-
-  // ----- Schema cache for img2img compatibility checks -----
-  const schemaCacheRef = useRef<Map<string, SchemaProperties>>(new Map());
-
-  // ----- Fetch collection models on mount -----
-  const fetchCollectionModels = useCallback(async () => {
-    setCollectionLoading(true);
-    setCollectionError(undefined);
-    try {
-      const result = await getCollectionModels();
-      if (Array.isArray(result)) {
-        setCollectionModels(result);
-        // Initialize selectedModels: load from DB, fallback to preferred default
-        setSelectedModels((prev) => {
-          if (prev.length === 0 && result.length > 0) {
-            const preferred = result.find(
-              (m) => m.owner === "bytedance" && m.name === "seedream-4.5"
-            );
-            return [preferred ?? result[0]];
-          }
-          return prev;
-        });
-      } else {
-        setCollectionError(result.error);
-      }
-    } catch {
-      setCollectionError("Failed to load models");
-    } finally {
-      setCollectionLoading(false);
-    }
-  }, []);
-
-  // Load saved model selection from DB, then fetch collection
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [savedModelIds, collectionResult] = await Promise.all([
-          getProjectSelectedModels({ projectId }),
-          getCollectionModels(),
-        ]);
-        if (cancelled) return;
-
-        if (Array.isArray(collectionResult)) {
-          setCollectionModels(collectionResult);
-
-          if (savedModelIds.length > 0) {
-            // Resolve saved IDs to CollectionModel objects
-            const resolved = savedModelIds
-              .map((id) => collectionResult.find((m) => `${m.owner}/${m.name}` === id))
-              .filter((m): m is CollectionModel => m !== undefined);
-            if (resolved.length > 0) {
-              setSelectedModels(resolved);
-            } else {
-              // Saved models no longer in collection — use default
-              const preferred = collectionResult.find(
-                (m) => m.owner === "bytedance" && m.name === "seedream-4.5"
-              );
-              setSelectedModels([preferred ?? collectionResult[0]]);
-            }
-          } else {
-            // No saved selection — use default
-            const preferred = collectionResult.find(
-              (m) => m.owner === "bytedance" && m.name === "seedream-4.5"
-            );
-            if (collectionResult.length > 0) {
-              setSelectedModels([preferred ?? collectionResult[0]]);
-            }
-          }
-        } else {
-          setCollectionError(collectionResult.error);
-        }
-      } catch {
-        setCollectionError("Failed to load models");
-      } finally {
-        if (!cancelled) setCollectionLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [projectId]);
 
   // ---------------------------------------------------------------------------
   // Save current state into modeStates
@@ -326,8 +242,6 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
           promptMotiv,
           promptStyle,
           negativePrompt,
-          modelId: selectedModelId,
-          paramValues,
           variantCount,
         };
       } else if (currentMode === "img2img") {
@@ -335,8 +249,6 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
           promptMotiv,
           promptStyle,
           negativePrompt,
-          modelId: selectedModelId,
-          paramValues,
           variantCount,
           referenceSlots,
         };
@@ -353,8 +265,6 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     promptMotiv,
     promptStyle,
     negativePrompt,
-    selectedModelId,
-    paramValues,
     variantCount,
     referenceSlots,
     upscaleSourceImageUrl,
@@ -362,110 +272,20 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   ]);
 
   // ---------------------------------------------------------------------------
-  // Model auto-switch for img2img compatibility (AC-12)
-  // ---------------------------------------------------------------------------
-
-  const checkAndAutoSwitchModel = useCallback(
-    async (modelId: string): Promise<string> => {
-      // Check if current model supports img2img
-      let modelSchema = schemaCacheRef.current.get(modelId);
-      if (!modelSchema) {
-        try {
-          const result = await getModelSchema({ modelId });
-          if ("properties" in result) {
-            modelSchema = result.properties as SchemaProperties;
-            schemaCacheRef.current.set(modelId, modelSchema);
-          }
-        } catch {
-          // If schema fetch fails, assume incompatible
-        }
-      }
-
-      if (modelSchema && schemaSupportsImg2Img(modelSchema)) {
-        return modelId; // Current model is compatible
-      }
-
-      // Find first compatible model from collection
-      for (const model of collectionModels) {
-        const candidateId = `${model.owner}/${model.name}`;
-        if (candidateId === modelId) continue;
-
-        let candidateSchema = schemaCacheRef.current.get(candidateId);
-        if (!candidateSchema) {
-          try {
-            const result = await getModelSchema({ modelId: candidateId });
-            if ("properties" in result) {
-              candidateSchema = result.properties as SchemaProperties;
-              schemaCacheRef.current.set(candidateId, candidateSchema);
-            }
-          } catch {
-            continue;
-          }
-        }
-
-        if (candidateSchema && schemaSupportsImg2Img(candidateSchema)) {
-          toast(`Model switched to ${model.name} (supports img2img)`);
-          // Update selectedModels to the compatible model
-          setSelectedModels([model]);
-          return candidateId;
-        }
-      }
-
-      // No compatible model found (edge case)
-      return modelId;
-    },
-    [collectionModels]
-  );
-
-  // ---------------------------------------------------------------------------
-  // Helper: set selectedModels from a modelId string
-  // ---------------------------------------------------------------------------
-
-  const setSelectedModelFromId = useCallback(
-    (modelId: string) => {
-      const matchingModel = collectionModels.find(
-        (m) => `${m.owner}/${m.name}` === modelId,
-      );
-      if (matchingModel) {
-        setSelectedModels([matchingModel]);
-      } else {
-        // Fallback: create a minimal CollectionModel from the modelId
-        const [owner, name] = modelId.split("/");
-        setSelectedModels([
-          {
-            url: "",
-            owner: owner ?? "",
-            name: name ?? "",
-            description: null,
-            cover_image_url: null,
-            run_count: 0,
-            created_at: "",
-          },
-        ]);
-      }
-    },
-    [collectionModels]
-  );
-
-  // ---------------------------------------------------------------------------
   // Mode change handler
   // ---------------------------------------------------------------------------
 
   const handleModeChange = useCallback(
-    async (targetMode: GenerationMode) => {
+    (targetMode: GenerationMode) => {
       if (targetMode === currentMode) return;
 
       // 1. Compute a local snapshot of the saved state BEFORE calling setModeStates.
-      //    This avoids a race condition where setModeStates (async React batch)
-      //    hasn't updated modeStates yet when we try to read it below.
       const snapshot: ModeStates = { ...modeStates };
       if (currentMode === "txt2img") {
         snapshot.txt2img = {
           promptMotiv,
           promptStyle,
           negativePrompt,
-          modelId: selectedModelId,
-          paramValues,
           variantCount,
         };
       } else if (currentMode === "img2img") {
@@ -473,8 +293,6 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
           promptMotiv,
           promptStyle,
           negativePrompt,
-          modelId: selectedModelId,
-          paramValues,
           variantCount,
           referenceSlots,
         };
@@ -489,91 +307,52 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
       setModeStates(snapshot);
 
       // 2. Determine which fields to restore vs carry over
-      //    Per State Persistence Matrix:
-      //    - Prompt fields "Keep" when both modes have them (txt2img <-> img2img)
-      //    - Prompt fields "Restore" from target mode when coming from upscale
-      //    - Source image "Keep (transfer)" between img2img <-> upscale
       const fromHasPrompt = currentMode !== "upscale";
 
       if (targetMode === "upscale") {
-        // Switching TO upscale: restore upscale-specific state only
         setUpscaleSourceImageUrl(snapshot.upscale.sourceImageUrl);
         setUpscaleScale(snapshot.upscale.scale);
       } else if (targetMode === "img2img") {
         if (fromHasPrompt) {
-          // txt2img -> img2img: "Keep" prompt, model, params; restore img2img-specific fields
           setReferenceSlots(snapshot.img2img.referenceSlots);
-          // Prompt, model, params, variantCount stay as-is (Keep)
         } else {
-          // upscale -> img2img: "Restore" all from snapshot
           const s = snapshot.img2img;
           setPromptMotiv(s.promptMotiv);
           setPromptStyle(s.promptStyle);
           setNegativePrompt(s.negativePrompt);
-          setSelectedModelFromId(s.modelId);
-          setParamValues(s.paramValues);
           setVariantCount(s.variantCount);
           setReferenceSlots(s.referenceSlots);
         }
       } else if (targetMode === "txt2img") {
-        if (fromHasPrompt) {
-          // img2img -> txt2img: "Keep" prompt, model, params
-          // Prompt, model, params, variantCount stay as-is (Keep)
-        } else {
-          // upscale -> txt2img: "Restore" all from snapshot
+        if (!fromHasPrompt) {
           const s = snapshot.txt2img;
           setPromptMotiv(s.promptMotiv);
           setPromptStyle(s.promptStyle);
           setNegativePrompt(s.negativePrompt);
-          setSelectedModelFromId(s.modelId);
-          setParamValues(s.paramValues);
           setVariantCount(s.variantCount);
         }
       }
 
       // 3. Transfer source image if moving between img2img and upscale
-      //    Only transfer when the target mode's stored sourceImageUrl is null/undefined
-      //    (restore wins over transfer — avoids overwriting a previously stored image)
       if (currentMode === "img2img" && targetMode === "upscale") {
         if (!snapshot.upscale.sourceImageUrl && referenceSlots.length > 0) {
-          // Use the first reference slot's image as the upscale source
           setUpscaleSourceImageUrl(referenceSlots[0].imageUrl);
         }
-      } else if (currentMode === "upscale" && targetMode === "img2img") {
-        // Upscale -> img2img: referenceSlots are restored from snapshot already
       }
 
-      // 4. If switching to img2img, check model compatibility (AC-12)
-      if (targetMode === "img2img") {
-        const activeModelId = fromHasPrompt ? selectedModelId : snapshot.img2img.modelId;
-        const compatibleModelId = await checkAndAutoSwitchModel(activeModelId);
-        if (compatibleModelId !== activeModelId) {
-          setSelectedModelFromId(compatibleModelId);
-          // Also update the modeStates for img2img
-          setModeStates((prev) => ({
-            ...prev,
-            img2img: { ...prev.img2img, modelId: compatibleModelId },
-          }));
-        }
-      }
-
-      // 5. Set the mode
+      // 4. Set the mode
       setCurrentMode(targetMode);
     },
     [
       currentMode,
-      selectedModelId,
       promptMotiv,
       promptStyle,
       negativePrompt,
-      paramValues,
       variantCount,
       referenceSlots,
       upscaleSourceImageUrl,
       upscaleScale,
-      checkAndAutoSwitchModel,
       modeStates,
-      setSelectedModelFromId,
     ]
   );
 
@@ -585,9 +364,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     if (!variationData) return;
 
     // Skip addReference-only payloads — they are handled by the dedicated
-    // addReference useEffect below. Without this guard the else-branch would
-    // set promptMotiv to undefined (corrupting the current prompt) and call
-    // clearVariation() before the addReference useEffect ever runs.
+    // addReference useEffect below.
     if (variationData.addReference && !variationData.targetMode && !variationData.promptMotiv) return;
 
     // If variationData has a targetMode, switch to it
@@ -619,73 +396,20 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
             ]);
           }
         }
-
-        if (variationData.modelId !== selectedModelIdRef.current) {
-          pendingVariationParamsRef.current = variationData.modelParams;
-          // Find the matching CollectionModel in the collection, or create a minimal one
-          const matchingModel = collectionModels.find(
-            (m) => `${m.owner}/${m.name}` === variationData.modelId,
-          );
-          if (matchingModel) {
-            setSelectedModels([matchingModel]);
-          } else {
-            const [owner, name] = variationData.modelId.split("/");
-            setSelectedModels([
-              {
-                url: "",
-                owner: owner ?? "",
-                name: name ?? "",
-                description: null,
-                cover_image_url: null,
-                run_count: 0,
-                created_at: "",
-              },
-            ]);
-          }
-        } else {
-          setParamValues(variationData.modelParams);
-        }
       } else if (targetMode === "upscale") {
         setUpscaleSourceImageUrl(variationData.sourceImageUrl ?? null);
       }
 
       setCurrentMode(targetMode);
     } else {
-      // Standard variation (no mode change) — same as before
+      // Standard variation (no mode change) — set prompt fields
       setPromptMotiv(variationData.promptMotiv);
       setPromptStyle(variationData.promptStyle ?? "");
       setNegativePrompt(variationData.negativePrompt ?? "");
-
-      if (variationData.modelId !== selectedModelIdRef.current) {
-        // Store params to restore after schema load clears them
-        pendingVariationParamsRef.current = variationData.modelParams;
-        // Find the matching CollectionModel in the collection, or create a minimal one
-        const matchingModel = collectionModels.find(
-          (m) => `${m.owner}/${m.name}` === variationData.modelId,
-        );
-        if (matchingModel) {
-          setSelectedModels([matchingModel]);
-        } else {
-          const [owner, name] = variationData.modelId.split("/");
-          setSelectedModels([
-            {
-              url: "",
-              owner: owner ?? "",
-              name: name ?? "",
-              description: null,
-              cover_image_url: null,
-              run_count: 0,
-              created_at: "",
-            },
-          ]);
-        }
-      } else {
-        setParamValues(variationData.modelParams);
-      }
     }
 
     clearVariation();
-  }, [variationData, clearVariation, collectionModels, saveCurrentModeState, referenceSlots]);
+  }, [variationData, clearVariation, saveCurrentModeState, referenceSlots]);
 
   // ---------------------------------------------------------------------------
   // addReference consumption (AC-7, AC-8): auto-switch to img2img, add ref, clear
@@ -721,45 +445,6 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
     clearVariation();
   }, [variationData?.addReference, clearVariation, currentMode, saveCurrentModeState]);
-
-  // ----- Load schema on model change -----
-  const loadSchema = useCallback(async (modelId: string) => {
-    if (!modelId) {
-      setSchema(null);
-      setSchemaLoading(false);
-      return;
-    }
-    setSchemaLoading(true);
-    setParamValues({});
-    try {
-      const result = await getModelSchema({ modelId });
-      if ("properties" in result) {
-        const props = result.properties as SchemaProperties;
-        setSchema(props);
-        schemaCacheRef.current.set(modelId, props);
-      } else {
-        setSchema(null);
-      }
-    } catch {
-      setSchema(null);
-    } finally {
-      setSchemaLoading(false);
-      // Restore variation params after schema load if pending
-      if (pendingVariationParamsRef.current) {
-        setParamValues(pendingVariationParamsRef.current);
-        pendingVariationParamsRef.current = null;
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    loadSchema(selectedModelId);
-  }, [selectedModelId, loadSchema]);
-
-  // ----- Schema-derived flags -----
-  const hasNegativePrompt = schema
-    ? "negative_prompt" in schema
-    : false;
 
   // ----- Auto-resize handlers -----
   const handleMotivChange = useCallback(
@@ -798,35 +483,6 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   useEffect(() => {
     if (negativeRef.current) autoResize(negativeRef.current);
   }, [negativePrompt]);
-
-  // ----- Model trigger handlers -----
-  const handleModelRemove = useCallback((model: CollectionModel) => {
-    setSelectedModels((prev) => {
-      const updated = prev.filter((m) => !(m.owner === model.owner && m.name === model.name));
-      // Persist outside updater to avoid setState-during-render (server actions trigger router refresh)
-      const modelIds = updated.map((m) => `${m.owner}/${m.name}`);
-      queueMicrotask(() => {
-        saveProjectSelectedModels({ projectId, modelIds }).catch(() => {});
-      });
-      return updated;
-    });
-  }, [projectId]);
-
-  const handleBrowse = useCallback(() => {
-    setDrawerOpen(true);
-  }, []);
-
-  const handleDrawerConfirm = useCallback((models: CollectionModel[]) => {
-    setSelectedModels(models);
-    const modelIds = models.map((m) => `${m.owner}/${m.name}`);
-    saveProjectSelectedModels({ projectId, modelIds }).catch(() => {
-      // Silently fail — UI state is already updated
-    });
-  }, [projectId]);
-
-  const handleDrawerClose = useCallback(() => {
-    setDrawerOpen(false);
-  }, []);
 
   // ---------------------------------------------------------------------------
   // Image upload handlers
@@ -1016,20 +672,25 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   // ---------------------------------------------------------------------------
 
   const handleGenerate = useCallback(() => {
+    // AC-10: Prevent generation when model settings are not loaded
+    if (modelSettings.length === 0) return;
+
     if (currentMode === "txt2img") {
       if (!promptMotiv.trim()) return;
-      if (selectedModels.length === 0) return;
+
+      // Resolve model from settings based on tier + maxQuality
+      const resolved = resolveModel(modelSettings, "txt2img", tier, maxQuality);
+      if (!resolved) return;
 
       startGeneration(async () => {
-        const modelIds = selectedModels.map((m) => `${m.owner}/${m.name}`);
         const result = await generateImages({
           projectId,
           promptMotiv: promptMotiv.trim(),
           promptStyle: promptStyle.trim() || undefined,
           negativePrompt: negativePrompt.trim() || undefined,
-          modelIds,
-          params: isSingleModel ? paramValues : {},
-          count: isSingleModel ? variantCount : 1,
+          modelIds: [resolved.modelId],
+          params: resolved.modelParams,
+          count: variantCount,
           generationMode: "txt2img",
         });
         if (Array.isArray(result)) {
@@ -1038,10 +699,12 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
       });
     } else if (currentMode === "img2img") {
       if (!promptMotiv.trim()) return;
-      if (selectedModels.length === 0) return;
 
-      // AC-9: Pass referenceSlots data to generateImages
-      // AC-10: If no references, generate without them (backwards compat)
+      // Resolve model from settings based on tier + maxQuality
+      const resolved = resolveModel(modelSettings, "img2img", tier, maxQuality);
+      if (!resolved) return;
+
+      // Pass referenceSlots data to generateImages
       const filledSlots = referenceSlots.filter((s) => s.imageUrl);
       const references = filledSlots.length > 0
         ? filledSlots.map((s) => ({
@@ -1053,19 +716,17 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
           }))
         : undefined;
 
-      // Backwards compat: use first reference as sourceImageUrl if present
       const sourceImageUrl = filledSlots.length > 0 ? filledSlots[0].imageUrl : undefined;
 
       startGeneration(async () => {
-        const modelIds = selectedModels.map((m) => `${m.owner}/${m.name}`);
         const result = await generateImages({
           projectId,
           promptMotiv: promptMotiv.trim(),
           promptStyle: promptStyle.trim() || undefined,
           negativePrompt: negativePrompt.trim() || undefined,
-          modelIds,
-          params: isSingleModel ? paramValues : {},
-          count: isSingleModel ? variantCount : 1,
+          modelIds: [resolved.modelId],
+          params: resolved.modelParams,
+          count: variantCount,
           generationMode: "img2img",
           sourceImageUrl,
           references,
@@ -1075,14 +736,19 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
         }
       });
     } else if (currentMode === "upscale") {
-      // AC-11: Don't upscale without source image
       if (!upscaleSourceImageUrl) return;
+
+      // Resolve upscale model from settings (upscale has no max tier)
+      const resolved = resolveModel(modelSettings, "upscale", tier, false);
+      if (!resolved) return;
 
       startGeneration(async () => {
         const result = await upscaleImage({
           projectId,
           sourceImageUrl: upscaleSourceImageUrl,
           scale: upscaleScale,
+          modelId: resolved.modelId,
+          modelParams: resolved.modelParams,
         });
         if (result && !("error" in result)) {
           onGenerationsCreated?.([result]);
@@ -1094,15 +760,15 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
     promptMotiv,
     promptStyle,
     negativePrompt,
-    selectedModels,
-    isSingleModel,
-    paramValues,
     variantCount,
     referenceSlots,
     upscaleSourceImageUrl,
     upscaleScale,
     projectId,
     onGenerationsCreated,
+    modelSettings,
+    tier,
+    maxQuality,
   ]);
 
   // ----- Keyboard shortcut (Cmd/Ctrl+Enter) on Motiv field -----
@@ -1122,8 +788,10 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
 
   const isButtonDisabled = (() => {
     if (isGenerating) return true;
-    if (currentMode === "txt2img") return !promptMotiv.trim() || selectedModels.length === 0;
-    if (currentMode === "img2img") return !promptMotiv.trim() || selectedModels.length === 0;
+    // AC-10: Disable when model settings not loaded
+    if (modelSettings.length === 0) return true;
+    if (currentMode === "txt2img") return !promptMotiv.trim();
+    if (currentMode === "img2img") return !promptMotiv.trim();
     if (currentMode === "upscale") return !upscaleSourceImageUrl;
     return true;
   })();
@@ -1136,7 +804,6 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   // ---------------------------------------------------------------------------
 
   const showPromptFields = currentMode !== "upscale";
-  const showModelSelector = currentMode !== "upscale";
   const showVariants = currentMode !== "upscale";
   const showImageDropzone = currentMode === "upscale";
   const showReferenceBar = true; // Always rendered; hidden via CSS when not img2img
@@ -1163,30 +830,6 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
         negativePrompt={negativePrompt}
       >
         <div className="space-y-5 pt-3">
-          {/* ── Group: Model Selection ── */}
-          {showModelSelector && (
-            <div className="space-y-3">
-              <SectionLabel>Model</SectionLabel>
-              <ModelTrigger
-                models={selectedModels}
-                onRemove={handleModelRemove}
-                onBrowse={handleBrowse}
-              />
-            </div>
-          )}
-
-          {/* Model Browser Drawer */}
-          <ModelBrowserDrawer
-            open={drawerOpen}
-            models={collectionModels}
-            selectedModels={selectedModels}
-            isLoading={collectionLoading}
-            error={collectionError}
-            onConfirm={handleDrawerConfirm}
-            onClose={handleDrawerClose}
-            onRetry={fetchCollectionModels}
-          />
-
           {/* ── Group: ReferenceBar (img2img) — hidden, not unmounted, in other modes ── */}
           {showReferenceBar && (
             <div
@@ -1241,23 +884,6 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
                   rows={3}
                   className={textareaClass}
                 />
-                {/* Prompt Tools */}
-                <div className="flex gap-2">
-                  <AssistantTrigger
-                    isOpen={assistantOpen}
-                    onClick={handleAssistantToggle}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowImprove(true)}
-                    disabled={!promptMotiv.trim() || showImprove}
-                    data-testid="improve-btn"
-                    className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors border-[#E5E5E3] text-foreground dark:border-[#2A2A2A] dark:text-white disabled:pointer-events-none disabled:opacity-50"
-                  >
-                    <Sparkles className="size-3.5 text-primary" />
-                    Improve
-                  </button>
-                </div>
               </div>
 
               {/* Style / Modifier Textarea (optional) */}
@@ -1275,12 +901,45 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
                 />
               </div>
 
+              {/* Negative Prompt */}
+              <div className="space-y-2">
+                <Label htmlFor="negative-prompt-textarea" className="text-sm font-bold font-display [letter-spacing:-0.5px]">Negative Prompt</Label>
+                <textarea
+                  id="negative-prompt-textarea"
+                  data-testid="negative-prompt-textarea"
+                  ref={negativeRef}
+                  value={negativePrompt}
+                  onChange={handleNegativePromptChange}
+                  placeholder="What to avoid in the image..."
+                  rows={2}
+                  className={textareaClass}
+                />
+              </div>
+
+              {/* Prompt Tools */}
+              <div className="flex gap-2">
+                <AssistantTrigger
+                  isOpen={assistantOpen}
+                  onClick={handleAssistantToggle}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowImprove(true)}
+                  disabled={!promptMotiv.trim() || showImprove}
+                  data-testid="improve-btn"
+                  className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors border-[#E5E5E3] text-foreground dark:border-[#2A2A2A] dark:text-white disabled:pointer-events-none disabled:opacity-50"
+                >
+                  <Sparkles className="size-3.5 text-primary" />
+                  Improve
+                </button>
+              </div>
+
               {/* LLM Prompt Improvement */}
               {showImprove && (
                 <LLMComparison
                   prompt={promptMotiv}
-                  modelId={selectedModelId}
-                  modelDisplayName={selectedModelId}
+                  modelId=""
+                  modelDisplayName=""
                   onAdopt={(improved) => {
                     setPromptMotiv(improved);
                     setShowImprove(false);
@@ -1288,53 +947,7 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
                   onDiscard={() => setShowImprove(false)}
                 />
               )}
-
-              {/* Negative Prompt (conditionally visible based on model schema) */}
-              {hasNegativePrompt && (
-                <div className="space-y-2">
-                  <Label htmlFor="negative-prompt-textarea" className="text-sm">Negative Prompt</Label>
-                  <textarea
-                    id="negative-prompt-textarea"
-                    data-testid="negative-prompt-textarea"
-                    ref={negativeRef}
-                    value={negativePrompt}
-                    onChange={handleNegativePromptChange}
-                    placeholder="What to avoid in the image..."
-                    rows={2}
-                    className={textareaClass}
-                  />
-                </div>
-              )}
             </div>
-          )}
-
-          {/* ── Group: Parameters (collapsible, default closed) ── */}
-          {showPromptFields && isSingleModel && schema && !schemaLoading && (
-            <Collapsible defaultOpen={false} className="group">
-              <hr className="border-border my-8" />
-              <CollapsibleTrigger className="flex w-full items-center justify-between py-1">
-                <SectionLabel className="pointer-events-none">Parameters</SectionLabel>
-                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=closed]:-rotate-90" />
-              </CollapsibleTrigger>
-              <CollapsibleContent className="px-3 pb-3">
-                <ParameterPanel
-                  schema={schema}
-                  isLoading={schemaLoading}
-                  values={paramValues}
-                  onChange={setParamValues}
-                />
-              </CollapsibleContent>
-            </Collapsible>
-          )}
-
-          {/* Multi-model notice */}
-          {showPromptFields && selectedModels.length > 1 && (
-            <p
-              className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground"
-              data-testid="multi-model-notice"
-            >
-              Default parameters will be used for multi-model generation.
-            </p>
           )}
 
           {/* Upscale mode: Scale selector */}
@@ -1358,11 +971,27 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
             </div>
           )}
 
-          {/* ── Action Bar: Variants + Generate ── */}
+          {/* ── Action Bar: Tier Toggle + Variants + Generate ── */}
           <div className="space-y-3">
             <hr className="border-border my-8" />
-            {/* Variant Count Stepper — hidden in upscale mode, only when single model */}
-            {showVariants && isSingleModel && (
+
+            {/* Tier Toggle — always visible */}
+            <TierToggle
+              tier={tier}
+              onTierChange={setTier}
+              disabled={isGenerating}
+            />
+
+            {/* Max Quality Toggle — visible only when quality tier and not upscale mode */}
+            {tier === "quality" && currentMode !== "upscale" && (
+              <MaxQualityToggle
+                maxQuality={maxQuality}
+                onMaxQualityChange={setMaxQuality}
+              />
+            )}
+
+            {/* Variant Count Stepper — hidden in upscale mode */}
+            {showVariants && (
               <div className="flex items-center justify-between px-1">
                 <Label className="text-sm text-muted-foreground">
                   Variants

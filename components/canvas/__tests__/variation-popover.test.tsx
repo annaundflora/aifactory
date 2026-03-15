@@ -440,6 +440,7 @@ describe("VariationPopover", () => {
       prompt: "A beautiful sunset over mountains",
       strength: "balanced",
       count: 1,
+      tier: "draft",
     });
 
     // Popover should close (activeToolId toggled to null)
@@ -492,6 +493,7 @@ describe("VariationPopover", () => {
       prompt: "A dramatic ocean scene",
       strength: "creative",
       count: 3,
+      tier: "draft",
     });
   });
 

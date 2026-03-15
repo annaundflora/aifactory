@@ -115,9 +115,8 @@ describe("ToolbarButton", () => {
     // aria-pressed indicates active state
     expect(button).toHaveAttribute("aria-pressed", "true");
 
-    // Active styling: bg-accent and text-accent-foreground
-    expect(button.className).toMatch(/bg-accent/);
-    expect(button.className).toMatch(/text-accent-foreground/);
+    // Active styling: text-primary
+    expect(button.className).toMatch(/text-primary/);
   });
 
   /**

@@ -18,7 +18,6 @@ export interface CanvasDetailState {
   redoStack: string[];
   isGenerating: boolean;
   chatSessionId: string | null;
-  selectedModelId: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -33,8 +32,7 @@ export type CanvasDetailAction =
   | { type: "POP_REDO" }
   | { type: "CLEAR_REDO" }
   | { type: "SET_GENERATING"; isGenerating: boolean }
-  | { type: "SET_CHAT_SESSION"; chatSessionId: string | null }
-  | { type: "SET_SELECTED_MODEL"; modelId: string | null };
+  | { type: "SET_CHAT_SESSION"; chatSessionId: string | null };
 
 // ---------------------------------------------------------------------------
 // Reducer (pure function, no side effects)
@@ -121,12 +119,6 @@ export function canvasDetailReducer(
         chatSessionId: action.chatSessionId,
       };
 
-    case "SET_SELECTED_MODEL":
-      return {
-        ...state,
-        selectedModelId: action.modelId,
-      };
-
     default:
       return state;
   }
@@ -164,7 +156,6 @@ export function CanvasDetailProvider({
     redoStack: [],
     isGenerating: false,
     chatSessionId: null,
-    selectedModelId: null,
   });
 
   // ---------------------------------------------------------------------------

@@ -28,6 +28,9 @@ vi.mock("lucide-react", () => ({
   Info: (props: Record<string, unknown>) => (
     <span data-testid="icon-info" {...props} />
   ),
+  PanelLeftIcon: (props: Record<string, unknown>) => (
+    <span data-testid="icon-panel-left" {...props} />
+  ),
 }));
 
 // Mock the downloadImage utility — it does fetch+blob+anchor click which is not
@@ -172,12 +175,14 @@ describe("CanvasToolbar", () => {
 
     // Verify order: all buttons should be within the toolbar nav
     // and their DOM order should match the expected top-down order
+    // (1 expand/collapse toggle at top + 6 tool buttons = 7 total)
     const allButtons = within(toolbar).getAllByRole("button");
-    expect(allButtons).toHaveLength(6);
+    expect(allButtons).toHaveLength(7);
 
-    // Verify aria-labels match the expected order
+    // Verify aria-labels match the expected order (first is the toggle)
     const labels = allButtons.map((btn) => btn.getAttribute("aria-label"));
     expect(labels).toEqual([
+      "Expand toolbar",
       "Variation",
       "img2img",
       "Upscale",
@@ -208,7 +213,7 @@ describe("CanvasToolbar", () => {
     // Now active — aria-pressed should be true
     expect(variationBtn).toHaveAttribute("aria-pressed", "true");
     // Active styling class applied
-    expect(variationBtn.className).toMatch(/bg-accent/);
+    expect(variationBtn.className).toMatch(/text-primary/);
   });
 
   /**
@@ -378,12 +383,18 @@ describe("CanvasToolbar", () => {
     const onDelete = vi.fn();
     renderToolbarWithGenerating({ onDelete });
 
-    // All 6 buttons should be aria-disabled
+    // All 6 tool buttons should be aria-disabled (toggle button excluded)
     const toolbar = screen.getByTestId("canvas-toolbar");
     const allButtons = within(toolbar).getAllByRole("button");
-    expect(allButtons).toHaveLength(6);
+    expect(allButtons).toHaveLength(7); // 6 tools + 1 toggle
 
-    for (const btn of allButtons) {
+    const toolButtons = allButtons.filter(
+      (btn) => btn.getAttribute("aria-label") !== "Expand toolbar"
+        && btn.getAttribute("aria-label") !== "Collapse toolbar"
+    );
+    expect(toolButtons).toHaveLength(6);
+
+    for (const btn of toolButtons) {
       expect(btn).toHaveAttribute("aria-disabled", "true");
       // Disabled styling: opacity-50 and pointer-events-none
       expect(btn.className).toMatch(/opacity-50/);

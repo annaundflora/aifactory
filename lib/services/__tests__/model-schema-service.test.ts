@@ -284,6 +284,32 @@ describe('ModelSchemaService.supportsImg2Img', () => {
     expect(result).toBe(true)
   })
 
+  // "images" field (Flux 2 Klein 4B) — array
+  it('should return true when schema contains "images" parameter (array)', async () => {
+    const properties = {
+      prompt: { type: 'string' },
+      images: { type: 'array', items: { type: 'string', format: 'uri' } },
+    }
+    mockFetch.mockResolvedValueOnce(buildReplicateResponse(properties))
+
+    const result = await ModelSchemaService.supportsImg2Img('black-forest-labs/flux-2-klein-4b')
+
+    expect(result).toBe(true)
+  })
+
+  // "input_image" field (Flux Kontext Pro/Max) — single string
+  it('should return true when schema contains "input_image" parameter (single)', async () => {
+    const properties = {
+      prompt: { type: 'string' },
+      input_image: { type: 'string', format: 'uri', nullable: true },
+    }
+    mockFetch.mockResolvedValueOnce(buildReplicateResponse(properties))
+
+    const result = await ModelSchemaService.supportsImg2Img('black-forest-labs/flux-kontext-pro')
+
+    expect(result).toBe(true)
+  })
+
   // AC-4: GIVEN ein Modell, dessen Schema keinen der Parameter "image", "image_prompt" oder "init_image" enthaelt
   //       WHEN supportsImg2Img(modelId) aufgerufen wird
   //       THEN gibt die Methode false zurueck

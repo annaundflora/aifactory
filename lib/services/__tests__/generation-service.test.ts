@@ -62,8 +62,11 @@ import {
 } from "@/lib/db/queries";
 import type { Generation } from "@/lib/db/queries";
 import { ModelSchemaService } from "@/lib/services/model-schema-service";
-import { UPSCALE_MODEL } from "@/lib/models";
 import sharp from "sharp";
+
+// Previously imported from @/lib/models — module deleted in slice-13 cleanup.
+// Constant inlined here for backwards-compatible test assertions.
+const UPSCALE_MODEL = "nightmareai/real-esrgan";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -492,13 +495,14 @@ describe("GenerationService", () => {
 
   // AC-2: GIVEN generation-service.ts nach dem Refactoring
   //       WHEN die Datei inspiziert wird
-  //       THEN existiert KEIN Import von @/lib/models (kein getModelById)
-  it("Slice04-AC-2: should not import getModelById from lib/models (UPSCALE_MODEL import is allowed)", () => {
+  //       THEN existiert KEIN Import von @/lib/models
+  it("Slice04-AC-2: should not import from lib/models", () => {
     const filePath = path.resolve(__dirname, "..", "generation-service.ts");
     const source = fs.readFileSync(filePath, "utf-8");
 
-    // getModelById whitelist check must be removed, but UPSCALE_MODEL import is allowed
+    // Neither getModelById nor UPSCALE_MODEL should be imported (lib/models.ts deleted in slice-13)
     expect(source).not.toContain("getModelById");
+    expect(source).not.toMatch(/@\/lib\/models/);
   });
 
   // AC-8 (slice-04): GIVEN generation-service.ts nach dem Refactoring
@@ -1270,6 +1274,8 @@ describe("GenerationService", () => {
         projectId: "proj-001",
         sourceImageUrl: SOURCE_IMAGE_URL,
         scale: 2,
+        modelId: UPSCALE_MODEL,
+        modelParams: { scale: 2 },
       });
 
       // Verify createGeneration was called with correct prompt
@@ -1311,6 +1317,8 @@ describe("GenerationService", () => {
         projectId: "proj-001",
         sourceImageUrl: SOURCE_IMAGE_URL,
         scale: 4,
+        modelId: UPSCALE_MODEL,
+        modelParams: { scale: 4 },
       });
 
       expect(createGeneration).toHaveBeenCalledWith(
@@ -1347,6 +1355,8 @@ describe("GenerationService", () => {
         sourceImageUrl: SOURCE_IMAGE_URL,
         scale: 2,
         sourceGenerationId: "gen-source",
+        modelId: UPSCALE_MODEL,
+        modelParams: { scale: 2 },
       });
 
       // Verify getGeneration was called with sourceGenerationId
@@ -1383,6 +1393,8 @@ describe("GenerationService", () => {
         sourceImageUrl: SOURCE_IMAGE_URL,
         scale: 2,
         sourceGenerationId: "gen-source-4",
+        modelId: UPSCALE_MODEL,
+        modelParams: { scale: 2 },
       });
 
       // Verify createGeneration received correct fields
@@ -1416,6 +1428,8 @@ describe("GenerationService", () => {
         projectId: "proj-001",
         sourceImageUrl: SOURCE_IMAGE_URL,
         scale: 2,
+        modelId: UPSCALE_MODEL,
+        modelParams: { scale: 2 },
       });
 
       expect(createGeneration).toHaveBeenCalledWith(
@@ -1449,6 +1463,8 @@ describe("GenerationService", () => {
         projectId: "proj-001",
         sourceImageUrl: SOURCE_IMAGE_URL,
         scale: 2,
+        modelId: UPSCALE_MODEL,
+        modelParams: { scale: 2 },
       });
 
       // Must be a single object, not an array
@@ -1477,6 +1493,8 @@ describe("GenerationService", () => {
         projectId: "proj-001",
         sourceImageUrl: SOURCE_IMAGE_URL,
         scale: 2,
+        modelId: UPSCALE_MODEL,
+        modelParams: {},
       });
 
       // Wait for fire-and-forget to call ReplicateClient.run
@@ -1514,6 +1532,8 @@ describe("GenerationService", () => {
         projectId: "proj-001",
         sourceImageUrl: SOURCE_IMAGE_URL,
         scale: 2,
+        modelId: UPSCALE_MODEL,
+        modelParams: { scale: 2 },
       });
 
       // The returned record is still pending (returned before fire-and-forget completes)
@@ -1541,6 +1561,8 @@ describe("GenerationService", () => {
           projectId: "proj-001",
           sourceImageUrl: SOURCE_IMAGE_URL,
           scale: 3 as unknown as 2 | 4,
+          modelId: UPSCALE_MODEL,
+          modelParams: { scale: 2 },
         })
       ).rejects.toThrow();
 

@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { getModelSchema, getCollectionModels, getFavoriteModels, toggleFavoriteModel, getProjectSelectedModels, saveProjectSelectedModels } from '@/app/actions/models'
+import { getModelSchema, getCollectionModels } from '@/app/actions/models'
 import { ModelSchemaService } from '@/lib/services/model-schema-service'
 import { CollectionModelService } from '@/lib/services/collection-model-service'
-import * as queries from '@/lib/db/queries'
 import type { CollectionModel } from '@/lib/types/collection-model'
 import { readFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
@@ -17,15 +16,6 @@ vi.mock('@/lib/services/collection-model-service', () => ({
     getCollectionModels: vi.fn(),
     clearCache: vi.fn(),
   },
-}))
-
-// Mock DB queries for favorite models (avoid importOriginal to prevent DATABASE_URL error)
-vi.mock('@/lib/db/queries', () => ({
-  getFavoriteModelIds: vi.fn().mockResolvedValue([]),
-  addFavoriteModel: vi.fn().mockResolvedValue(undefined),
-  removeFavoriteModel: vi.fn().mockResolvedValue(undefined),
-  getProjectSelectedModelIds: vi.fn().mockResolvedValue([]),
-  saveProjectSelectedModelIds: vi.fn().mockResolvedValue(undefined),
 }))
 
 // Helper: build a valid Replicate API response
@@ -210,127 +200,35 @@ describe('getModelSchema Server Action', () => {
   })
 })
 
-describe('getFavoriteModels Server Action', () => {
-  const mockGetFavoriteModelIds = vi.mocked(queries.getFavoriteModelIds)
-
-  beforeEach(() => {
-    mockGetFavoriteModelIds.mockReset()
-  })
-
-  it('should return an array of model IDs', async () => {
-    mockGetFavoriteModelIds.mockResolvedValueOnce(['owner/model1', 'owner/model2'])
-
-    const result = await getFavoriteModels()
-
-    expect(Array.isArray(result)).toBe(true)
-    expect(result).toHaveLength(2)
-    expect(result).toEqual(['owner/model1', 'owner/model2'])
-  })
-
-  it('should return an empty array when no favorites exist', async () => {
-    mockGetFavoriteModelIds.mockResolvedValueOnce([])
-
-    const result = await getFavoriteModels()
-
-    expect(result).toEqual([])
-  })
-})
-
-describe('toggleFavoriteModel Server Action', () => {
-  const mockGetFavoriteModelIds = vi.mocked(queries.getFavoriteModelIds)
-  const mockAddFavoriteModel = vi.mocked(queries.addFavoriteModel)
-  const mockRemoveFavoriteModel = vi.mocked(queries.removeFavoriteModel)
-
-  beforeEach(() => {
-    mockGetFavoriteModelIds.mockReset()
-    mockAddFavoriteModel.mockReset()
-    mockRemoveFavoriteModel.mockReset()
-  })
-
-  it('should add a model to favorites when not already favorited', async () => {
-    mockGetFavoriteModelIds.mockResolvedValueOnce([])
-    mockAddFavoriteModel.mockResolvedValueOnce(undefined)
-
-    const result = await toggleFavoriteModel({ modelId: 'owner/new-model' })
-
-    expect(result).toEqual({ isFavorite: true })
-    expect(mockAddFavoriteModel).toHaveBeenCalledWith('owner/new-model')
-    expect(mockRemoveFavoriteModel).not.toHaveBeenCalled()
-  })
-
-  it('should remove a model from favorites when already favorited', async () => {
-    mockGetFavoriteModelIds.mockResolvedValueOnce(['owner/existing-model'])
-    mockRemoveFavoriteModel.mockResolvedValueOnce(undefined)
-
-    const result = await toggleFavoriteModel({ modelId: 'owner/existing-model' })
-
-    expect(result).toEqual({ isFavorite: false })
-    expect(mockRemoveFavoriteModel).toHaveBeenCalledWith('owner/existing-model')
-    expect(mockAddFavoriteModel).not.toHaveBeenCalled()
-  })
-})
-
-describe('getProjectSelectedModels Server Action', () => {
-  const mockGetProjectSelectedModelIds = vi.mocked(queries.getProjectSelectedModelIds)
-
-  beforeEach(() => {
-    mockGetProjectSelectedModelIds.mockReset()
-  })
-
-  it('should return saved model IDs for a project', async () => {
-    mockGetProjectSelectedModelIds.mockResolvedValueOnce(['owner/model1', 'owner/model2'])
-
-    const result = await getProjectSelectedModels({ projectId: 'test-project-id' })
-
-    expect(result).toEqual(['owner/model1', 'owner/model2'])
-    expect(mockGetProjectSelectedModelIds).toHaveBeenCalledWith('test-project-id')
-  })
-
-  it('should return an empty array when no models are saved', async () => {
-    mockGetProjectSelectedModelIds.mockResolvedValueOnce([])
-
-    const result = await getProjectSelectedModels({ projectId: 'test-project-id' })
-
-    expect(result).toEqual([])
-  })
-})
-
-describe('saveProjectSelectedModels Server Action', () => {
-  const mockSaveProjectSelectedModelIds = vi.mocked(queries.saveProjectSelectedModelIds)
-
-  beforeEach(() => {
-    mockSaveProjectSelectedModelIds.mockReset()
-  })
-
-  it('should save model IDs for a project', async () => {
-    mockSaveProjectSelectedModelIds.mockResolvedValueOnce(undefined)
-
-    await saveProjectSelectedModels({
-      projectId: 'test-project-id',
-      modelIds: ['owner/model1', 'owner/model2'],
-    })
-
-    expect(mockSaveProjectSelectedModelIds).toHaveBeenCalledWith(
-      'test-project-id',
-      ['owner/model1', 'owner/model2'],
-    )
-  })
-})
-
-describe('Slice 03 Deletion Verification', () => {
-  // AC-7: GIVEN die Datei lib/models.ts
-  //       WHEN Slice 03 abgeschlossen ist
-  //       THEN existiert die Datei NICHT mehr im Projekt (geloescht)
-  it.skip('AC-7: should have deleted lib/models.ts (skipped: file still in use by other modules)', () => {
+describe('Dead Code Cleanup Verification', () => {
+  it('should have deleted lib/models.ts', () => {
     const filePath = resolve(__dirname, '..', '..', '..', 'lib', 'models.ts')
     expect(existsSync(filePath)).toBe(false)
   })
 
-  // AC-8: GIVEN die Datei lib/__tests__/models.test.ts
-  //       WHEN Slice 03 abgeschlossen ist
-  //       THEN existiert die Datei NICHT mehr im Projekt (geloescht)
-  it.skip('AC-8: should have deleted lib/__tests__/models.test.ts (skipped: file still in use)', () => {
+  it('should have deleted lib/__tests__/models.test.ts', () => {
     const filePath = resolve(__dirname, '..', '..', '..', 'lib', '__tests__', 'models.test.ts')
     expect(existsSync(filePath)).toBe(false)
+  })
+
+  it('should not export deprecated server actions from models.ts', () => {
+    const filePath = resolve(__dirname, '..', 'models.ts')
+    const content = readFileSync(filePath, 'utf-8')
+
+    expect(content).not.toMatch(/export\s+async\s+function\s+getFavoriteModels/)
+    expect(content).not.toMatch(/export\s+async\s+function\s+toggleFavoriteModel/)
+    expect(content).not.toMatch(/export\s+async\s+function\s+getProjectSelectedModels/)
+    expect(content).not.toMatch(/export\s+async\s+function\s+saveProjectSelectedModels/)
+  })
+
+  it('should not import deprecated query functions', () => {
+    const filePath = resolve(__dirname, '..', 'models.ts')
+    const content = readFileSync(filePath, 'utf-8')
+
+    expect(content).not.toMatch(/getFavoriteModelIds/)
+    expect(content).not.toMatch(/addFavoriteModel/)
+    expect(content).not.toMatch(/removeFavoriteModel/)
+    expect(content).not.toMatch(/getProjectSelectedModelIds/)
+    expect(content).not.toMatch(/saveProjectSelectedModelIds/)
   })
 })

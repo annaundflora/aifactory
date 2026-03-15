@@ -64,7 +64,7 @@ function ToolActivator({
  */
 function renderUpscalePopover(
   overrides: Partial<{
-    onUpscale: (params: { scale: 2 | 4 }) => void;
+    onUpscale: (params: { scale: 2 | 4; tier: import("@/lib/types").Tier }) => void;
     isUpscaleDisabled: boolean;
     initialActiveToolId: string | null;
   }> = {}
@@ -133,7 +133,7 @@ describe("UpscalePopover", () => {
 
     // Callback should have been called with scale: 2
     expect(onUpscale).toHaveBeenCalledTimes(1);
-    expect(onUpscale).toHaveBeenCalledWith({ scale: 2 });
+    expect(onUpscale).toHaveBeenCalledWith({ scale: 2, tier: "draft" });
 
     // Popover should close (content removed from DOM)
     expect(screen.queryByTestId("upscale-popover")).not.toBeInTheDocument();
@@ -154,7 +154,7 @@ describe("UpscalePopover", () => {
 
     // Callback should have been called with scale: 4
     expect(onUpscale).toHaveBeenCalledTimes(1);
-    expect(onUpscale).toHaveBeenCalledWith({ scale: 4 });
+    expect(onUpscale).toHaveBeenCalledWith({ scale: 4, tier: "draft" });
 
     // Popover should close (content removed from DOM)
     expect(screen.queryByTestId("upscale-popover")).not.toBeInTheDocument();

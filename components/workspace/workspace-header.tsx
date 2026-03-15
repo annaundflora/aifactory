@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { MoreVertical, Pencil, Trash2, RefreshCw } from "lucide-react";
+import { MoreVertical, Pencil, Trash2, RefreshCw, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { SettingsDialog } from "@/components/settings/settings-dialog";
 import {
   renameProject,
   deleteProject,
@@ -31,6 +32,7 @@ export function WorkspaceHeader({ project }: WorkspaceHeaderProps) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(project.name);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   // Sync rename value when project name changes (e.g. from sidebar rename)
@@ -118,6 +120,15 @@ export function WorkspaceHeader({ project }: WorkspaceHeaderProps) {
         )}
 
         <div className="ml-auto flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsSettingsOpen(true)}
+            aria-label="Open settings"
+            className="shrink-0 size-8 text-muted-foreground hover:text-foreground"
+          >
+            <Settings className="size-4" />
+          </Button>
           <ThemeToggle />
         </div>
 
@@ -166,6 +177,11 @@ export function WorkspaceHeader({ project }: WorkspaceHeaderProps) {
         confirmLabel="Delete"
         onConfirm={handleDelete}
         onCancel={() => setIsDeleteDialogOpen(false)}
+      />
+
+      <SettingsDialog
+        open={isSettingsOpen}
+        onOpenChange={setIsSettingsOpen}
       />
     </>
   );

@@ -9,6 +9,7 @@ import {
   bigint,
   boolean,
   index,
+  uniqueIndex,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
@@ -92,6 +93,10 @@ export const generations = pgTable(
 // -----------------------------------------------
 // favorite_models
 // -----------------------------------------------
+/**
+ * @deprecated Use `model_settings` table instead. This table is no longer
+ * read or written by any production code and will be removed in a future migration.
+ */
 export const favoriteModels = pgTable(
   "favorite_models",
   {
@@ -109,6 +114,10 @@ export const favoriteModels = pgTable(
 // -----------------------------------------------
 // project_selected_models
 // -----------------------------------------------
+/**
+ * @deprecated Use `model_settings` table instead. This table is no longer
+ * read or written by any production code and will be removed in a future migration.
+ */
 export const projectSelectedModels = pgTable(
   "project_selected_models",
   {
@@ -231,5 +240,30 @@ export const generationReferences = pgTable(
   },
   (table) => [
     index("generation_references_generation_id_idx").on(table.generationId),
+  ]
+);
+
+// -----------------------------------------------
+// model_settings
+// -----------------------------------------------
+export const modelSettings = pgTable(
+  "model_settings",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    mode: varchar("mode", { length: 20 }).notNull(),
+    tier: varchar("tier", { length: 20 }).notNull(),
+    modelId: varchar("model_id", { length: 255 }).notNull(),
+    modelParams: jsonb("model_params").notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("model_settings_mode_tier_idx").on(table.mode, table.tier),
   ]
 );

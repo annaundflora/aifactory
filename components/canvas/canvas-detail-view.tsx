@@ -13,14 +13,16 @@ import { DetailsOverlay } from "@/components/canvas/details-overlay";
 import { VariationPopover } from "@/components/canvas/popovers/variation-popover";
 import { Img2imgPopover } from "@/components/canvas/popovers/img2img-popover";
 import { UpscalePopover } from "@/components/canvas/popovers/upscale-popover";
-import { CanvasModelSelector } from "@/components/canvas/canvas-model-selector";
 import { CanvasChatPanel } from "@/components/canvas/canvas-chat-panel";
 import { generateImages, upscaleImage, fetchGenerations } from "@/app/actions/generations";
 import { deleteGeneration } from "@/app/actions/generations";
+import { getModelSettings } from "@/app/actions/model-settings";
+import { uploadReferenceImage, addGalleryAsReference } from "@/app/actions/references";
 import { Button } from "@/components/ui/button";
-import { type Generation } from "@/lib/db/queries";
+import { type Generation, type ModelSetting } from "@/lib/db/queries";
 import type { VariationParams } from "@/components/canvas/popovers/variation-popover";
 import type { Img2imgParams } from "@/components/canvas/popovers/img2img-popover";
+import type { Tier } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -51,7 +53,6 @@ export interface CanvasDetailViewProps {
   onGenerationsCreated?: (newGens: Generation[]) => void;
   toolbarSlot?: ReactNode;
   chatSlot?: ReactNode;
-  modelSelectorSlot?: ReactNode;
   undoRedoSlot?: ReactNode;
 }
 
@@ -66,7 +67,6 @@ export function CanvasDetailView({
   onGenerationsCreated,
   toolbarSlot,
   chatSlot,
-  modelSelectorSlot,
   undoRedoSlot,
 }: CanvasDetailViewProps) {
   const { state, dispatch } = useCanvasDetail();
@@ -80,6 +80,29 @@ export function CanvasDetailView({
   useEffect(() => {
     setLocalGenerations(allGenerations);
   }, [allGenerations]);
+
+  // ---------------------------------------------------------------------------
+  // Model Settings: fetch once on mount, cache in local state
+  // ---------------------------------------------------------------------------
+  const [modelSettings, setModelSettings] = useState<ModelSetting[]>([]);
+
+  const loadModelSettings = useCallback(() => {
+    getModelSettings()
+      .then((settings) => {
+        setModelSettings(settings);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch model settings:", err);
+      });
+  }, []);
+
+  useEffect(() => {
+    loadModelSettings();
+    window.addEventListener("model-settings-changed", loadModelSettings);
+    return () => {
+      window.removeEventListener("model-settings-changed", loadModelSettings);
+    };
+  }, [loadModelSettings]);
 
   // Track pending generation IDs for polling via ref to avoid effect churn.
   // A counter state triggers re-renders when pending list changes.
@@ -232,7 +255,11 @@ export function CanvasDetailView({
     async (params: VariationParams) => {
       if (state.isGenerating) return;
 
-      const selectedModel = state.selectedModelId ?? currentGeneration.modelId;
+      // Resolve model from settings using the tier from params
+      const setting = modelSettings.find(
+        (s) => s.mode === "img2img" && s.tier === params.tier
+      );
+      const selectedModel = setting?.modelId ?? currentGeneration.modelId;
       const promptStrength =
         VARIATION_STRENGTH_MAP[params.strength] ?? 0.6;
 
@@ -275,7 +302,7 @@ export function CanvasDetailView({
         toast.error("Generation fehlgeschlagen.");
       }
     },
-    [state.isGenerating, state.selectedModelId, currentGeneration, dispatch, setPendingGenerationIds, onGenerationsCreated]
+    [state.isGenerating, modelSettings, currentGeneration, dispatch, setPendingGenerationIds, onGenerationsCreated]
   );
 
   // ---------------------------------------------------------------------------
@@ -286,19 +313,72 @@ export function CanvasDetailView({
     async (params: Img2imgParams) => {
       if (state.isGenerating) return;
 
-      const selectedModel = state.selectedModelId ?? currentGeneration.modelId;
+      // Resolve model from settings using the tier from params
+      const setting = modelSettings.find(
+        (s) => s.mode === "img2img" && s.tier === params.tier
+      );
+      const selectedModel = setting?.modelId ?? currentGeneration.modelId;
 
       dispatch({ type: "SET_GENERATING", isGenerating: true });
 
       try {
-        // Map references to the server action format
-        const references = params.references.map((ref, index) => ({
-          referenceImageId: `ref-${index}`,
+        // Upload blob: URLs to R2 before sending to Replicate.
+        // The img2img popover creates blob: URLs for local file uploads,
+        // but Replicate requires publicly accessible https: URLs.
+        const resolvedRefs = await Promise.all(
+          params.references.map(async (ref) => {
+            if (ref.imageUrl.startsWith("blob:")) {
+              const response = await fetch(ref.imageUrl);
+              const blob = await response.blob();
+              const file = new File([blob], "reference.png", { type: blob.type || "image/png" });
+              const uploadResult = await uploadReferenceImage({
+                projectId: currentGeneration.projectId,
+                file,
+              });
+              if ("error" in uploadResult) {
+                throw new Error(uploadResult.error);
+              }
+              return { ...ref, imageUrl: uploadResult.imageUrl, uploadedId: uploadResult.id };
+            }
+            return ref;
+          })
+        );
+
+        // Map references to the server action format, using real IDs from upload.
+        // Auto-include the current canvas image as the first reference (slot 0),
+        // so img2img in the canvas always uses the displayed image as context.
+        const manualRefs = resolvedRefs.map((ref, index) => ({
+          referenceImageId: ("uploadedId" in ref && ref.uploadedId) ? ref.uploadedId : `ref-${index + 1}`,
           imageUrl: ref.imageUrl,
           role: ref.role,
           strength: ref.strength,
-          slotPosition: index,
+          slotPosition: index + 1,
         }));
+
+        // Create a reference_images DB record for the current canvas image
+        // so the FK constraint on generation_references is satisfied.
+        let canvasRef: typeof manualRefs | undefined;
+        if (currentGeneration.imageUrl) {
+          const galleryResult = await addGalleryAsReference({
+            projectId: currentGeneration.projectId,
+            generationId: currentGeneration.id,
+            imageUrl: currentGeneration.imageUrl,
+          });
+          if (!("error" in galleryResult)) {
+            canvasRef = [{
+              referenceImageId: galleryResult.id,
+              imageUrl: currentGeneration.imageUrl,
+              role: "content",
+              strength: "strong",
+              slotPosition: 0,
+            }];
+          }
+        }
+
+        const references = [
+          ...(canvasRef ?? []),
+          ...manualRefs,
+        ];
 
         const result = await generateImages({
           projectId: currentGeneration.projectId,
@@ -336,7 +416,7 @@ export function CanvasDetailView({
         toast.error("Generation fehlgeschlagen.");
       }
     },
-    [state.isGenerating, state.selectedModelId, currentGeneration, dispatch, setPendingGenerationIds, onGenerationsCreated]
+    [state.isGenerating, modelSettings, currentGeneration, dispatch, setPendingGenerationIds, onGenerationsCreated]
   );
 
   // ---------------------------------------------------------------------------
@@ -344,22 +424,30 @@ export function CanvasDetailView({
   // ---------------------------------------------------------------------------
 
   const handleUpscale = useCallback(
-    async (params: { scale: 2 | 4 }) => {
+    async (params: { scale: 2 | 4; tier: Tier }) => {
       if (state.isGenerating) return;
       if (!currentGeneration.imageUrl) {
         toast.error("Kein Bild zum Hochskalieren vorhanden.");
         return;
       }
 
+      // Resolve model from settings using the tier from params
+      const setting = modelSettings.find(
+        (s) => s.mode === "upscale" && s.tier === params.tier
+      );
+      const resolvedModelId = setting?.modelId ?? currentGeneration.modelId;
+      const resolvedModelParams = setting?.modelParams ?? {};
+
       dispatch({ type: "SET_GENERATING", isGenerating: true });
 
       try {
-        // AC-3: Hardcoded model nightmareai/real-esrgan, ignores header selector
         const result = await upscaleImage({
           projectId: currentGeneration.projectId,
           sourceImageUrl: currentGeneration.imageUrl,
           scale: params.scale,
           sourceGenerationId: currentGeneration.id,
+          modelId: resolvedModelId,
+          modelParams: resolvedModelParams as Record<string, unknown>,
         });
 
         if ("error" in result) {
@@ -382,7 +470,7 @@ export function CanvasDetailView({
         toast.error("Upscale fehlgeschlagen.");
       }
     },
-    [state.isGenerating, currentGeneration, dispatch, setPendingGenerationIds, onGenerationsCreated]
+    [state.isGenerating, modelSettings, currentGeneration, dispatch, setPendingGenerationIds, onGenerationsCreated]
   );
 
   // ---------------------------------------------------------------------------
@@ -395,11 +483,6 @@ export function CanvasDetailView({
   // Render
   // ---------------------------------------------------------------------------
 
-  // Compose the model selector slot: use provided slot or default to CanvasModelSelector
-  const effectiveModelSelectorSlot = modelSelectorSlot ?? (
-    <CanvasModelSelector initialModelId={currentGeneration.modelId} />
-  );
-
   return (
     <div
       className="flex h-full w-full flex-col"
@@ -408,7 +491,6 @@ export function CanvasDetailView({
       {/* Header */}
       <CanvasHeader
         onBack={onBack}
-        modelSelectorSlot={effectiveModelSelectorSlot}
         undoRedoSlot={undoRedoSlot}
       >
         {chatSlot && (
@@ -431,9 +513,9 @@ export function CanvasDetailView({
 
       {/* Body: 3-column layout */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left: Toolbar slot (48px wide) */}
+        {/* Left: Toolbar slot */}
         <aside
-          className="relative flex w-12 shrink-0 flex-col border-r border-border/80 bg-card"
+          className="relative flex h-full shrink-0 flex-col border-r border-border/80 bg-card"
           data-testid="toolbar-slot"
         >
           {toolbarSlot ?? (
@@ -455,7 +537,6 @@ export function CanvasDetailView({
             onGenerate={handleVariationGenerate}
           />
           <Img2imgPopover
-            generation={currentGeneration}
             onGenerate={handleImg2imgGenerate}
           />
           <UpscalePopover
@@ -498,6 +579,7 @@ export function CanvasDetailView({
                 projectId={currentGeneration.projectId}
                 onPendingGenerations={setPendingGenerationIds}
                 onGenerationsCreated={onGenerationsCreated}
+                modelSettings={modelSettings}
               />
             )}
           </aside>

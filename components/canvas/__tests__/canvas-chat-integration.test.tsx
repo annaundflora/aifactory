@@ -524,7 +524,8 @@ describe("CanvasChatPanel (Backend-Integration)", () => {
       expect.objectContaining({
         projectId: "project-gen",
         promptMotiv: "blue sky background",
-        modelIds: ["flux-2-max"],
+        // Model resolution now falls back to generation.modelId when modelSettings is empty
+        modelIds: ["model-1"],
         params: { steps: 30 },
         count: 1,
         generationMode: "txt2img",

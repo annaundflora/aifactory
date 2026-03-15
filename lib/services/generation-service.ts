@@ -8,7 +8,6 @@ import {
   updateGeneration,
   type Generation,
 } from "@/lib/db/queries";
-import { UPSCALE_MODEL } from "@/lib/models";
 import { ModelSchemaService, getImg2ImgFieldName } from "@/lib/services/model-schema-service";
 import type { ReferenceRole, ReferenceStrength } from "@/lib/types/reference";
 
@@ -23,6 +22,10 @@ export interface UpscaleInput {
   sourceImageUrl: string;
   scale: 2 | 4;
   sourceGenerationId?: string;
+  /** Model ID for upscaling (resolved from settings). */
+  modelId: string;
+  /** Model parameters for upscaling (resolved from settings). Merged with image/scale for Replicate call. */
+  modelParams: Record<string, unknown>;
 }
 
 /**
@@ -497,13 +500,13 @@ async function retry(generationId: string): Promise<Generation> {
 }
 
 /**
- * Upscale a single image using the fixed UPSCALE_MODEL.
+ * Upscale a single image using the provided model from settings.
  * Creates 1 pending Generation record with generationMode "upscale",
  * then processes it fire-and-forget.
  * Returns the pending generation immediately for optimistic UI.
  */
 async function upscale(input: UpscaleInput): Promise<Generation> {
-  const { projectId, sourceImageUrl, scale, sourceGenerationId } = input;
+  const { projectId, sourceImageUrl, scale, sourceGenerationId, modelId, modelParams } = input;
 
   // Validate scale: only 2 and 4 allowed
   if (scale !== 2 && scale !== 4) {
@@ -521,7 +524,7 @@ async function upscale(input: UpscaleInput): Promise<Generation> {
   const generation = await createGeneration({
     projectId,
     prompt,
-    modelId: UPSCALE_MODEL,
+    modelId,
     generationMode: "upscale",
     sourceImageUrl,
     sourceGenerationId: sourceGenerationId ?? null,
@@ -533,10 +536,13 @@ async function upscale(input: UpscaleInput): Promise<Generation> {
 
     try {
       // Call Replicate with upscale-specific input (image + scale, no prompt)
-      const result = await ReplicateClient.run(UPSCALE_MODEL, {
+      // Merge model-specific params from settings, with image/scale taking precedence
+      const replicateInput: Record<string, unknown> = {
+        ...modelParams,
         image: sourceImageUrl,
         scale,
-      });
+      };
+      const result = await ReplicateClient.run(modelId, replicateInput);
 
       // Convert stream to PNG buffer + get dimensions
       const { buffer, width, height } = await streamToPngBuffer(result.output);
