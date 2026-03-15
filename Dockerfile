@@ -51,10 +51,12 @@ COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 
-# Copy migration files
+# Copy migration files and their dependencies (not traced by Next.js standalone)
 COPY --from=build /app/drizzle ./drizzle
 COPY --from=build /app/scripts/migrate.mjs ./scripts/migrate.mjs
 COPY --from=build /app/scripts/entrypoint.sh ./scripts/entrypoint.sh
+COPY --from=build /app/node_modules/drizzle-orm ./node_modules/drizzle-orm
+COPY --from=build /app/node_modules/postgres ./node_modules/postgres
 RUN chmod +x ./scripts/entrypoint.sh
 
 # Set correct ownership
