@@ -1,6 +1,8 @@
 "use server";
 
 import { StorageService } from "@/lib/clients/storage";
+import { requireAuth } from "@/lib/auth/guard";
+import { validateUrl } from "@/lib/security/url-validator";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -24,6 +26,12 @@ export async function uploadSourceImage(
     | { projectId: string; file: File }
     | { projectId: string; url: string }
 ): Promise<{ url: string } | { error: string }> {
+  // Auth guard -- must be first check
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
   const { projectId } = input;
 
   if (!projectId || projectId.trim().length === 0) {
@@ -31,6 +39,12 @@ export async function uploadSourceImage(
   }
 
   if ("url" in input) {
+    // SSRF prevention -- validate URL before fetch
+    const urlCheck = validateUrl(input.url);
+    if (!urlCheck.valid) {
+      return { error: urlCheck.reason };
+    }
+
     // URL path: server-side fetch and proxy through R2
     let response: Response;
     try {
