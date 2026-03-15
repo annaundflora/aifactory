@@ -72,39 +72,27 @@ vi.mock("sonner", () => ({
 // Mock lucide-react icons used across the canvas component tree.
 vi.mock("lucide-react", () => {
   const stub = (name: string) => {
-    const Comp = (props: Record<string, unknown>) => (
-      <span data-testid={`${name}-icon`} {...props} />
-    );
+    const id = name.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+    const Comp = (props: Record<string, unknown>) => <span data-testid={`${id}-icon`} {...props} />;
     Comp.displayName = name;
     return Comp;
   };
   return {
-    ArrowLeft: stub("ArrowLeft"),
-    ArrowUp: stub("ArrowUp"),
-    ChevronLeft: stub("ChevronLeft"),
-    ChevronRight: stub("ChevronRight"),
-    ChevronDown: stub("ChevronDown"),
-    Copy: stub("Copy"),
-    ArrowRightLeft: stub("ArrowRightLeft"),
-    ZoomIn: stub("ZoomIn"),
-    Download: stub("Download"),
-    Trash2: stub("Trash2"),
-    Info: stub("Info"),
-    ImageOff: stub("ImageOff"),
-    Loader2: stub("Loader2"),
-    PanelRightClose: stub("PanelRightClose"),
-    PanelRightOpen: stub("PanelRightOpen"),
-    MessageSquare: stub("MessageSquare"),
-    Minus: stub("Minus"),
-    Plus: stub("Plus"),
-    Sparkles: stub("Sparkles"),
-    Library: stub("Library"),
-    Undo2: stub("Undo2"),
-    Redo2: stub("Redo2"),
-    ChevronUp: stub("ChevronUp"),
-    ChevronDownIcon: stub("ChevronDownIcon"),
-    ChevronUpIcon: stub("ChevronUpIcon"),
-    CheckIcon: stub("CheckIcon"),
+    MessageSquare: stub("MessageSquare"), Minus: stub("Minus"), Plus: stub("Plus"),
+    ArrowUp: stub("ArrowUp"), Square: stub("Square"), PanelRightClose: stub("PanelRightClose"),
+    Image: stub("Image"), Loader2: stub("Loader2"), ImageOff: stub("ImageOff"),
+    PanelRightOpen: stub("PanelRightOpen"), PanelLeftIcon: stub("PanelLeftIcon"),
+    PanelLeftClose: stub("PanelLeftClose"), PenLine: stub("PenLine"),
+    ChevronDown: stub("ChevronDown"), Check: stub("Check"), Type: stub("Type"),
+    ImagePlus: stub("ImagePlus"), Scaling: stub("Scaling"), X: stub("X"),
+    ArrowLeft: stub("ArrowLeft"), Undo2: stub("Undo2"), Redo2: stub("Redo2"),
+    ChevronUp: stub("ChevronUp"), ChevronDownIcon: stub("ChevronDownIcon"),
+    ChevronUpIcon: stub("ChevronUpIcon"), CheckIcon: stub("CheckIcon"),
+    Info: stub("Info"), Copy: stub("Copy"), ArrowRightLeft: stub("ArrowRightLeft"),
+    ZoomIn: stub("ZoomIn"), Download: stub("Download"), Trash2: stub("Trash2"),
+    Sparkles: stub("Sparkles"), Library: stub("Library"), Star: stub("Star"),
+    ChevronLeft: stub("ChevronLeft"), ChevronRight: stub("ChevronRight"),
+    PanelLeftOpen: stub("PanelLeftOpen"),
   };
 });
 
@@ -202,8 +190,7 @@ describe("CanvasDetailView", () => {
     const toolbarSlot = screen.getByTestId("toolbar-slot");
     expect(toolbarSlot).toBeInTheDocument();
     expect(toolbarSlot.tagName).toBe("ASIDE");
-    // w-12 = 48px in Tailwind
-    expect(toolbarSlot.className).toMatch(/w-12/);
+    // Toolbar slot uses shrink-0 for fixed width (width is determined by inner CanvasToolbar)
     expect(toolbarSlot.className).toMatch(/shrink-0/);
 
     // Canvas area (center, flex: 1)

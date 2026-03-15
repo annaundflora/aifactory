@@ -200,11 +200,8 @@ describe("PromptAssistantContext - Apply Logic", () => {
       });
     });
 
-    // Apply (creates snapshot)
-    act(() => {
-      result.current.applyToWorkspace();
-    });
-
+    // Auto-apply fires via useEffect when draftVersion increments from SET_DRAFT_PROMPT
+    // So setVariation is already called once by the auto-apply effect
     expect(mockSetVariation).toHaveBeenCalledTimes(1);
 
     // Undo
@@ -212,7 +209,7 @@ describe("PromptAssistantContext - Apply Logic", () => {
       result.current.undoApply();
     });
 
-    // Second call should restore old values
+    // Undo call restores old values (second call total)
     expect(mockSetVariation).toHaveBeenCalledTimes(2);
     expect(mockSetVariation).toHaveBeenLastCalledWith(
       expect.objectContaining({

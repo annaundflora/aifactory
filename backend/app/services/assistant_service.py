@@ -158,12 +158,9 @@ class AssistantService:
                 "configurable": {
                     "thread_id": session_id,
                     "pending_image_url": str(image_url) if image_url else None,
+                    "model": model,
                 }
             }
-
-            # If a model override is specified, we could pass it via config
-            # For now, the agent uses the default model from settings.
-            # Model override support will be enhanced in later slices.
 
             input_state = {"messages": [human_message]}
 

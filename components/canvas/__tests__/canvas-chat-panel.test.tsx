@@ -8,23 +8,31 @@ import "@testing-library/jest-dom/vitest";
 // Mocks (mock_external strategy -- only icons and crypto)
 // ---------------------------------------------------------------------------
 
-vi.mock("lucide-react", () => ({
-  MessageSquare: (props: Record<string, unknown>) => (
-    <span data-testid="message-square-icon" {...props} />
-  ),
-  Minus: (props: Record<string, unknown>) => (
-    <span data-testid="minus-icon" {...props} />
-  ),
-  Plus: (props: Record<string, unknown>) => (
-    <span data-testid="plus-icon" {...props} />
-  ),
-  ArrowUp: (props: Record<string, unknown>) => (
-    <span data-testid="arrow-up-icon" {...props} />
-  ),
-  Square: (props: Record<string, unknown>) => (
-    <span data-testid="square-icon" {...props} />
-  ),
-}));
+vi.mock("lucide-react", () => {
+  const stub = (name: string) => {
+    const id = name.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+    const Comp = (props: Record<string, unknown>) => <span data-testid={`${id}-icon`} {...props} />;
+    Comp.displayName = name;
+    return Comp;
+  };
+  return {
+    MessageSquare: stub("MessageSquare"), Minus: stub("Minus"), Plus: stub("Plus"),
+    ArrowUp: stub("ArrowUp"), Square: stub("Square"), PanelRightClose: stub("PanelRightClose"),
+    Image: stub("Image"), Loader2: stub("Loader2"), ImageOff: stub("ImageOff"),
+    PanelRightOpen: stub("PanelRightOpen"), PanelLeftIcon: stub("PanelLeftIcon"),
+    PanelLeftClose: stub("PanelLeftClose"), PenLine: stub("PenLine"),
+    ChevronDown: stub("ChevronDown"), Check: stub("Check"), Type: stub("Type"),
+    ImagePlus: stub("ImagePlus"), Scaling: stub("Scaling"), X: stub("X"),
+    ArrowLeft: stub("ArrowLeft"), Undo2: stub("Undo2"), Redo2: stub("Redo2"),
+    ChevronUp: stub("ChevronUp"), ChevronDownIcon: stub("ChevronDownIcon"),
+    ChevronUpIcon: stub("ChevronUpIcon"), CheckIcon: stub("CheckIcon"),
+    Info: stub("Info"), Copy: stub("Copy"), ArrowRightLeft: stub("ArrowRightLeft"),
+    ZoomIn: stub("ZoomIn"), Download: stub("Download"), Trash2: stub("Trash2"),
+    Sparkles: stub("Sparkles"), Library: stub("Library"), Star: stub("Star"),
+    ChevronLeft: stub("ChevronLeft"), ChevronRight: stub("ChevronRight"),
+    PanelLeftOpen: stub("PanelLeftOpen"),
+  };
+});
 
 // Mock the model selector (uses radix Select which needs complex setup in jsdom)
 vi.mock("@/components/assistant/model-selector", () => ({
@@ -196,9 +204,9 @@ describe("CanvasChatPanel", () => {
     const expandedPanel = screen.getByTestId("canvas-chat-panel");
     expect(expandedPanel).toBeInTheDocument();
 
-    // Width should be the default (360px) since we haven't resized
+    // Width should be the default (320px) since we haven't resized
     const widthValue = parseInt(expandedPanel.style.width, 10);
-    expect(widthValue).toBe(360);
+    expect(widthValue).toBe(320);
   });
 
   /**

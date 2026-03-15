@@ -64,10 +64,10 @@ describe("ChatThread - Streaming Text Rendering", () => {
       <ChatThread messages={initialMessages} isStreaming={true} />
     );
 
-    // The assistant bubble should exist with streaming placeholder "..."
-    const assistantBubble = screen.getByTestId("assistant-message");
-    expect(assistantBubble).toBeInTheDocument();
-    expect(assistantBubble).toHaveTextContent("...");
+    // Empty streaming assistant messages are hidden (return null) — the StreamingIndicator handles this state
+    expect(screen.queryByTestId("assistant-message")).not.toBeInTheDocument();
+    // The streaming indicator should be visible instead
+    expect(screen.getByTestId("streaming-indicator")).toBeInTheDocument();
 
     // Simulate first text-delta: "Hier"
     const afterDelta1: Message[] = [

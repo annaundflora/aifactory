@@ -247,9 +247,9 @@ describe("ChatThread", () => {
   });
 
   // --------------------------------------------------------------------------
-  // Streaming placeholder: Empty content with isStreaming shows "..."
+  // Streaming placeholder: Empty content with isStreaming hides assistant bubble
   // --------------------------------------------------------------------------
-  it("should show streaming placeholder when assistant message is streaming with empty content", () => {
+  it("should hide empty streaming assistant message and show streaming indicator instead", () => {
     const messages: Message[] = [
       createUserMessage("Hello"),
       createAssistantMessage("", true, "streaming-asst"),
@@ -257,7 +257,9 @@ describe("ChatThread", () => {
 
     render(<ChatThread messages={messages} isStreaming={true} />);
 
-    const assistantBubble = screen.getByTestId("assistant-message");
-    expect(assistantBubble).toHaveTextContent("...");
+    // Empty streaming assistant messages are hidden (return null)
+    expect(screen.queryByTestId("assistant-message")).not.toBeInTheDocument();
+    // The streaming indicator is shown instead
+    expect(screen.getByTestId("streaming-indicator")).toBeInTheDocument();
   });
 });

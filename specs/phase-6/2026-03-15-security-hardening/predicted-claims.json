@@ -1,0 +1,33 @@
+{
+  "files_claimed": [
+    { "file": "auth.ts", "action": "create", "source_slice": "slice-01-auth-setup" },
+    { "file": "app/api/auth/[...nextauth]/route.ts", "action": "create", "source_slice": "slice-01-auth-setup" },
+    { "file": "app/layout.tsx", "action": "modify", "source_slice": "slice-01-auth-setup" },
+    { "file": "app/login/page.tsx", "action": "create", "source_slice": "slice-02-login-page" },
+    { "file": "middleware.ts", "action": "create", "source_slice": "slice-03-middleware" },
+    { "file": "lib/db/schema.ts", "action": "modify", "source_slice": "slice-04-db-auth-tables" },
+    { "file": "drizzle/0008_auth_tables.sql", "action": "create", "source_slice": "slice-04-db-auth-tables" },
+    { "file": "drizzle/0009_add_user_id.sql", "action": "create", "source_slice": "slice-05-db-userid-migration" },
+    { "file": "lib/auth/guard.ts", "action": "create", "source_slice": "slice-06-auth-guard" },
+    { "file": "app/actions/projects.ts", "action": "modify", "source_slice": "slice-07-auth-projects" },
+    { "file": "lib/db/queries.ts", "action": "modify", "source_slice": "slice-07-auth-projects" },
+    { "file": "app/actions/generations.ts", "action": "modify", "source_slice": "slice-08-auth-generations-refs" },
+    { "file": "app/actions/references.ts", "action": "modify", "source_slice": "slice-08-auth-generations-refs" },
+    { "file": "app/actions/prompts.ts", "action": "modify", "source_slice": "slice-09-auth-prompts-models" },
+    { "file": "app/actions/models.ts", "action": "modify", "source_slice": "slice-09-auth-prompts-models" },
+    { "file": "app/actions/model-settings.ts", "action": "modify", "source_slice": "slice-09-auth-prompts-models" },
+    { "file": "lib/security/url-validator.ts", "action": "create", "source_slice": "slice-10-auth-upload-ssrf" },
+    { "file": "app/actions/upload.ts", "action": "modify", "source_slice": "slice-10-auth-upload-ssrf" },
+    { "file": "components/sidebar.tsx", "action": "modify", "source_slice": "slice-11-sidebar-auth" },
+    { "file": "next.config.ts", "action": "modify", "source_slice": "slice-12-security-headers" },
+    { "file": "Dockerfile", "action": "create", "source_slice": "slice-13-dockerfile-compose" },
+    { "file": "docker-compose.prod.yml", "action": "create", "source_slice": "slice-13-dockerfile-compose" },
+    { "file": "Caddyfile", "action": "create", "source_slice": "slice-14-caddy-env" },
+    { "file": ".env.example", "action": "create", "source_slice": "slice-14-caddy-env" }
+  ],
+  "summary": {
+    "files_claimed": 24,
+    "new_files": 13,
+    "modified_files": 11
+  }
+}

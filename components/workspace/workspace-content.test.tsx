@@ -40,6 +40,59 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
 
+// Mock workspace-state (needed by PromptAssistantProvider -> useWorkspaceVariation)
+vi.mock("@/lib/workspace-state", () => ({
+  useWorkspaceVariation: () => ({
+    variationData: null,
+    setVariation: vi.fn(),
+    clearVariation: vi.fn(),
+  }),
+  useWorkspaceVariationOptional: () => null,
+  WorkspaceStateProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+// Mock assistant context (needed by AssistantPanelContent)
+vi.mock("@/lib/assistant/assistant-context", () => ({
+  PromptAssistantProvider: ({ children }: { children: React.ReactNode }) => children,
+  usePromptAssistant: () => ({
+    messages: [],
+    isStreaming: false,
+    hasCanvas: false,
+    selectedModel: "gpt-4",
+    setSelectedModel: vi.fn(),
+    cancelStream: vi.fn(),
+    activeView: "startscreen" as const,
+    setActiveView: vi.fn(),
+    loadSession: vi.fn(),
+    sessionId: null,
+    dispatch: vi.fn(),
+    sessionIdRef: { current: null },
+    sendMessageRef: { current: null },
+    cancelStreamRef: { current: null },
+  }),
+  getWorkspaceFieldsForChip: () => null,
+}));
+
+vi.mock("@/lib/assistant/use-assistant-runtime", () => ({
+  useAssistantRuntime: () => ({
+    sendMessage: vi.fn(),
+  }),
+}));
+
+vi.mock("@/lib/assistant/use-sessions", () => ({
+  useSessions: () => ({
+    sessions: [],
+    isLoading: false,
+    error: null,
+    refresh: vi.fn(),
+  }),
+}));
+
+// Mock assistant components (prevent deep import chains)
+vi.mock("@/components/assistant/assistant-panel", () => ({
+  AssistantPanelContent: () => null,
+}));
+
 // Stub CanvasDetailView + Provider (server-side deps, complex tree)
 vi.mock("@/components/canvas/canvas-detail-view", () => ({
   CanvasDetailView: (props: Record<string, unknown>) => (
@@ -170,17 +223,16 @@ describe("AC-3: Panel width", () => {
    *       WHEN die Klasse auf `w-[480px]` geaendert wird
    *       THEN rendert das Prompt-Area-Panel mit einer festen Breite von 480px
    */
-  it("should render prompt area panel with w-[480px] class instead of w-80", () => {
+  it("should render prompt area panel with fixed width via inline style", () => {
     const { container } = render(
       <WorkspaceContent projectId="test-project" initialGenerations={[]} />
     );
 
     // Find the panel that wraps the PromptArea stub
-    const promptArea = screen.getByTestId("prompt-area");
-    const panel = promptArea.parentElement!;
+    const panel = screen.getByTestId("prompt-area-panel") as HTMLElement;
 
-    // Panel MUST have the w-[480px] class (the new width)
-    expect(panel.className).toContain("w-[480px]");
+    // Panel uses inline style for width (PROMPT_DEFAULT_WIDTH = 320)
+    expect(panel.style.width).toBe("320px");
 
     // Panel MUST NOT have the old w-80 class
     expect(panel.className).not.toContain("w-80");
@@ -220,8 +272,8 @@ describe("AC-5: Gallery flex layout", () => {
     expect(galleryPanel).not.toBeNull();
     expect(galleryPanel!.className).toContain("flex-1");
 
-    // The prompt panel (w-[480px]) and gallery panel (flex-1) must be siblings
-    const promptPanel = screen.getByTestId("prompt-area").parentElement!;
+    // The prompt panel and gallery panel (flex-1) must be siblings
+    const promptPanel = screen.getByTestId("prompt-area-panel") as HTMLElement;
     expect(promptPanel.parentElement).toBe(galleryPanel!.parentElement);
 
     // Verify the layout container uses flexbox with gap

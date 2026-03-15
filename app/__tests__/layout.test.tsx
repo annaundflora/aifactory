@@ -7,14 +7,21 @@ import "@testing-library/jest-dom/vitest";
 vi.mock("next/font/google", () => ({
   Geist: () => ({ variable: "--font-geist-sans" }),
   Geist_Mono: () => ({ variable: "--font-geist-mono" }),
+  Sora: () => ({ variable: "--font-sora" }),
+  Inter: () => ({ variable: "--font-inter" }),
 }));
 
-// Track whether Toaster is rendered
-const mockToaster = vi.fn();
-vi.mock("sonner", () => ({
-  Toaster: (props: Record<string, unknown>) => {
-    mockToaster(props);
-    return <div data-testid="sonner-toaster" />;
+// Mock ThemeProvider (wraps children)
+vi.mock("@/components/shared/theme-provider", () => ({
+  ThemeProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+// Track whether ToastProvider is rendered
+const mockToastProvider = vi.fn();
+vi.mock("@/components/shared/toast-provider", () => ({
+  ToastProvider: (props: Record<string, unknown>) => {
+    mockToastProvider(props);
+    return <div data-testid="toast-provider" />;
   },
 }));
 
@@ -42,12 +49,9 @@ describe("Root Layout (app/layout.tsx)", () => {
       { container: document.documentElement }
     );
 
-    // Toaster should be rendered
-    const toaster = container.querySelector('[data-testid="sonner-toaster"]');
-    expect(toaster).toBeInTheDocument();
-
-    // Toaster mock should have been called (confirming sonner Toaster is used)
-    expect(mockToaster).toHaveBeenCalled();
+    // ToastProvider should be rendered
+    const toastProvider = container.querySelector('[data-testid="toast-provider"]');
+    expect(toastProvider).toBeInTheDocument();
 
     // Children should also be rendered (Toaster does not replace content)
     const childContent = container.querySelector(

@@ -73,24 +73,31 @@ vi.mock("@/app/actions/references", () => ({
 }));
 
 // Mock lucide-react icons
-vi.mock("lucide-react", () => ({
-  ChevronDown: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "chevron-down", ...props }),
-  ChevronRight: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "chevron-right", ...props }),
-  Loader2: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "loader-icon", ...props }),
-  Sparkles: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "sparkles-icon", ...props }),
-  Minus: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "minus-icon", ...props }),
-  Plus: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "plus-icon", ...props }),
-  X: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "x-icon", ...props }),
-  Search: (props: Record<string, unknown>) =>
-    createElement("span", { "data-testid": "search-icon", ...props }),
-}));
+vi.mock("lucide-react", () => {
+  const stub = (name: string) => {
+    const id = name.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+    const Comp = (props: Record<string, unknown>) => <span data-testid={`${id}-icon`} {...props} />;
+    Comp.displayName = name;
+    return Comp;
+  };
+  return {
+    MessageSquare: stub("MessageSquare"), Minus: stub("Minus"), Plus: stub("Plus"),
+    ArrowUp: stub("ArrowUp"), Square: stub("Square"), PanelRightClose: stub("PanelRightClose"),
+    Image: stub("Image"), Loader2: stub("Loader2"), ImageOff: stub("ImageOff"),
+    PanelRightOpen: stub("PanelRightOpen"), PanelLeftIcon: stub("PanelLeftIcon"),
+    PanelLeftClose: stub("PanelLeftClose"), PenLine: stub("PenLine"),
+    ChevronDown: stub("ChevronDown"), Check: stub("Check"), Type: stub("Type"),
+    ImagePlus: stub("ImagePlus"), Scaling: stub("Scaling"), X: stub("X"),
+    ArrowLeft: stub("ArrowLeft"), Undo2: stub("Undo2"), Redo2: stub("Redo2"),
+    ChevronUp: stub("ChevronUp"), ChevronDownIcon: stub("ChevronDownIcon"),
+    ChevronUpIcon: stub("ChevronUpIcon"), CheckIcon: stub("CheckIcon"),
+    Info: stub("Info"), Copy: stub("Copy"), ArrowRightLeft: stub("ArrowRightLeft"),
+    ZoomIn: stub("ZoomIn"), Download: stub("Download"), Trash2: stub("Trash2"),
+    Sparkles: stub("Sparkles"), Library: stub("Library"), Star: stub("Star"),
+    ChevronLeft: stub("ChevronLeft"), ChevronRight: stub("ChevronRight"),
+    PanelLeftOpen: stub("PanelLeftOpen"),
+  };
+});
 
 // Mock LLMComparison (external component, not under test)
 vi.mock("@/components/prompt-improve/llm-comparison", () => ({
@@ -249,8 +256,11 @@ async function switchToMode(
   user: ReturnType<typeof userEvent.setup>,
   label: string,
 ) {
-  const segment = screen.getByText(label);
-  await user.click(segment);
+  // ModeSelector is now a DropdownMenu -- click trigger to open, then click item
+  const trigger = screen.getByTestId("mode-selector");
+  await user.click(trigger);
+  const item = await screen.findByRole("menuitem", { name: new RegExp(label, "i") });
+  await user.click(item);
 }
 
 // ===========================================================================
@@ -361,12 +371,8 @@ describe("PromptArea - Generation Model Resolution", () => {
     const motivTextarea = screen.getByTestId("prompt-motiv-textarea");
     await user.type(motivTextarea, "A beautiful landscape");
 
-    // Switch to quality tier
-    await user.click(screen.getByText("Quality"));
-
-    // Enable maxQuality toggle
-    const maxQualityToggle = screen.getByTestId("max-quality-toggle");
-    await user.click(maxQualityToggle);
+    // Switch to max tier (TierToggle now has Draft/Quality/Max segments)
+    await user.click(screen.getByText("Max"));
 
     const generateButton = screen.getByTestId("generate-button");
     await waitFor(() => {

@@ -3,6 +3,15 @@ import { describe, it, expect, vi, beforeAll } from "vitest";
 import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 
+// Polyfill ResizeObserver for jsdom
+if (typeof globalThis.ResizeObserver === "undefined") {
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}
+
 // Polyfill matchMedia for jsdom (needed by useColumnCount hook)
 beforeAll(() => {
   Object.defineProperty(window, "matchMedia", {
@@ -20,12 +29,33 @@ beforeAll(() => {
   });
 });
 
-// Mock lucide-react icons (GalleryGrid uses ImageIcon for empty state)
-vi.mock("lucide-react", () => ({
-  ImageIcon: (props: Record<string, unknown>) => (
-    <span data-testid="image-icon" {...props} />
-  ),
-}));
+// Mock lucide-react icons
+vi.mock("lucide-react", () => {
+  const stub = (name: string) => {
+    const id = name.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+    const Comp = (props: Record<string, unknown>) => <span data-testid={`${id}-icon`} {...props} />;
+    Comp.displayName = name;
+    return Comp;
+  };
+  return {
+    MessageSquare: stub("MessageSquare"), Minus: stub("Minus"), Plus: stub("Plus"),
+    ArrowUp: stub("ArrowUp"), Square: stub("Square"), PanelRightClose: stub("PanelRightClose"),
+    Image: stub("Image"), Loader2: stub("Loader2"), ImageOff: stub("ImageOff"),
+    PanelRightOpen: stub("PanelRightOpen"), PanelLeftIcon: stub("PanelLeftIcon"),
+    PanelLeftClose: stub("PanelLeftClose"), PenLine: stub("PenLine"),
+    ChevronDown: stub("ChevronDown"), Check: stub("Check"), Type: stub("Type"),
+    ImagePlus: stub("ImagePlus"), Scaling: stub("Scaling"), X: stub("X"),
+    ArrowLeft: stub("ArrowLeft"), Undo2: stub("Undo2"), Redo2: stub("Redo2"),
+    ChevronUp: stub("ChevronUp"), ChevronDownIcon: stub("ChevronDownIcon"),
+    ChevronUpIcon: stub("ChevronUpIcon"), CheckIcon: stub("CheckIcon"),
+    Info: stub("Info"), Copy: stub("Copy"), ArrowRightLeft: stub("ArrowRightLeft"),
+    ZoomIn: stub("ZoomIn"), Download: stub("Download"), Trash2: stub("Trash2"),
+    Sparkles: stub("Sparkles"), Library: stub("Library"), Star: stub("Star"),
+    ChevronLeft: stub("ChevronLeft"), ChevronRight: stub("ChevronRight"),
+    PanelLeftOpen: stub("PanelLeftOpen"),
+    ImageIcon: stub("ImageIcon"),
+  };
+});
 
 // Import AFTER mocks
 import { GalleryGrid } from "@/components/workspace/gallery-grid";

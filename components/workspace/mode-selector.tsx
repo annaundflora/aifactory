@@ -96,7 +96,7 @@ export function ModeSelector({
             <DropdownMenuItem
               key={option.value}
               disabled={isDisabled}
-              onClick={() => onChange(option.value)}
+              onClick={() => { if (!isDisabled) onChange(option.value); }}
               className={cn("flex items-start gap-3 px-3 py-2.5", isActive && "bg-accent")}
             >
               <Icon className={cn("mt-0.5 size-4 shrink-0", isActive ? "text-primary" : "text-muted-foreground")} />
