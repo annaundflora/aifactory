@@ -88,8 +88,9 @@ export function CanvasDetailView({
 
   const loadModelSettings = useCallback(() => {
     getModelSettings()
-      .then((settings) => {
-        setModelSettings(settings);
+      .then((result) => {
+        if ("error" in result) return;
+        setModelSettings(result);
       })
       .catch((err) => {
         console.error("Failed to fetch model settings:", err);
@@ -151,7 +152,9 @@ export function CanvasDetailView({
 
   const handleDelete = useCallback(async () => {
     const result = await deleteGeneration({ id: state.currentGenerationId });
-    if (result.success) {
+    if ("error" in result) {
+      toast.error(result.error);
+    } else if (result.success) {
       onBack();
     } else {
       toast.error("Loeschen fehlgeschlagen");
@@ -181,9 +184,12 @@ export function CanvasDetailView({
     const poll = async () => {
       try {
         const projectId = projectIdRef.current;
-        const results = await fetchGenerations(projectId);
+        const fetchResult = await fetchGenerations(projectId);
 
         if (cancelled) return;
+        if (!Array.isArray(fetchResult)) return;
+
+        const results = fetchResult;
 
         // Read current pending IDs from ref (not stale closure state)
         const currentPending = [...pendingGenerationIdsRef.current];

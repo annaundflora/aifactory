@@ -92,6 +92,7 @@ export function HistoryList({
     setInitialized(true);
     startTransition(async () => {
       const result = await getPromptHistory({ offset: 0, limit: BATCH_SIZE });
+      if ("error" in result) return;
       setEntries(result);
       setHasMore(result.length === BATCH_SIZE);
     });
@@ -106,6 +107,7 @@ export function HistoryList({
     if (isPending || !hasMore) return;
     startTransition(async () => {
       const result = await getPromptHistory({ offset: entries.length, limit: BATCH_SIZE });
+      if ("error" in result) return;
       setEntries((prev) => [...prev, ...result]);
       setHasMore(result.length === BATCH_SIZE);
     });
@@ -120,6 +122,7 @@ export function HistoryList({
       e.stopPropagation();
       try {
         const result = await toggleFavorite({ generationId: entry.generationId });
+        if ("error" in result) return;
         setEntries((prev) =>
           prev.map((en) =>
             en.generationId === entry.generationId

@@ -7,6 +7,7 @@ import {
   VALID_TIERS,
   type UpdateModelSettingInput,
 } from "@/lib/types";
+import { requireAuth } from "@/lib/auth/guard";
 
 // ---------------------------------------------------------------------------
 // Validation
@@ -48,7 +49,12 @@ function validateUpdateInput(
  * Returns all model settings. Delegates to ModelSettingsService.getAll()
  * which seeds defaults if the table is empty.
  */
-export async function getModelSettings(): Promise<ModelSetting[]> {
+export async function getModelSettings(): Promise<ModelSetting[] | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
   return ModelSettingsService.getAll();
 }
 
@@ -60,6 +66,11 @@ export async function getModelSettings(): Promise<ModelSetting[]> {
 export async function updateModelSetting(
   input: UpdateModelSettingInput
 ): Promise<ModelSetting | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
   const validationError = validateUpdateInput(input);
   if (validationError) {
     return validationError;

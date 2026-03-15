@@ -92,6 +92,7 @@ export function FavoritesList({
     setInitialized(true);
     startTransition(async () => {
       const result = await getFavoritePrompts({ offset: 0, limit: BATCH_SIZE });
+      if ("error" in result) return;
       setEntries(result);
       setHasMore(result.length === BATCH_SIZE);
     });
@@ -106,6 +107,7 @@ export function FavoritesList({
     if (isPending || !hasMore) return;
     startTransition(async () => {
       const result = await getFavoritePrompts({ offset: entries.length, limit: BATCH_SIZE });
+      if ("error" in result) return;
       setEntries((prev) => [...prev, ...result]);
       setHasMore(result.length === BATCH_SIZE);
     });

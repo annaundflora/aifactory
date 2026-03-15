@@ -56,6 +56,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   const loadSettings = useCallback(async () => {
     const result = await getModelSettings();
+    if ("error" in result) return;
     setSettings(result);
   }, []);
 
@@ -74,7 +75,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         result.map(async (model) => {
           const modelId = `${model.owner}/${model.name}`;
           try {
-            const compatible = await checkImg2ImgSupport({ modelId });
+            const checkResult = await checkImg2ImgSupport({ modelId });
+            const compatible = typeof checkResult === "boolean" ? checkResult : true;
             map[modelId] = compatible;
           } catch {
             // If schema fetch fails, allow selection (fallback)
