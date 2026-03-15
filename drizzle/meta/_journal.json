@@ -71,6 +71,13 @@
       "when": 1774022400000,
       "tag": "0009_add_user_id",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1774108800000,
+      "tag": "0010_add_assistant_tables",
+      "breakpoints": true
     }
   ]
 }
