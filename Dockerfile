@@ -31,6 +31,8 @@ ENV AUTH_SECRET=dummy-build-secret
 ENV AUTH_GOOGLE_ID=dummy
 ENV AUTH_GOOGLE_SECRET=dummy
 ENV ALLOWED_EMAILS=dummy@dummy.com
+# Backend URL baked into Next.js rewrites at build time
+ENV ASSISTANT_BACKEND_URL=http://aifactory-backend:8000
 
 # Build the Next.js application (standalone output)
 RUN pnpm build
