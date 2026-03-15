@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronUp } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { useCanvasDetail } from "@/lib/canvas-detail-context";
 import { ProvenanceRow } from "@/components/lightbox/provenance-row";
 import { modelIdToDisplayName } from "@/lib/utils/model-display-name";
@@ -94,7 +94,7 @@ export function DetailsOverlay({ generation }: DetailsOverlayProps) {
             data-testid="details-hide-button"
             className="gap-1 text-xs text-muted-foreground"
           >
-            <ChevronUp className="size-3.5" />
+            <ChevronRight className="size-3.5 transition-transform duration-200 rotate-90" />
             Hide
           </Button>
         </div>

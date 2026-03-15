@@ -30,7 +30,7 @@ export function AssistantTrigger({ isOpen, onClick }: AssistantTriggerProps) {
         isOpen && "bg-primary text-primary-foreground hover:bg-primary/90 border-transparent dark:border-transparent"
       )}
     >
-      <Sparkles className="size-3.5 text-primary" />
+      <Sparkles className={cn("size-3.5", isOpen ? "text-primary-foreground" : "text-primary")} />
       Assistent
     </button>
   );

@@ -100,6 +100,10 @@ class CanvasSendMessageRequest(BaseModel):
         default=None,
         description="Optional LLM model override",
     )
+    image_url: Optional[HttpUrl] = Field(
+        default=None,
+        description="Optional user-uploaded image URL",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -180,12 +184,16 @@ async def send_canvas_message(session_id: UUID, request: CanvasSendMessageReques
     # mode="json" ensures HttpUrl objects are serialized as plain strings.
     image_context_dict = request.image_context.model_dump(mode="json")
 
+    # Convert user image_url to string (if present) for service injection
+    user_image_url = str(request.image_url) if request.image_url else None
+
     async def event_generator():
         async for sse_event in _service.stream_response(
             session_id=session_id_str,
             content=request.content,
             image_context=image_context_dict,
             model=request.model,
+            user_image_url=user_image_url,
         ):
             yield {
                 "event": sse_event["event"],

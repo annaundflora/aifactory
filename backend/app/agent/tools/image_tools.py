@@ -104,7 +104,10 @@ async def _download_image(image_url: str) -> bytes:
         ValueError: If the download fails or the response is not an image.
     """
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        headers = {
+            "User-Agent": "AIFactory/1.0 (Image Analysis Tool)",
+        }
+        async with httpx.AsyncClient(timeout=30.0, headers=headers) as client:
             response = await client.get(image_url)
             response.raise_for_status()
     except httpx.HTTPStatusError as e:
@@ -242,10 +245,20 @@ async def analyze_image(image_url: str, config: RunnableConfig = None) -> dict:
         Dict with keys: subject, style, mood, lighting, composition, palette.
         All values are non-empty English strings describing the image.
     """
-    # Extract session_id from LangGraph config (thread_id)
+    # Extract session_id and actual image URL from LangGraph config.
+    # The LLM may hallucinate external URLs (e.g. Wikimedia) instead of
+    # using the actual R2 upload URL. pending_image_url contains the real URL.
     session_id = ""
     if config and "configurable" in config:
         session_id = config["configurable"].get("thread_id", "")
+        actual_url = config["configurable"].get("pending_image_url")
+        if actual_url:
+            logger.info(
+                "Overriding LLM-provided URL (%s) with actual upload URL (%s)",
+                image_url[:80],
+                actual_url[:80],
+            )
+            image_url = actual_url
 
     # Step 1: Check DB cache for existing analysis result
     try:

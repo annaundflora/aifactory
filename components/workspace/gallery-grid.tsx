@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { ImageIcon } from "lucide-react";
 import { type Generation } from "@/lib/db/queries";
 import { GenerationCard } from "@/components/workspace/generation-card";
@@ -36,7 +36,8 @@ export function GalleryGrid({
   onSelectGeneration,
   modeFilter = "all",
 }: GalleryGridProps) {
-  const columnCount = useColumnCount();
+  const gridRef = useRef<HTMLDivElement>(null);
+  const columnCount = useColumnCount(gridRef);
 
   // Filter to only completed generations, apply mode filter, and sort by created_at DESC
   const completedGenerations = useMemo(() => {
@@ -76,7 +77,7 @@ export function GalleryGrid({
 
   // Masonry grid via flexbox with round-robin column distribution
   return (
-    <div className="flex gap-4" data-testid="gallery-grid">
+    <div ref={gridRef} className="flex gap-4" data-testid="gallery-grid">
       {columns.map((col, i) => (
         <div key={i} className="flex-1 flex flex-col gap-4">
           {col.map((generation) => (

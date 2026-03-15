@@ -130,6 +130,7 @@ class CanvasAssistantService:
         content: str,
         image_context: Optional[dict] = None,
         model: Optional[str] = None,
+        user_image_url: Optional[str] = None,
     ) -> AsyncGenerator[dict, None]:
         """Stream a response from the canvas LangGraph agent as SSE events.
 
@@ -156,6 +157,17 @@ class CanvasAssistantService:
                     {"type": "text", "text": content},
                     {"type": "image_url", "image_url": {"url": str(image_context["image_url"])}},
                 ]
+                # Attach user-uploaded image if present (in addition to canvas image)
+                if user_image_url:
+                    message_content.append(
+                        {"type": "image_url", "image_url": {"url": user_image_url}}
+                    )
+                human_message = HumanMessage(content=message_content)
+            elif user_image_url:
+                message_content = [
+                    {"type": "text", "text": content},
+                    {"type": "image_url", "image_url": {"url": user_image_url}},
+                ]
                 human_message = HumanMessage(content=message_content)
             else:
                 human_message = HumanMessage(content=content)
@@ -167,6 +179,7 @@ class CanvasAssistantService:
                     "thread_id": session_id,
                     "image_context": image_context,
                     "model": model,
+                    "pending_image_url": user_image_url,
                 }
             }
 

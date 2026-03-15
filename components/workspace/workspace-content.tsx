@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
+import { PenLine, PanelLeftClose } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { type Generation } from "@/lib/db/queries";
 import { fetchGenerations } from "@/app/actions/generations";
 import { PromptArea } from "@/components/workspace/prompt-area";
@@ -11,8 +13,16 @@ import { FilterChips, type FilterValue } from "@/components/workspace/filter-chi
 import { CanvasDetailView } from "@/components/canvas/canvas-detail-view";
 import { CanvasDetailProvider } from "@/lib/canvas-detail-context";
 import { startViewTransitionIfSupported } from "@/lib/utils/view-transition";
+import { PromptAssistantProvider } from "@/lib/assistant/assistant-context";
+import { AssistantPanelContent } from "@/components/assistant/assistant-panel";
 
 const POLLING_INTERVAL_MS = 3000;
+
+// Prompt area resize/collapse constants
+const PROMPT_MIN_WIDTH = 320;
+const PROMPT_MAX_WIDTH = 480;
+const PROMPT_DEFAULT_WIDTH = 480;
+const PROMPT_COLLAPSED_WIDTH = 48;
 
 interface WorkspaceContentProps {
   projectId: string;
@@ -35,6 +45,97 @@ export function WorkspaceContent({
   // it via props/callbacks so external consumers can read it.
   const [detailViewOpen, setDetailViewOpen] = useState(false);
   const [selectedGenerationId, setSelectedGenerationId] = useState<string | null>(null);
+
+  // ----- Assistant Panel state -----
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const handleAssistantToggle = useCallback(() => {
+    setAssistantOpen((prev) => !prev);
+  }, []);
+  const handleAssistantClose = useCallback(() => {
+    setAssistantOpen(false);
+  }, []);
+
+  // ----- Prompt Area resize/collapse -----
+  const [promptWidth, setPromptWidth] = useState(PROMPT_DEFAULT_WIDTH);
+  const [promptCollapsed, setPromptCollapsed] = useState(false);
+  const promptPreCollapseWidthRef = useRef(PROMPT_DEFAULT_WIDTH);
+  const promptIsResizing = useRef(false);
+  const promptRafRef = useRef<number | null>(null);
+  const promptMouseMoveRef = useRef<((e: MouseEvent) => void) | null>(null);
+  const promptMouseUpRef = useRef<(() => void) | null>(null);
+
+  const cleanupPromptResize = useCallback(() => {
+    if (promptRafRef.current !== null) {
+      cancelAnimationFrame(promptRafRef.current);
+      promptRafRef.current = null;
+    }
+    if (promptMouseMoveRef.current) {
+      document.removeEventListener("mousemove", promptMouseMoveRef.current);
+      promptMouseMoveRef.current = null;
+    }
+    if (promptMouseUpRef.current) {
+      document.removeEventListener("mouseup", promptMouseUpRef.current);
+      promptMouseUpRef.current = null;
+    }
+    promptIsResizing.current = false;
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+  }, []);
+
+  useEffect(() => {
+    return () => cleanupPromptResize();
+  }, [cleanupPromptResize]);
+
+  const handlePromptCollapse = useCallback(() => {
+    promptPreCollapseWidthRef.current = promptWidth;
+    setPromptCollapsed(true);
+  }, [promptWidth]);
+
+  const handlePromptExpand = useCallback(() => {
+    setPromptCollapsed(false);
+    setPromptWidth(promptPreCollapseWidthRef.current || PROMPT_DEFAULT_WIDTH);
+  }, []);
+
+  const handlePromptResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      if (promptCollapsed) return;
+      e.preventDefault();
+      promptIsResizing.current = true;
+
+      const startX = e.clientX;
+      const startWidth = promptWidth;
+
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        if (!promptIsResizing.current) return;
+        if (promptRafRef.current !== null) {
+          cancelAnimationFrame(promptRafRef.current);
+        }
+        // Right edge: dragging right = wider
+        const delta = moveEvent.clientX - startX;
+        const newWidth = Math.min(
+          PROMPT_MAX_WIDTH,
+          Math.max(PROMPT_MIN_WIDTH, startWidth + delta)
+        );
+        promptRafRef.current = requestAnimationFrame(() => {
+          promptRafRef.current = null;
+          setPromptWidth(newWidth);
+        });
+      };
+
+      const handleMouseUp = () => {
+        cleanupPromptResize();
+      };
+
+      promptMouseMoveRef.current = handleMouseMove;
+      promptMouseUpRef.current = handleMouseUp;
+
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    },
+    [promptCollapsed, promptWidth, cleanupPromptResize]
+  );
 
   // ----- Polling -----
   const hasPending = useMemo(
@@ -159,20 +260,68 @@ export function WorkspaceContent({
 
       {/* Gallery-View: hidden (not unmounted) when detail view is open */}
       <div
-        className="flex flex-1 gap-3 overflow-hidden bg-muted/40 p-3"
+        className="flex h-[calc(100dvh-3.5rem)] gap-3 overflow-hidden bg-muted/40 p-3"
         data-testid="workspace-gallery-view"
         style={showDetailView ? { display: "none" } : undefined}
       >
-        {/* Left: Prompt Area */}
-        <div className="w-[480px] shrink-0 overflow-y-auto rounded-xl border border-border/80 bg-card p-4 shadow-sm">
-          <PromptArea
-            projectId={projectId}
-            onGenerationsCreated={handleGenerationsCreated}
-          />
-        </div>
+        {/* Left: Prompt Area (resizable + collapsible) */}
+        {promptCollapsed ? (
+          <div
+            className="flex shrink-0 flex-col items-center rounded-xl border border-border/80 bg-card py-3 cursor-pointer shadow-sm"
+            style={{ width: PROMPT_COLLAPSED_WIDTH }}
+            onClick={handlePromptExpand}
+            data-testid="prompt-area-collapsed"
+            role="button"
+            aria-label="Expand prompt panel"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handlePromptExpand();
+              }
+            }}
+          >
+            <PenLine className="size-5 text-muted-foreground" />
+          </div>
+        ) : (
+          <div
+            className="relative shrink-0 overflow-y-auto rounded-xl border border-border/80 bg-card shadow-sm"
+            style={{ width: promptWidth }}
+            data-testid="prompt-area-panel"
+          >
+            {/* Resize handle on right edge */}
+            <div
+              className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize z-10 hover:bg-primary/20 active:bg-primary/30"
+              onMouseDown={handlePromptResizeStart}
+              data-testid="prompt-resize-handle"
+              role="separator"
+              aria-orientation="vertical"
+            />
+            {/* Collapse button — left-aligned, matches collapse direction */}
+            <div className="flex items-center justify-start px-3 pt-2 pb-1">
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={handlePromptCollapse}
+                aria-label="Collapse prompt panel"
+                data-testid="prompt-collapse-button"
+              >
+                <PanelLeftClose className="size-4" />
+              </Button>
+            </div>
+            <div className="px-4 pb-4">
+              <PromptArea
+                projectId={projectId}
+                onGenerationsCreated={handleGenerationsCreated}
+                assistantOpen={assistantOpen}
+                onAssistantToggle={handleAssistantToggle}
+              />
+            </div>
+          </div>
+        )}
 
-        {/* Right: Gallery */}
-        <div className="flex-1 overflow-y-auto rounded-xl border border-border/80 bg-card p-6 shadow-sm">
+        {/* Center: Gallery */}
+        <div className="min-w-[300px] flex-1 overflow-y-auto rounded-xl border border-border/80 bg-card p-6 shadow-sm">
           {/* Pending Placeholders (failed -> only toast, no card) */}
           {pendingGenerations.length > 0 && (
             <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -193,6 +342,23 @@ export function WorkspaceContent({
             onSelectGeneration={handleSelectGeneration}
             modeFilter={modeFilter}
           />
+        </div>
+
+        {/* Right: Assistant Panel — always mounted, width animated */}
+        <div
+          className="h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out"
+          style={{ width: assistantOpen ? 480 : 0 }}
+          data-testid="assistant-panel-wrapper"
+        >
+          <div className="h-full w-[480px] overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
+            <PromptAssistantProvider projectId={projectId}>
+              <AssistantPanelContent
+                open={assistantOpen}
+                onClose={handleAssistantClose}
+                projectId={projectId}
+              />
+            </PromptAssistantProvider>
+          </div>
         </div>
 
       </div>

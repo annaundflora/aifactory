@@ -9,9 +9,11 @@ import {
   type ChangeEvent,
 } from "react";
 import { ArrowUp, Square } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ImageUploadButton } from "./image-upload-button";
 import { ImagePreview } from "./image-preview";
+import { GALLERY_DRAG_MIME_TYPE, type GalleryDragPayload } from "@/lib/constants/drag-types";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -49,6 +51,7 @@ export function ChatInput({
 }: ChatInputProps) {
   const [value, setValue] = useState("");
   const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const trimmed = value.trim();
@@ -82,11 +85,14 @@ export function ChatInput({
   // AC-5: Send message with content and optional imageUrl, then reset
   const handleSend = useCallback(() => {
     if (!canSend) return;
-    console.log("[ChatInput] Sending:", trimmed, "imageUrl:", pendingImageUrl);
+    // When only an image is attached without text, send a default content
+    // to satisfy the backend's min_length=1 validation on the content field.
+    const messageContent =
+      pendingImageUrl && !trimmed ? "Analysiere dieses Bild" : trimmed;
     if (pendingImageUrl) {
-      onSend(trimmed, pendingImageUrl);
+      onSend(messageContent, pendingImageUrl);
     } else {
-      onSend(trimmed);
+      onSend(messageContent);
     }
     setValue("");
     setPendingImageUrl(null);
@@ -122,8 +128,39 @@ export function ChatInput({
     setPendingImageUrl(null);
   }, []);
 
+  // Gallery drag-to-chat handlers
+  const handleDragOver = useCallback(
+    (e: React.DragEvent) => {
+      if (e.dataTransfer.types.includes(GALLERY_DRAG_MIME_TYPE)) {
+        e.preventDefault();
+        setIsDragOver(true);
+      }
+    },
+    []
+  );
+
+  const handleDragLeave = useCallback(() => {
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const data = e.dataTransfer.getData(GALLERY_DRAG_MIME_TYPE);
+    if (data) {
+      const parsed = JSON.parse(data) as GalleryDragPayload;
+      setPendingImageUrl(parsed.imageUrl);
+    }
+  }, []);
+
   return (
-    <div data-testid="chat-input">
+    <div
+      data-testid="chat-input"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={cn(isDragOver && "ring-2 ring-primary/50 bg-primary/5 rounded-lg")}
+    >
       {/* AC-3: Image preview area above textarea when pendingImageUrl is set */}
       {pendingImageUrl && (
         <div

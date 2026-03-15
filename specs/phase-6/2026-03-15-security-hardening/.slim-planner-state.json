@@ -1,0 +1,30 @@
+{
+  "spec_path": "specs/phase-6/2026-03-15-security-hardening",
+  "status": "in_progress",
+  "phase": "slice_planning",
+  "started_at": "2026-03-15T12:00:00Z",
+  "detected_stack": "TypeScript (Next.js 16.1.6) + Python",
+  "total_slices": 14,
+  "current_slice_index": 9,
+  "slices": [
+    { "number": 1, "name": "Auth.js Setup + Config", "status": "approved", "retries": 1 },
+    { "number": 2, "name": "Login Page UI", "status": "approved", "retries": 0 },
+    { "number": 3, "name": "Middleware + Route Protection", "status": "approved", "retries": 0 },
+    { "number": 4, "name": "DB Schema - Auth.js Tabellen", "status": "approved", "retries": 0 },
+    { "number": 5, "name": "DB Schema - userId Migration", "status": "approved", "retries": 0 },
+    { "number": 6, "name": "Auth Guard Helper", "status": "approved", "retries": 0 },
+    { "number": 7, "name": "Server Action Auth - Projects + Queries", "status": "approved", "retries": 0 },
+    { "number": 8, "name": "Server Action Auth - Generations + References", "status": "approved", "retries": 1 },
+    { "number": 9, "name": "Server Action Auth - Prompts + Models + Model-Settings", "status": "approved", "retries": 1 },
+    { "number": 10, "name": "Server Action Auth - Upload + SSRF Fix", "status": "pending", "retries": 0 },
+    { "number": 11, "name": "Sidebar Auth - User-Info + Logout", "status": "pending", "retries": 0 },
+    { "number": 12, "name": "Security Headers", "status": "pending", "retries": 0 },
+    { "number": 13, "name": "Dockerfile + Production Docker Compose", "status": "pending", "retries": 0 },
+    { "number": 14, "name": "Caddy Reverse Proxy + .env.example", "status": "pending", "retries": 0 }
+  ],
+  "approved_slices": [1, 2, 3, 4, 5, 6, 7, 8, 9],
+  "failed_slices": [],
+  "gate3_retries": 0,
+  "last_action": "Slice 9 approved",
+  "last_updated": "2026-03-15T12:45:00Z"
+}

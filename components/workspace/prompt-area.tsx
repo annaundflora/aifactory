@@ -33,20 +33,6 @@ import { Loader2, Sparkles, Minus, Plus } from "lucide-react";
 import { LLMComparison } from "@/components/prompt-improve/llm-comparison";
 import { AssistantTrigger } from "@/components/assistant/assistant-trigger";
 import { SectionLabel } from "@/components/shared/section-label";
-import { AssistantSheet } from "@/components/assistant/assistant-sheet";
-import { Startscreen } from "@/components/assistant/startscreen";
-import { ChatInput } from "@/components/assistant/chat-input";
-import { ChatThread } from "@/components/assistant/chat-thread";
-import { PromptCanvas } from "@/components/assistant/prompt-canvas";
-import { SessionList } from "@/components/assistant/session-list";
-import { SessionSwitcher } from "@/components/assistant/session-switcher";
-import { ModelSelector } from "@/components/assistant/model-selector";
-import {
-  PromptAssistantProvider,
-  usePromptAssistant,
-  getWorkspaceFieldsForChip,
-} from "@/lib/assistant/assistant-context";
-import { useAssistantRuntime } from "@/lib/assistant/use-assistant-runtime";
 import { toast } from "sonner";
 
 // Re-export Generation type for callback
@@ -59,6 +45,8 @@ import { type Generation } from "@/lib/db/queries";
 interface PromptAreaProps {
   projectId: string;
   onGenerationsCreated?: (generations: Generation[]) => void;
+  assistantOpen?: boolean;
+  onAssistantToggle?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -158,7 +146,7 @@ function resolveModel(
 // Component
 // ---------------------------------------------------------------------------
 
-export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps) {
+export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: assistantOpenProp, onAssistantToggle }: PromptAreaProps) {
   // ----- Mode state -----
   const [currentMode, setCurrentMode] = useState<GenerationMode>("txt2img");
 
@@ -218,12 +206,12 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
   // ----- LLM comparison -----
   const [showImprove, setShowImprove] = useState(false);
 
-  // ----- Assistant Sheet state -----
-  const [assistantOpen, setAssistantOpen] = useState(false);
+  // ----- Assistant Panel state (lifted to workspace-content) -----
+  const assistantOpen = assistantOpenProp ?? false;
 
   const handleAssistantToggle = useCallback(() => {
-    setAssistantOpen((prev) => !prev);
-  }, []);
+    onAssistantToggle?.();
+  }, [onAssistantToggle]);
 
   // Session history navigation is now handled inside AssistantSheetContent via context.setActiveView
 
@@ -1050,195 +1038,6 @@ export function PromptArea({ projectId, onGenerationsCreated }: PromptAreaProps)
         </div>
       </PromptTabs>
 
-      {/* Assistant Sheet with Context Provider */}
-      <PromptAssistantProvider projectId={projectId}>
-        <AssistantSheetContent
-          open={assistantOpen}
-          onOpenChange={setAssistantOpen}
-          projectId={projectId}
-        />
-      </PromptAssistantProvider>
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// AssistantSheetContent (inner component using PromptAssistantContext)
-// ---------------------------------------------------------------------------
-
-interface AssistantSheetContentProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  projectId: string;
-}
-
-function AssistantSheetContent({
-  open,
-  onOpenChange,
-  projectId,
-}: AssistantSheetContentProps) {
-  const {
-    messages,
-    isStreaming,
-    hasCanvas,
-    selectedModel,
-    setSelectedModel,
-    cancelStream,
-    activeView,
-    setActiveView,
-    loadSession,
-    sessionId,
-    dispatch,
-    sessionIdRef,
-    sendMessageRef,
-    cancelStreamRef,
-  } = usePromptAssistant();
-
-  const { variationData } = useWorkspaceVariation();
-
-  const { sendMessage } = useAssistantRuntime({
-    projectId,
-    dispatch,
-    sessionIdRef,
-    selectedModel,
-    sendMessageRef,
-    cancelStreamRef,
-  });
-
-  const handleSend = useCallback(
-    (text: string, imageUrl?: string) => {
-      sendMessage(text, imageUrl);
-    },
-    [sendMessage]
-  );
-
-  /**
-   * Slice-19 AC-8/AC-9: "Verbessere meinen aktuellen Prompt" chip handler.
-   * Enriches the chip text with current workspace fields when available.
-   */
-  const handleChipClick = useCallback(
-    (text: string) => {
-      const IMPROVE_CHIP_TEXT = "Verbessere meinen aktuellen Prompt";
-      if (text === IMPROVE_CHIP_TEXT) {
-        const context = getWorkspaceFieldsForChip(variationData);
-        if (context) {
-          // AC-8: Prepend workspace fields as context
-          sendMessage(`${text}\n\n${context}`);
-        } else {
-          // AC-9: Send chip text as-is when all workspace fields are empty
-          sendMessage(text);
-        }
-      } else {
-        sendMessage(text);
-      }
-    },
-    [sendMessage, variationData]
-  );
-
-  /**
-   * Slice-19 AC-1/AC-4: Auto-resume active session when sheet opens.
-   * If sessionId exists but messages are empty (e.g., after page-level navigation),
-   * reload the session from backend. If messages already exist in context, the
-   * state is already preserved (AC-4/AC-7).
-   * AC-5: When no sessionId exists, startscreen is shown (default behavior).
-   */
-  const handleSheetOpen = useCallback(() => {
-    if (sessionId && messages.length === 0) {
-      // Session ID exists but state was lost -- reload from backend
-      loadSession(sessionId);
-    } else if (sessionId && messages.length > 0) {
-      // AC-1: Session is already in memory, ensure chat view is active
-      if (activeView === "startscreen") {
-        setActiveView("chat");
-      }
-    }
-    // AC-5: No sessionId -> startscreen remains (default)
-  }, [sessionId, messages.length, loadSession, activeView, setActiveView]);
-
-  // AC-7: Session switcher navigates to session list
-  const handleSwitcherClick = useCallback(() => {
-    setActiveView("session-list");
-  }, [setActiveView]);
-
-  // AC-4: Loading a session from the list
-  const handleSelectSession = useCallback(
-    (id: string) => {
-      loadSession(id);
-    },
-    [loadSession]
-  );
-
-  // Navigate back from session list to startscreen or chat
-  const handleSessionListBack = useCallback(() => {
-    if (messages.length > 0) {
-      setActiveView("chat");
-    } else {
-      setActiveView("startscreen");
-    }
-  }, [messages.length, setActiveView]);
-
-  // New session from session list
-  const handleNewSession = useCallback(() => {
-    dispatch({ type: "RESET_SESSION" });
-    setActiveView("startscreen");
-  }, [dispatch, setActiveView]);
-
-  // Navigate to session list from startscreen
-  const handleSessionHistoryClick = useCallback(() => {
-    setActiveView("session-list");
-  }, [setActiveView]);
-
-  // Render the appropriate content based on activeView
-  const renderContent = () => {
-    if (activeView === "session-list") {
-      return (
-        <SessionList
-          projectId={projectId}
-          onSelectSession={handleSelectSession}
-          onBack={handleSessionListBack}
-          onNewSession={handleNewSession}
-        />
-      );
-    }
-
-    // For "chat" and "startscreen" views
-    return (
-      <div className="flex flex-1 flex-col h-full">
-        {activeView === "chat" && messages.length > 0 ? (
-          <ChatThread messages={messages} isStreaming={isStreaming} />
-        ) : (
-          <Startscreen
-            hasSessions={false}
-            onChipClick={handleChipClick}
-            onSessionHistoryClick={handleSessionHistoryClick}
-          />
-        )}
-        <ChatInput
-          onSend={handleSend}
-          isStreaming={isStreaming}
-          onStop={cancelStream}
-          autoFocus={open}
-          projectId={projectId}
-        />
-      </div>
-    );
-  };
-
-  return (
-    <AssistantSheet
-      open={open}
-      onOpenChange={onOpenChange}
-      onOpen={handleSheetOpen}
-      hasCanvas={hasCanvas && activeView !== "session-list"}
-      canvasSlot={<PromptCanvas />}
-      headerSlot={
-        <>
-          <ModelSelector value={selectedModel} onChange={setSelectedModel} />
-          <SessionSwitcher onClick={handleSwitcherClick} />
-        </>
-      }
-    >
-      {renderContent()}
-    </AssistantSheet>
   );
 }

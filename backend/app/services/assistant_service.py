@@ -151,8 +151,15 @@ class AssistantService:
 
             human_message = HumanMessage(content=message_content)
 
-            # LangGraph config with thread_id for session persistence
-            config = {"configurable": {"thread_id": session_id}}
+            # LangGraph config with thread_id for session persistence.
+            # Pass the actual image URL so analyze_image uses the correct R2 URL
+            # instead of whatever URL the LLM hallucinates.
+            config = {
+                "configurable": {
+                    "thread_id": session_id,
+                    "pending_image_url": str(image_url) if image_url else None,
+                }
+            }
 
             # If a model override is specified, we could pass it via config
             # For now, the agent uses the default model from settings.

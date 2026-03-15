@@ -6,7 +6,7 @@ import {
   useRef,
   useEffect,
 } from "react";
-import { MessageSquare, Minus, Plus } from "lucide-react";
+import { MessageSquare, PanelRightClose, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { TierToggle } from "@/components/ui/tier-toggle";
@@ -345,7 +345,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
   // Core send logic — used by handleSend and handleChipClick
   // ---------------------------------------------------------------------------
   const sendMessageToBackend = useCallback(
-    async (text: string) => {
+    async (text: string, imageUrl?: string) => {
       // Ensure we have a session
       if (!sessionIdRef.current) {
         try {
@@ -442,7 +442,8 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
             }
           },
           abortControllerRef.current.signal,
-          chatModelSlug
+          chatModelSlug,
+          imageUrl
         );
       } catch (error) {
         console.error("[CanvasChatPanel] SSE stream error:", error);
@@ -483,14 +484,15 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
   // AC-2: Send message
   // ---------------------------------------------------------------------------
   const handleSend = useCallback(
-    (text: string) => {
+    (text: string, imageUrl?: string) => {
       const userMsg: ChatMessage = {
         id: `user-${crypto.randomUUID()}`,
         role: "user",
         content: text,
+        ...(imageUrl ? { imageUrl } : {}),
       };
       setMessages((prev) => [...prev, userMsg]);
-      sendMessageToBackend(text).catch((err) =>
+      sendMessageToBackend(text, imageUrl).catch((err) =>
         console.error("[CanvasChatPanel] send failed:", err)
       );
     },
@@ -616,7 +618,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
             aria-label="Collapse chat panel"
             data-testid="chat-collapse-button"
           >
-            <Minus className="size-3.5" />
+            <PanelRightClose className="size-4" />
           </Button>
         </div>
       </div>
@@ -652,7 +654,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
         onSend={handleSend}
         disabled={inputDisabled}
         isStreaming={isStreaming}
-        hideImageUpload
+        projectId={projectId}
         placeholder="Describe changes..."
       />
     </div>
