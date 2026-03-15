@@ -46,7 +46,7 @@
 
 ## Screen: Prompt Panel (txt2img / img2img)
 
-**Context:** Right sidebar in Workspace. Controls appear between Tier Toggle and Variant Count Stepper. Shown in txt2img and img2img modes only (not upscale).
+**Context:** Right sidebar in Workspace. Controls appear inside the Action Bar div (`space-y-3`), between TierToggle and the Variant Count Stepper. The Action Bar starts after the `<hr>` separator below Prompt Tools. Shown in txt2img and img2img modes only (not upscale).
 
 ### Wireframe
 
@@ -88,9 +88,11 @@
 
 **Annotations:**
 - ① `TierToggle`: Existing tier selector (Draft/Quality/Max). Tier change triggers model re-resolution and schema refetch.
-- ② `Primary Controls > Aspect Ratio`: Select dropdown populated from model schema enum. Only shown if current model has `aspect_ratio` in schema.
+- ② `Primary Controls > Aspect Ratio`: Select dropdown populated from model schema enum. Only shown if current model has `aspect_ratio` in schema. For models with many options (e.g. Nano Banana 2 with 14 values), options are visually grouped: Common (1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3) shown first, then a separator, then Extreme (4:5, 5:4, 21:9, 4:1, 1:4, 8:1, 1:8). Grouping is purely visual — all values remain selectable.
 - ③ `Primary Controls > Megapixels/Resolution`: Select dropdown for size parameter. Shows `megapixels` (Flux models) or `resolution` (Nano Banana 2). Only shown if current model has the field. GPT Image 1.5 has neither — field hidden.
 - ④ `Advanced Toggle`: Clickable text/button to expand Advanced Controls section. Hidden if model has no advanced properties.
+
+**Implementation Note:** The new controls (②③④) are inserted inside the existing Action Bar `<div className="space-y-3">` in `prompt-area.tsx:962`, between `<TierToggle>` and the `{showVariants && ...}` Variant Count Stepper block.
 
 ### Wireframe: Advanced Expanded
 

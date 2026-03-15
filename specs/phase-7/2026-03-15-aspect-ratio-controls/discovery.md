@@ -138,7 +138,7 @@
 
 | Element | Type | Location | States | Behavior |
 |---------|------|----------|--------|----------|
-| Primary Controls | ParameterPanel (gefiltert auf Whitelist) | Prompt Panel, Variation Popover, Img2img Popover | `loading` (Skeleton), `ready` (Dropdowns), `empty` (Model hat keine Primary-Fields) | Zeigt aspect_ratio, megapixels, resolution -- je nach Model-Schema |
+| Primary Controls | ParameterPanel (gefiltert auf Whitelist) | Prompt Panel, Variation Popover, Img2img Popover | `loading` (3 Skeleton-Rows: je Label + Select-Placeholder), `ready` (Dropdowns), `empty` (Model hat keine Primary-Fields) | Zeigt aspect_ratio, megapixels, resolution -- je nach Model-Schema |
 | Advanced Toggle | Button/Link | Prompt Panel, Variation Popover, Img2img Popover | `collapsed` (Default), `expanded` | Klick toggled Advanced Section |
 | Advanced Controls | ParameterPanel (alle nicht-Primary Properties) | Prompt Panel, Variation Popover, Img2img Popover | `collapsed` (hidden), `expanded` (Dropdowns/Inputs sichtbar), `empty` (keine Advanced-Fields) | Zeigt alle Schema-Properties ausser Primary-Whitelist und interne Felder |
 
@@ -163,7 +163,7 @@
 | `schema_loading` | Schema geladen, keine Primary- oder Advanced-Fields | Controls-Bereich nicht sichtbar | `schema_empty` | -- |
 | `schema_loading` | Schema-Fetch fehlgeschlagen | Controls-Bereich nicht sichtbar | `schema_error` | -- |
 | `schema_ready` | Tier-Wechsel -> anderes Model | Controls kurz Skeleton, dann neue Optionen | `schema_loading` -> `schema_ready` | Ungueltige Werte werden auf Model-Default zurueckgesetzt |
-| `schema_ready` | Mode-Wechsel (txt2img <-> img2img) | Controls bleiben wenn gleiches Model | `schema_ready` | imageParams werden beibehalten |
+| `schema_ready` | Mode-Wechsel (txt2img <-> img2img) | Controls bleiben wenn gleiches Model | `schema_ready` | imageParams werden per Mode persistiert (siehe Mode Persistence unten) |
 
 ---
 
@@ -171,12 +171,34 @@
 
 - Schema-Properties werden dynamisch aus dem Replicate Model-Schema geladen (nicht hardcoded)
 - **Primary-Whitelist:** `aspect_ratio`, `megapixels`, `resolution` -- immer sichtbar wenn im Schema vorhanden
-- **Advanced:** Alle anderen Schema-Properties (ausser internen Feldern wie `prompt`, img2img-Felder, `openai_api_key`) -- einklappbar
+- **Advanced:** Alle anderen Schema-Properties ausser INTERNAL_FIELDS (siehe unten) -- einklappbar
+- **INTERNAL_FIELDS** (von ParameterPanel komplett ausgeschlossen, weder Primary noch Advanced):
+  - Prompt-Felder: `prompt`, `negative_prompt`
+  - Image-Input-Felder (programmatisch gesetzt): `image`, `image_input`, `image_prompt`, `init_image`, `input_image`, `input_images`, `images`
+  - Img2img-Steuerung: `prompt_strength`, `strength`
+  - Inpainting: `mask`, `mask_prompt`
+  - Backend-only: `seed`, `num_outputs`
+  - API-Keys: `openai_api_key`
+  - Zusaetzlich per Type ausgeschlossen: `type === "string"` ohne enum, `type === "boolean"`, `type === "array"` ohne enum
 - Wenn das Model ein Primary-Field nicht hat -> entsprechendes Control nicht anzeigen (kein Platzhalter)
 - User-gewaehlte Werte ueberschreiben Model-Defaults beim Merge in params
 - Bei Model-Wechsel (Tier-Aenderung oder Admin-Settings-Aenderung): wenn der gewaehlte Wert im neuen Schema nicht existiert -> auf Model-Default zuruecksetzen
 - Upscale Mode zeigt keine Controls (nicht relevant)
 - Model-Auswahl erfolgt ausschliesslich ueber Admin-Settings (`model_settings` Tabelle), nicht im Generierungs-UI
+
+### Mode Persistence fuer imageParams
+
+`imageParams: Record<string, unknown>` muss in `Txt2ImgState` und `Img2ImgState` aufgenommen werden (analog zu promptMotiv, promptStyle etc.). Beim Mode-Wechsel:
+- **txt2img <-> img2img (gleiches Model):** imageParams werden pro Mode gespeichert und beim Zurueckwechseln wiederhergestellt
+- **Tier-Wechsel (anderes Model):** imageParams werden zurueckgesetzt (ungueltige Werte fuer neues Schema)
+- **Upscale:** keine imageParams (nicht relevant)
+
+### Canvas Popover imageParams Flow
+
+Canvas Popovers (`VariationPopover`, `Img2imgPopover`) muessen imageParams durch ihre Params-Interfaces an die Generation-Handler weiterreichen:
+- `VariationParams` erhaelt `imageParams?: Record<string, unknown>`
+- `Img2imgParams` erhaelt `imageParams?: Record<string, unknown>`
+- `canvas-detail-view.tsx` Handlers (`handleVariationGenerate`, `handleImg2imgGenerate`) spreaden `...imageParams` in das `params`-Objekt neben bestehenden Feldern wie `prompt_strength`
 
 ---
 
@@ -184,7 +206,7 @@
 
 | Field | Required | Validation | Notes |
 |-------|----------|------------|-------|
-| `aspect_ratio` | No | Muss in Schema-enum des aktuellen Models enthalten sein | Flux: 9 Werte, Nano Banana 2: 14 Werte, GPT Image 1.5: 3 Werte |
+| `aspect_ratio` | No | Muss in Schema-enum des aktuellen Models enthalten sein | Flux: 9 Werte, Nano Banana 2: 14 Werte, GPT Image 1.5: 3 Werte. Bei >8 Optionen: Visuelle Gruppierung in Common (1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3) und Extreme (Rest) mit Separator im Dropdown |
 | `megapixels` | No | Muss in Schema-enum des aktuellen Models enthalten sein | Nur Flux-Models (enum: "0.25", "1") |
 | `resolution` | No | Muss in Schema-enum des aktuellen Models enthalten sein | Nur Nano Banana 2 (enum: "512px", "1K", "2K", "4K") |
 | Advanced params (variabel) | No | Muss im Schema des aktuellen Models enthalten sein | Model-spezifisch: quality, background, safety_filter_level, etc. |
