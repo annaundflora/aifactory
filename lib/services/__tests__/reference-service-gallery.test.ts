@@ -66,9 +66,10 @@ import type { ReferenceImage } from "@/lib/db/queries";
 // Helpers
 // ---------------------------------------------------------------------------
 
+const TEST_R2_PUBLIC_URL = "https://r2.example.com";
 const TEST_PROJECT_ID = "proj-xyz";
 const TEST_GENERATION_ID = "gen-abc-123";
-const TEST_IMAGE_URL = "https://r2.example.com/generations/img.png";
+const TEST_IMAGE_URL = `${TEST_R2_PUBLIC_URL}/generations/img.png`;
 
 /** Create a fake ReferenceImage record as returned by createReferenceImage */
 function makeGalleryReferenceImage(
@@ -95,6 +96,7 @@ function makeGalleryReferenceImage(
 describe("ReferenceService.uploadFromGallery", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.R2_PUBLIC_URL = TEST_R2_PUBLIC_URL;
   });
 
   // =========================================================================

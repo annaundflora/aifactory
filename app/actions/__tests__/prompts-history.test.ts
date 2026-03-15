@@ -21,6 +21,10 @@ vi.mock('@/lib/services/prompt-service', () => ({
   },
 }))
 
+vi.mock('@/lib/auth/guard', () => ({
+  requireAuth: vi.fn().mockResolvedValue({ userId: 'mock-user-id', email: 'test@example.com' }),
+}))
+
 import {
   getPromptHistory,
   getFavoritePrompts,
@@ -56,7 +60,7 @@ describe('Prompt History Actions', () => {
     const result = await getPromptHistory({ offset: 0, limit: 20 })
 
     expect(mockGetHistory).toHaveBeenCalledOnce()
-    expect(mockGetHistory).toHaveBeenCalledWith(0, 20)
+    expect(mockGetHistory).toHaveBeenCalledWith('mock-user-id', 0, 20)
     expect(result).toEqual(fakeEntries)
   })
 
@@ -65,7 +69,7 @@ describe('Prompt History Actions', () => {
 
     await getPromptHistory({})
 
-    expect(mockGetHistory).toHaveBeenCalledWith(0, 50)
+    expect(mockGetHistory).toHaveBeenCalledWith('mock-user-id', 0, 50)
   })
 
   it('AC-9 (getFavoritePrompts): should delegate getFavoritePrompts to promptHistoryService.getFavorites', async () => {
@@ -87,7 +91,7 @@ describe('Prompt History Actions', () => {
     const result = await getFavoritePrompts({ offset: 0, limit: 20 })
 
     expect(mockGetFavorites).toHaveBeenCalledOnce()
-    expect(mockGetFavorites).toHaveBeenCalledWith(0, 20)
+    expect(mockGetFavorites).toHaveBeenCalledWith('mock-user-id', 0, 20)
     expect(result).toEqual(fakeEntries)
   })
 
@@ -104,7 +108,7 @@ describe('Prompt History Actions', () => {
     const result = await toggleFavorite({ generationId: validUuid })
 
     expect(mockToggleFavorite).toHaveBeenCalledOnce()
-    expect(mockToggleFavorite).toHaveBeenCalledWith(validUuid)
+    expect(mockToggleFavorite).toHaveBeenCalledWith('mock-user-id', validUuid)
     expect(result).toEqual({ isFavorite: true })
   })
 

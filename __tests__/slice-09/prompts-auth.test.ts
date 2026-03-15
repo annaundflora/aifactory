@@ -151,8 +151,8 @@ describe("Authenticated access -- prompts actions delegate to services", () => {
 
     const result = await getPromptHistory({ offset: 0, limit: 10 });
 
-    // Verify the service was called with the correct parameters
-    expect(mockGetHistory).toHaveBeenCalledWith(0, 10);
+    // Verify the service was called with userId and correct parameters
+    expect(mockGetHistory).toHaveBeenCalledWith("user-123", 0, 10);
     // Verify the result is the service response (not modified)
     expect(result).toEqual(fakeHistory);
   });

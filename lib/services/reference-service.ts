@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db/index";
 import { referenceImages } from "@/lib/db/schema";
 import { StorageService } from "@/lib/clients/storage";
+import { validateUrl } from "@/lib/security/url-validator";
 import {
   createReferenceImage,
   deleteReferenceImage,
@@ -75,10 +76,19 @@ async function upload(input: {
   let originalFilename: string | undefined;
 
   if (url) {
+    // SSRF prevention -- validate URL before fetch
+    const urlCheck = validateUrl(url);
+    if (!urlCheck.valid) {
+      throw new Error(urlCheck.reason);
+    }
+
     // URL path: server-side fetch
     let response: Response;
     try {
-      response = await fetch(url);
+      response = await fetch(url, {
+        redirect: "error",
+        signal: AbortSignal.timeout(15_000),
+      });
     } catch {
       throw new Error("Bild konnte nicht geladen werden");
     }
@@ -197,6 +207,12 @@ async function uploadFromGallery(input: {
 
   if (!imageUrl || imageUrl.trim().length === 0) {
     throw new Error("Bild-URL erforderlich");
+  }
+
+  // Only allow internal R2 storage URLs to prevent stored SSRF
+  const r2PublicUrl = process.env.R2_PUBLIC_URL;
+  if (!r2PublicUrl || !imageUrl.startsWith(r2PublicUrl)) {
+    throw new Error("Nur interne Bilder erlaubt");
   }
 
   if (!generationId || generationId.trim().length === 0) {

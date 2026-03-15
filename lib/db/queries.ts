@@ -254,23 +254,26 @@ export type PromptHistoryRow = {
  * Uses raw SQL for DISTINCT ON since Drizzle ORM does not natively support it.
  */
 export async function getPromptHistoryQuery(
+  userId: string,
   offset: number,
   limit: number
 ): Promise<PromptHistoryRow[]> {
   const rows = await db.execute(
     sql`
       SELECT * FROM (
-        SELECT DISTINCT ON (prompt_motiv, prompt_style, negative_prompt, model_id)
-          id,
-          prompt_motiv AS "promptMotiv",
-          prompt_style AS "promptStyle",
-          negative_prompt AS "negativePrompt",
-          model_id AS "modelId",
-          model_params AS "modelParams",
-          is_favorite AS "isFavorite",
-          created_at AS "createdAt"
-        FROM generations
-        ORDER BY prompt_motiv, prompt_style, negative_prompt, model_id, created_at DESC
+        SELECT DISTINCT ON (g.prompt_motiv, g.prompt_style, g.negative_prompt, g.model_id)
+          g.id,
+          g.prompt_motiv AS "promptMotiv",
+          g.prompt_style AS "promptStyle",
+          g.negative_prompt AS "negativePrompt",
+          g.model_id AS "modelId",
+          g.model_params AS "modelParams",
+          g.is_favorite AS "isFavorite",
+          g.created_at AS "createdAt"
+        FROM generations g
+        INNER JOIN projects p ON g.project_id = p.id
+        WHERE p.user_id = ${userId}
+        ORDER BY g.prompt_motiv, g.prompt_style, g.negative_prompt, g.model_id, g.created_at DESC
       ) sub
       ORDER BY sub."createdAt" DESC
       LIMIT ${limit}
@@ -284,6 +287,7 @@ export async function getPromptHistoryQuery(
  * Returns generations marked as favorite, ordered by newest first.
  */
 export async function getFavoritesQuery(
+  userId: string,
   offset: number,
   limit: number
 ): Promise<PromptHistoryRow[]> {
@@ -299,7 +303,8 @@ export async function getFavoritesQuery(
       createdAt: generations.createdAt,
     })
     .from(generations)
-    .where(eq(generations.isFavorite, true))
+    .innerJoin(projects, eq(generations.projectId, projects.id))
+    .where(and(eq(generations.isFavorite, true), eq(projects.userId, userId)))
     .orderBy(desc(generations.createdAt))
     .limit(limit)
     .offset(offset);
@@ -311,12 +316,14 @@ export async function getFavoritesQuery(
  * Throws if the generation is not found.
  */
 export async function toggleFavoriteQuery(
+  userId: string,
   generationId: string
 ): Promise<{ isFavorite: boolean }> {
   const [current] = await db
     .select({ isFavorite: generations.isFavorite })
     .from(generations)
-    .where(eq(generations.id, generationId));
+    .innerJoin(projects, eq(generations.projectId, projects.id))
+    .where(and(eq(generations.id, generationId), eq(projects.userId, userId)));
 
   if (!current) {
     throw new Error("Generation not found");

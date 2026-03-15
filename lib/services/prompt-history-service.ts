@@ -16,10 +16,11 @@ export interface PromptHistoryEntry {
 }
 
 async function getHistory(
+  userId: string,
   offset: number,
   limit: number
 ): Promise<PromptHistoryEntry[]> {
-  const rows = await getPromptHistoryQuery(offset, limit);
+  const rows = await getPromptHistoryQuery(userId, offset, limit);
   return rows.map((row) => ({
     generationId: row.id,
     promptMotiv: row.promptMotiv,
@@ -33,10 +34,11 @@ async function getHistory(
 }
 
 async function getFavorites(
+  userId: string,
   offset: number,
   limit: number
 ): Promise<PromptHistoryEntry[]> {
-  const rows = await getFavoritesQuery(offset, limit);
+  const rows = await getFavoritesQuery(userId, offset, limit);
   return rows.map((row) => ({
     generationId: row.id,
     promptMotiv: row.promptMotiv,
@@ -50,9 +52,10 @@ async function getFavorites(
 }
 
 async function toggleFavorite(
+  userId: string,
   generationId: string
 ): Promise<{ isFavorite: boolean }> {
-  return toggleFavoriteQuery(generationId);
+  return toggleFavoriteQuery(userId, generationId);
 }
 
 export const promptHistoryService = {

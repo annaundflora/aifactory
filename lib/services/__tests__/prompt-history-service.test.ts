@@ -71,12 +71,12 @@ describe('PromptHistoryService', () => {
 
       mockGetPromptHistoryQuery.mockResolvedValueOnce(distinctRows)
 
-      const result = await promptHistoryService.getHistory(0, 50)
+      const result = await promptHistoryService.getHistory('user-1', 0, 50)
 
       // Exactly 3 distinct entries
       expect(result).toHaveLength(3)
-      // Query was called with correct offset/limit
-      expect(mockGetPromptHistoryQuery).toHaveBeenCalledWith(0, 50)
+      // Query was called with correct userId/offset/limit
+      expect(mockGetPromptHistoryQuery).toHaveBeenCalledWith('user-1', 0, 50)
       // Verify ordering: newest first (already done by DB, service preserves order)
       expect(new Date(result[0].createdAt).getTime()).toBeGreaterThanOrEqual(
         new Date(result[1].createdAt).getTime()
@@ -98,10 +98,10 @@ describe('PromptHistoryService', () => {
 
       mockGetPromptHistoryQuery.mockResolvedValueOnce(fiftyRows)
 
-      const result = await promptHistoryService.getHistory(0, 50)
+      const result = await promptHistoryService.getHistory('user-1', 0, 50)
 
       expect(result).toHaveLength(50)
-      expect(mockGetPromptHistoryQuery).toHaveBeenCalledWith(0, 50)
+      expect(mockGetPromptHistoryQuery).toHaveBeenCalledWith('user-1', 0, 50)
     })
 
     /**
@@ -116,10 +116,10 @@ describe('PromptHistoryService', () => {
 
       mockGetPromptHistoryQuery.mockResolvedValueOnce(tenRows)
 
-      const result = await promptHistoryService.getHistory(50, 50)
+      const result = await promptHistoryService.getHistory('user-1', 50, 50)
 
       expect(result).toHaveLength(10)
-      expect(mockGetPromptHistoryQuery).toHaveBeenCalledWith(50, 50)
+      expect(mockGetPromptHistoryQuery).toHaveBeenCalledWith('user-1', 50, 50)
     })
 
     /**
@@ -142,7 +142,7 @@ describe('PromptHistoryService', () => {
 
       mockGetPromptHistoryQuery.mockResolvedValueOnce([row])
 
-      const result = await promptHistoryService.getHistory(0, 50)
+      const result = await promptHistoryService.getHistory('user-1', 0, 50)
 
       expect(result).toHaveLength(1)
       const entry: PromptHistoryEntry = result[0]
@@ -202,10 +202,10 @@ describe('PromptHistoryService', () => {
 
       mockGetFavoritesQuery.mockResolvedValueOnce(favRows)
 
-      const result = await promptHistoryService.getFavorites(0, 50)
+      const result = await promptHistoryService.getFavorites('user-1', 0, 50)
 
       expect(result).toHaveLength(2)
-      expect(mockGetFavoritesQuery).toHaveBeenCalledWith(0, 50)
+      expect(mockGetFavoritesQuery).toHaveBeenCalledWith('user-1', 0, 50)
       // Every entry must have isFavorite === true
       for (const entry of result) {
         expect(entry.isFavorite).toBe(true)
@@ -225,9 +225,9 @@ describe('PromptHistoryService', () => {
     it('AC-5: should toggle isFavorite from false to true', async () => {
       mockToggleFavoriteQuery.mockResolvedValueOnce({ isFavorite: true })
 
-      const result = await promptHistoryService.toggleFavorite('gen-uuid-1')
+      const result = await promptHistoryService.toggleFavorite('user-1', 'gen-uuid-1')
 
-      expect(mockToggleFavoriteQuery).toHaveBeenCalledWith('gen-uuid-1')
+      expect(mockToggleFavoriteQuery).toHaveBeenCalledWith('user-1', 'gen-uuid-1')
       expect(result).toEqual({ isFavorite: true })
     })
 
@@ -239,9 +239,9 @@ describe('PromptHistoryService', () => {
     it('AC-6: should toggle isFavorite from true to false', async () => {
       mockToggleFavoriteQuery.mockResolvedValueOnce({ isFavorite: false })
 
-      const result = await promptHistoryService.toggleFavorite('gen-uuid-2')
+      const result = await promptHistoryService.toggleFavorite('user-1', 'gen-uuid-2')
 
-      expect(mockToggleFavoriteQuery).toHaveBeenCalledWith('gen-uuid-2')
+      expect(mockToggleFavoriteQuery).toHaveBeenCalledWith('user-1', 'gen-uuid-2')
       expect(result).toEqual({ isFavorite: false })
     })
 
@@ -254,10 +254,10 @@ describe('PromptHistoryService', () => {
       mockToggleFavoriteQuery.mockRejectedValueOnce(new Error('Generation not found'))
 
       await expect(
-        promptHistoryService.toggleFavorite('non-existent')
+        promptHistoryService.toggleFavorite('user-1', 'non-existent')
       ).rejects.toThrow('Generation not found')
 
-      expect(mockToggleFavoriteQuery).toHaveBeenCalledWith('non-existent')
+      expect(mockToggleFavoriteQuery).toHaveBeenCalledWith('user-1', 'non-existent')
     })
   })
 })

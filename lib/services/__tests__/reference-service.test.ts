@@ -235,8 +235,10 @@ describe("ReferenceService.upload", () => {
       url: "https://example.com/photo.jpg",
     });
 
-    // Verify fetch was called with the URL
-    expect(fetchSpy).toHaveBeenCalledWith("https://example.com/photo.jpg");
+    // Verify fetch was called with the URL and security options
+    expect(fetchSpy).toHaveBeenCalledWith("https://example.com/photo.jpg", expect.objectContaining({
+      redirect: "error",
+    }));
 
     // Verify R2 key uses .jpg extension (from image/jpeg)
     const uploadArgs = (StorageService.upload as Mock).mock.calls[0];

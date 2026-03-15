@@ -30,7 +30,7 @@ export async function getPromptHistory(input: {
   const offset = input.offset ?? 0;
   const limit = input.limit ?? 50;
 
-  return promptHistoryService.getHistory(offset, limit);
+  return promptHistoryService.getHistory(auth.userId, offset, limit);
 }
 
 export async function getFavoritePrompts(input: {
@@ -45,7 +45,7 @@ export async function getFavoritePrompts(input: {
   const offset = input.offset ?? 0;
   const limit = input.limit ?? 50;
 
-  return promptHistoryService.getFavorites(offset, limit);
+  return promptHistoryService.getFavorites(auth.userId, offset, limit);
 }
 
 export async function toggleFavorite(input: {
@@ -62,7 +62,7 @@ export async function toggleFavorite(input: {
     throw new Error("Ungueltige generationId: muss ein gueltiges UUID-Format haben");
   }
 
-  return promptHistoryService.toggleFavorite(generationId);
+  return promptHistoryService.toggleFavorite(auth.userId, generationId);
 }
 
 export async function improvePrompt(input: {
