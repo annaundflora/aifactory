@@ -1,0 +1,32 @@
+{
+  "files_claimed": [
+    { "file": "lib/db/schema.ts", "action": "modify", "source_slice": "slice-01-db-schema-migration" },
+    { "file": "drizzle/0007_*.sql", "action": "create", "source_slice": "slice-01-db-schema-migration" },
+    { "file": "lib/db/queries.ts", "action": "modify", "source_slice": "slice-02-model-settings-service" },
+    { "file": "lib/services/model-settings-service.ts", "action": "create", "source_slice": "slice-02-model-settings-service" },
+    { "file": "app/actions/model-settings.ts", "action": "create", "source_slice": "slice-03-server-actions-model-settings" },
+    { "file": "lib/types.ts", "action": "create", "source_slice": "slice-03-server-actions-model-settings" },
+    { "file": "components/settings/settings-dialog.tsx", "action": "create", "source_slice": "slice-04-settings-dialog-ui" },
+    { "file": "components/settings/model-mode-section.tsx", "action": "create", "source_slice": "slice-04-settings-dialog-ui" },
+    { "file": "components/workspace/workspace-header.tsx", "action": "modify", "source_slice": "slice-04-settings-dialog-ui" },
+    { "file": "components/ui/tier-toggle.tsx", "action": "create", "source_slice": "slice-05-tier-toggle-component" },
+    { "file": "components/ui/max-quality-toggle.tsx", "action": "create", "source_slice": "slice-05-tier-toggle-component" },
+    { "file": "components/workspace/prompt-area.tsx", "action": "modify", "source_slice": "slice-06-workspace-prompt-area-tier-toggle" },
+    { "file": "app/actions/generations.ts", "action": "modify", "source_slice": "slice-07-workspace-generation-integration" },
+    { "file": "lib/services/generation-service.ts", "action": "modify", "source_slice": "slice-07-workspace-generation-integration" },
+    { "file": "lib/canvas-detail-context.tsx", "action": "modify", "source_slice": "slice-08-canvas-context-cleanup" },
+    { "file": "components/canvas/canvas-detail-view.tsx", "action": "modify", "source_slice": "slice-08-canvas-context-cleanup" },
+    { "file": "components/canvas/popovers/variation-popover.tsx", "action": "modify", "source_slice": "slice-09-canvas-variation-img2img-tier-toggle" },
+    { "file": "components/canvas/popovers/img2img-popover.tsx", "action": "modify", "source_slice": "slice-09-canvas-variation-img2img-tier-toggle" },
+    { "file": "components/canvas/popovers/upscale-popover.tsx", "action": "modify", "source_slice": "slice-10-canvas-upscale-tier-toggle" },
+    { "file": "components/canvas/canvas-chat-panel.tsx", "action": "modify", "source_slice": "slice-11-canvas-chat-panel-tier-toggle" },
+    { "file": "components/canvas/canvas-header.tsx", "action": "modify", "source_slice": "slice-12-workspace-cleanup-remove-old-ui" },
+    { "file": "app/actions/models.ts", "action": "modify", "source_slice": "slice-13-dead-code-cleanup-deprecation" },
+    { "file": "lib/models.ts", "action": "modify", "source_slice": "slice-13-dead-code-cleanup-deprecation" }
+  ],
+  "summary": {
+    "files_claimed": 23,
+    "new_files": 8,
+    "modified_files": 15
+  }
+}

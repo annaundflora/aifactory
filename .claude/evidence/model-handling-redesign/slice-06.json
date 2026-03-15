@@ -1,0 +1,13 @@
+{
+  "feature": "model-handling-redesign",
+  "slice": "slice-06",
+  "timestamp": "2026-03-14T12:17:00Z",
+  "status": "completed",
+  "implementation": {"status": "completed", "files_changed": ["components/workspace/prompt-area.tsx"]},
+  "review": {"verdict": "APPROVED", "findings": [], "attempt": 1},
+  "deterministic_gate": {"detected_stack": "TypeScript", "lint_passed": true, "lint_iterations": 2},
+  "tests": {"test_files": ["components/workspace/__tests__/prompt-area-tier-toggle.test.tsx"], "ac_coverage": {"total": 11, "covered": 11, "missing": []}},
+  "validation": {"overall_status": "passed"},
+  "retries": 0,
+  "review_iterations": 1
+}

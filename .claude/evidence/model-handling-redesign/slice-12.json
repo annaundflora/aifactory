@@ -1,0 +1,13 @@
+{
+  "feature": "model-handling-redesign",
+  "slice": "slice-12",
+  "timestamp": "2026-03-14T12:30:00Z",
+  "status": "completed",
+  "implementation": {"status": "completed", "files_changed": ["components/canvas/canvas-detail-view.tsx"]},
+  "review": {"verdict": "APPROVED", "findings": [], "attempt": 1},
+  "deterministic_gate": {"detected_stack": "TypeScript", "lint_passed": true, "lint_iterations": 0},
+  "tests": {"test_files": ["components/canvas/__tests__/canvas-detail-view-cleanup.test.tsx", "components/canvas/__tests__/canvas-header-cleanup.test.tsx", "components/canvas/__tests__/cleanup-no-old-imports.test.tsx"], "ac_coverage": {"total": 8, "covered": 8, "missing": []}},
+  "validation": {"overall_status": "passed"},
+  "retries": 0,
+  "review_iterations": 1
+}

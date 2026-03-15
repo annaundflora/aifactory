@@ -1,0 +1,13 @@
+{
+  "feature": "model-handling-redesign",
+  "slice": "slice-13",
+  "timestamp": "2026-03-14T12:33:00Z",
+  "status": "completed",
+  "implementation": {"status": "completed", "files_changed": ["app/actions/models.ts", "lib/db/queries.ts", "lib/db/schema.ts", "lib/models.ts (deleted)", "components/models/model-browser-drawer.tsx"]},
+  "review": {"verdict": "APPROVED", "findings": [], "attempt": 1},
+  "deterministic_gate": {"detected_stack": "TypeScript", "lint_passed": true, "lint_iterations": 2},
+  "tests": {"test_files": ["app/actions/__tests__/models-cleanup.test.ts", "lib/db/__tests__/queries-cleanup.test.ts", "lib/db/__tests__/schema-deprecation.test.ts", "lib/__tests__/models-cleanup.test.ts", "__tests__/dead-code-no-imports.test.ts"], "ac_coverage": {"total": 7, "covered": 5, "missing": ["AC-5 (build)", "AC-6 (build)"]}},
+  "validation": {"overall_status": "passed"},
+  "retries": 0,
+  "review_iterations": 1
+}

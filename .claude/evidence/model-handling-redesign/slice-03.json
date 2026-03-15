@@ -1,0 +1,20 @@
+{
+  "feature": "model-handling-redesign",
+  "slice": "slice-03",
+  "timestamp": "2026-03-14T12:10:00Z",
+  "status": "completed",
+  "implementation": {
+    "status": "completed",
+    "files_changed": ["lib/types.ts", "app/actions/model-settings.ts"]
+  },
+  "review": {"verdict": "APPROVED", "findings": [], "attempt": 1},
+  "deterministic_gate": {"detected_stack": "TypeScript", "lint_passed": true, "lint_iterations": 0},
+  "tests": {
+    "test_files": ["lib/__tests__/types.test.ts", "app/actions/__tests__/model-settings.test.ts"],
+    "test_count": {"unit": 3, "integration": 0, "acceptance": 9},
+    "ac_coverage": {"total": 12, "covered": 12, "missing": []}
+  },
+  "validation": {"overall_status": "passed", "unit": "12 passed", "regression": "30 passed"},
+  "retries": 0,
+  "review_iterations": 1
+}
