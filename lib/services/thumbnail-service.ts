@@ -5,7 +5,6 @@ import { upload } from "@/lib/clients/storage";
 import {
   getGenerations,
   updateProjectThumbnail,
-  type Project,
 } from "@/lib/db/queries";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
