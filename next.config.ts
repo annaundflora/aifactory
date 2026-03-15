@@ -41,6 +41,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   experimental: {
     viewTransition: true,
     serverActions: {
