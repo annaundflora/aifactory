@@ -111,7 +111,6 @@ function PersistenceConsumer() {
       <span data-testid="session-id">{ctx.sessionId ?? "null"}</span>
       <span data-testid="messages-count">{ctx.messages.length}</span>
       <span data-testid="active-view">{ctx.activeView}</span>
-      <span data-testid="has-canvas">{String(ctx.hasCanvas)}</span>
       <span data-testid="is-applied">{String(ctx.isApplied)}</span>
       <span data-testid="draft-prompt">
         {ctx.draftPrompt ? JSON.stringify(ctx.draftPrompt) : "null"}
@@ -240,8 +239,7 @@ describe("PromptAssistantContext - Session Persistence", () => {
     expect(messagesJson[1].role).toBe("assistant");
     expect(messagesJson[1].content).toBe("Hier ist mein Vorschlag.");
 
-    // Canvas-Panel: draftPrompt set, hasCanvas true
-    expect(screen.getByTestId("has-canvas")).toHaveTextContent("true");
+    // draftPrompt set
     const draft = JSON.parse(screen.getByTestId("draft-prompt").textContent!);
     expect(draft).toEqual({
       motiv: "A sunset over the ocean",
@@ -368,12 +366,10 @@ describe("PromptAssistantContext - Session Persistence", () => {
     const sessionIdAfterLoad = latestCtx!.sessionId;
     const messagesAfterLoad = latestCtx!.messages;
     const draftAfterLoad = latestCtx!.draftPrompt;
-    const hasCanvasAfterLoad = latestCtx!.hasCanvas;
 
     expect(sessionIdAfterLoad).toBe("session-persist-1");
     expect(messagesAfterLoad).toHaveLength(2);
     expect(draftAfterLoad).not.toBeNull();
-    expect(hasCanvasAfterLoad).toBe(true);
 
     // Simulate "sheet close" -- the Context Provider remains mounted,
     // only the Sheet UI would unmount. Since we test context persistence,
@@ -388,6 +384,5 @@ describe("PromptAssistantContext - Session Persistence", () => {
     expect(latestCtx!.messages[0].content).toBe("Erstelle ein Bild");
     expect(latestCtx!.messages[1].content).toBe("Hier ist mein Vorschlag.");
     expect(latestCtx!.draftPrompt).toEqual(draftAfterLoad);
-    expect(latestCtx!.hasCanvas).toBe(true);
   });
 });

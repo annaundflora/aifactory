@@ -299,3 +299,46 @@ async def analyze_image(image_url: str, config: RunnableConfig = None) -> dict:
             )
 
     return result
+
+
+@tool
+def generate_image(
+    action: str,
+    prompt: str,
+    model_id: str,
+    params: dict,
+) -> dict:
+    """Signal that the user wants to generate a new image.
+
+    This tool does NOT call any external API. It returns structured generation
+    parameters that the frontend uses to trigger the actual image generation
+    via the generateImages() server action.
+
+    Use this tool when the user asks to:
+    - Generate a new image based on a prompt
+    - Create a variation of an existing image
+    - Apply style changes or prompt modifications to generate an image
+
+    Args:
+        action: Either "variation" (text-to-image variation) or "img2img"
+            (image-to-image with a reference image).
+            Use "variation" for prompt-only generation.
+            Use "img2img" when a source image structure should be preserved.
+        prompt: The optimized English prompt for image generation.
+        model_id: The model ID to use (e.g., "flux-2-max", "flux-1.1-pro").
+        params: Additional generation parameters as a dict.
+            May include strength, guidance_scale, etc. for img2img.
+            Use an empty dict {} if no special parameters are needed.
+
+    Returns:
+        Dict with action, prompt, model_id, and params for the frontend.
+    """
+    if action not in ("variation", "img2img"):
+        action = "variation"
+
+    return {
+        "action": action,
+        "prompt": str(prompt),
+        "model_id": str(model_id),
+        "params": params if isinstance(params, dict) else {},
+    }

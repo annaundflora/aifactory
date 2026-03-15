@@ -10,7 +10,6 @@ import { MessageSquare, PanelRightClose, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { TierToggle } from "@/components/ui/tier-toggle";
-import { MaxQualityToggle } from "@/components/ui/max-quality-toggle";
 import { useCanvasDetail } from "@/lib/canvas-detail-context";
 import { ChatThread } from "@/components/assistant/chat-thread";
 import { ChatInput } from "@/components/assistant/chat-input";
@@ -33,7 +32,7 @@ import { generateImages } from "@/app/actions/generations";
 
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 480;
-const DEFAULT_WIDTH = 360;
+const DEFAULT_WIDTH = 320;
 const COLLAPSED_WIDTH = 48;
 
 // ---------------------------------------------------------------------------
@@ -56,18 +55,10 @@ export interface CanvasChatPanelProps {
 // ---------------------------------------------------------------------------
 
 function buildInitMessage(generation: Generation): ChatMessage {
-  const params = generation.modelParams as Record<string, unknown> | null;
-  const steps = params?.num_inference_steps ?? params?.steps ?? "—";
-  const cfg = params?.guidance_scale ?? params?.cfg_scale ?? params?.cfg ?? "—";
-  const promptDisplay =
-    generation.prompt && generation.prompt.length > 120
-      ? generation.prompt.slice(0, 120) + "..."
-      : generation.prompt ?? "";
-
   return {
     id: `init-${generation.id}-${crypto.randomUUID()}`,
     role: "system",
-    content: `Model: ${generation.modelId}\nPrompt: "${promptDisplay}"\nSteps: ${steps}, CFG: ${cfg}`,
+    content: "Beschreibe, was du an diesem Bild verändern möchtest — ich helfe dir mit Prompt-Optimierung, Variationen oder Upscaling.",
   };
 }
 
@@ -99,7 +90,6 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
 
   // Tier state for chat panel model resolution (independent from popovers)
   const [tier, setTier] = useState<Tier>("draft");
-  const [maxQuality, setMaxQuality] = useState(false);
 
   // Session state — local to the chat panel (not in Context per spec constraint)
   const sessionIdRef = useRef<string | null>(null);
@@ -282,12 +272,9 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
     async (event: SSECanvasGenerateEvent) => {
       dispatch({ type: "SET_GENERATING", isGenerating: true });
 
-      // Resolve effective tier: maxQuality + quality => "max"
-      const effectiveTier: Tier = maxQuality && tier === "quality" ? "max" : tier;
-
       // Resolve model from settings (img2img mode for chat panel)
       const setting = modelSettings.find(
-        (s) => s.mode === "img2img" && s.tier === effectiveTier
+        (s) => s.mode === "img2img" && s.tier === tier
       );
       // Use setting model + params, or fall back to generation.modelId (AC-10)
       const resolvedModelId = setting?.modelId ?? generation.modelId;
@@ -338,7 +325,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
         dispatch({ type: "SET_GENERATING", isGenerating: false });
       }
     },
-    [dispatch, projectId, onPendingGenerations, onGenerationsCreated, tier, maxQuality, modelSettings, generation.modelId]
+    [dispatch, projectId, onPendingGenerations, onGenerationsCreated, tier, modelSettings, generation.modelId]
   );
 
   // ---------------------------------------------------------------------------
@@ -556,7 +543,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
     return (
       <div
         ref={panelRef}
-        className="flex shrink-0 flex-col items-center border-l border-border/80 bg-card py-3 cursor-pointer"
+        className="flex shrink-0 flex-col items-center bg-card py-3 cursor-pointer"
         style={{ width: COLLAPSED_WIDTH }}
         onClick={handleExpand}
         data-testid="canvas-chat-panel-collapsed"
@@ -581,7 +568,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
   return (
     <div
       ref={panelRef}
-      className="relative flex h-full shrink-0 flex-col overflow-hidden border-l border-border/80 bg-card"
+      className="relative flex h-full shrink-0 flex-col overflow-hidden bg-card"
       style={{ width }}
       data-testid="canvas-chat-panel"
     >
@@ -640,13 +627,6 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
           onTierChange={setTier}
           disabled={state.isGenerating}
         />
-        {tier === "quality" && (
-          <MaxQualityToggle
-            maxQuality={maxQuality}
-            onMaxQualityChange={setMaxQuality}
-            disabled={state.isGenerating}
-          />
-        )}
       </div>
 
       {/* Input — disabled while generating or streaming */}

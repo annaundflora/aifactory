@@ -24,13 +24,13 @@ from typing import Optional
 
 from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig, RunnableLambda
-from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import ToolNode
 from langgraph.prebuilt.chat_agent_executor import AgentState
 
+from app.agent.tools.image_tools import generate_image
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -60,51 +60,6 @@ class CanvasAgentState(AgentState):
 # ---------------------------------------------------------------------------
 # Canvas Tool
 # ---------------------------------------------------------------------------
-
-
-@tool
-def generate_image(
-    action: str,
-    prompt: str,
-    model_id: str,
-    params: dict,
-) -> dict:
-    """Signal that the user wants to generate a new image based on the current one.
-
-    This tool does NOT call any external API. It returns structured generation
-    parameters that the frontend uses to trigger the actual image generation
-    via the generateImages() server action.
-
-    Use this tool when the user asks to:
-    - Modify the current image (e.g., "make the sky more blue")
-    - Create a variation of the current image
-    - Apply style changes or prompt modifications
-
-    Args:
-        action: Either "variation" (text-to-image variation) or "img2img"
-            (image-to-image with the current image as reference).
-            Use "variation" for prompt-only modifications.
-            Use "img2img" when the current image structure should be preserved.
-        prompt: The optimized English prompt for image generation.
-            Improve upon the original prompt based on the user's editing request.
-        model_id: The model ID to use (e.g., "flux-2-max", "flux-1.1-pro").
-            Use the same model_id as the current image unless the user requests a change.
-        params: Additional generation parameters as a dict.
-            May include strength, guidance_scale, etc. for img2img.
-            Use an empty dict {} if no special parameters are needed.
-
-    Returns:
-        Dict with action, prompt, model_id, and params for the frontend.
-    """
-    if action not in ("variation", "img2img"):
-        action = "variation"
-
-    return {
-        "action": action,
-        "prompt": str(prompt),
-        "model_id": str(model_id),
-        "params": params if isinstance(params, dict) else {},
-    }
 
 
 # Tool registry: all tools available to the canvas agent.

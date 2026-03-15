@@ -3,8 +3,8 @@
 import { useEffect, useRef, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/lib/types/chat-message";
-import { StreamingIndicator } from "./streaming-indicator";
 import { ImagePreview } from "./image-preview";
+import { StreamingIndicator } from "./streaming-indicator";
 
 // ---------------------------------------------------------------------------
 // Constants for "Verbessere" Chip (Slice 19, AC-8)
@@ -128,9 +128,6 @@ function MessageBubble({
         {/* Message content -- text builds up character by character via text-delta (AC-3) */}
         <div className="whitespace-pre-wrap break-words">
           {mainContent}
-          {message.isStreaming && message.content.length === 0 && (
-            <span className="text-muted-foreground">...</span>
-          )}
         </div>
 
         {/* Slice-19 AC-8: Display workspace context in a visually distinct style */}
@@ -198,6 +195,10 @@ export function ChatThread({ messages, isStreaming, onChipClick }: ChatThreadPro
             return <ContextSeparator key={message.id} message={message} />;
           case "user":
           case "assistant":
+            // Hide empty streaming assistant bubble — the StreamingIndicator handles this state
+            if (message.role === "assistant" && message.isStreaming && !message.content) {
+              return null;
+            }
             return (
               <MessageBubble
                 key={message.id}
@@ -210,7 +211,7 @@ export function ChatThread({ messages, isStreaming, onChipClick }: ChatThreadPro
         }
       })}
 
-      {/* AC-1/AC-2: Streaming indicator below last assistant message */}
+      {/* Animated streaming indicator */}
       <StreamingIndicator visible={isStreaming} />
 
       {/* Scroll anchor */}

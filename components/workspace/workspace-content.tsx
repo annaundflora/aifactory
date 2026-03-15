@@ -21,8 +21,13 @@ const POLLING_INTERVAL_MS = 3000;
 // Prompt area resize/collapse constants
 const PROMPT_MIN_WIDTH = 320;
 const PROMPT_MAX_WIDTH = 480;
-const PROMPT_DEFAULT_WIDTH = 480;
+const PROMPT_DEFAULT_WIDTH = 320;
 const PROMPT_COLLAPSED_WIDTH = 48;
+
+// Assistant panel resize constants
+const ASSISTANT_MIN_WIDTH = 320;
+const ASSISTANT_MAX_WIDTH = 480;
+const ASSISTANT_DEFAULT_WIDTH = 320;
 
 interface WorkspaceContentProps {
   projectId: string;
@@ -48,12 +53,80 @@ export function WorkspaceContent({
 
   // ----- Assistant Panel state -----
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantWidth, setAssistantWidth] = useState(ASSISTANT_DEFAULT_WIDTH);
+  const assistantIsResizing = useRef(false);
+  const assistantRafRef = useRef<number | null>(null);
+  const assistantMouseMoveRef = useRef<((e: MouseEvent) => void) | null>(null);
+  const assistantMouseUpRef = useRef<(() => void) | null>(null);
+
   const handleAssistantToggle = useCallback(() => {
     setAssistantOpen((prev) => !prev);
   }, []);
   const handleAssistantClose = useCallback(() => {
     setAssistantOpen(false);
   }, []);
+
+  const cleanupAssistantResize = useCallback(() => {
+    if (assistantRafRef.current !== null) {
+      cancelAnimationFrame(assistantRafRef.current);
+      assistantRafRef.current = null;
+    }
+    if (assistantMouseMoveRef.current) {
+      document.removeEventListener("mousemove", assistantMouseMoveRef.current);
+      assistantMouseMoveRef.current = null;
+    }
+    if (assistantMouseUpRef.current) {
+      document.removeEventListener("mouseup", assistantMouseUpRef.current);
+      assistantMouseUpRef.current = null;
+    }
+    assistantIsResizing.current = false;
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+  }, []);
+
+  useEffect(() => {
+    return () => cleanupAssistantResize();
+  }, [cleanupAssistantResize]);
+
+  const handleAssistantResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      assistantIsResizing.current = true;
+
+      const startX = e.clientX;
+      const startWidth = assistantWidth;
+
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        if (!assistantIsResizing.current) return;
+        if (assistantRafRef.current !== null) {
+          cancelAnimationFrame(assistantRafRef.current);
+        }
+        // Left edge: dragging left = wider (negative delta = wider)
+        const delta = startX - moveEvent.clientX;
+        const newWidth = Math.min(
+          ASSISTANT_MAX_WIDTH,
+          Math.max(ASSISTANT_MIN_WIDTH, startWidth + delta)
+        );
+        assistantRafRef.current = requestAnimationFrame(() => {
+          assistantRafRef.current = null;
+          setAssistantWidth(newWidth);
+        });
+      };
+
+      const handleMouseUp = () => {
+        cleanupAssistantResize();
+      };
+
+      assistantMouseMoveRef.current = handleMouseMove;
+      assistantMouseUpRef.current = handleMouseUp;
+
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    },
+    [assistantWidth, cleanupAssistantResize]
+  );
 
   // ----- Prompt Area resize/collapse -----
   const [promptWidth, setPromptWidth] = useState(PROMPT_DEFAULT_WIDTH);
@@ -347,10 +420,21 @@ export function WorkspaceContent({
         {/* Right: Assistant Panel — always mounted, width animated */}
         <div
           className="h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out"
-          style={{ width: assistantOpen ? 480 : 0 }}
+          style={{ width: assistantOpen ? assistantWidth : 0 }}
           data-testid="assistant-panel-wrapper"
         >
-          <div className="h-full w-[480px] overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
+          <div
+            className="relative h-full overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm"
+            style={{ width: assistantWidth }}
+          >
+            {/* Resize handle on left edge */}
+            <div
+              className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize z-10 hover:bg-primary/20 active:bg-primary/30"
+              onMouseDown={handleAssistantResizeStart}
+              data-testid="assistant-resize-handle"
+              role="separator"
+              aria-orientation="vertical"
+            />
             <PromptAssistantProvider projectId={projectId}>
               <AssistantPanelContent
                 open={assistantOpen}

@@ -27,7 +27,6 @@ import type {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { TierToggle } from "@/components/ui/tier-toggle";
-import { MaxQualityToggle } from "@/components/ui/max-quality-toggle";
 import type { Tier } from "@/lib/types";
 import { Loader2, Sparkles, Minus, Plus } from "lucide-react";
 import { LLMComparison } from "@/components/prompt-improve/llm-comparison";
@@ -129,11 +128,9 @@ function resolveModel(
   settings: ModelSetting[],
   mode: GenerationMode,
   tier: Tier,
-  maxQuality: boolean
 ): { modelId: string; modelParams: Record<string, unknown> } | undefined {
-  const effectiveTier = maxQuality ? "max" : tier;
   const setting = settings.find(
-    (s) => s.mode === mode && s.tier === effectiveTier
+    (s) => s.mode === mode && s.tier === tier
   );
   if (!setting) return undefined;
   return {
@@ -157,7 +154,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
 
   // ----- Tier state (Draft/Quality) -----
   const [tier, setTier] = useState<Tier>("draft");
-  const [maxQuality, setMaxQuality] = useState<boolean>(false);
 
   // ----- Model settings (cached from DB) -----
   const [modelSettings, setModelSettings] = useState<ModelSetting[]>([]);
@@ -667,7 +663,7 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
       if (!promptMotiv.trim()) return;
 
       // Resolve model from settings based on tier + maxQuality
-      const resolved = resolveModel(modelSettings, "txt2img", tier, maxQuality);
+      const resolved = resolveModel(modelSettings, "txt2img", tier);
       if (!resolved) return;
 
       startGeneration(async () => {
@@ -689,7 +685,7 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
       if (!promptMotiv.trim()) return;
 
       // Resolve model from settings based on tier + maxQuality
-      const resolved = resolveModel(modelSettings, "img2img", tier, maxQuality);
+      const resolved = resolveModel(modelSettings, "img2img", tier);
       if (!resolved) return;
 
       // Pass referenceSlots data to generateImages
@@ -727,7 +723,7 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
       if (!upscaleSourceImageUrl) return;
 
       // Resolve upscale model from settings (upscale has no max tier)
-      const resolved = resolveModel(modelSettings, "upscale", tier, false);
+      const resolved = resolveModel(modelSettings, "upscale", tier);
       if (!resolved) return;
 
       startGeneration(async () => {
@@ -756,7 +752,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
     onGenerationsCreated,
     modelSettings,
     tier,
-    maxQuality,
   ]);
 
   // ----- Keyboard shortcut (Cmd/Ctrl+Enter) on Motiv field -----
@@ -853,7 +848,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
           {/* ── Group: Prompt Composition ── */}
           {showPromptFields && (
             <div className="space-y-3">
-              <hr className="border-border my-8" />
               <SectionLabel>Prompt</SectionLabel>
 
               {/* Motiv Textarea (required) */}
@@ -968,15 +962,8 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
               tier={tier}
               onTierChange={setTier}
               disabled={isGenerating}
+              hiddenValues={currentMode === "upscale" ? ["max"] : []}
             />
-
-            {/* Max Quality Toggle — visible only when quality tier and not upscale mode */}
-            {tier === "quality" && currentMode !== "upscale" && (
-              <MaxQualityToggle
-                maxQuality={maxQuality}
-                onMaxQualityChange={setMaxQuality}
-              />
-            )}
 
             {/* Variant Count Stepper — hidden in upscale mode */}
             {showVariants && (

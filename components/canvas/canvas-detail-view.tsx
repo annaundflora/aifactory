@@ -572,16 +572,18 @@ export function CanvasDetailView({
 
         {/* Right: Chat panel — uses currentGeneration so context updates on Prev/Next */}
         {chatOpen && (
-          <aside className="flex shrink-0 overflow-hidden" data-testid="chat-slot">
-            {chatSlot ?? (
-              <CanvasChatPanel
-                generation={currentGeneration}
-                projectId={currentGeneration.projectId}
-                onPendingGenerations={setPendingGenerationIds}
-                onGenerationsCreated={onGenerationsCreated}
-                modelSettings={modelSettings}
-              />
-            )}
+          <aside className="flex shrink-0 overflow-hidden p-3 pl-0" data-testid="chat-slot">
+            <div className="flex h-full overflow-hidden rounded-xl border border-border/80 shadow-sm">
+              {chatSlot ?? (
+                <CanvasChatPanel
+                  generation={currentGeneration}
+                  projectId={currentGeneration.projectId}
+                  onPendingGenerations={setPendingGenerationIds}
+                  onGenerationsCreated={onGenerationsCreated}
+                  modelSettings={modelSettings}
+                />
+              )}
+            </div>
           </aside>
         )}
       </div>

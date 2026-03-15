@@ -5,6 +5,7 @@ import {
   useContext,
   useReducer,
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   type ReactNode,
@@ -78,10 +79,8 @@ export interface AssistantState {
   messages: Message[];
   isStreaming: boolean;
   draftPrompt: DraftPrompt | null;
-  /** Whether the canvas panel should be visible (true once a draft_prompt has been received) */
-  hasCanvas: boolean;
-  /** Transient flag to trigger a visual highlight on canvas fields after a refine_prompt event */
-  canvasHighlight: boolean;
+  /** Counter that increments on SET_DRAFT_PROMPT / REFINE_DRAFT to trigger auto-apply */
+  draftVersion: number;
   recommendedModel: ModelRecommendation | null;
   selectedModel: string;
   toolCallResults: ToolCallResult[];
@@ -98,8 +97,7 @@ const initialState: AssistantState = {
   messages: [],
   isStreaming: false,
   draftPrompt: null,
-  hasCanvas: false,
-  canvasHighlight: false,
+  draftVersion: 0,
   recommendedModel: null,
   selectedModel: "anthropic/claude-sonnet-4.6",
   toolCallResults: [],
@@ -121,9 +119,7 @@ export type AssistantAction =
   | { type: "ADD_ERROR_MESSAGE"; content: string }
   | { type: "SET_STREAMING"; isStreaming: boolean }
   | { type: "SET_DRAFT_PROMPT"; draftPrompt: DraftPrompt }
-  | { type: "UPDATE_DRAFT_FIELD"; field: DraftPromptField; value: string }
   | { type: "REFINE_DRAFT"; draftPrompt: DraftPrompt }
-  | { type: "CLEAR_CANVAS_HIGHLIGHT" }
   | { type: "SET_RECOMMENDED_MODEL"; recommendedModel: ModelRecommendation }
   | { type: "ADD_TOOL_CALL_RESULT"; result: ToolCallResult }
   | { type: "SET_SELECTED_MODEL"; model: string }
@@ -210,32 +206,17 @@ function assistantReducer(
       return {
         ...state,
         draftPrompt: action.draftPrompt,
-        hasCanvas: true,
+        draftVersion: state.draftVersion + 1,
         isApplied: false,
       };
-
-    case "UPDATE_DRAFT_FIELD": {
-      if (!state.draftPrompt) return state;
-      return {
-        ...state,
-        draftPrompt: {
-          ...state.draftPrompt,
-          [action.field]: action.value,
-        },
-      };
-    }
 
     case "REFINE_DRAFT":
       return {
         ...state,
         draftPrompt: action.draftPrompt,
-        hasCanvas: true,
-        canvasHighlight: true,
+        draftVersion: state.draftVersion + 1,
         isApplied: false,
       };
-
-    case "CLEAR_CANVAS_HIGHLIGHT":
-      return { ...state, canvasHighlight: false };
 
     case "SET_RECOMMENDED_MODEL":
       return { ...state, recommendedModel: action.recommendedModel };
@@ -261,8 +242,7 @@ function assistantReducer(
         sessionId: action.sessionId,
         messages: action.messages,
         draftPrompt: action.draftPrompt,
-        hasCanvas: action.draftPrompt !== null,
-        canvasHighlight: false,
+        // Do NOT increment draftVersion on session restore — prevents auto-apply
         recommendedModel: action.recommendedModel,
         toolCallResults: [],
         isStreaming: false,
@@ -295,10 +275,6 @@ export interface PromptAssistantContextValue {
   messages: Message[];
   isStreaming: boolean;
   draftPrompt: DraftPrompt | null;
-  /** Whether the canvas panel should be visible */
-  hasCanvas: boolean;
-  /** Transient flag for highlighting canvas fields after a refine_prompt event */
-  canvasHighlight: boolean;
   recommendedModel: ModelRecommendation | null;
   selectedModel: string;
   /** Current view within the assistant sheet */
@@ -310,8 +286,6 @@ export interface PromptAssistantContextValue {
   sendMessage: (content: string, imageUrl?: string) => void;
   cancelStream: () => void;
   setSelectedModel: (model: string) => void;
-  /** Update a single field in the draft prompt (local edit, no API call) */
-  updateDraftField: (field: DraftPromptField, value: string) => void;
   /** Navigate to a specific view */
   setActiveView: (view: ActiveView) => void;
   /** Load a session from the backend by ID (AC-4, AC-5, AC-6, AC-10, AC-11) */
@@ -440,13 +414,6 @@ export function PromptAssistantProvider({
   const setSelectedModel = useCallback(
     (model: string) => {
       dispatch({ type: "SET_SELECTED_MODEL", model });
-    },
-    [dispatch]
-  );
-
-  const updateDraftField = useCallback(
-    (field: DraftPromptField, value: string) => {
-      dispatch({ type: "UPDATE_DRAFT_FIELD", field, value });
     },
     [dispatch]
   );
@@ -600,14 +567,23 @@ export function PromptAssistantProvider({
     undoSnapshotRef.current = null;
   }, [variationData, setVariation, dispatch]);
 
+  // Auto-apply: when draftVersion increments (from SET_DRAFT_PROMPT or REFINE_DRAFT),
+  // automatically apply the draft to the workspace. draftVersion=0 on init and
+  // is NOT incremented by LOAD_SESSION, so session restore won't trigger auto-apply.
+  const draftVersionRef = useRef(0);
+  useEffect(() => {
+    if (state.draftVersion > 0 && state.draftVersion !== draftVersionRef.current) {
+      draftVersionRef.current = state.draftVersion;
+      applyToWorkspace();
+    }
+  }, [state.draftVersion, applyToWorkspace]);
+
   const value = useMemo<PromptAssistantContextValue>(
     () => ({
       sessionId: state.sessionId,
       messages: state.messages,
       isStreaming: state.isStreaming,
       draftPrompt: state.draftPrompt,
-      hasCanvas: state.hasCanvas,
-      canvasHighlight: state.canvasHighlight,
       recommendedModel: state.recommendedModel,
       selectedModel: state.selectedModel,
       activeView: state.activeView,
@@ -616,7 +592,6 @@ export function PromptAssistantProvider({
       sendMessage,
       cancelStream,
       setSelectedModel,
-      updateDraftField,
       setActiveView,
       loadSession,
       applyToWorkspace,
@@ -631,7 +606,6 @@ export function PromptAssistantProvider({
       sendMessage,
       cancelStream,
       setSelectedModel,
-      updateDraftField,
       setActiveView,
       loadSession,
       applyToWorkspace,

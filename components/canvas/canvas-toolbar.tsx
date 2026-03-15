@@ -68,7 +68,7 @@ export function CanvasToolbar({ generation, onDelete }: CanvasToolbarProps) {
   const { state, dispatch } = useCanvasDetail();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
   const isDisabled = state.isGenerating;
 

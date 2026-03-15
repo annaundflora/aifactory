@@ -12,10 +12,12 @@ interface TierToggleProps {
   onTierChange: (tier: Tier) => void;
   disabled?: boolean;
   className?: string;
+  /** Hide specific tier values (e.g. "max" in upscale mode) */
+  hiddenValues?: Tier[];
 }
 
 interface Segment {
-  value: Extract<Tier, "draft" | "quality">;
+  value: Tier;
   label: string;
 }
 
@@ -26,6 +28,7 @@ interface Segment {
 const SEGMENTS: Segment[] = [
   { value: "draft", label: "Draft" },
   { value: "quality", label: "Quality" },
+  { value: "max", label: "Max" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -33,37 +36,31 @@ const SEGMENTS: Segment[] = [
 // ---------------------------------------------------------------------------
 
 /**
- * Segmented control for selecting the quality tier (Draft / Quality).
+ * Segmented control for selecting the quality tier (Draft / Quality / Max).
  *
- * Fully controlled -- no internal state. The `max` tier is handled
- * separately via the `MaxQualityToggle` component.
- *
- * Visual pattern follows `ModeSelector` (segmented control with
- * `bg-primary text-primary-foreground` for the active segment).
+ * Fully controlled -- no internal state.
+ * Use `hiddenValues` to hide specific tiers (e.g. "max" in upscale mode).
  */
 export function TierToggle({
   tier,
   onTierChange,
   disabled = false,
   className,
+  hiddenValues = [],
 }: TierToggleProps) {
   return (
     <div
       role="group"
       aria-label="Quality tier"
       className={cn(
-        "inline-flex rounded-lg border border-border-subtle bg-input p-1 gap-1",
+        "flex w-full rounded-lg border border-border-subtle bg-white dark:bg-card p-1 gap-1",
         disabled && "opacity-50",
         className,
       )}
       data-testid="tier-toggle"
     >
-      {SEGMENTS.map((segment) => {
-        // When tier is "max", Quality is considered the active visual segment
-        // because max is a sub-state of quality.
-        const isActive =
-          segment.value === tier ||
-          (segment.value === "quality" && tier === "max");
+      {SEGMENTS.filter((s) => !hiddenValues.includes(s.value)).map((segment) => {
+        const isActive = segment.value === tier;
 
         return (
           <button

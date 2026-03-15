@@ -5,7 +5,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ChatInput } from "@/components/assistant/chat-input";
 import { ChatThread } from "@/components/assistant/chat-thread";
-import { PromptCanvas } from "@/components/assistant/prompt-canvas";
+import { ModelRecommendation } from "@/components/assistant/model-recommendation";
 import { SessionList } from "@/components/assistant/session-list";
 import { SessionSwitcher } from "@/components/assistant/session-switcher";
 import { ModelSelector } from "@/components/assistant/model-selector";
@@ -39,7 +39,6 @@ export function AssistantPanelContent({
   const {
     messages,
     isStreaming,
-    hasCanvas,
     selectedModel,
     setSelectedModel,
     cancelStream,
@@ -47,6 +46,7 @@ export function AssistantPanelContent({
     setActiveView,
     loadSession,
     sessionId,
+    recommendedModel,
     dispatch,
     sessionIdRef,
     sendMessageRef,
@@ -132,8 +132,6 @@ export function AssistantPanelContent({
     setActiveView("session-list");
   }, [setActiveView]);
 
-  const showSplitView = hasCanvas && activeView !== "session-list";
-
   const renderContent = () => {
     if (activeView === "session-list") {
       return (
@@ -157,6 +155,7 @@ export function AssistantPanelContent({
             onSessionHistoryClick={handleSessionHistoryClick}
           />
         )}
+        {recommendedModel && <ModelRecommendation />}
         <ChatInput
           onSend={handleSend}
           isStreaming={isStreaming}
@@ -189,21 +188,10 @@ export function AssistantPanelContent({
         </div>
       </div>
 
-      {/* Body */}
-      {showSplitView ? (
-        <div className="flex flex-1 flex-row overflow-hidden" data-testid="assistant-split-view">
-          <div className="flex flex-1 flex-col overflow-y-auto border-r">
-            {renderContent()}
-          </div>
-          <div className="flex flex-1 flex-col overflow-y-auto">
-            <PromptCanvas />
-          </div>
-        </div>
-      ) : (
-        <div className="flex-1 overflow-y-auto">
-          {renderContent()}
-        </div>
-      )}
+      {/* Body — single column, no split view */}
+      <div className="flex-1 overflow-y-auto">
+        {renderContent()}
+      </div>
     </div>
   );
 }
