@@ -64,6 +64,13 @@
       "when": 1773936000000,
       "tag": "0008_auth_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1774022400000,
+      "tag": "0009_add_user_id",
+      "breakpoints": true
     }
   ]
 }
