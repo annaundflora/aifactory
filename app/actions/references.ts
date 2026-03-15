@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { ReferenceService } from "@/lib/services/reference-service";
-import { getGenerationReferences, getProject as getProjectQuery } from "@/lib/db/queries";
+import { getGenerationReferences, getGeneration, getProject as getProjectQuery } from "@/lib/db/queries";
 import { db } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { referenceImages } from "@/lib/db/schema";

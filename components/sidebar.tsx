@@ -158,25 +158,25 @@ export function Sidebar({ projects }: SidebarProps) {
                   </span>
                 </div>
               </div>
-              {/* Logout button */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => signOut({ callbackUrl: "/login" })}
-                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center w-full"
-                    data-testid="sidebar-logout-button"
-                    type="button"
-                  >
-                    <LogOut className="size-4 shrink-0" />
-                    <span className="group-data-[collapsible=icon]:hidden">
-                      Logout
-                    </span>
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="right" align="center">
-                  Logout
-                </TooltipContent>
-              </Tooltip>
+              {/* Logout button - hidden in collapsed mode, only avatar visible per AC-7 */}
+              <div className="group-data-[collapsible=icon]:hidden">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => signOut({ callbackUrl: "/login" })}
+                      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground w-full"
+                      data-testid="sidebar-logout-button"
+                      type="button"
+                    >
+                      <LogOut className="size-4 shrink-0" />
+                      <span>Logout</span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" align="center">
+                    Logout
+                  </TooltipContent>
+                </Tooltip>
+              </div>
             </SidebarGroupContent>
           </SidebarGroup>
         )}
