@@ -5,11 +5,13 @@ const ASSISTANT_BACKEND_URL =
 
 const ContentSecurityPolicy = [
   "default-src 'self'",
+  // 'unsafe-inline' required: Next.js injects inline scripts, and layout.tsx uses
+  // dangerouslySetInnerHTML for theme-flash-prevention script.
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://pub-cd07f08bbf5d4226b8f7ef9510aef4bd.r2.dev https://*.replicate.delivery https://replicate.delivery",
   "font-src 'self'",
-  "connect-src 'self' https://api.replicate.com",
+  "connect-src 'self' blob: https://api.replicate.com https://pub-cd07f08bbf5d4226b8f7ef9510aef4bd.r2.dev https://*.replicate.delivery https://replicate.delivery",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
