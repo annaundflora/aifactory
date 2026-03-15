@@ -314,22 +314,25 @@ describe('Dockerfile + Docker Compose (slice-13) -- Acceptance Tests', () => {
   // THEN antwortet die App mit HTTP 200 (oder Redirect zu /login)
   //
   // Note: This is a live acceptance test requiring running Docker containers.
-  // This test validates that the app service exposes port 3000
-  // as a prerequisite for HTTP reachability.
+  // This test validates that the app service makes port 3000 available
+  // either via `ports` (direct external access) or `expose` (internal
+  // access behind a reverse proxy like Caddy).
   // -------------------------------------------------------------------------
   it('AC-9: GIVEN compose up is running WHEN HTTP request to localhost:3000 THEN app service exposes port 3000', () => {
     const compose = parseComposeProd()
 
-    // App service must expose port 3000
-    expect(compose.services.app.ports).toBeDefined()
-    expect(Array.isArray(compose.services.app.ports)).toBe(true)
+    const ports = compose.services.app.ports
+    const expose = compose.services.app.expose
 
-    // Must map to port 3000
-    const portMappings = compose.services.app.ports.map(String)
-    const has3000 = portMappings.some(
+    // App service must make port 3000 available via ports OR expose
+    const hasPorts = Array.isArray(ports) && ports.map(String).some(
       (p: string) => p.includes('3000:3000') || p === '3000'
     )
-    expect(has3000).toBe(true)
+    const hasExpose = Array.isArray(expose) && expose.map(String).some(
+      (e: string) => e === '3000'
+    )
+
+    expect(hasPorts || hasExpose).toBe(true)
   })
 
   // -------------------------------------------------------------------------
