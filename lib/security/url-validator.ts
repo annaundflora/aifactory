@@ -76,11 +76,25 @@ function isPrivateIPv6(addr: string): boolean {
   // Unspecified
   if (a === "::") return true;
 
-  // IPv4-mapped IPv6 -- ::ffff:a.b.c.d
-  // URL.hostname normalizes these, so we may see "::ffff:127.0.0.1"
-  const v4MappedMatch = a.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
-  if (v4MappedMatch) {
-    return isPrivateIPv4(v4MappedMatch[1]);
+  // IPv4-mapped IPv6 -- two forms:
+  //   1. Dotted-decimal:  ::ffff:127.0.0.1    (as typed by user)
+  //   2. Hex:             ::ffff:7f00:1        (as normalized by URL constructor)
+  // Both must be detected and the embedded IPv4 checked.
+  const v4MappedDotted = a.match(
+    /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/
+  );
+  if (v4MappedDotted) {
+    return isPrivateIPv4(v4MappedDotted[1]);
+  }
+
+  // Hex form: ::ffff:HHHH:HHHH where each 16-bit group encodes two octets
+  const v4MappedHex = a.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (v4MappedHex) {
+    const hi = parseInt(v4MappedHex[1], 16);
+    const lo = parseInt(v4MappedHex[2], 16);
+    // Convert to dotted-decimal: hi >> 8 . hi & 0xff . lo >> 8 . lo & 0xff
+    const ipv4 = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+    return isPrivateIPv4(ipv4);
   }
 
   // Expand the first hex group to check prefix-based ranges.
@@ -113,7 +127,7 @@ function isPrivateHost(hostname: string): boolean {
   // localhost
   if (h === "localhost") return true;
 
-  // IPv6 address check (URL.hostname strips brackets for IPv6, so we get bare "::1" etc.)
+  // IPv6 address check (URL.hostname keeps brackets for IPv6, e.g. "[::1]")
   // Detect IPv6: contains ":" which is not valid in IPv4 or domain names
   if (h.includes(":")) {
     return isPrivateIPv6(h);
