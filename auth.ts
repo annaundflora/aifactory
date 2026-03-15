@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { db } from "@/lib/db";
+import { users, accounts, sessions } from "@/lib/db/schema";
 
 // ---------------------------------------------------------------------------
 // Startup-time env validation (Finding 1 + 2)
@@ -52,7 +53,11 @@ const allowedEmails = getAllowedEmails();
 export const { auth, handlers, signIn, signOut } = NextAuth({
   // NOTE: Auth.js tables (users, accounts, sessions) are created in Slice 04.
   // Until that migration runs, database sessions will not be functional.
-  adapter: DrizzleAdapter(db),
+  adapter: DrizzleAdapter(db, {
+    usersTable: users,
+    accountsTable: accounts,
+    sessionsTable: sessions,
+  }),
   providers: [
     Google({
       clientId: process.env.AUTH_GOOGLE_ID,
@@ -75,6 +80,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       const email = user.email;
       if (!email) return false;
 
+      console.log("[auth] signIn attempt:", email, "| allowed:", allowedEmails);
       return allowedEmails.includes(email.toLowerCase());
     },
     session({ session, user }) {
