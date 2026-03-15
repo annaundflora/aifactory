@@ -55,7 +55,9 @@ export function useGenerationPolling(
     const poll = async () => {
       try {
         const result = await fetchGenerations(projectId);
-        setGenerations(result);
+        if (Array.isArray(result)) {
+          setGenerations(result);
+        }
       } catch (error) {
         console.error("Polling error:", error);
       }

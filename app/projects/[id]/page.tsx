@@ -17,7 +17,7 @@ interface WorkspacePageProps {
 export default async function WorkspacePage({ params }: WorkspacePageProps) {
   const { id } = await params;
 
-  const [projectResult, projectsResult, generations] = await Promise.all([
+  const [projectResult, projectsResult, generationsResult] = await Promise.all([
     getProject({ id }),
     getProjects(),
     fetchGenerations(id),
@@ -30,6 +30,7 @@ export default async function WorkspacePage({ params }: WorkspacePageProps) {
 
   const project = projectResult;
   const projects = Array.isArray(projectsResult) ? projectsResult : [];
+  const generations = Array.isArray(generationsResult) ? generationsResult : [];
 
   return (
     <SidebarProvider defaultOpen={false}>

@@ -364,7 +364,12 @@ export async function getVariantFamilyAction(
   batchId: string | null,
   sourceGenerationId: string | null,
   currentGenerationId: string
-): Promise<Generation[]> {
+): Promise<Generation[] | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
   try {
     return await getVariantFamily(batchId, sourceGenerationId, currentGenerationId);
   } catch (error) {

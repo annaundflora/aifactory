@@ -44,7 +44,9 @@ export function SiblingThumbnails({
 
     startTransition(async () => {
       const result = await getVariantFamilyAction(batchId, sourceGenerationId, currentGenerationId);
-      setSiblings(result);
+      if (Array.isArray(result)) {
+        setSiblings(result);
+      }
     });
   }, [batchId, sourceGenerationId, currentGenerationId]);
 

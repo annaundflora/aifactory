@@ -2,10 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { ReferenceService } from "@/lib/services/reference-service";
-import { getGenerationReferences } from "@/lib/db/queries";
+import { getGenerationReferences, getProject as getProjectQuery } from "@/lib/db/queries";
 import { db } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { referenceImages } from "@/lib/db/schema";
+import { requireAuth } from "@/lib/auth/guard";
 
 import type { ReferenceImage } from "@/lib/db/queries";
 
@@ -39,6 +40,18 @@ export async function uploadReferenceImage(
   | { id: string; imageUrl: string; width: number; height: number }
   | { error: string }
 > {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
+  // Ownership check: verify project belongs to user
+  try {
+    await getProjectQuery(input.projectId, auth.userId);
+  } catch {
+    return { error: "Not found" };
+  }
+
   // AC-3: Validate projectId
   if (!input.projectId || input.projectId.trim().length === 0) {
     return { error: "Ungueltige Projekt-ID" };
@@ -72,6 +85,11 @@ export async function uploadReferenceImage(
 export async function deleteReferenceImage(
   input: DeleteReferenceImageInput
 ): Promise<{ success: true } | { success: false } | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
   // AC-8: Validate id
   if (!input.id || input.id.trim().length === 0) {
     return { error: "Ungueltige Referenz-ID" };
@@ -94,6 +112,18 @@ export async function deleteReferenceImage(
 export async function addGalleryAsReference(
   input: AddGalleryAsReferenceInput
 ): Promise<ReferenceImage | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
+  // Ownership check: verify project belongs to user
+  try {
+    await getProjectQuery(input.projectId, auth.userId);
+  } catch {
+    return { error: "Not found" };
+  }
+
   // AC-6: Validate projectId
   if (!input.projectId || input.projectId.trim().length === 0) {
     return { error: "Ungueltige Projekt-ID" };
@@ -129,7 +159,19 @@ export async function addGalleryAsReference(
  */
 export async function getReferenceCount(
   projectId: string
-): Promise<number> {
+): Promise<number | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
+  // Ownership check: verify project belongs to user
+  try {
+    await getProjectQuery(projectId, auth.userId);
+  } catch {
+    return { error: "Not found" };
+  }
+
   const rows = await db
     .select({ id: referenceImages.id })
     .from(referenceImages)
@@ -157,7 +199,12 @@ export interface ProvenanceItem {
  */
 export async function getProvenanceData(
   generationId: string
-): Promise<ProvenanceItem[]> {
+): Promise<ProvenanceItem[] | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
   const refs = await getGenerationReferences(generationId);
 
   if (refs.length === 0) {

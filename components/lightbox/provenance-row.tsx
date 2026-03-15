@@ -44,7 +44,9 @@ export function ProvenanceRow({ generationId }: ProvenanceRowProps) {
     async function load() {
       const data = await getProvenanceData(generationId);
       if (!cancelled) {
-        setItems(data);
+        if (Array.isArray(data)) {
+          setItems(data);
+        }
       }
     }
 
