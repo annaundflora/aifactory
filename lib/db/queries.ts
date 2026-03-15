@@ -18,23 +18,24 @@ export type ModelSetting = typeof modelSettings.$inferSelect;
 
 export async function createProject(input: {
   name: string;
+  userId: string;
 }): Promise<Project> {
   const [project] = await db
     .insert(projects)
-    .values({ name: input.name })
+    .values({ name: input.name, userId: input.userId })
     .returning();
   return project;
 }
 
-export async function getProjects(): Promise<Project[]> {
-  return db.select().from(projects).orderBy(desc(projects.createdAt));
+export async function getProjects(userId: string): Promise<Project[]> {
+  return db.select().from(projects).where(eq(projects.userId, userId)).orderBy(desc(projects.createdAt));
 }
 
-export async function getProject(id: string): Promise<Project> {
+export async function getProject(id: string, userId: string): Promise<Project> {
   const [project] = await db
     .select()
     .from(projects)
-    .where(eq(projects.id, id));
+    .where(and(eq(projects.id, id), eq(projects.userId, userId)));
   if (!project) {
     throw new Error(`Project not found: ${id}`);
   }
@@ -43,12 +44,13 @@ export async function getProject(id: string): Promise<Project> {
 
 export async function renameProject(
   id: string,
-  name: string
+  name: string,
+  userId: string
 ): Promise<Project> {
   const [project] = await db
     .update(projects)
     .set({ name, updatedAt: new Date() })
-    .where(eq(projects.id, id))
+    .where(and(eq(projects.id, id), eq(projects.userId, userId)))
     .returning();
   if (!project) {
     throw new Error(`Project not found: ${id}`);
@@ -56,8 +58,8 @@ export async function renameProject(
   return project;
 }
 
-export async function deleteProject(id: string): Promise<void> {
-  await db.delete(projects).where(eq(projects.id, id));
+export async function deleteProject(id: string, userId: string): Promise<void> {
+  await db.delete(projects).where(and(eq(projects.id, id), eq(projects.userId, userId)));
 }
 
 // ---------------------------------------------------------------------------
