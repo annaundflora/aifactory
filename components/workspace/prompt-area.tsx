@@ -32,6 +32,7 @@ import { Loader2, Sparkles, Minus, Plus } from "lucide-react";
 import { LLMComparison } from "@/components/prompt-improve/llm-comparison";
 import { AssistantTrigger } from "@/components/assistant/assistant-trigger";
 import { SectionLabel } from "@/components/shared/section-label";
+import { modelIdToDisplayName } from "@/lib/utils/model-display-name";
 import { toast } from "sonner";
 
 // Re-export Generation type for callback
@@ -917,18 +918,22 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
               </div>
 
               {/* LLM Prompt Improvement */}
-              {showImprove && (
+              {showImprove && (() => {
+                const resolved = resolveModel(modelSettings, currentMode, tier);
+                const mid = resolved?.modelId ?? "";
+                return (
                 <LLMComparison
                   prompt={promptMotiv}
-                  modelId=""
-                  modelDisplayName=""
+                  modelId={mid}
+                  modelDisplayName={modelIdToDisplayName(mid)}
                   onAdopt={(improved) => {
                     setPromptMotiv(improved);
                     setShowImprove(false);
                   }}
                   onDiscard={() => setShowImprove(false)}
                 />
-              )}
+                );
+              })()}
             </div>
           )}
 
