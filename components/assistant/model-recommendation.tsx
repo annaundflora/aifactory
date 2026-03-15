@@ -31,7 +31,7 @@ export function ModelRecommendation() {
 
     // AC-4: Preserve all existing workspace fields, only override modelId
     workspace.setVariation({
-      ...workspace.variationData,
+      ...workspace.variationData!,
       modelId: recommendedModel.id,
     });
   }, [recommendedModel, workspace]);
