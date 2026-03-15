@@ -1,0 +1,1 @@
+{"feature":"security-hardening","slice":"slice-08","status":"completed","review":{"verdict":"APPROVED","attempts":2},"tests":{"ac_coverage":{"total":21,"covered":21}},"validation":{"passed":135,"failed":0},"retries":0}

@@ -16,7 +16,7 @@ import logging
 from typing import Optional
 
 from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
-from langchain_core.runnables import RunnableLambda
+from langchain_core.runnables import RunnableConfig, RunnableLambda
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
@@ -201,45 +201,48 @@ def create_agent(
     Returns:
         A compiled LangGraph graph ready for invocation.
     """
-    llm = ChatOpenAI(
-        model=settings.assistant_model_default,
-        api_key=settings.openrouter_api_key,
-        base_url="https://openrouter.ai/api/v1",
-        temperature=0.7,
-        max_tokens=4096,
-        streaming=True,
-    )
+    def _make_llm(model: str | None = None):
+        """Create a ChatOpenAI instance, optionally with a model override."""
+        llm = ChatOpenAI(
+            model=model or settings.assistant_model_default,
+            api_key=settings.openrouter_api_key,
+            base_url="https://openrouter.ai/api/v1",
+            temperature=0.7,
+            max_tokens=4096,
+            streaming=True,
+        )
+        if ALL_TOOLS:
+            try:
+                return llm.bind_tools(ALL_TOOLS)
+            except NotImplementedError:
+                logger.warning(
+                    "LLM does not support bind_tools. "
+                    "Tools will not be available for this agent instance."
+                )
+                return llm
+        return llm
 
-    # Bind tools to the LLM if available.
-    # Some LLM implementations (e.g., FakeListChatModel in tests) don't
-    # support bind_tools. Fall back gracefully to the raw LLM in that case.
-    if ALL_TOOLS:
-        try:
-            llm_with_tools = llm.bind_tools(ALL_TOOLS)
-        except NotImplementedError:
-            logger.warning(
-                "LLM does not support bind_tools. "
-                "Tools will not be available for this agent instance."
-            )
-            llm_with_tools = llm
-    else:
-        llm_with_tools = llm
+    _default_llm = _make_llm()
 
-    # Define both sync and async assistant node implementations as closures
-    # over the LLM instance. LangGraph requires sync for invoke() and
-    # async for ainvoke()/astream_events().
-    def _call_model_sync(state: PromptAssistantState) -> dict:
+    def _get_llm(config: RunnableConfig):
+        """Return the LLM for this request — default or per-request override."""
+        model = config.get("configurable", {}).get("model")
+        if model and model != settings.assistant_model_default:
+            return _make_llm(model)
+        return _default_llm
+
+    def _call_model_sync(state: PromptAssistantState, config: RunnableConfig) -> dict:
         """Sync: Call the LLM with the current messages and system prompt."""
         system_msg = SystemMessage(content=SYSTEM_PROMPT)
         messages = [system_msg] + list(state["messages"])
-        response = llm_with_tools.invoke(messages)
+        response = _get_llm(config).invoke(messages)
         return {"messages": [response]}
 
-    async def _call_model_async(state: PromptAssistantState) -> dict:
+    async def _call_model_async(state: PromptAssistantState, config: RunnableConfig) -> dict:
         """Async: Call the LLM with the current messages and system prompt."""
         system_msg = SystemMessage(content=SYSTEM_PROMPT)
         messages = [system_msg] + list(state["messages"])
-        response = await llm_with_tools.ainvoke(messages)
+        response = await _get_llm(config).ainvoke(messages)
         return {"messages": [response]}
 
     assistant_node = RunnableLambda(_call_model_sync, afunc=_call_model_async)
