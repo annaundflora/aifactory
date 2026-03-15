@@ -1,0 +1,688 @@
+{
+  "entities_changed": [
+    {
+      "file": ".dockerignore",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 18],
+      "diff_summary": "+18 -0"
+    },
+    {
+      "file": ".env.example",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 67],
+      "diff_summary": "+67 -0"
+    },
+    {
+      "file": "Caddyfile",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 3],
+      "diff_summary": "+3 -0"
+    },
+    {
+      "file": "Dockerfile",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 58],
+      "diff_summary": "+58 -0"
+    },
+    {
+      "file": "__tests__/slice-01/auth-config.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 396],
+      "diff_summary": "+396 -0"
+    },
+    {
+      "file": "__tests__/slice-01/auth-route.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 66],
+      "diff_summary": "+66 -0"
+    },
+    {
+      "file": "__tests__/slice-01/layout-session-provider.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 111],
+      "diff_summary": "+111 -0"
+    },
+    {
+      "file": "__tests__/slice-02/login-page.test.tsx",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 228],
+      "diff_summary": "+228 -0"
+    },
+    {
+      "file": "__tests__/slice-03/middleware.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 353],
+      "diff_summary": "+353 -0"
+    },
+    {
+      "file": "__tests__/slice-04/auth-migration.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 194],
+      "diff_summary": "+194 -0"
+    },
+    {
+      "file": "__tests__/slice-04/auth-schema.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 392],
+      "diff_summary": "+392 -0"
+    },
+    {
+      "file": "__tests__/slice-05/userid-migration.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 219],
+      "diff_summary": "+219 -0"
+    },
+    {
+      "file": "__tests__/slice-05/userid-schema.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 349],
+      "diff_summary": "+349 -0"
+    },
+    {
+      "file": "__tests__/slice-06/auth-guard.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 330],
+      "diff_summary": "+330 -0"
+    },
+    {
+      "file": "__tests__/slice-07/projects-auth.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 300],
+      "diff_summary": "+300 -0"
+    },
+    {
+      "file": "__tests__/slice-07/queries-userid.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 249],
+      "diff_summary": "+249 -0"
+    },
+    {
+      "file": "__tests__/slice-08/build-check.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 118],
+      "diff_summary": "+118 -0"
+    },
+    {
+      "file": "__tests__/slice-08/generations-auth.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 282],
+      "diff_summary": "+282 -0"
+    },
+    {
+      "file": "__tests__/slice-08/references-auth.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 224],
+      "diff_summary": "+224 -0"
+    },
+    {
+      "file": "__tests__/slice-09/build.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 48],
+      "diff_summary": "+48 -0"
+    },
+    {
+      "file": "__tests__/slice-09/model-settings-auth.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 148],
+      "diff_summary": "+148 -0"
+    },
+    {
+      "file": "__tests__/slice-09/models-auth.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 147],
+      "diff_summary": "+147 -0"
+    },
+    {
+      "file": "__tests__/slice-09/prompts-auth.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 159],
+      "diff_summary": "+159 -0"
+    },
+    {
+      "file": "__tests__/slice-10/upload-auth.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 370],
+      "diff_summary": "+370 -0"
+    },
+    {
+      "file": "__tests__/slice-10/url-validator.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 359],
+      "diff_summary": "+359 -0"
+    },
+    {
+      "file": "__tests__/slice-11/sidebar-auth.test.tsx",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 463],
+      "diff_summary": "+463 -0"
+    },
+    {
+      "file": "__tests__/slice-12/security-headers.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 344],
+      "diff_summary": "+344 -0"
+    },
+    {
+      "file": "__tests__/slice-13/dockerfile-compose.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 592],
+      "diff_summary": "+592 -0"
+    },
+    {
+      "file": "__tests__/slice-14/caddy-env.test.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 510],
+      "diff_summary": "+510 -0"
+    },
+    {
+      "file": "app/actions/generations.ts",
+      "entity": "generateImages",
+      "entity_type": "function",
+      "lines": [72, 83],
+      "diff_summary": "+12 -0"
+    },
+    {
+      "file": "app/actions/generations.ts",
+      "entity": "retryGeneration",
+      "entity_type": "function",
+      "lines": [169, 181],
+      "diff_summary": "+13 -0"
+    },
+    {
+      "file": "app/actions/generations.ts",
+      "entity": "fetchGenerations",
+      "entity_type": "function",
+      "lines": [203, 215],
+      "diff_summary": "+13 -1"
+    },
+    {
+      "file": "app/actions/generations.ts",
+      "entity": "upscaleImage",
+      "entity_type": "function",
+      "lines": [226, 237],
+      "diff_summary": "+12 -0"
+    },
+    {
+      "file": "app/actions/generations.ts",
+      "entity": "deleteGeneration",
+      "entity_type": "function",
+      "lines": [280, 302],
+      "diff_summary": "+13 -1"
+    },
+    {
+      "file": "app/actions/generations.ts",
+      "entity": "getSiblingGenerations",
+      "entity_type": "function",
+      "lines": [341, 346],
+      "diff_summary": "+6 -1"
+    },
+    {
+      "file": "app/actions/generations.ts",
+      "entity": "getVariantFamilyAction",
+      "entity_type": "function",
+      "lines": [367, 372],
+      "diff_summary": "+6 -1"
+    },
+    {
+      "file": "app/actions/model-settings.ts",
+      "entity": "getModelSettings",
+      "entity_type": "function",
+      "lines": [52, 57],
+      "diff_summary": "+6 -1"
+    },
+    {
+      "file": "app/actions/model-settings.ts",
+      "entity": "updateModelSetting",
+      "entity_type": "function",
+      "lines": [69, 73],
+      "diff_summary": "+5 -0"
+    },
+    {
+      "file": "app/actions/models.ts",
+      "entity": "getCollectionModels",
+      "entity_type": "function",
+      "lines": [11, 15],
+      "diff_summary": "+5 -0"
+    },
+    {
+      "file": "app/actions/models.ts",
+      "entity": "checkImg2ImgSupport",
+      "entity_type": "function",
+      "lines": [21, 26],
+      "diff_summary": "+6 -1"
+    },
+    {
+      "file": "app/actions/models.ts",
+      "entity": "getModelSchema",
+      "entity_type": "function",
+      "lines": [39, 43],
+      "diff_summary": "+5 -0"
+    },
+    {
+      "file": "app/actions/projects.ts",
+      "entity": "createProject",
+      "entity_type": "function",
+      "lines": [39, 50],
+      "diff_summary": "+6 -1"
+    },
+    {
+      "file": "app/actions/projects.ts",
+      "entity": "getProjects",
+      "entity_type": "function",
+      "lines": [62, 68],
+      "diff_summary": "+6 -1"
+    },
+    {
+      "file": "app/actions/projects.ts",
+      "entity": "getProject",
+      "entity_type": "function",
+      "lines": [78, 84],
+      "diff_summary": "+6 -1"
+    },
+    {
+      "file": "app/actions/projects.ts",
+      "entity": "renameProject",
+      "entity_type": "function",
+      "lines": [99, 110],
+      "diff_summary": "+6 -1"
+    },
+    {
+      "file": "app/actions/projects.ts",
+      "entity": "deleteProject",
+      "entity_type": "function",
+      "lines": [125, 131],
+      "diff_summary": "+6 -1"
+    },
+    {
+      "file": "app/actions/projects.ts",
+      "entity": "generateThumbnail",
+      "entity_type": "function",
+      "lines": [155, 174],
+      "diff_summary": "+6 -1"
+    },
+    {
+      "file": "app/actions/prompts.ts",
+      "entity": "getPromptHistory",
+      "entity_type": "function",
+      "lines": [24, 29],
+      "diff_summary": "+6 -1"
+    },
+    {
+      "file": "app/actions/prompts.ts",
+      "entity": "getFavoritePrompts",
+      "entity_type": "function",
+      "lines": [39, 44],
+      "diff_summary": "+6 -1"
+    },
+    {
+      "file": "app/actions/prompts.ts",
+      "entity": "toggleFavorite",
+      "entity_type": "function",
+      "lines": [53, 58],
+      "diff_summary": "+6 -1"
+    },
+    {
+      "file": "app/actions/prompts.ts",
+      "entity": "improvePrompt",
+      "entity_type": "function",
+      "lines": [72, 76],
+      "diff_summary": "+5 -0"
+    },
+    {
+      "file": "app/actions/references.ts",
+      "entity": "uploadReferenceImage",
+      "entity_type": "function",
+      "lines": [43, 54],
+      "diff_summary": "+12 -0"
+    },
+    {
+      "file": "app/actions/references.ts",
+      "entity": "deleteReferenceImage",
+      "entity_type": "function",
+      "lines": [88, 111],
+      "diff_summary": "+19 -0"
+    },
+    {
+      "file": "app/actions/references.ts",
+      "entity": "addGalleryAsReference",
+      "entity_type": "function",
+      "lines": [129, 140],
+      "diff_summary": "+12 -0"
+    },
+    {
+      "file": "app/actions/references.ts",
+      "entity": "getReferenceCount",
+      "entity_type": "function",
+      "lines": [176, 188],
+      "diff_summary": "+13 -1"
+    },
+    {
+      "file": "app/actions/references.ts",
+      "entity": "getProvenanceData",
+      "entity_type": "function",
+      "lines": [216, 229],
+      "diff_summary": "+14 -1"
+    },
+    {
+      "file": "app/actions/upload.ts",
+      "entity": "uploadSourceImage",
+      "entity_type": "function",
+      "lines": [29, 53],
+      "diff_summary": "+15 -1"
+    },
+    {
+      "file": "app/api/auth/[...nextauth]/route.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 3],
+      "diff_summary": "+3 -0"
+    },
+    {
+      "file": "app/layout.tsx",
+      "entity": "RootLayout",
+      "entity_type": "function",
+      "lines": [53, 58],
+      "diff_summary": "+7 -4"
+    },
+    {
+      "file": "app/login/login-form.tsx",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 110],
+      "diff_summary": "+110 -0"
+    },
+    {
+      "file": "app/login/page.tsx",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 23],
+      "diff_summary": "+23 -0"
+    },
+    {
+      "file": "app/projects/[id]/page.tsx",
+      "entity": "WorkspacePage",
+      "entity_type": "function",
+      "lines": [20, 33],
+      "diff_summary": "+2 -1"
+    },
+    {
+      "file": "auth.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 87],
+      "diff_summary": "+87 -0"
+    },
+    {
+      "file": "components/canvas/canvas-detail-view.tsx",
+      "entity": "CanvasDetailView",
+      "entity_type": "function",
+      "lines": [91, 190],
+      "diff_summary": "+9 -4"
+    },
+    {
+      "file": "components/canvas/canvas-model-selector.tsx",
+      "entity": "CanvasModelSelector",
+      "entity_type": "function",
+      "lines": [121, 139],
+      "diff_summary": "+4 -2"
+    },
+    {
+      "file": "components/canvas/sibling-thumbnails.tsx",
+      "entity": "SiblingThumbnails",
+      "entity_type": "function",
+      "lines": [47, 49],
+      "diff_summary": "+3 -1"
+    },
+    {
+      "file": "components/lightbox/provenance-row.tsx",
+      "entity": "ProvenanceRow",
+      "entity_type": "function",
+      "lines": [47, 49],
+      "diff_summary": "+3 -1"
+    },
+    {
+      "file": "components/settings/settings-dialog.tsx",
+      "entity": "SettingsDialog",
+      "entity_type": "function",
+      "lines": [59, 78],
+      "diff_summary": "+3 -1"
+    },
+    {
+      "file": "components/shared/session-provider.tsx",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 11],
+      "diff_summary": "+11 -0"
+    },
+    {
+      "file": "components/sidebar.tsx",
+      "entity": "Sidebar",
+      "entity_type": "function",
+      "lines": [41, 184],
+      "diff_summary": "+67 -1"
+    },
+    {
+      "file": "components/ui/alert.tsx",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 66],
+      "diff_summary": "+66 -0"
+    },
+    {
+      "file": "components/workspace/favorites-list.tsx",
+      "entity": "FavoritesList",
+      "entity_type": "function",
+      "lines": [95, 110],
+      "diff_summary": "+2 -0"
+    },
+    {
+      "file": "components/workspace/generation-placeholder.tsx",
+      "entity": "useGenerationPolling",
+      "entity_type": "function",
+      "lines": [58, 60],
+      "diff_summary": "+3 -1"
+    },
+    {
+      "file": "components/workspace/history-list.tsx",
+      "entity": "HistoryList",
+      "entity_type": "function",
+      "lines": [95, 125],
+      "diff_summary": "+3 -0"
+    },
+    {
+      "file": "components/workspace/prompt-area.tsx",
+      "entity": "PromptArea",
+      "entity_type": "function",
+      "lines": [164, 166],
+      "diff_summary": "+3 -2"
+    },
+    {
+      "file": "components/workspace/workspace-content.tsx",
+      "entity": "WorkspaceContent",
+      "entity_type": "function",
+      "lines": [233, 235],
+      "diff_summary": "+3 -1"
+    },
+    {
+      "file": "docker-compose.prod.yml",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 78],
+      "diff_summary": "+78 -0"
+    },
+    {
+      "file": "drizzle/0008_auth_tables.sql",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 31],
+      "diff_summary": "+31 -0"
+    },
+    {
+      "file": "drizzle/0009_add_user_id.sql",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 62],
+      "diff_summary": "+62 -0"
+    },
+    {
+      "file": "drizzle/meta/0008_snapshot.json",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 1257],
+      "diff_summary": "+1257 -0"
+    },
+    {
+      "file": "drizzle/meta/_journal.json",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [60, 69],
+      "diff_summary": "+8 -1"
+    },
+    {
+      "file": "lib/auth/guard.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 46],
+      "diff_summary": "+46 -0"
+    },
+    {
+      "file": "lib/db/queries.ts",
+      "entity": "createProject",
+      "entity_type": "function",
+      "lines": [21, 25],
+      "diff_summary": "+2 -1"
+    },
+    {
+      "file": "lib/db/queries.ts",
+      "entity": "getProjects",
+      "entity_type": "function",
+      "lines": [30, 31],
+      "diff_summary": "+2 -2"
+    },
+    {
+      "file": "lib/db/queries.ts",
+      "entity": "getProject",
+      "entity_type": "function",
+      "lines": [34, 38],
+      "diff_summary": "+2 -2"
+    },
+    {
+      "file": "lib/db/queries.ts",
+      "entity": "renameProject",
+      "entity_type": "function",
+      "lines": [47, 53],
+      "diff_summary": "+3 -2"
+    },
+    {
+      "file": "lib/db/queries.ts",
+      "entity": "deleteProject",
+      "entity_type": "function",
+      "lines": [61, 62],
+      "diff_summary": "+2 -2"
+    },
+    {
+      "file": "lib/db/schema.ts",
+      "entity": "projects",
+      "entity_type": "unknown",
+      "lines": [32, 45],
+      "diff_summary": "+7 -1"
+    },
+    {
+      "file": "lib/db/schema.ts",
+      "entity": "favoriteModels",
+      "entity_type": "unknown",
+      "lines": [113, 125],
+      "diff_summary": "+8 -2"
+    },
+    {
+      "file": "lib/db/schema.ts",
+      "entity": "users",
+      "entity_type": "unknown",
+      "lines": [284, 339],
+      "diff_summary": "+56 -0"
+    },
+    {
+      "file": "lib/security/url-validator.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 175],
+      "diff_summary": "+175 -0"
+    },
+    {
+      "file": "lib/services/thumbnail-service.ts",
+      "entity": "generateForProject",
+      "entity_type": "function",
+      "lines": [108, 112],
+      "diff_summary": "+8 -4"
+    },
+    {
+      "file": "middleware.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "lines": [1, 38],
+      "diff_summary": "+38 -0"
+    },
+    {
+      "file": "next.config.ts",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [6, 59],
+      "diff_summary": "+46 -0"
+    },
+    {
+      "file": "package.json",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": [13, 20],
+      "diff_summary": "+2 -0"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": null,
+      "diff_summary": "+107 -0"
+    },
+    {
+      "file": "tsconfig.tsbuildinfo",
+      "entity": null,
+      "entity_type": "unknown",
+      "lines": null,
+      "diff_summary": "+1 -1"
+    }
+  ],
+  "summary": {
+    "files_changed": 70,
+    "entities_changed": 93,
+    "new_files": 41
+  }
+}

@@ -3,7 +3,8 @@
 import { useTransition } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, LogOut, User } from "lucide-react";
+import { useSession, signOut } from "next-auth/react";
 import { toast } from "sonner";
 import {
   Sidebar as ShadcnSidebar,
@@ -37,6 +38,7 @@ export function Sidebar({ projects }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
+  const { data: session, status } = useSession();
 
   // Extract active project ID from pathname
   const activeProjectId = pathname.startsWith("/projects/")
@@ -114,8 +116,72 @@ export function Sidebar({ projects }: SidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-      {/* Footer: back to overview */}
+      {/* Footer: user info + logout + back to overview */}
       <SidebarFooter>
+        {/* User info + logout (only when authenticated) */}
+        {status === "authenticated" && session?.user && (
+          <SidebarGroup data-testid="sidebar-user-info">
+            <SidebarGroupContent>
+              <div className="flex items-center gap-2 px-2 py-1.5">
+                {/* Avatar */}
+                {session.user.image ? (
+                  <img
+                    src={session.user.image}
+                    alt={session.user.name ?? "User avatar"}
+                    width={32}
+                    height={32}
+                    className="rounded-full shrink-0"
+                    data-testid="sidebar-user-avatar"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div
+                    className="flex size-8 items-center justify-center rounded-full bg-sidebar-accent shrink-0"
+                    data-testid="sidebar-user-avatar-fallback"
+                  >
+                    <User className="size-4 text-sidebar-foreground/70" />
+                  </div>
+                )}
+                {/* Name + Email */}
+                <div className="flex min-w-0 flex-col group-data-[collapsible=icon]:hidden">
+                  <span
+                    className="truncate text-sm font-medium text-sidebar-foreground"
+                    data-testid="sidebar-user-name"
+                  >
+                    {session.user.name ?? session.user.email}
+                  </span>
+                  <span
+                    className="truncate text-xs text-sidebar-foreground/70"
+                    data-testid="sidebar-user-email"
+                  >
+                    {session.user.email}
+                  </span>
+                </div>
+              </div>
+              {/* Logout button - hidden in collapsed mode, only avatar visible per AC-7 */}
+              <div className="group-data-[collapsible=icon]:hidden">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => signOut({ callbackUrl: "/login" })}
+                      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground w-full"
+                      data-testid="sidebar-logout-button"
+                      type="button"
+                    >
+                      <LogOut className="size-4 shrink-0" />
+                      <span>Logout</span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" align="center">
+                    Logout
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {/* Back to overview */}
         <SidebarGroup>
           <SidebarGroupContent>
             <Tooltip>

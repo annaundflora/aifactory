@@ -161,8 +161,9 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
 
   // Fetch model settings on mount and when settings change
   const loadModelSettings = useCallback(() => {
-    getModelSettings().then((settings) => {
-      setModelSettings(settings);
+    getModelSettings().then((result) => {
+      if ("error" in result) return;
+      setModelSettings(result);
     }).catch((err) => {
       console.error("Failed to load model settings:", err);
     });

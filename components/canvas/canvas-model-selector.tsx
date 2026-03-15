@@ -118,7 +118,8 @@ export function CanvasModelSelector({
       let supportsImg2img = img2imgCache.get(newModelId);
       if (supportsImg2img === undefined) {
         try {
-          supportsImg2img = await checkImg2ImgSupport({ modelId: newModelId });
+          const checkResult = await checkImg2ImgSupport({ modelId: newModelId });
+          supportsImg2img = typeof checkResult === "boolean" ? checkResult : true;
           setImg2imgCache((prev) => new Map(prev).set(newModelId, supportsImg2img!));
         } catch {
           // If we can't determine, assume it supports img2img
@@ -135,7 +136,8 @@ export function CanvasModelSelector({
           let supports = img2imgCache.get(mId);
           if (supports === undefined) {
             try {
-              supports = await checkImg2ImgSupport({ modelId: mId });
+              const checkRes = await checkImg2ImgSupport({ modelId: mId });
+              supports = typeof checkRes === "boolean" ? checkRes : true;
               setImg2imgCache((prev) => new Map(prev).set(mId, supports!));
             } catch {
               continue;

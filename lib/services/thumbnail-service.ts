@@ -3,11 +3,12 @@ import { openRouterClient } from "@/lib/clients/openrouter";
 import { replicateRun } from "@/lib/clients/replicate";
 import { upload } from "@/lib/clients/storage";
 import {
-  getProject,
   getGenerations,
   updateProjectThumbnail,
-  type Project,
 } from "@/lib/db/queries";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { projects } from "@/lib/db/schema";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -104,8 +105,11 @@ export async function generateForProject(projectId: string): Promise<void> {
   });
 
   try {
-    // Fetch project name for the LLM prompt
-    const project: Project = await getProject(projectId);
+    // Fetch project name for the LLM prompt (internal service — no userId filter needed)
+    const [project] = await db.select().from(projects).where(eq(projects.id, projectId));
+    if (!project) {
+      throw new Error(`Project not found: ${projectId}`);
+    }
 
     // AC-2: Call OpenRouter to generate a thumbnail image prompt from project name
     const userMessage = `Project name: "${project.name}". Generate a representative thumbnail image prompt.`;

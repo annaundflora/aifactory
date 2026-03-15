@@ -5,12 +5,14 @@ import { GenerationService, validateTotalMegapixels } from "@/lib/services/gener
 import {
   getGenerations,
   getGeneration,
+  getProject as getProjectQuery,
   deleteGeneration as deleteGenerationFromDb,
   getSiblingsByBatchId,
   getVariantFamily,
   type Generation,
 } from "@/lib/db/queries";
 import { StorageService } from "@/lib/clients/storage";
+import { requireAuth } from "@/lib/auth/guard";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -67,6 +69,18 @@ interface DeleteGenerationInput {
 export async function generateImages(
   input: GenerateImagesInput
 ): Promise<Generation[] | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
+  // Ownership check: verify project belongs to user
+  try {
+    await getProjectQuery(input.projectId, auth.userId);
+  } catch {
+    return { error: "Not found" };
+  }
+
   // AC-9: Empty prompt validation
   if (!input.promptMotiv || input.promptMotiv.trim().length === 0) {
     return { error: "Prompt darf nicht leer sein" };
@@ -152,6 +166,19 @@ export async function generateImages(
 export async function retryGeneration(
   input: RetryGenerationInput
 ): Promise<Generation | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
+  // Ownership check: load generation, then verify its project belongs to user
+  try {
+    const gen = await getGeneration(input.id);
+    await getProjectQuery(gen.projectId, auth.userId);
+  } catch {
+    return { error: "Not found" };
+  }
+
   try {
     const generation = await GenerationService.retry(input.id);
     return generation;
@@ -173,7 +200,19 @@ export async function retryGeneration(
 
 export async function fetchGenerations(
   projectId: string
-): Promise<Generation[]> {
+): Promise<Generation[] | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
+  // Ownership check: verify project belongs to user
+  try {
+    await getProjectQuery(projectId, auth.userId);
+  } catch {
+    return { error: "Not found" };
+  }
+
   return getGenerations(projectId);
 }
 
@@ -184,6 +223,18 @@ export async function fetchGenerations(
 export async function upscaleImage(
   input: UpscaleImageInput
 ): Promise<Generation | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
+  // Ownership check: verify project belongs to user
+  try {
+    await getProjectQuery(input.projectId, auth.userId);
+  } catch {
+    return { error: "Not found" };
+  }
+
   // Validate projectId
   if (!input.projectId || input.projectId.trim().length === 0) {
     return { error: "Ungültige Projekt-ID" };
@@ -226,7 +277,12 @@ export async function upscaleImage(
 
 export async function deleteGeneration(
   input: DeleteGenerationInput
-): Promise<{ success: boolean }> {
+): Promise<{ success: boolean } | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
   try {
     // Fetch the generation first to check existence and get image_url
     let generation: Generation;
@@ -235,6 +291,13 @@ export async function deleteGeneration(
     } catch {
       // Generation not found
       return { success: false };
+    }
+
+    // Ownership check: verify the generation's project belongs to user
+    try {
+      await getProjectQuery(generation.projectId, auth.userId);
+    } catch {
+      return { error: "Not found" };
     }
 
     // DB DELETE first (data integrity)
@@ -275,7 +338,12 @@ export async function deleteGeneration(
  */
 export async function getSiblingGenerations(
   batchId: string | null
-): Promise<Generation[]> {
+): Promise<Generation[] | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
   if (!batchId) {
     return [];
   }
@@ -296,7 +364,12 @@ export async function getVariantFamilyAction(
   batchId: string | null,
   sourceGenerationId: string | null,
   currentGenerationId: string
-): Promise<Generation[]> {
+): Promise<Generation[] | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
   try {
     return await getVariantFamily(batchId, sourceGenerationId, currentGenerationId);
   } catch (error) {

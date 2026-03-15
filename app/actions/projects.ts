@@ -13,6 +13,7 @@ import {
   generateForProject,
   refreshForProject,
 } from "@/lib/services/thumbnail-service";
+import { requireAuth } from "@/lib/auth/guard";
 
 // ---------------------------------------------------------------------------
 // Validation
@@ -35,13 +36,18 @@ function validateProjectName(
 export async function createProject(input: {
   name: string;
 }): Promise<{ id: string; name: string; createdAt: Date } | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
   const validation = validateProjectName(input.name);
   if (!validation.valid) {
     return { error: validation.error };
   }
 
   try {
-    const project = await createProjectQuery({ name: validation.trimmed });
+    const project = await createProjectQuery({ name: validation.trimmed, userId: auth.userId });
     // AC-7: Fire-and-forget thumbnail generation — do NOT await
     generateForProject(project.id).catch(console.error);
     revalidatePath("/");
@@ -53,8 +59,13 @@ export async function createProject(input: {
 }
 
 export async function getProjects(): Promise<Project[] | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
   try {
-    return await getProjectsQuery();
+    return await getProjectsQuery(auth.userId);
   } catch (err) {
     console.error("getProjects DB error:", err);
     return { error: "Datenbankfehler" };
@@ -64,8 +75,13 @@ export async function getProjects(): Promise<Project[] | { error: string }> {
 export async function getProject(input: {
   id: string;
 }): Promise<Project | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
   try {
-    const project = await getProjectQuery(input.id);
+    const project = await getProjectQuery(input.id, auth.userId);
     return project;
   } catch (err) {
     if (err instanceof Error && err.message.includes("not found")) {
@@ -80,13 +96,18 @@ export async function renameProject(input: {
   id: string;
   name: string;
 }): Promise<Project | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
   const validation = validateProjectName(input.name);
   if (!validation.valid) {
     return { error: validation.error };
   }
 
   try {
-    const project = await renameProjectQuery(input.id, validation.trimmed);
+    const project = await renameProjectQuery(input.id, validation.trimmed, auth.userId);
     revalidatePath("/");
     return project;
   } catch (err) {
@@ -101,8 +122,13 @@ export async function renameProject(input: {
 export async function deleteProject(input: {
   id: string;
 }): Promise<{ success: boolean } | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
   try {
-    await deleteProjectQuery(input.id);
+    await deleteProjectQuery(input.id, auth.userId);
     revalidatePath("/");
     return { success: true };
   } catch (err) {
@@ -126,6 +152,11 @@ export async function deleteProject(input: {
 export async function generateThumbnail(input: {
   projectId: string;
 }): Promise<Project | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
   const projectId = input.projectId?.trim();
 
   // AC-10: Validate projectId — must be a non-empty UUID
@@ -140,7 +171,7 @@ export async function generateThumbnail(input: {
 
   let project: Project;
   try {
-    project = await getProjectQuery(projectId);
+    project = await getProjectQuery(projectId, auth.userId);
   } catch (err) {
     if (err instanceof Error && err.message.includes("not found")) {
       return { error: "Projekt nicht gefunden" };

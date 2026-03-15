@@ -8,6 +8,7 @@ import {
   promptHistoryService,
   type PromptHistoryEntry,
 } from "@/lib/services/prompt-history-service";
+import { requireAuth } from "@/lib/auth/guard";
 
 // UUID v4 format validation
 const UUID_REGEX =
@@ -20,7 +21,12 @@ const UUID_REGEX =
 export async function getPromptHistory(input: {
   offset?: number;
   limit?: number;
-}): Promise<PromptHistoryEntry[]> {
+}): Promise<PromptHistoryEntry[] | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
   const offset = input.offset ?? 0;
   const limit = input.limit ?? 50;
 
@@ -30,7 +36,12 @@ export async function getPromptHistory(input: {
 export async function getFavoritePrompts(input: {
   offset?: number;
   limit?: number;
-}): Promise<PromptHistoryEntry[]> {
+}): Promise<PromptHistoryEntry[] | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
   const offset = input.offset ?? 0;
   const limit = input.limit ?? 50;
 
@@ -39,7 +50,12 @@ export async function getFavoritePrompts(input: {
 
 export async function toggleFavorite(input: {
   generationId: string;
-}): Promise<{ isFavorite: boolean }> {
+}): Promise<{ isFavorite: boolean } | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
   const generationId = (input.generationId ?? "").trim();
 
   if (!UUID_REGEX.test(generationId)) {
@@ -53,6 +69,11 @@ export async function improvePrompt(input: {
   prompt: string;
   modelId: string;
 }): Promise<ImproveResult | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
   const prompt = input.prompt.trim();
   const modelId = (input.modelId ?? "").trim();
 

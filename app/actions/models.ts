@@ -3,16 +3,27 @@
 import { ModelSchemaService } from "@/lib/services/model-schema-service";
 import { CollectionModelService } from "@/lib/services/collection-model-service";
 import type { CollectionModel } from "@/lib/types/collection-model";
+import { requireAuth } from "@/lib/auth/guard";
 
 export async function getCollectionModels(): Promise<
   CollectionModel[] | { error: string }
 > {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
   return CollectionModelService.getCollectionModels();
 }
 
 export async function checkImg2ImgSupport(input: {
   modelId: string;
-}): Promise<boolean> {
+}): Promise<boolean | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
   const { modelId } = input;
   if (!modelId || !modelId.includes("/")) return false;
   try {
@@ -25,6 +36,11 @@ export async function checkImg2ImgSupport(input: {
 export async function getModelSchema(input: {
   modelId: string;
 }): Promise<{ properties: Record<string, unknown> } | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
   const { modelId } = input;
 
   if (!modelId || !modelId.includes("/")) {

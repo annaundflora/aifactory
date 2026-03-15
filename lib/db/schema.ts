@@ -1,5 +1,6 @@
 import {
   pgTable,
+  primaryKey,
   uuid,
   varchar,
   text,
@@ -28,6 +29,9 @@ export const projects = pgTable(
     thumbnailStatus: varchar("thumbnail_status", { length: 20 })
       .notNull()
       .default("none"),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -35,7 +39,10 @@ export const projects = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [index("projects_thumbnail_status_idx").on(table.thumbnailStatus)]
+  (table) => [
+    index("projects_thumbnail_status_idx").on(table.thumbnailStatus),
+    index("projects_user_id_idx").on(table.userId),
+  ]
 );
 
 // -----------------------------------------------
@@ -103,12 +110,19 @@ export const favoriteModels = pgTable(
     id: uuid("id")
       .primaryKey()
       .default(sql`gen_random_uuid()`),
-    modelId: varchar("model_id", { length: 255 }).notNull().unique(),
+    modelId: varchar("model_id", { length: 255 }).notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (table) => [index("favorite_models_model_id_idx").on(table.modelId)]
+  (table) => [
+    index("favorite_models_model_id_idx").on(table.modelId),
+    index("favorite_models_user_id_idx").on(table.userId),
+    uniqueIndex("favorite_models_user_id_model_id_idx").on(table.userId, table.modelId),
+  ]
 );
 
 // -----------------------------------------------
@@ -265,5 +279,61 @@ export const modelSettings = pgTable(
   },
   (table) => [
     uniqueIndex("model_settings_mode_tier_idx").on(table.mode, table.tier),
+  ]
+);
+
+// -----------------------------------------------
+// users (Auth.js)
+// -----------------------------------------------
+export const users = pgTable("users", {
+  id: uuid("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  name: text("name"),
+  email: text("email").notNull().unique(),
+  emailVerified: timestamp("emailVerified", { mode: "date", withTimezone: true }),
+  image: text("image"),
+});
+
+// -----------------------------------------------
+// accounts (Auth.js)
+// -----------------------------------------------
+export const accounts = pgTable(
+  "accounts",
+  {
+    userId: uuid("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    provider: text("provider").notNull(),
+    providerAccountId: text("providerAccountId").notNull(),
+    refresh_token: text("refresh_token"),
+    access_token: text("access_token"),
+    expires_at: integer("expires_at"),
+    token_type: text("token_type"),
+    scope: text("scope"),
+    id_token: text("id_token"),
+    session_state: text("session_state"),
+  },
+  (table) => [
+    primaryKey({ columns: [table.provider, table.providerAccountId] }),
+    index("accounts_userId_idx").on(table.userId),
+  ]
+);
+
+// -----------------------------------------------
+// sessions (Auth.js)
+// -----------------------------------------------
+export const sessions = pgTable(
+  "sessions",
+  {
+    sessionToken: text("sessionToken").primaryKey(),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expires: timestamp("expires", { mode: "date", withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index("sessions_userId_idx").on(table.userId),
   ]
 );
