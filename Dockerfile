@@ -28,6 +28,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Dummy env vars needed at build time (Next.js page data collection)
 ENV DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy
 ENV AUTH_SECRET=dummy-build-secret
+ENV AUTH_GOOGLE_ID=dummy
+ENV AUTH_GOOGLE_SECRET=dummy
+ENV ALLOWED_EMAILS=dummy@dummy.com
 
 # Build the Next.js application (standalone output)
 RUN pnpm build
