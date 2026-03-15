@@ -3,12 +3,12 @@ FROM node:22.14.0-slim AS deps
 WORKDIR /app
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.21.0 --activate
 
 # Copy dependency files
 COPY package.json pnpm-lock.yaml ./
 
-# Install production dependencies only
+# Install all dependencies (including dev, required for build)
 RUN pnpm install --frozen-lockfile
 
 # Stage 2: Build the application
@@ -16,7 +16,7 @@ FROM node:22.14.0-slim AS build
 WORKDIR /app
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.21.0 --activate
 
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
