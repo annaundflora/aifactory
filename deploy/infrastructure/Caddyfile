@@ -1,0 +1,13 @@
+# AI Factory
+acfactory.uk {
+	reverse_proxy aifactory-app:3000
+}
+
+www.acfactory.uk {
+	redir https://acfactory.uk{uri}
+}
+
+# Future apps: add new domain blocks here
+# example.com {
+#     reverse_proxy other-app:3000
+# }

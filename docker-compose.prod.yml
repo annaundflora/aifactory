@@ -1,6 +1,11 @@
-# Production Docker Compose configuration for AI Factory.
-# Use with: docker compose -f docker-compose.prod.yml up -d
-# Requires a .env file with POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, AUTH_SECRET, etc.
+# AI Factory production stack.
+# Requires shared infrastructure running (deploy/infrastructure/).
+#
+# Setup:
+#   1. Ensure 'web' network exists: docker network create web
+#   2. Ensure infrastructure is running: cd /opt/infrastructure && docker compose up -d
+#   3. cp .env.example .env && nano .env
+#   4. docker compose -f docker-compose.prod.yml up -d --build
 
 services:
   app:
@@ -12,7 +17,8 @@ services:
     expose:
       - "3000"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      ASSISTANT_BACKEND_URL: http://aifactory-backend:8000
       AUTH_SECRET: ${AUTH_SECRET}
       AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID}
       AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET}
@@ -25,54 +31,25 @@ services:
       R2_BUCKET_NAME: ${R2_BUCKET_NAME}
       R2_ENDPOINT: ${R2_ENDPOINT}
       R2_PUBLIC_URL: ${R2_PUBLIC_URL}
-    depends_on:
-      db:
-        condition: service_healthy
     networks:
-      - internal
+      - web
 
-  db:
-    image: postgres:16
-    container_name: aifactory-db-prod
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aifactory-backend
     restart: unless-stopped
+    expose:
+      - "8000"
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    volumes:
-      - postgres-data-prod:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN}
+      FRONTEND_URL: https://acfactory.uk
     networks:
-      - internal
-
-  caddy:
-    image: caddy:2.11.2-alpine
-    container_name: aifactory-caddy
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    environment:
-      DOMAIN: ${DOMAIN}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - app
-    networks:
-      - internal
+      - web
 
 networks:
-  internal:
-    driver: bridge
-
-volumes:
-  postgres-data-prod:
-  caddy_data:
-  caddy_config:
+  web:
+    external: true
