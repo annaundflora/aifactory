@@ -13,7 +13,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ImageUploadButton } from "./image-upload-button";
 import { ImagePreview } from "./image-preview";
-import { GALLERY_DRAG_MIME_TYPE, type GalleryDragPayload } from "@/lib/constants/drag-types";
+import { GALLERY_DRAG_MIME_TYPE, GALLERY_DROP_TARGET_ATTR, type GalleryDragPayload } from "@/lib/constants/drag-types";
+import { useTouchDropTarget } from "@/hooks/use-touch-drop-target";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -153,13 +154,25 @@ export function ChatInput({
     }
   }, []);
 
+  // Touch drag drop target
+  const handleTouchDrop = useCallback(
+    (payload: GalleryDragPayload) => {
+      setPendingImageUrl(payload.imageUrl);
+    },
+    []
+  );
+  const { isOver: touchIsOver } = useTouchDropTarget("chat-input", handleTouchDrop);
+
+  const showDropHighlight = isDragOver || touchIsOver;
+
   return (
     <div
       data-testid="chat-input"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={cn(isDragOver && "ring-2 ring-primary/50 bg-primary/5 rounded-lg")}
+      {...{ [GALLERY_DROP_TARGET_ATTR]: "chat-input" }}
+      className={cn(showDropHighlight && "ring-2 ring-primary/50 bg-primary/5 rounded-lg")}
     >
       {/* AC-3: Image preview area above textarea when pendingImageUrl is set */}
       {pendingImageUrl && (

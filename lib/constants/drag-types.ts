@@ -12,3 +12,9 @@ export interface GalleryDragPayload {
   generationId: string;
   imageUrl: string;
 }
+
+/**
+ * Data attribute used to identify touch drag drop targets.
+ * Elements with this attribute are discoverable via elementFromPoint hit-testing.
+ */
+export const GALLERY_DROP_TARGET_ATTR = "data-gallery-drop-target";

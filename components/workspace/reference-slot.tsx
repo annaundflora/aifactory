@@ -20,8 +20,10 @@ import {
 import { cn } from "@/lib/utils";
 import {
   GALLERY_DRAG_MIME_TYPE,
+  GALLERY_DROP_TARGET_ATTR,
   type GalleryDragPayload,
 } from "@/lib/constants/drag-types";
+import { useTouchDropTarget } from "@/hooks/use-touch-drop-target";
 import type {
   ReferenceRole,
   ReferenceStrength,
@@ -149,6 +151,7 @@ export interface ReferenceSlotProps {
 
 export function ReferenceSlot({
   slotData,
+  slotPosition,
   dimmed = false,
   errorMessage,
   uploading = false,
@@ -169,6 +172,17 @@ export function ReferenceSlot({
   const isDimmed = slotData !== null && dimmed;
   const isError = errorMessage != null && errorMessage.length > 0;
   const isUploading = uploading;
+
+  // Touch drag drop target
+  const slotDropId = `reference-slot-${slotData?.slotPosition ?? slotPosition ?? "empty"}`;
+  const handleTouchDrop = useCallback(
+    (payload: GalleryDragPayload) => {
+      if (isReady) return; // reject drops on filled slots
+      onGalleryDrop?.(payload);
+    },
+    [isReady, onGalleryDrop]
+  );
+  const { isOver: touchIsOver } = useTouchDropTarget(slotDropId, handleTouchDrop);
 
   // ---------------------------------------------------------------------------
   // Helpers: detect gallery drag via custom MIME type
@@ -505,12 +519,13 @@ export function ReferenceSlot({
   // ---------------------------------------------------------------------------
 
   const isDragOver = visualState === "drag-over";
+  const showDropHighlight = isDragOver || touchIsOver;
 
   return (
     <div
       className={cn(
         "relative flex flex-col items-center justify-center rounded-lg border-2 transition-colors min-h-[80px] gap-1 p-4 cursor-pointer",
-        isDragOver
+        showDropHighlight
           ? "border-solid border-primary bg-primary/5"
           : "border-dashed border-muted-foreground/40 hover:border-muted-foreground/70"
       )}
@@ -518,8 +533,9 @@ export function ReferenceSlot({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       onClick={handleDropzoneClick}
+      {...{ [GALLERY_DROP_TARGET_ATTR]: slotDropId }}
       data-testid="reference-slot"
-      data-state={isDragOver ? "drag-over" : "empty"}
+      data-state={showDropHighlight ? "drag-over" : "empty"}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {

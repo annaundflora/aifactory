@@ -1,0 +1,23 @@
+{
+  "spec_path": "specs/phase-7/2026-03-15-aspect-ratio-controls",
+  "status": "in_progress",
+  "phase": "slice_planning",
+  "started_at": "2026-03-16T12:00:00.000Z",
+  "detected_stack": "TypeScript",
+  "total_slices": 7,
+  "current_slice_index": 0,
+  "slices": [
+    { "number": 1, "name": "resolveModel Utility extrahieren", "status": "pending", "retries": 0 },
+    { "number": 2, "name": "useModelSchema Hook", "status": "pending", "retries": 0 },
+    { "number": 3, "name": "ParameterPanel Primary/Advanced Split", "status": "pending", "retries": 0 },
+    { "number": 4, "name": "Prompt Panel: imageParams State + ParameterPanel Mount", "status": "pending", "retries": 0 },
+    { "number": 5, "name": "Prompt Panel: imageParams Merge in handleGenerate", "status": "pending", "retries": 0 },
+    { "number": 6, "name": "Canvas Popovers: ParameterPanel Mount + imageParams State", "status": "pending", "retries": 0 },
+    { "number": 7, "name": "Canvas Popovers: imageParams Merge in Handlers", "status": "pending", "retries": 0 }
+  ],
+  "approved_slices": [],
+  "failed_slices": [],
+  "gate3_retries": 0,
+  "last_action": "Slicer completed, 7 slices",
+  "last_updated": "2026-03-16T12:00:00.000Z"
+}

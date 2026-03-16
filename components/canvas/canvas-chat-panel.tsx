@@ -194,21 +194,21 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
   const panelRef = useRef<HTMLDivElement>(null);
   const isResizing = useRef(false);
   const rAfRef = useRef<number | null>(null);
-  const mouseMoveRef = useRef<((e: MouseEvent) => void) | null>(null);
-  const mouseUpRef = useRef<(() => void) | null>(null);
+  const pointerMoveRef = useRef<((e: PointerEvent) => void) | null>(null);
+  const pointerUpRef = useRef<(() => void) | null>(null);
 
   const cleanupResizeListeners = useCallback(() => {
     if (rAfRef.current !== null) {
       cancelAnimationFrame(rAfRef.current);
       rAfRef.current = null;
     }
-    if (mouseMoveRef.current) {
-      document.removeEventListener("mousemove", mouseMoveRef.current);
-      mouseMoveRef.current = null;
+    if (pointerMoveRef.current) {
+      document.removeEventListener("pointermove", pointerMoveRef.current);
+      pointerMoveRef.current = null;
     }
-    if (mouseUpRef.current) {
-      document.removeEventListener("mouseup", mouseUpRef.current);
-      mouseUpRef.current = null;
+    if (pointerUpRef.current) {
+      document.removeEventListener("pointerup", pointerUpRef.current);
+      pointerUpRef.current = null;
     }
     isResizing.current = false;
     document.body.style.cursor = "";
@@ -226,7 +226,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
   }, [cleanupResizeListeners]);
 
   const handleResizeStart = useCallback(
-    (e: React.MouseEvent) => {
+    (e: React.PointerEvent) => {
       if (collapsed) return;
       e.preventDefault();
       isResizing.current = true;
@@ -234,7 +234,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
       const startX = e.clientX;
       const startWidth = width;
 
-      const handleMouseMove = (moveEvent: MouseEvent) => {
+      const handlePointerMove = (moveEvent: PointerEvent) => {
         if (!isResizing.current) return;
         if (rAfRef.current !== null) {
           cancelAnimationFrame(rAfRef.current);
@@ -248,17 +248,17 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
         });
       };
 
-      const handleMouseUp = () => {
+      const handlePointerUp = () => {
         cleanupResizeListeners();
       };
 
-      mouseMoveRef.current = handleMouseMove;
-      mouseUpRef.current = handleMouseUp;
+      pointerMoveRef.current = handlePointerMove;
+      pointerUpRef.current = handlePointerUp;
 
       document.body.style.cursor = "col-resize";
       document.body.style.userSelect = "none";
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
+      document.addEventListener("pointermove", handlePointerMove);
+      document.addEventListener("pointerup", handlePointerUp);
     },
     [collapsed, width, cleanupResizeListeners]
   );
@@ -575,7 +575,8 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
       {/* Resize handle on the left edge */}
       <div
         className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize z-10 hover:bg-primary/20 active:bg-primary/30"
-        onMouseDown={handleResizeStart}
+        onPointerDown={handleResizeStart}
+        style={{ touchAction: "none" }}
         data-testid="chat-resize-handle"
         role="separator"
         aria-orientation="vertical"

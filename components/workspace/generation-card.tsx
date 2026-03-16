@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, type DragEvent } from "react";
+import { useCallback, useRef, type DragEvent } from "react";
 import { type Generation } from "@/lib/db/queries";
 import { Badge } from "@/components/ui/badge";
 import { modelIdToDisplayName } from "@/lib/utils/model-display-name";
 import { ModeBadge, type Mode } from "@/components/workspace/mode-badge";
 import { GALLERY_DRAG_MIME_TYPE } from "@/lib/constants/drag-types";
+import { useTouchDragOptional } from "@/lib/touch-drag-context";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -20,7 +21,15 @@ export interface GenerationCardProps {
 // GenerationCard
 // ---------------------------------------------------------------------------
 
+const LONG_PRESS_MS = 300;
+const SCROLL_THRESHOLD = 10;
+
 export function GenerationCard({ generation, onSelect }: GenerationCardProps) {
+  const touchDrag = useTouchDragOptional();
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const isTouchDraggingRef = useRef(false);
+
   const handleDragStart = useCallback(
     (e: DragEvent<HTMLButtonElement>) => {
       const payload = JSON.stringify({
@@ -33,12 +42,96 @@ export function GenerationCard({ generation, onSelect }: GenerationCardProps) {
     [generation.id, generation.imageUrl]
   );
 
+  const clearLongPress = useCallback(() => {
+    if (longPressTimerRef.current !== null) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLButtonElement>) => {
+      if (e.pointerType !== "touch" || !touchDrag) return;
+
+      touchStartPosRef.current = { x: e.clientX, y: e.clientY };
+      isTouchDraggingRef.current = false;
+
+      const pointerId = e.pointerId;
+      const target = e.target as HTMLElement;
+      const clientX = e.clientX;
+      const clientY = e.clientY;
+
+      longPressTimerRef.current = setTimeout(() => {
+        longPressTimerRef.current = null;
+        isTouchDraggingRef.current = true;
+        target.setPointerCapture?.(pointerId);
+        touchDrag.startDrag(
+          { generationId: generation.id, imageUrl: generation.imageUrl ?? "" },
+          clientX,
+          clientY
+        );
+      }, LONG_PRESS_MS);
+    },
+    [generation.id, generation.imageUrl, touchDrag]
+  );
+
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent<HTMLButtonElement>) => {
+      if (e.pointerType !== "touch") return;
+
+      // If long press hasn't fired yet, check for scroll gesture
+      if (longPressTimerRef.current !== null && touchStartPosRef.current) {
+        const dx = e.clientX - touchStartPosRef.current.x;
+        const dy = e.clientY - touchStartPosRef.current.y;
+        if (Math.sqrt(dx * dx + dy * dy) > SCROLL_THRESHOLD) {
+          clearLongPress();
+          return;
+        }
+      }
+
+      if (isTouchDraggingRef.current && touchDrag) {
+        touchDrag.updatePosition(e.clientX, e.clientY);
+      }
+    },
+    [clearLongPress, touchDrag]
+  );
+
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent<HTMLButtonElement>) => {
+      if (e.pointerType !== "touch") return;
+
+      clearLongPress();
+      if (isTouchDraggingRef.current) {
+        isTouchDraggingRef.current = false;
+        touchDrag?.endDrag();
+      }
+    },
+    [clearLongPress, touchDrag]
+  );
+
+  const handlePointerCancel = useCallback(() => {
+    clearLongPress();
+    if (isTouchDraggingRef.current) {
+      isTouchDraggingRef.current = false;
+      touchDrag?.cancelDrag();
+    }
+  }, [clearLongPress, touchDrag]);
+
   return (
     <button
       type="button"
       draggable="true"
       onDragStart={handleDragStart}
-      onClick={() => onSelect(generation.id)}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      onClick={() => {
+        // Prevent click from firing after a touch drag
+        if (touchDrag?.state.isDragging) return;
+        onSelect(generation.id);
+      }}
+      style={{ touchAction: "auto" }}
       className="group relative w-full overflow-hidden rounded-lg border border-border bg-card cursor-pointer transition-all duration-200 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10 hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       {/* Thumbnail */}

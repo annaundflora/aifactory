@@ -163,3 +163,8 @@
 .animate-canvas-highlight {
   animation: canvas-highlight 600ms ease-out;
 }
+
+/* Prevent iOS long-press context menu on draggable elements */
+[draggable="true"] {
+  -webkit-touch-callout: none;
+}

@@ -15,6 +15,8 @@ import { CanvasDetailProvider } from "@/lib/canvas-detail-context";
 import { startViewTransitionIfSupported } from "@/lib/utils/view-transition";
 import { PromptAssistantProvider } from "@/lib/assistant/assistant-context";
 import { AssistantPanelContent } from "@/components/assistant/assistant-panel";
+import { TouchDragProvider } from "@/lib/touch-drag-context";
+import { TouchDragOverlay } from "@/components/workspace/touch-drag-overlay";
 
 const POLLING_INTERVAL_MS = 3000;
 
@@ -56,8 +58,8 @@ export function WorkspaceContent({
   const [assistantWidth, setAssistantWidth] = useState(ASSISTANT_DEFAULT_WIDTH);
   const assistantIsResizing = useRef(false);
   const assistantRafRef = useRef<number | null>(null);
-  const assistantMouseMoveRef = useRef<((e: MouseEvent) => void) | null>(null);
-  const assistantMouseUpRef = useRef<(() => void) | null>(null);
+  const assistantPointerMoveRef = useRef<((e: PointerEvent) => void) | null>(null);
+  const assistantPointerUpRef = useRef<(() => void) | null>(null);
 
   const handleAssistantToggle = useCallback(() => {
     setAssistantOpen((prev) => !prev);
@@ -71,13 +73,13 @@ export function WorkspaceContent({
       cancelAnimationFrame(assistantRafRef.current);
       assistantRafRef.current = null;
     }
-    if (assistantMouseMoveRef.current) {
-      document.removeEventListener("mousemove", assistantMouseMoveRef.current);
-      assistantMouseMoveRef.current = null;
+    if (assistantPointerMoveRef.current) {
+      document.removeEventListener("pointermove", assistantPointerMoveRef.current);
+      assistantPointerMoveRef.current = null;
     }
-    if (assistantMouseUpRef.current) {
-      document.removeEventListener("mouseup", assistantMouseUpRef.current);
-      assistantMouseUpRef.current = null;
+    if (assistantPointerUpRef.current) {
+      document.removeEventListener("pointerup", assistantPointerUpRef.current);
+      assistantPointerUpRef.current = null;
     }
     assistantIsResizing.current = false;
     document.body.style.cursor = "";
@@ -89,14 +91,14 @@ export function WorkspaceContent({
   }, [cleanupAssistantResize]);
 
   const handleAssistantResizeStart = useCallback(
-    (e: React.MouseEvent) => {
+    (e: React.PointerEvent) => {
       e.preventDefault();
       assistantIsResizing.current = true;
 
       const startX = e.clientX;
       const startWidth = assistantWidth;
 
-      const handleMouseMove = (moveEvent: MouseEvent) => {
+      const handlePointerMove = (moveEvent: PointerEvent) => {
         if (!assistantIsResizing.current) return;
         if (assistantRafRef.current !== null) {
           cancelAnimationFrame(assistantRafRef.current);
@@ -113,17 +115,17 @@ export function WorkspaceContent({
         });
       };
 
-      const handleMouseUp = () => {
+      const handlePointerUp = () => {
         cleanupAssistantResize();
       };
 
-      assistantMouseMoveRef.current = handleMouseMove;
-      assistantMouseUpRef.current = handleMouseUp;
+      assistantPointerMoveRef.current = handlePointerMove;
+      assistantPointerUpRef.current = handlePointerUp;
 
       document.body.style.cursor = "col-resize";
       document.body.style.userSelect = "none";
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
+      document.addEventListener("pointermove", handlePointerMove);
+      document.addEventListener("pointerup", handlePointerUp);
     },
     [assistantWidth, cleanupAssistantResize]
   );
@@ -134,21 +136,21 @@ export function WorkspaceContent({
   const promptPreCollapseWidthRef = useRef(PROMPT_DEFAULT_WIDTH);
   const promptIsResizing = useRef(false);
   const promptRafRef = useRef<number | null>(null);
-  const promptMouseMoveRef = useRef<((e: MouseEvent) => void) | null>(null);
-  const promptMouseUpRef = useRef<(() => void) | null>(null);
+  const promptPointerMoveRef = useRef<((e: PointerEvent) => void) | null>(null);
+  const promptPointerUpRef = useRef<(() => void) | null>(null);
 
   const cleanupPromptResize = useCallback(() => {
     if (promptRafRef.current !== null) {
       cancelAnimationFrame(promptRafRef.current);
       promptRafRef.current = null;
     }
-    if (promptMouseMoveRef.current) {
-      document.removeEventListener("mousemove", promptMouseMoveRef.current);
-      promptMouseMoveRef.current = null;
+    if (promptPointerMoveRef.current) {
+      document.removeEventListener("pointermove", promptPointerMoveRef.current);
+      promptPointerMoveRef.current = null;
     }
-    if (promptMouseUpRef.current) {
-      document.removeEventListener("mouseup", promptMouseUpRef.current);
-      promptMouseUpRef.current = null;
+    if (promptPointerUpRef.current) {
+      document.removeEventListener("pointerup", promptPointerUpRef.current);
+      promptPointerUpRef.current = null;
     }
     promptIsResizing.current = false;
     document.body.style.cursor = "";
@@ -170,7 +172,7 @@ export function WorkspaceContent({
   }, []);
 
   const handlePromptResizeStart = useCallback(
-    (e: React.MouseEvent) => {
+    (e: React.PointerEvent) => {
       if (promptCollapsed) return;
       e.preventDefault();
       promptIsResizing.current = true;
@@ -178,7 +180,7 @@ export function WorkspaceContent({
       const startX = e.clientX;
       const startWidth = promptWidth;
 
-      const handleMouseMove = (moveEvent: MouseEvent) => {
+      const handlePointerMove = (moveEvent: PointerEvent) => {
         if (!promptIsResizing.current) return;
         if (promptRafRef.current !== null) {
           cancelAnimationFrame(promptRafRef.current);
@@ -195,17 +197,17 @@ export function WorkspaceContent({
         });
       };
 
-      const handleMouseUp = () => {
+      const handlePointerUp = () => {
         cleanupPromptResize();
       };
 
-      promptMouseMoveRef.current = handleMouseMove;
-      promptMouseUpRef.current = handleMouseUp;
+      promptPointerMoveRef.current = handlePointerMove;
+      promptPointerUpRef.current = handlePointerUp;
 
       document.body.style.cursor = "col-resize";
       document.body.style.userSelect = "none";
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
+      document.addEventListener("pointermove", handlePointerMove);
+      document.addEventListener("pointerup", handlePointerUp);
     },
     [promptCollapsed, promptWidth, cleanupPromptResize]
   );
@@ -334,6 +336,7 @@ export function WorkspaceContent({
       )}
 
       {/* Gallery-View: hidden (not unmounted) when detail view is open */}
+      <TouchDragProvider>
       <div
         className="flex h-[calc(100dvh-3.5rem)] gap-3 overflow-hidden bg-muted/40 p-3"
         data-testid="workspace-gallery-view"
@@ -367,7 +370,8 @@ export function WorkspaceContent({
             {/* Resize handle on right edge */}
             <div
               className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize z-10 hover:bg-primary/20 active:bg-primary/30"
-              onMouseDown={handlePromptResizeStart}
+              onPointerDown={handlePromptResizeStart}
+              style={{ touchAction: "none" }}
               data-testid="prompt-resize-handle"
               role="separator"
               aria-orientation="vertical"
@@ -432,7 +436,8 @@ export function WorkspaceContent({
             {/* Resize handle on left edge */}
             <div
               className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize z-10 hover:bg-primary/20 active:bg-primary/30"
-              onMouseDown={handleAssistantResizeStart}
+              onPointerDown={handleAssistantResizeStart}
+              style={{ touchAction: "none" }}
               data-testid="assistant-resize-handle"
               role="separator"
               aria-orientation="vertical"
@@ -448,6 +453,8 @@ export function WorkspaceContent({
         </div>
 
       </div>
+      <TouchDragOverlay />
+      </TouchDragProvider>
     </>
   );
 }
