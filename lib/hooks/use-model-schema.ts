@@ -52,6 +52,7 @@ export function useModelSchema(
         }
 
         if ("error" in result) {
+          console.error("useModelSchema: server returned error", result.error);
           setError(result.error);
           setSchema(null);
         } else {
@@ -64,6 +65,7 @@ export function useModelSchema(
           return;
         }
 
+        console.error("useModelSchema: failed to fetch schema for", id, err);
         setError(
           err instanceof Error
             ? err.message
