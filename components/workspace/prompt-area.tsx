@@ -33,6 +33,7 @@ import { LLMComparison } from "@/components/prompt-improve/llm-comparison";
 import { AssistantTrigger } from "@/components/assistant/assistant-trigger";
 import { SectionLabel } from "@/components/shared/section-label";
 import { modelIdToDisplayName } from "@/lib/utils/model-display-name";
+import { resolveModel } from "@/lib/utils/resolve-model";
 import { toast } from "sonner";
 
 // Re-export Generation type for callback
@@ -110,33 +111,6 @@ function createInitialModeStates(): ModeStates {
       sourceImageUrl: null,
       scale: DEFAULT_SCALE,
     },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Model Resolution Helper
-// ---------------------------------------------------------------------------
-
-/**
- * Resolve model ID and params from cached model settings based on mode, tier,
- * and maxQuality flag.
- *
- * effectiveTier = maxQuality ? "max" : tier
- *
- * Returns { modelId, modelParams } or undefined if no matching setting found.
- */
-function resolveModel(
-  settings: ModelSetting[],
-  mode: GenerationMode,
-  tier: Tier,
-): { modelId: string; modelParams: Record<string, unknown> } | undefined {
-  const setting = settings.find(
-    (s) => s.mode === mode && s.tier === tier
-  );
-  if (!setting) return undefined;
-  return {
-    modelId: setting.modelId,
-    modelParams: (setting.modelParams ?? {}) as Record<string, unknown>,
   };
 }
 
