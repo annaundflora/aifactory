@@ -312,13 +312,13 @@ describe("In-Place Generation Flow", () => {
 
   /**
    * AC-1: GIVEN der User klickt "Generate" im Variation-Popover mit
-   *       { prompt: "A dramatic sunset", strength: "creative", count: 2 }
+   *       { prompt: "A dramatic sunset", count: 2 }
    *       WHEN der Callback ausgefuehrt wird
-   *       THEN wird generateImages() Server Action aufgerufen mit dem aktuellen
-   *       Bild als img2img-Input, dem Prompt, dem Model aus dem Header-Selector
-   *       und count 2, und das Popover schliesst sich
+   *       THEN wird generateImages() Server Action aufgerufen als txt2img
+   *       (ohne Quellbild), mit dem Prompt, dem Model und count 2,
+   *       und das Popover schliesst sich
    */
-  it("AC-1: should call generateImages with current image as img2img input, prompt, header model, and count when variation popover generates", async () => {
+  it("AC-1: should call generateImages as txt2img with prompt, model, and count when variation popover generates", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const generation = makeGeneration({
       id: "gen-var-1",
@@ -349,14 +349,6 @@ describe("In-Place Generation Flow", () => {
     const btn2 = screen.getByTestId("variation-count-2");
     await user.click(btn2);
 
-    // Select "Creative" strength
-    const strengthTrigger = screen.getByTestId("variation-strength-trigger");
-    await user.click(strengthTrigger);
-    const creativeOption = await screen.findByTestId(
-      "variation-strength-creative"
-    );
-    await user.click(creativeOption);
-
     // Click generate
     const generateBtn = screen.getByTestId("variation-generate-button");
     await user.click(generateBtn);
@@ -371,10 +363,10 @@ describe("In-Place Generation Flow", () => {
     expect(callArgs.promptMotiv).toBe("A dramatic sunset");
     expect(callArgs.modelIds).toEqual(["black-forest-labs/flux-2-max"]);
     expect(callArgs.count).toBe(2);
-    expect(callArgs.generationMode).toBe("img2img");
-    expect(callArgs.sourceImageUrl).toBe("https://example.com/current.png");
-    // strength "creative" maps to prompt_strength 0.85
-    expect(callArgs.strength).toBe(0.85);
+    expect(callArgs.generationMode).toBe("txt2img");
+    // No source image for txt2img variations
+    expect(callArgs.sourceImageUrl).toBeUndefined();
+    expect(callArgs.strength).toBeUndefined();
 
     // Popover should close
     await waitFor(() => {
@@ -879,8 +871,8 @@ describe("CanvasModelSelector", () => {
   // -------------------------------------------------------------------------
 
   /**
-   * AC-10 (updated for slice-08): Model resolution is now settings-based.
-   * GIVEN modelSettings contain an img2img/draft entry with modelId "stability-ai/sdxl"
+   * AC-10 (updated): Model resolution is now settings-based via txt2img mode.
+   * GIVEN modelSettings contain a txt2img/draft entry with modelId "stability-ai/sdxl"
    * WHEN the user clicks "Generate" in the Variation-Popover
    * THEN generateImages is called with the settings-resolved model, not the image's original model.
    */
@@ -889,7 +881,7 @@ describe("CanvasModelSelector", () => {
 
     // Provide model settings so the handler resolves from settings
     mockGetModelSettings.mockResolvedValue([
-      { id: "ms-1", mode: "img2img", tier: "draft", modelId: "stability-ai/sdxl", modelParams: {}, createdAt: new Date(), updatedAt: new Date() },
+      { id: "ms-1", mode: "txt2img", tier: "draft", modelId: "stability-ai/sdxl", modelParams: {}, createdAt: new Date(), updatedAt: new Date() },
     ]);
 
     mockGenerateImages.mockResolvedValue([

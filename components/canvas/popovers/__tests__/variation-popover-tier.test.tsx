@@ -48,6 +48,9 @@ beforeAll(() => {
 // ---------------------------------------------------------------------------
 
 vi.mock("lucide-react", () => ({
+  Copy: (props: Record<string, unknown>) => (
+    <span data-testid="icon-copy" {...props} />
+  ),
   Sparkles: (props: Record<string, unknown>) => (
     <span data-testid="icon-sparkles" {...props} />
   ),
@@ -332,7 +335,8 @@ describe("VariationParams interface", () => {
     // TypeScript compilation error.
     const draftParams: VariationParams = {
       prompt: "test",
-      strength: "balanced",
+      promptStyle: "",
+      negativePrompt: "",
       count: 1,
       tier: "draft",
     };
@@ -340,7 +344,8 @@ describe("VariationParams interface", () => {
 
     const qualityParams: VariationParams = {
       prompt: "test",
-      strength: "balanced",
+      promptStyle: "",
+      negativePrompt: "",
       count: 1,
       tier: "quality",
     };
@@ -348,7 +353,8 @@ describe("VariationParams interface", () => {
 
     const maxParams: VariationParams = {
       prompt: "test",
-      strength: "balanced",
+      promptStyle: "",
+      negativePrompt: "",
       count: 1,
       tier: "max",
     };
@@ -359,7 +365,8 @@ describe("VariationParams interface", () => {
     for (const tier of allTiers) {
       const params: VariationParams = {
         prompt: "test",
-        strength: "balanced",
+        promptStyle: "",
+        negativePrompt: "",
         count: 1,
         tier,
       };

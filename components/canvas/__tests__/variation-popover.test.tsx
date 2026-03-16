@@ -51,6 +51,9 @@ beforeAll(() => {
 // ---------------------------------------------------------------------------
 
 vi.mock("lucide-react", () => ({
+  Copy: (props: Record<string, unknown>) => (
+    <span data-testid="icon-copy" {...props} />
+  ),
   Sparkles: (props: Record<string, unknown>) => (
     <span data-testid="icon-sparkles" {...props} />
   ),
@@ -256,74 +259,7 @@ describe("VariationPopover", () => {
   });
 
   // -------------------------------------------------------------------------
-  // AC-3: Strength-Dropdown zeigt 3 Optionen
-  // -------------------------------------------------------------------------
-
-  /**
-   * AC-3: GIVEN das Variation-Popover ist sichtbar
-   *       WHEN der User den Strength-Dropdown oeffnet
-   *       THEN zeigt er genau 3 Optionen: "Subtle", "Balanced", "Creative"
-   */
-  it("AC-3: should show Subtle, Balanced, Creative options in strength dropdown", async () => {
-    const user = userEvent.setup();
-    renderPopoverOpen();
-
-    // Wait for the popover to be visible
-    await screen.findByTestId("variation-popover");
-
-    // Open the strength dropdown
-    const trigger = screen.getByTestId("variation-strength-trigger");
-    await user.click(trigger);
-
-    // All three options should be visible
-    const subtleOption = await screen.findByTestId("variation-strength-subtle");
-    const balancedOption = screen.getByTestId("variation-strength-balanced");
-    const creativeOption = screen.getByTestId("variation-strength-creative");
-
-    expect(subtleOption).toBeInTheDocument();
-    expect(balancedOption).toBeInTheDocument();
-    expect(creativeOption).toBeInTheDocument();
-
-    // Verify text content
-    expect(subtleOption).toHaveTextContent("Subtle");
-    expect(balancedOption).toHaveTextContent("Balanced");
-    expect(creativeOption).toHaveTextContent("Creative");
-  });
-
-  // -------------------------------------------------------------------------
-  // AC-4: Strength-Wert aenderbar
-  // -------------------------------------------------------------------------
-
-  /**
-   * AC-4: GIVEN das Variation-Popover ist sichtbar und Strength ist initial `"Balanced"`
-   *       WHEN der User `"Creative"` aus dem Dropdown waehlt
-   *       THEN zeigt der Dropdown den Wert `"Creative"` an
-   */
-  it("AC-4: should update strength value when a different option is selected", async () => {
-    const user = userEvent.setup();
-    renderPopoverOpen();
-
-    await screen.findByTestId("variation-popover");
-
-    // Verify initial value is "Balanced" (shown in the trigger)
-    const trigger = screen.getByTestId("variation-strength-trigger");
-    expect(trigger).toHaveTextContent("Balanced");
-
-    // Open dropdown and select "Creative"
-    await user.click(trigger);
-    const creativeOption = await screen.findByTestId(
-      "variation-strength-creative"
-    );
-    await user.click(creativeOption);
-
-    // Trigger should now show "Creative"
-    await waitFor(() => {
-      expect(trigger).toHaveTextContent("Creative");
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // AC-5: Count-Selector zeigt 1-4 mit initial 1
+  // AC-3: Count-Selector zeigt 1-4 mit initial 1
   // -------------------------------------------------------------------------
 
   /**
@@ -411,13 +347,13 @@ describe("VariationPopover", () => {
   // -------------------------------------------------------------------------
 
   /**
-   * AC-7: GIVEN das Variation-Popover ist sichtbar mit Prompt, Strength und Count
+   * AC-5: GIVEN das Variation-Popover ist sichtbar mit Prompt und Count
    *       WHEN der User auf den Generate-Button klickt
    *       THEN wird ein `onGenerate`-Callback aufgerufen mit
-   *            `{ prompt: string, strength: "subtle" | "balanced" | "creative", count: number }`
+   *            `{ prompt, promptStyle, negativePrompt, count, tier }`
    *            und das Popover schliesst sich (`activeToolId` wird auf `null` gesetzt)
    */
-  it("AC-7: should call onGenerate with prompt, strength, and count and close popover", async () => {
+  it("AC-5: should call onGenerate with prompt and count and close popover", async () => {
     const user = userEvent.setup();
     const onGenerate = vi.fn();
     renderPopoverOpen({
@@ -429,7 +365,7 @@ describe("VariationPopover", () => {
 
     await screen.findByTestId("variation-popover");
 
-    // Default state: prompt pre-filled, strength "balanced", count 1
+    // Default state: prompt pre-filled, count 1
     // Click Generate
     const generateBtn = screen.getByTestId("variation-generate-button");
     await user.click(generateBtn);
@@ -438,7 +374,8 @@ describe("VariationPopover", () => {
     expect(onGenerate).toHaveBeenCalledTimes(1);
     expect(onGenerate).toHaveBeenCalledWith({
       prompt: "A beautiful sunset over mountains",
-      strength: "balanced",
+      promptStyle: "",
+      negativePrompt: "",
       count: 1,
       tier: "draft",
     });
@@ -452,10 +389,10 @@ describe("VariationPopover", () => {
   });
 
   /**
-   * AC-7 extended: Verify onGenerate with modified values (edited prompt, changed
-   * strength and count) to ensure all form values are correctly passed.
+   * AC-5 extended: Verify onGenerate with modified values (edited prompt and count)
+   * to ensure all form values are correctly passed.
    */
-  it("AC-7 extended: should call onGenerate with modified values after user edits form", async () => {
+  it("AC-5 extended: should call onGenerate with modified values after user edits form", async () => {
     const user = userEvent.setup();
     const onGenerate = vi.fn();
     renderPopoverOpen({
@@ -476,14 +413,6 @@ describe("VariationPopover", () => {
     const btn3 = screen.getByTestId("variation-count-3");
     await user.click(btn3);
 
-    // Change strength to "creative"
-    const strengthTrigger = screen.getByTestId("variation-strength-trigger");
-    await user.click(strengthTrigger);
-    const creativeOption = await screen.findByTestId(
-      "variation-strength-creative"
-    );
-    await user.click(creativeOption);
-
     // Click Generate
     const generateBtn = screen.getByTestId("variation-generate-button");
     await user.click(generateBtn);
@@ -491,7 +420,8 @@ describe("VariationPopover", () => {
     expect(onGenerate).toHaveBeenCalledTimes(1);
     expect(onGenerate).toHaveBeenCalledWith({
       prompt: "A dramatic ocean scene",
-      strength: "creative",
+      promptStyle: "",
+      negativePrompt: "",
       count: 3,
       tier: "draft",
     });
