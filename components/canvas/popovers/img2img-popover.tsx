@@ -13,12 +13,16 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { TierToggle } from "@/components/ui/tier-toggle";
+import { ParameterPanel, type SchemaProperties } from "@/components/workspace/parameter-panel";
+import { useModelSchema } from "@/lib/hooks/use-model-schema";
+import { resolveModel } from "@/lib/utils/resolve-model";
 import type {
   ReferenceRole,
   ReferenceStrength,
   ReferenceSlotData,
 } from "@/lib/types/reference";
 import type { GalleryDragPayload } from "@/lib/constants/drag-types";
+import type { ModelSetting } from "@/lib/db/queries";
 import type { Tier } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -37,6 +41,7 @@ export interface Img2imgParams {
   style: string;
   variants: number;
   tier: Tier;
+  imageParams?: Record<string, unknown>;
 }
 
 // ---------------------------------------------------------------------------
@@ -53,6 +58,7 @@ const VARIANTS_MAX = 4;
 
 export interface Img2imgPopoverProps {
   onGenerate?: (params: Img2imgParams) => void;
+  modelSettings?: ModelSetting[];
 }
 
 // ---------------------------------------------------------------------------
@@ -61,6 +67,7 @@ export interface Img2imgPopoverProps {
 
 export function Img2imgPopover({
   onGenerate,
+  modelSettings = [],
 }: Img2imgPopoverProps) {
   const { state, dispatch } = useCanvasDetail();
 
@@ -70,6 +77,16 @@ export function Img2imgPopover({
   const [style, setStyle] = useState("");
   const [variants, setVariants] = useState(1);
   const [tier, setTier] = useState<Tier>("draft");
+  const [imageParams, setImageParams] = useState<Record<string, unknown>>({});
+
+  // Resolve modelId from settings for schema fetching
+  const resolved = resolveModel(modelSettings, "img2img", tier);
+  const { schema, isLoading, error } = useModelSchema(resolved?.modelId);
+
+  // Reset imageParams when tier/model changes
+  useEffect(() => {
+    setImageParams({});
+  }, [resolved?.modelId]);
 
   // Track all blob URLs we create so we can revoke them on unmount
   const blobUrlsRef = useRef<Set<string>>(new Set());
@@ -283,9 +300,10 @@ export function Img2imgPopover({
       style,
       variants,
       tier,
+      imageParams,
     };
     onGenerate?.(params);
-  }, [slots, motiv, style, variants, tier, onGenerate]);
+  }, [slots, motiv, style, variants, tier, imageParams, onGenerate]);
 
   // -------------------------------------------------------------------------
   // Render
@@ -414,6 +432,19 @@ export function Img2imgPopover({
               />
             </div>
           </section>
+
+          {/* ---- Parameter Controls (schema-based) ---- */}
+          {!error && (
+            <section data-testid="parameter-section">
+              <ParameterPanel
+                schema={schema as SchemaProperties | null}
+                isLoading={isLoading}
+                values={imageParams}
+                onChange={setImageParams}
+                primaryFields={["aspect_ratio", "megapixels", "resolution"]}
+              />
+            </section>
+          )}
 
           {/* ---- Generate Button ---- */}
           <Button

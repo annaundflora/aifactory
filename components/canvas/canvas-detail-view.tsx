@@ -276,7 +276,7 @@ export function CanvasDetailView({
           projectId: currentGeneration.projectId,
           promptMotiv: params.prompt,
           modelIds: [selectedModel],
-          params: { prompt_strength: promptStrength },
+          params: { prompt_strength: promptStrength, ...(params.imageParams ?? {}) },
           count: params.count,
           generationMode: "img2img",
           sourceImageUrl: currentGeneration.imageUrl ?? undefined,
@@ -391,7 +391,7 @@ export function CanvasDetailView({
           promptMotiv: params.motiv,
           promptStyle: params.style,
           modelIds: [selectedModel],
-          params: {},
+          params: { ...(params.imageParams ?? {}) },
           count: params.variants,
           generationMode: "img2img",
           sourceGenerationId: currentGeneration.id,
@@ -541,9 +541,11 @@ export function CanvasDetailView({
           <VariationPopover
             generation={currentGeneration}
             onGenerate={handleVariationGenerate}
+            modelSettings={modelSettings}
           />
           <Img2imgPopover
             onGenerate={handleImg2imgGenerate}
+            modelSettings={modelSettings}
           />
           <UpscalePopover
             onUpscale={handleUpscale}
