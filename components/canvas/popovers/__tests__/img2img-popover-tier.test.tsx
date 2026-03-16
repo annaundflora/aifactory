@@ -230,35 +230,36 @@ describe("Img2imgPopover TierToggle", () => {
   });
 
   // -------------------------------------------------------------------------
-  // AC-5: MaxQualityToggle bei Quality sichtbar
+  // AC-5: Max-Segment im TierToggle direkt anklickbar
   // -------------------------------------------------------------------------
 
   /**
-   * AC-5: GIVEN das Img2Img-Popover mit tier="quality" ausgewaehlt
-   *       WHEN es gerendert wird
-   *       THEN erscheint ein MaxQualityToggle zwischen TierToggle und
-   *            Generate-Button (Default: off)
+   * AC-5: GIVEN das Img2Img-Popover ist geoeffnet
+   *       WHEN der User auf "Max" im TierToggle klickt
+   *       THEN wechselt das aktive Segment zu "Max"
    */
-  it("AC-5: should show MaxQualityToggle when tier is quality", async () => {
+  it("AC-5: should switch to Max tier directly via TierToggle segment", async () => {
     const user = userEvent.setup();
     renderImg2imgPopover({ initialActiveToolId: "img2img" });
 
     // Wait for popover
     await screen.findByTestId("img2img-popover");
 
-    // MaxQualityToggle should NOT be visible initially (tier=draft)
+    // All three segments should be visible
+    expect(screen.getByText("Draft")).toBeInTheDocument();
+    expect(screen.getByText("Quality")).toBeInTheDocument();
+    expect(screen.getByText("Max")).toBeInTheDocument();
+
+    // Click on "Max" to switch tier
+    const maxButton = screen.getByText("Max");
+    await user.click(maxButton);
+
+    // Max should now be active
+    expect(maxButton).toHaveAttribute("aria-pressed", "true");
+    expect(maxButton).toHaveAttribute("data-active", "true");
+
+    // No separate MaxQualityToggle should exist
     expect(screen.queryByTestId("max-quality-toggle")).not.toBeInTheDocument();
-
-    // Click on "Quality" to switch tier
-    const qualityButton = screen.getByText("Quality");
-    await user.click(qualityButton);
-
-    // Now MaxQualityToggle should be visible
-    const maxQualityToggle = await screen.findByTestId("max-quality-toggle");
-    expect(maxQualityToggle).toBeInTheDocument();
-
-    // Default should be off (aria-pressed=false)
-    expect(maxQualityToggle).toHaveAttribute("aria-pressed", "false");
   });
 
   // -------------------------------------------------------------------------

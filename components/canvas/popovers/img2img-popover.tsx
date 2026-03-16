@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { TierToggle } from "@/components/ui/tier-toggle";
-import { MaxQualityToggle } from "@/components/ui/max-quality-toggle";
 import type {
   ReferenceRole,
   ReferenceStrength,
@@ -71,7 +70,6 @@ export function Img2imgPopover({
   const [style, setStyle] = useState("");
   const [variants, setVariants] = useState(1);
   const [tier, setTier] = useState<Tier>("draft");
-  const [maxQuality, setMaxQuality] = useState(false);
 
   // Track all blob URLs we create so we can revoke them on unmount
   const blobUrlsRef = useRef<Set<string>>(new Set());
@@ -269,25 +267,12 @@ export function Img2imgPopover({
     setVariants((prev) => Math.min(VARIANTS_MAX, prev + 1));
   }, []);
 
-  // -------------------------------------------------------------------------
-  // Tier change handler: reset maxQuality when switching to draft
-  // -------------------------------------------------------------------------
-
-  const handleTierChange = useCallback((newTier: Tier) => {
-    setTier(newTier);
-    if (newTier === "draft") {
-      setMaxQuality(false);
-    }
-  }, []);
 
   // -------------------------------------------------------------------------
   // Generate
   // -------------------------------------------------------------------------
 
   const handleGenerate = useCallback(() => {
-    // Resolve effective tier: quality + maxQuality=on -> "max"
-    const effectiveTier: Tier = tier === "quality" && maxQuality ? "max" : tier;
-
     const params: Img2imgParams = {
       references: slots.map((s) => ({
         imageUrl: s.imageUrl,
@@ -297,10 +282,10 @@ export function Img2imgPopover({
       motiv,
       style,
       variants,
-      tier: effectiveTier,
+      tier,
     };
     onGenerate?.(params);
-  }, [slots, motiv, style, variants, tier, maxQuality, onGenerate]);
+  }, [slots, motiv, style, variants, tier, onGenerate]);
 
   // -------------------------------------------------------------------------
   // Render
@@ -424,16 +409,9 @@ export function Img2imgPopover({
             <div className="space-y-2">
               <TierToggle
                 tier={tier}
-                onTierChange={handleTierChange}
+                onTierChange={setTier}
                 disabled={state.isGenerating}
               />
-              {tier === "quality" && (
-                <MaxQualityToggle
-                  maxQuality={maxQuality}
-                  onMaxQualityChange={setMaxQuality}
-                  disabled={state.isGenerating}
-                />
-              )}
             </div>
           </section>
 

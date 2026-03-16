@@ -136,6 +136,7 @@ export function UpscalePopover({
             tier={tier}
             onTierChange={setTier}
             disabled={state.isGenerating}
+            hiddenValues={["max"]}
           />
         </div>
 

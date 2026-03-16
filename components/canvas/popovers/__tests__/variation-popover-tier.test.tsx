@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
@@ -195,70 +195,36 @@ describe("VariationPopover TierToggle", () => {
   });
 
   // -------------------------------------------------------------------------
-  // AC-2: MaxQualityToggle bei Quality sichtbar
+  // AC-2: Max-Segment im TierToggle direkt anklickbar
   // -------------------------------------------------------------------------
 
   /**
-   * AC-2: GIVEN das Variation-Popover mit tier="quality" ausgewaehlt
-   *       WHEN es gerendert wird
-   *       THEN erscheint ein MaxQualityToggle zwischen TierToggle und
-   *            Generate-Button (Default: off)
+   * AC-2: GIVEN das Variation-Popover ist geoeffnet
+   *       WHEN der User auf "Max" im TierToggle klickt
+   *       THEN wechselt das aktive Segment zu "Max"
    */
-  it("AC-2: should show MaxQualityToggle when tier is quality", async () => {
+  it("AC-2: should switch to Max tier directly via TierToggle segment", async () => {
     const user = userEvent.setup();
     renderPopoverOpen();
 
     // Wait for popover
     await screen.findByTestId("variation-popover");
 
-    // MaxQualityToggle should NOT be visible initially (tier=draft)
+    // All three segments should be visible
+    expect(screen.getByText("Draft")).toBeInTheDocument();
+    expect(screen.getByText("Quality")).toBeInTheDocument();
+    expect(screen.getByText("Max")).toBeInTheDocument();
+
+    // Click on "Max" to switch tier
+    const maxButton = screen.getByText("Max");
+    await user.click(maxButton);
+
+    // Max should now be active
+    expect(maxButton).toHaveAttribute("aria-pressed", "true");
+    expect(maxButton).toHaveAttribute("data-active", "true");
+
+    // No separate MaxQualityToggle should exist
     expect(screen.queryByTestId("max-quality-toggle")).not.toBeInTheDocument();
-
-    // Click on "Quality" to switch tier
-    const qualityButton = screen.getByText("Quality");
-    await user.click(qualityButton);
-
-    // Now MaxQualityToggle should be visible
-    const maxQualityToggle = await screen.findByTestId("max-quality-toggle");
-    expect(maxQualityToggle).toBeInTheDocument();
-
-    // Default should be off (aria-pressed=false)
-    expect(maxQualityToggle).toHaveAttribute("aria-pressed", "false");
-  });
-
-  // -------------------------------------------------------------------------
-  // AC-3: MaxQualityToggle bei Draft versteckt
-  // -------------------------------------------------------------------------
-
-  /**
-   * AC-3: GIVEN das Variation-Popover mit tier="draft" ausgewaehlt
-   *       WHEN es gerendert wird
-   *       THEN ist der MaxQualityToggle NICHT sichtbar
-   */
-  it("AC-3: should hide MaxQualityToggle when tier is draft", async () => {
-    const user = userEvent.setup();
-    renderPopoverOpen();
-
-    // Wait for popover
-    await screen.findByTestId("variation-popover");
-
-    // Default tier is "draft" -- MaxQualityToggle should NOT be visible
-    expect(screen.queryByTestId("max-quality-toggle")).not.toBeInTheDocument();
-
-    // Switch to quality, verify it appears
-    const qualityButton = screen.getByText("Quality");
-    await user.click(qualityButton);
-    expect(screen.getByTestId("max-quality-toggle")).toBeInTheDocument();
-
-    // Switch back to draft -- MaxQualityToggle should disappear
-    const draftButton = screen.getByText("Draft");
-    await user.click(draftButton);
-
-    await waitFor(() => {
-      expect(
-        screen.queryByTestId("max-quality-toggle")
-      ).not.toBeInTheDocument();
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -292,7 +258,7 @@ describe("VariationPopover TierToggle", () => {
   // -------------------------------------------------------------------------
 
   /**
-   * AC-9: GIVEN Variation-Popover mit tier="quality" und MaxQuality=off,
+   * AC-9: GIVEN Variation-Popover mit tier="quality",
    *       User klickt Generate
    *       WHEN onGenerate aufgerufen wird
    *       THEN enthaelt VariationParams.tier den Wert "quality"
@@ -309,11 +275,7 @@ describe("VariationPopover TierToggle", () => {
     const qualityButton = screen.getByText("Quality");
     await user.click(qualityButton);
 
-    // MaxQualityToggle should appear and be off by default
-    const maxQualityToggle = await screen.findByTestId("max-quality-toggle");
-    expect(maxQualityToggle).toHaveAttribute("aria-pressed", "false");
-
-    // Click Generate (MaxQuality is off -> tier should be "quality")
+    // Click Generate
     const generateBtn = screen.getByTestId("variation-generate-button");
     await user.click(generateBtn);
 
@@ -327,12 +289,12 @@ describe("VariationPopover TierToggle", () => {
   // -------------------------------------------------------------------------
 
   /**
-   * AC-10: GIVEN Variation-Popover mit tier="quality" und MaxQuality=on,
+   * AC-10: GIVEN Variation-Popover mit tier="max" direkt im TierToggle,
    *        User klickt Generate
    *        WHEN onGenerate aufgerufen wird
    *        THEN enthaelt VariationParams.tier den Wert "max"
    */
-  it('AC-10: should call onGenerate with tier max when Generate clicked with MaxQuality on', async () => {
+  it('AC-10: should call onGenerate with tier max when Max segment is selected', async () => {
     const user = userEvent.setup();
     const onGenerate = vi.fn();
     renderPopoverOpen({ onGenerate });
@@ -340,18 +302,11 @@ describe("VariationPopover TierToggle", () => {
     // Wait for popover
     await screen.findByTestId("variation-popover");
 
-    // Switch to "Quality"
-    const qualityButton = screen.getByText("Quality");
-    await user.click(qualityButton);
+    // Switch to "Max" directly via TierToggle
+    const maxButton = screen.getByText("Max");
+    await user.click(maxButton);
 
-    // Enable MaxQuality
-    const maxQualityToggle = await screen.findByTestId("max-quality-toggle");
-    await user.click(maxQualityToggle);
-
-    // MaxQuality should now be on
-    expect(maxQualityToggle).toHaveAttribute("aria-pressed", "true");
-
-    // Click Generate (MaxQuality is on -> tier should be "max")
+    // Click Generate (tier should be "max")
     const generateBtn = screen.getByTestId("variation-generate-button");
     await user.click(generateBtn);
 
