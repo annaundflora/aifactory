@@ -36,7 +36,7 @@
 | Primary/Advanced Split: Primary-Fields immer sichtbar, Advanced einklappbar |
 | Primary-Whitelist: `aspect_ratio`, `megapixels`, `resolution` |
 | Alle anderen Schema-Properties als Advanced Controls |
-| Multi-Model-Support: Flux, Nano Banana 2, GPT Image 1.5 |
+| Multi-Model-Support: Flux, Nano Banana 2, GPT Image 1.5, Hunyuan Image 3 |
 | Schema-basierte Optionen (dynamisch per Model von Replicate API) |
 | Merge von User-gewaehlten Params mit DB-modelParams |
 
@@ -206,7 +206,7 @@ Canvas Popovers (`VariationPopover`, `Img2imgPopover`) muessen imageParams durch
 
 | Field | Required | Validation | Notes |
 |-------|----------|------------|-------|
-| `aspect_ratio` | No | Muss in Schema-enum des aktuellen Models enthalten sein | Flux: 9 Werte, Nano Banana 2: 14 Werte, GPT Image 1.5: 3 Werte. Bei >8 Optionen: Visuelle Gruppierung in Common (1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3) und Extreme (Rest) mit Separator im Dropdown |
+| `aspect_ratio` | No | Muss in Schema-enum des aktuellen Models enthalten sein | Flux: 9 Werte, Nano Banana 2: 14 Werte, GPT Image 1.5: 3 Werte, Hunyuan Image 3: 11 Werte. Bei >8 Optionen: Visuelle Gruppierung in Common (1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3) und Extreme (Rest) mit Separator im Dropdown |
 | `megapixels` | No | Muss in Schema-enum des aktuellen Models enthalten sein | Nur Flux-Models (enum: "0.25", "1") |
 | `resolution` | No | Muss in Schema-enum des aktuellen Models enthalten sein | Nur Nano Banana 2 (enum: "512px", "1K", "2K", "4K") |
 | Advanced params (variabel) | No | Muss im Schema des aktuellen Models enthalten sein | Model-spezifisch: quality, background, safety_filter_level, etc. |
@@ -260,6 +260,7 @@ Slice 1 (Hook + Utility) -> Slice 2 (Primary/Advanced Split) -> Slice 3 (Prompt 
 | Flux 2 Max | `black-forest-labs/flux-2-max` | enum (model-spezifisch) | `megapixels` enum (model-spezifisch) | -- |
 | Nano Banana 2 | `google/nano-banana-2` | enum: 1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9, 1:4, 4:1, 1:8, 8:1 | `resolution` enum: 512px, 1K, 2K, 4K | safety_filter_level, output_format, allow_fallback_model |
 | GPT Image 1.5 | `openai/gpt-image-1.5` | enum: 1:1, 3:2, 2:3 | -- (kein Groessen-Param) | quality, input_fidelity, background, moderation, output_format, output_compression |
+| Hunyuan Image 3 | `tencent/hunyuan-image-3` | enum: 1:1, 16:9, 21:9, 3:2, 2:3, 4:5, 5:4, 3:4, 4:3, 9:16, 9:21 | -- (kein Groessen-Param) | output_format (enum: webp, jpg, png) |
 
 ### Primary-Whitelist Rationale
 
@@ -292,6 +293,7 @@ Slice 1 (Hook + Utility) -> Slice 2 (Primary/Advanced Split) -> Slice 3 (Prompt 
 | 2026-03-15 | Replicate API | GPT Image 1.5 (openai/gpt-image-1.5): aspect_ratio (3 enum-Werte), kein megapixels/resolution, hat quality + input_fidelity + background |
 | 2026-03-15 | Codebase | getImg2ImgFieldName() unterstuetzt bereits image_input (Nano Banana) und input_images (GPT Image 1.5) |
 | 2026-03-15 | Codebase | model_settings Tabelle akzeptiert beliebige modelIds -- Admin kann Model jederzeit umkonfigurieren |
+| 2026-03-16 | Replicate API | Hunyuan Image 3 (tencent/hunyuan-image-3): aspect_ratio (11 enum-Werte, wie Flux), kein megapixels/resolution, nur output_format als Advanced-Feld. Nur txt2img (kein Image-Input-Feld) |
 
 ---
 
@@ -303,6 +305,6 @@ Slice 1 (Hook + Utility) -> Slice 2 (Primary/Advanced Split) -> Slice 3 (Prompt 
 | 2 | Wo sollen die Controls hin? | Prompt Panel (txt2img + img2img) + Canvas Popovers (Variation + Img2img) |
 | 3 | Funktionieren Aspect Ratio Controls auch mit Nano Banana Pro, Nano Banana 2 und GPT Image 1.5? | Ja, alle drei haben aspect_ratio als enum im Replicate Schema. Megapixels existiert bei keinem -- Nano Banana nutzt resolution, GPT Image 1.5 hat keinen Groessen-Param |
 | 4 | Wie soll der User zwischen Max-Alternativen (Flux 2 Max, Nano Banana 2, GPT Image 1.5) waehlen? | Admin-Settings only -- Model wird in model_settings konfiguriert, kein Model-Dropdown im Generierungs-UI |
-| 5 | Welche Models sollen als Max-Alternativen unterstuetzt werden? | Drei: Flux 2 Max, Nano Banana 2, GPT Image 1.5 (ohne Nano Banana Pro, da aeltere Version) |
+| 5 | Welche Models sollen als Max-Alternativen unterstuetzt werden? | Vier: Flux 2 Max, Nano Banana 2, GPT Image 1.5, Hunyuan Image 3 (ohne Nano Banana Pro, da aeltere Version) |
 | 6 | Sollen alle Schema-Properties als Controls angezeigt werden? | Ja, aber mit Primary/Advanced Split: aspect_ratio + Groessen-Params (megapixels, resolution) immer sichtbar, Rest unter "Advanced" einklappbar |
 | 7 | Wie sollen die Primary-Fields erkannt werden? | Whitelist per Feldname: aspect_ratio, megapixels, resolution. Alles andere = Advanced |

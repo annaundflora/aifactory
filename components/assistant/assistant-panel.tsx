@@ -5,7 +5,6 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ChatInput } from "@/components/assistant/chat-input";
 import { ChatThread } from "@/components/assistant/chat-thread";
-import { ModelRecommendation } from "@/components/assistant/model-recommendation";
 import { SessionList } from "@/components/assistant/session-list";
 import { SessionSwitcher } from "@/components/assistant/session-switcher";
 import { ModelSelector } from "@/components/assistant/model-selector";
@@ -46,7 +45,6 @@ export function AssistantPanelContent({
     setActiveView,
     loadSession,
     sessionId,
-    recommendedModel,
     dispatch,
     sessionIdRef,
     sendMessageRef,
@@ -155,7 +153,6 @@ export function AssistantPanelContent({
             onSessionHistoryClick={handleSessionHistoryClick}
           />
         )}
-        {recommendedModel && <ModelRecommendation />}
         <ChatInput
           onSend={handleSend}
           isStreaming={isStreaming}

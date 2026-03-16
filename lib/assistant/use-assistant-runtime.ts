@@ -5,7 +5,6 @@ import type { Dispatch, MutableRefObject } from "react";
 import type {
   AssistantAction,
   DraftPrompt,
-  ModelRecommendation,
   ToolCallResult,
 } from "./assistant-context";
 
@@ -196,12 +195,6 @@ export function useAssistantRuntime({
                   style: rawData.style,
                   negativePrompt: rawData.negative_prompt,
                 },
-              });
-            } else if (result.tool === "recommend_model") {
-              dispatch({
-                type: "SET_RECOMMENDED_MODEL",
-                recommendedModel:
-                  result.data as unknown as ModelRecommendation,
               });
             }
             break;

@@ -5,7 +5,6 @@
  * Tests derived from GIVEN/WHEN/THEN Acceptance Criteria:
  * - AC-4:  Session laden stellt Messages wieder her
  * - AC-5:  Session laden setzt draftPrompt
- * - AC-6:  Session laden setzt recommendedModel
  * - AC-9:  Auto-Title nach erster Nachricht
  * - AC-10: Session-Wechsel ersetzt vorherigen State
  * - AC-11: Fehler beim Laden zeigt Toast
@@ -79,7 +78,6 @@ function makeSessionDetailResponse(overrides: Record<string, unknown> = {}) {
         },
       ],
       draft_prompt: null,
-      recommended_model: null,
     },
     ...overrides,
   };
@@ -96,24 +94,6 @@ function makeSessionWithDraft() {
         motiv: "A cat sitting on a windowsill",
         style: "watercolor, soft edges",
         negative_prompt: "blurry, dark, low quality",
-      },
-      recommended_model: null,
-    },
-  });
-}
-
-function makeSessionWithModel() {
-  return makeSessionDetailResponse({
-    state: {
-      messages: [
-        { role: "human", content: "Landschaftsbild" },
-        { role: "assistant", content: "Ein Modell passt besonders gut." },
-      ],
-      draft_prompt: null,
-      recommended_model: {
-        id: "stability/sdxl",
-        name: "Stable Diffusion XL",
-        reason: "Excellent for landscapes with high detail",
       },
     },
   });
@@ -137,7 +117,6 @@ function makeSessionS2() {
         { role: "assistant", content: "Hier ist das Meerbild." },
       ],
       draft_prompt: null,
-      recommended_model: null,
     },
   };
 }
@@ -162,9 +141,6 @@ function ResumeConsumer() {
       </span>
       <span data-testid="draft-prompt">
         {ctx.draftPrompt ? JSON.stringify(ctx.draftPrompt) : "null"}
-      </span>
-      <span data-testid="recommended-model">
-        {ctx.recommendedModel ? JSON.stringify(ctx.recommendedModel) : "null"}
       </span>
       <span data-testid="messages-json">
         {JSON.stringify(ctx.messages.map((m) => ({ role: m.role, content: m.content })))}
@@ -300,43 +276,6 @@ describe("PromptAssistantContext - Session Resume", () => {
       motiv: "A cat sitting on a windowsill",
       style: "watercolor, soft edges",
       negativePrompt: "blurry, dark, low quality",
-    });
-  });
-
-  // --------------------------------------------------------------------------
-  // AC-6: GIVEN eine geladene Session die ein recommended_model im State hat
-  //       WHEN der Chat-Thread angezeigt wird
-  //       THEN wird recommendedModel im PromptAssistantContext gesetzt
-  // --------------------------------------------------------------------------
-  it("AC-6: should set recommendedModel from session state when recommendation exists", async () => {
-    const responseData = makeSessionWithModel();
-
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => responseData,
-    });
-
-    render(
-      <PromptAssistantProvider projectId="test-project">
-        <ResumeConsumer />
-      </PromptAssistantProvider>
-    );
-
-    // Initially no model recommendation
-    expect(screen.getByTestId("recommended-model")).toHaveTextContent("null");
-
-    // Act: load session with model recommendation
-    await act(async () => {
-      screen.getByTestId("load-session-S1").click();
-    });
-
-    // Assert: recommendedModel is set
-    const modelText = screen.getByTestId("recommended-model").textContent!;
-    const parsed = JSON.parse(modelText);
-    expect(parsed).toEqual({
-      id: "stability/sdxl",
-      name: "Stable Diffusion XL",
-      reason: "Excellent for landscapes with high detail",
     });
   });
 
@@ -747,25 +686,4 @@ describe("PromptAssistantContext - Session Resume", () => {
     expect(screen.getByTestId("draft-prompt")).toHaveTextContent("null");
   });
 
-  it("AC-6: should set recommendedModel to null when loaded session has no recommendation", async () => {
-    const responseData = makeSessionDetailResponse();
-    expect(responseData.state.recommended_model).toBeNull();
-
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => responseData,
-    });
-
-    render(
-      <PromptAssistantProvider projectId="test-project">
-        <ResumeConsumer />
-      </PromptAssistantProvider>
-    );
-
-    await act(async () => {
-      screen.getByTestId("load-session-S1").click();
-    });
-
-    expect(screen.getByTestId("recommended-model")).toHaveTextContent("null");
-  });
 });

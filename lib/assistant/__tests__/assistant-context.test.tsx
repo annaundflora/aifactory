@@ -38,9 +38,6 @@ function ContextConsumer({
       <span data-testid="draft-prompt">
         {ctx.draftPrompt ? JSON.stringify(ctx.draftPrompt) : "null"}
       </span>
-      <span data-testid="recommended-model">
-        {ctx.recommendedModel ? JSON.stringify(ctx.recommendedModel) : "null"}
-      </span>
       <span data-testid="selected-model">{ctx.selectedModel}</span>
     </div>
   );
@@ -60,9 +57,6 @@ function ContextDispatcher() {
       <span data-testid="is-streaming">{String(ctx.isStreaming)}</span>
       <span data-testid="draft-prompt">
         {ctx.draftPrompt ? JSON.stringify(ctx.draftPrompt) : "null"}
-      </span>
-      <span data-testid="recommended-model">
-        {ctx.recommendedModel ? JSON.stringify(ctx.recommendedModel) : "null"}
       </span>
       <span data-testid="selected-model">{ctx.selectedModel}</span>
       <span data-testid="tool-results">
@@ -139,19 +133,6 @@ function ContextDispatcher() {
         }
       />
       <button
-        data-testid="dispatch-recommend-model"
-        onClick={() =>
-          ctx.dispatch({
-            type: "SET_RECOMMENDED_MODEL",
-            recommendedModel: {
-              id: "stability/sdxl",
-              name: "Stable Diffusion XL",
-              reason: "Great for landscapes",
-            },
-          })
-        }
-      />
-      <button
         data-testid="dispatch-tool-call"
         onClick={() =>
           ctx.dispatch({
@@ -194,10 +175,9 @@ describe("PromptAssistantContext", () => {
   // AC-8: GIVEN der PromptAssistantContext wird bereitgestellt
   //       WHEN eine Komponente den Context konsumiert
   //       THEN sind folgende Werte verfuegbar: sessionId, messages, isStreaming,
-  //            draftPrompt, recommendedModel, sendMessage(content, imageUrl?),
-  //            selectedModel
+  //            draftPrompt, sendMessage(content, imageUrl?), selectedModel
   // --------------------------------------------------------------------------
-  it("AC-8: should provide sessionId, messages, isStreaming, draftPrompt, recommendedModel, sendMessage, selectedModel", () => {
+  it("AC-8: should provide sessionId, messages, isStreaming, draftPrompt, sendMessage, selectedModel", () => {
     let capturedValue: PromptAssistantContextValue | null = null;
 
     render(
@@ -217,7 +197,6 @@ describe("PromptAssistantContext", () => {
     expect(capturedValue!.messages).toEqual([]);
     expect(capturedValue!.isStreaming).toBe(false);
     expect(capturedValue!.draftPrompt).toBeNull();
-    expect(capturedValue!.recommendedModel).toBeNull();
     expect(capturedValue!.selectedModel).toBe("anthropic/claude-sonnet-4.6");
     expect(typeof capturedValue!.sendMessage).toBe("function");
 
@@ -242,7 +221,6 @@ describe("PromptAssistantContext", () => {
     expect(screen.getByTestId("messages-count")).toHaveTextContent("0");
     expect(screen.getByTestId("is-streaming")).toHaveTextContent("false");
     expect(screen.getByTestId("draft-prompt")).toHaveTextContent("null");
-    expect(screen.getByTestId("recommended-model")).toHaveTextContent("null");
     expect(screen.getByTestId("selected-model")).toHaveTextContent(
       "anthropic/claude-sonnet-4.6"
     );
@@ -272,33 +250,6 @@ describe("PromptAssistantContext", () => {
       motiv: "A sunset over mountains",
       style: "oil painting",
       negativePrompt: "blurry, low quality",
-    });
-  });
-
-  // --------------------------------------------------------------------------
-  // AC-5 (recommend_model): tool-call-result with tool=recommend_model updates recommendedModel
-  // --------------------------------------------------------------------------
-  it("AC-5: should update recommendedModel when tool-call-result with tool=recommend_model is received", () => {
-    render(
-      <PromptAssistantProvider projectId="test-project">
-        <ContextDispatcher />
-      </PromptAssistantProvider>
-    );
-
-    // Initially null
-    expect(screen.getByTestId("recommended-model")).toHaveTextContent("null");
-
-    // Dispatch SET_RECOMMENDED_MODEL (as would happen from tool-call-result handling)
-    act(() => {
-      screen.getByTestId("dispatch-recommend-model").click();
-    });
-
-    const modelText = screen.getByTestId("recommended-model").textContent!;
-    const parsed = JSON.parse(modelText);
-    expect(parsed).toEqual({
-      id: "stability/sdxl",
-      name: "Stable Diffusion XL",
-      reason: "Great for landscapes",
     });
   });
 

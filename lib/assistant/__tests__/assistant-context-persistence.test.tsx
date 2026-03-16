@@ -305,7 +305,6 @@ describe("PromptAssistantContext - Session Persistence", () => {
           style: "oil painting",
           negativePrompt: "blurry",
         },
-        recommendedModel: null,
         isApplied: true,
       });
     });
@@ -330,7 +329,6 @@ describe("PromptAssistantContext - Session Persistence", () => {
         sessionId: "session-persist-1",
         messages: [{ id: "m1", role: "user", content: "Test" }],
         draftPrompt: null,
-        recommendedModel: null,
         // isApplied not provided -> defaults to false
       });
     });

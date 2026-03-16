@@ -31,12 +31,6 @@ export interface DraftPrompt {
 /** Field names for the DraftPrompt type */
 export type DraftPromptField = keyof DraftPrompt;
 
-export interface ModelRecommendation {
-  id: string;
-  name: string;
-  reason: string;
-}
-
 export interface ToolCallResult {
   tool: string;
   data: Record<string, unknown>;
@@ -56,7 +50,6 @@ interface SessionDetailState {
     style: string;
     negative_prompt: string;
   } | null;
-  recommended_model: { id: string; name: string; reason: string } | null;
 }
 
 interface SessionDetailResponse {
@@ -81,7 +74,6 @@ export interface AssistantState {
   draftPrompt: DraftPrompt | null;
   /** Counter that increments on SET_DRAFT_PROMPT / REFINE_DRAFT to trigger auto-apply */
   draftVersion: number;
-  recommendedModel: ModelRecommendation | null;
   selectedModel: string;
   toolCallResults: ToolCallResult[];
   /** Current view within the assistant sheet */
@@ -98,7 +90,6 @@ const initialState: AssistantState = {
   isStreaming: false,
   draftPrompt: null,
   draftVersion: 0,
-  recommendedModel: null,
   selectedModel: "anthropic/claude-sonnet-4.6",
   toolCallResults: [],
   activeView: "startscreen",
@@ -120,7 +111,6 @@ export type AssistantAction =
   | { type: "SET_STREAMING"; isStreaming: boolean }
   | { type: "SET_DRAFT_PROMPT"; draftPrompt: DraftPrompt }
   | { type: "REFINE_DRAFT"; draftPrompt: DraftPrompt }
-  | { type: "SET_RECOMMENDED_MODEL"; recommendedModel: ModelRecommendation }
   | { type: "ADD_TOOL_CALL_RESULT"; result: ToolCallResult }
   | { type: "SET_SELECTED_MODEL"; model: string }
   | { type: "SET_ACTIVE_VIEW"; view: ActiveView }
@@ -130,7 +120,6 @@ export type AssistantAction =
       sessionId: string;
       messages: Message[];
       draftPrompt: DraftPrompt | null;
-      recommendedModel: ModelRecommendation | null;
       /** Whether the draft was previously applied to the workspace (AC-6) */
       isApplied?: boolean;
     }
@@ -218,9 +207,6 @@ function assistantReducer(
         isApplied: false,
       };
 
-    case "SET_RECOMMENDED_MODEL":
-      return { ...state, recommendedModel: action.recommendedModel };
-
     case "ADD_TOOL_CALL_RESULT":
       return {
         ...state,
@@ -243,7 +229,6 @@ function assistantReducer(
         messages: action.messages,
         draftPrompt: action.draftPrompt,
         // Do NOT increment draftVersion on session restore — prevents auto-apply
-        recommendedModel: action.recommendedModel,
         toolCallResults: [],
         isStreaming: false,
         isLoadingSession: false,
@@ -275,7 +260,6 @@ export interface PromptAssistantContextValue {
   messages: Message[];
   isStreaming: boolean;
   draftPrompt: DraftPrompt | null;
-  recommendedModel: ModelRecommendation | null;
   selectedModel: string;
   /** Current view within the assistant sheet */
   activeView: ActiveView;
@@ -429,7 +413,6 @@ export function PromptAssistantProvider({
    * Load a session from the backend by ID.
    * AC-4: Restores messages from session state.
    * AC-5: Sets draftPrompt from session state.
-   * AC-6: Sets recommendedModel from session state.
    * AC-10: Replaces current session state when switching.
    * AC-11: Shows error toast on failure.
    */
@@ -466,23 +449,12 @@ export function PromptAssistantProvider({
             }
           : null;
 
-        // Convert backend recommended_model to frontend ModelRecommendation
-        const recommendedModel: ModelRecommendation | null =
-          data.state.recommended_model
-            ? {
-                id: data.state.recommended_model.id,
-                name: data.state.recommended_model.name,
-                reason: data.state.recommended_model.reason,
-              }
-            : null;
-
         // AC-10: Replace current session state entirely
         dispatch({
           type: "LOAD_SESSION",
           sessionId,
           messages,
           draftPrompt,
-          recommendedModel,
         });
 
         // Update the sessionIdRef for the runtime
@@ -584,7 +556,6 @@ export function PromptAssistantProvider({
       messages: state.messages,
       isStreaming: state.isStreaming,
       draftPrompt: state.draftPrompt,
-      recommendedModel: state.recommendedModel,
       selectedModel: state.selectedModel,
       activeView: state.activeView,
       isLoadingSession: state.isLoadingSession,
