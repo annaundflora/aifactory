@@ -316,7 +316,10 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
           setImageParams(s.imageParams);
         }
       } else if (targetMode === "txt2img") {
-        if (!fromHasPrompt) {
+        if (fromHasPrompt) {
+          // Prompts carry over; restore only txt2img-specific imageParams
+          setImageParams(snapshot.txt2img.imageParams);
+        } else {
           const s = snapshot.txt2img;
           setPromptMotiv(s.promptMotiv);
           setPromptStyle(s.promptStyle);
