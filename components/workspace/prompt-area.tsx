@@ -686,7 +686,7 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
           promptStyle: promptStyle.trim() || undefined,
           negativePrompt: negativePrompt.trim() || undefined,
           modelIds: [resolved.modelId],
-          params: resolved.modelParams,
+          params: { ...resolved.modelParams, ...imageParams },
           count: variantCount,
           generationMode: "txt2img",
         });
@@ -722,7 +722,7 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
           promptStyle: promptStyle.trim() || undefined,
           negativePrompt: negativePrompt.trim() || undefined,
           modelIds: [resolved.modelId],
-          params: resolved.modelParams,
+          params: { ...resolved.modelParams, ...imageParams },
           count: variantCount,
           generationMode: "img2img",
           sourceImageUrl,
@@ -765,6 +765,7 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
     onGenerationsCreated,
     modelSettings,
     tier,
+    imageParams,
   ]);
 
   // ----- Keyboard shortcut (Cmd/Ctrl+Enter) on Motiv field -----
