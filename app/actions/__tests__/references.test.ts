@@ -6,6 +6,10 @@ import { resolve } from "path";
 // Mocks (mock_external strategy per slice spec)
 // ---------------------------------------------------------------------------
 
+vi.mock("@/lib/auth/guard", () => ({
+  requireAuth: vi.fn().mockResolvedValue({ userId: "user-001", email: "test@example.com" }),
+}));
+
 vi.mock("@/lib/services/reference-service", () => ({
   ReferenceService: {
     upload: vi.fn(),
@@ -25,7 +29,7 @@ vi.mock("@/lib/db", () => ({
   db: {
     select: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([]),
+        where: vi.fn().mockResolvedValue([{ projectId: "proj-001" }]),
       }),
     }),
   },
@@ -33,6 +37,8 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("@/lib/db/queries", () => ({
   getGenerationReferences: vi.fn().mockResolvedValue([]),
+  getProject: vi.fn().mockResolvedValue({ id: "proj-001", name: "Test", userId: "user-001" }),
+  getGeneration: vi.fn(),
 }));
 
 vi.mock("@/lib/db/schema", () => ({

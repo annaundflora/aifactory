@@ -6,6 +6,10 @@ import { resolve } from "path";
 // Mocks (mock_external strategy per slice spec)
 // ---------------------------------------------------------------------------
 
+vi.mock("@/lib/auth/guard", () => ({
+  requireAuth: vi.fn().mockResolvedValue({ userId: "user-001", email: "test@example.com" }),
+}));
+
 vi.mock("@/lib/services/generation-service", () => ({
   GenerationService: {
     generate: vi.fn(),
@@ -17,9 +21,12 @@ vi.mock("@/lib/services/generation-service", () => ({
 vi.mock("@/lib/db/queries", () => ({
   getGenerations: vi.fn(),
   createGeneration: vi.fn(),
-  getGeneration: vi.fn(),
+  getGeneration: vi.fn().mockResolvedValue({ id: "gen-001", projectId: "proj-001" }),
   updateGeneration: vi.fn(),
   deleteGeneration: vi.fn(),
+  getProject: vi.fn().mockResolvedValue({ id: "proj-001", name: "Test", userId: "user-001" }),
+  getSiblingsByBatchId: vi.fn().mockResolvedValue([]),
+  getVariantFamily: vi.fn().mockResolvedValue([]),
 }));
 
 // Mock next/cache to prevent server-side Next.js errors

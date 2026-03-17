@@ -18,6 +18,12 @@ vi.mock('@/auth', () => ({
   auth: (...args: any[]) => mockAuth(...args),
 }))
 
+// Override the global @/lib/auth/guard mock from vitest.setup.ts
+// so the REAL requireAuth() implementation is used with our mocked auth()
+vi.mock('@/lib/auth/guard', async (importOriginal) => {
+  return await importOriginal()
+})
+
 // Import after mock setup
 import { requireAuth } from '../../lib/auth/guard'
 import type { AuthResult, AuthSuccess, AuthError } from '../../lib/auth/guard'

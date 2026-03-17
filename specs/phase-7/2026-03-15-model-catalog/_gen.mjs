@@ -1,0 +1,1 @@
+import{writeFileSync as w}from"fs";const B=String.fromCharCode(96);const b=s=>B+s+B;const L=[];const p=s=>L.push(s);p("# Codebase Scan");w("E:/WebDev/aifactory/specs/phase-7/2026-03-15-model-catalog/_gen.mjs","//done");console.log("prepared");

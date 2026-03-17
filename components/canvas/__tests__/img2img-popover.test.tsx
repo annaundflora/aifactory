@@ -45,13 +45,29 @@ beforeAll(() => {
 // Mocks
 // ---------------------------------------------------------------------------
 
-// Mock lucide-react icons used by the component
+// Mock lucide-react icons used by the component and its transitive dependencies
+// (img2img-popover uses ArrowRightLeft, Minus, Plus; parameter-panel uses ChevronDown)
 vi.mock("lucide-react", () => ({
+  ArrowRightLeft: (props: Record<string, unknown>) => (
+    <span data-testid="icon-arrow-right-left" {...props} />
+  ),
   Minus: (props: Record<string, unknown>) => (
     <span data-testid="icon-minus" {...props} />
   ),
   Plus: (props: Record<string, unknown>) => (
     <span data-testid="icon-plus" {...props} />
+  ),
+  ChevronDown: (props: Record<string, unknown>) => (
+    <span data-testid="icon-chevron-down" {...props} />
+  ),
+  ChevronDownIcon: (props: Record<string, unknown>) => (
+    <span data-testid="icon-chevron-down" {...props} />
+  ),
+  ChevronUpIcon: (props: Record<string, unknown>) => (
+    <span data-testid="icon-chevron-up" {...props} />
+  ),
+  CheckIcon: (props: Record<string, unknown>) => (
+    <span data-testid="icon-check" {...props} />
   ),
 }));
 
@@ -543,6 +559,7 @@ describe("Img2imgPopover", () => {
       style: "",
       variants: 1,
       tier: "draft",
+      imageParams: {},
     });
   });
 
@@ -614,6 +631,7 @@ describe("Img2imgPopover", () => {
       style: "oil painting",
       variants: 2,
       tier: "draft",
+      imageParams: {},
     });
   });
 });

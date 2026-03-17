@@ -334,8 +334,8 @@ describe('slice-01-db-schema-migration Acceptance', () => {
     expect(existsSync(journalPath)).toBe(true)
     const journal = JSON.parse(readFileSync(journalPath, 'utf-8'))
 
-    // Must have all 8 entries (0000 through 0007)
-    expect(journal.entries.length).toBe(8)
+    // Must have at least 8 entries (0000 through 0007, plus any later migrations)
+    expect(journal.entries.length).toBeGreaterThanOrEqual(8)
 
     // Entry 7 must be our migration
     const entry7 = journal.entries.find((e: any) => e.idx === 7)

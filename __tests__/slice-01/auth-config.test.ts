@@ -16,6 +16,13 @@ vi.mock('@/lib/db', () => ({
   db: {},
 }))
 
+// Mock the schema module — auth.ts imports { users, accounts, sessions }
+vi.mock('@/lib/db/schema', () => ({
+  users: { id: 'id', name: 'users' },
+  accounts: { id: 'id', name: 'accounts' },
+  sessions: { id: 'id', name: 'sessions' },
+}))
+
 // Mock next-auth to capture the config object passed to NextAuth()
 // This allows us to inspect providers, callbacks, and session strategy
 // without needing a running OAuth server or database.
@@ -66,8 +73,16 @@ async function loadAuthModule(envOverrides: Record<string, string | undefined> =
   capturedConfig = null
   vi.resetModules()
 
+  // Remove the global @/auth mock from vitest.setup.ts so the real auth.ts loads
+  vi.doUnmock('@/auth')
+
   // Re-apply mocks after resetModules
   vi.doMock('@/lib/db', () => ({ db: {} }))
+  vi.doMock('@/lib/db/schema', () => ({
+    users: { id: 'id', name: 'users' },
+    accounts: { id: 'id', name: 'accounts' },
+    sessions: { id: 'id', name: 'sessions' },
+  }))
   vi.doMock('next-auth', () => ({
     default: (config: any) => {
       capturedConfig = config

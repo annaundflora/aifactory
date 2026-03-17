@@ -6,6 +6,15 @@ import * as path from "path";
 // Mocks (as per Mocking Strategy: mock_external)
 // ---------------------------------------------------------------------------
 
+vi.mock("@/lib/auth/guard", () => ({
+  requireAuth: vi.fn().mockResolvedValue({ userId: "user-001", email: "test@example.com" }),
+}));
+
+vi.mock("@/lib/services/thumbnail-service", () => ({
+  generateForProject: vi.fn().mockResolvedValue(undefined),
+  refreshForProject: vi.fn().mockResolvedValue(undefined),
+}));
+
 // Mock next/cache
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
@@ -112,6 +121,7 @@ describe("createProject", () => {
 
     expect(mockCreateProjectQuery).toHaveBeenCalledWith({
       name: "My Project",
+      userId: "user-001",
     });
     expect(result).toEqual({
       id: project.id,
@@ -154,7 +164,7 @@ describe("getProject", () => {
 
     const result = await getProject({ id: project.id });
 
-    expect(mockGetProjectQuery).toHaveBeenCalledWith(project.id);
+    expect(mockGetProjectQuery).toHaveBeenCalledWith(project.id, "user-001");
     expect(result).toEqual(project);
   });
 
@@ -195,7 +205,8 @@ describe("renameProject", () => {
 
     expect(mockRenameProjectQuery).toHaveBeenCalledWith(
       updatedProject.id,
-      "New Name"
+      "New Name",
+      "user-001"
     );
     expect(result).toEqual(updatedProject);
     expect(mockRevalidatePath).toHaveBeenCalledWith("/");
@@ -233,7 +244,8 @@ describe("deleteProject", () => {
     });
 
     expect(mockDeleteProjectQuery).toHaveBeenCalledWith(
-      "550e8400-e29b-41d4-a716-446655440000"
+      "550e8400-e29b-41d4-a716-446655440000",
+      "user-001"
     );
     expect(result).toEqual({ success: true });
     expect(mockRevalidatePath).toHaveBeenCalledWith("/");

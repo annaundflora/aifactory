@@ -4,6 +4,11 @@ import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 // Mocks (mock_external strategy per slice spec)
 // ---------------------------------------------------------------------------
 
+// Mock auth guard (needed for server action tests AC-4/5/6)
+vi.mock("@/lib/auth/guard", () => ({
+  requireAuth: vi.fn().mockResolvedValue({ userId: "user-001", email: "test@example.com" }),
+}));
+
 // Mock ReplicateClient
 vi.mock("@/lib/clients/replicate", () => ({
   ReplicateClient: {
@@ -15,6 +20,7 @@ vi.mock("@/lib/clients/replicate", () => ({
 vi.mock("@/lib/clients/storage", () => ({
   StorageService: {
     upload: vi.fn(),
+    delete: vi.fn(),
   },
 }));
 
@@ -25,6 +31,9 @@ vi.mock("@/lib/db/queries", () => ({
   updateGeneration: vi.fn(),
   getGenerations: vi.fn(),
   deleteGeneration: vi.fn(),
+  getProject: vi.fn().mockResolvedValue({ id: "proj-001", name: "Test", userId: "user-001" }),
+  getSiblingsByBatchId: vi.fn().mockResolvedValue([]),
+  getVariantFamily: vi.fn().mockResolvedValue([]),
 }));
 
 // Mock sharp

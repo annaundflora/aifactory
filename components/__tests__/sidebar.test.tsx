@@ -94,6 +94,19 @@ vi.mock("lucide-react", () => ({
   RefreshCw: (props: Record<string, unknown>) => (
     <span data-testid="refresh-cw-icon" {...props} />
   ),
+  LogOut: (props: Record<string, unknown>) => (
+    <span data-testid="logout-icon" {...props} />
+  ),
+  User: (props: Record<string, unknown>) => (
+    <span data-testid="user-icon" {...props} />
+  ),
+}));
+
+// Mock next-auth/react (Sidebar uses useSession + signOut)
+vi.mock("next-auth/react", () => ({
+  useSession: () => ({ data: null, status: "unauthenticated" }),
+  signOut: vi.fn(),
+  SessionProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 // Mock useIsMobile hook - default to desktop

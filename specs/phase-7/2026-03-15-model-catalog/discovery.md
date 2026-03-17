@@ -39,10 +39,13 @@
 | Paralleles Fetching mit Concurrency-Limit (~5) |
 | Soft-Delete (`is_active` Flag) für entfernte Models |
 | Ersetzung von `CollectionModelService` und `ModelSchemaService` |
-| UI: Model-Settings-Dropdowns filtern nach Capability |
+| UI: Model-Settings-Dropdowns filtern nach Capability (5 Sections: txt2img, img2img, upscale, inpaint, outpaint) |
+| UI: INPAINT Section im Model Settings Modal (Dropdown mit inpaint-Models) |
+| UI: OUTPAINT Section im Model Settings Modal (Dropdown mit outpaint-Models) |
 | UI: Parameter-Panel liest Schema aus DB |
-| UI: Sync-Button im Model Settings Modal |
-| UI: Progress-Toast während Sync |
+| UI: Sync-Button im Model Settings Modal (unterhalb Header-Titel, nicht neben Close) |
+| UI: Progress-Toast während Sync (kein Cancel, 60s Auto-Timeout → sync_failed) |
+| UI: Partial-Toast user-dismissible mit persistentem ⚠ Badge am Sync-Button |
 | Auto-Sync beim ersten App-Start (leere Tabelle) |
 | On-the-fly Schema-Fetch wenn Model in Dropdown gewählt aber nicht in DB |
 
@@ -138,10 +141,11 @@
 
 **Layout:**
 - Header: "Model Settings" + Close-Button
-- NEU: Sync-Button rechts oben neben Close oder unter dem Header-Text
-- Sections: TEXT TO IMAGE, IMAGE TO IMAGE, UPSCALE (wie bisher)
-- Pro Section: Tier-Dropdowns (Draft, Quality, Max)
+- NEU: Sync-Button unterhalb des Header-Titels (rechts-aligned), NICHT neben dem Close-Button
+- Sections: TEXT TO IMAGE, IMAGE TO IMAGE, UPSCALE, INPAINT, OUTPAINT
+- Tiers pro Capability-Section: TEXT TO IMAGE = Draft/Quality/Max · IMAGE TO IMAGE = Draft/Quality · UPSCALE = Quality/Max · INPAINT = Quality · OUTPAINT = Quality
 - Dropdowns: NEU gefiltert nach Capability des jeweiligen Modes
+- Workspace bleibt während Auto-Sync vollständig nutzbar; Progress-Toast erscheint als non-blocking Overlay in der Viewport-Ecke
 
 ---
 
@@ -149,9 +153,11 @@
 
 | Element | Type | Location | States | Behavior |
 |---------|------|----------|--------|----------|
-| `sync-button` | Button | Model Settings Modal Header | `idle`, `syncing`, `disabled` | Startet Bulk-Sync. Disabled während Sync läuft |
-| `sync-toast` | Toast | Global Toast Area | `progress`, `success`, `partial`, `error` | Zeigt Sync-Fortschritt und Ergebnis |
-| `model-dropdown` | Select | Pro Mode/Tier Row | `loaded`, `empty`, `loading` | Zeigt nur Models mit passender Capability |
+| `sync-button` | Button | Model Settings Modal — unter Header-Titel (rechts-aligned) | `idle`, `syncing`, `sync_partial` | Startet Bulk-Sync. Label ändert sich: `idle`="↻ Sync Models", `syncing`="◌ Syncing..." (disabled). Im `sync_partial` State: ⚠ Badge + Tooltip "Last sync: X models failed. Click to retry." (requires persistent failed-count storage). Badge bleibt bis nächster erfolgreicher Sync. |
+| `sync-toast` | Toast | Global Toast Area (bottom-right oder top-right des Viewports) | `progress`, `success`, `partial`, `error` | Zeigt Sync-Fortschritt und Ergebnis. `partial` und `error` sind user-dismissible (kein Auto-Dismiss). |
+| `model-dropdown` | Select | Pro Mode/Tier Row | `loaded`, `empty:syncing`, `empty:never-synced`, `empty:failed`, `empty:partial`, `loading` | Zeigt nur Models mit passender Capability. Empty-State-Message ist context-aware. `loading` state: Spinner erscheint im Parameter-Panel-Bereich unterhalb des Dropdowns (NICHT im Dropdown selbst). `empty:partial` Tooltip: "Other modes synced successfully. This capability had no results." |
+| `inpaint-dropdown` | Select | INPAINT Section Row | wie `model-dropdown` | Zeigt nur Models mit `capabilities.inpaint = true` |
+| `outpaint-dropdown` | Select | OUTPAINT Section Row | wie `model-dropdown` | Zeigt nur Models mit `capabilities.outpaint = true` |
 
 ---
 
@@ -161,23 +167,24 @@
 
 | State | UI | Available Actions |
 |-------|----|--------------------|
-| `no_models` | Dropdowns leer, Auto-Sync startet | Warten |
-| `syncing` | Progress-Toast sichtbar, Sync-Button disabled | Abbrechen (optional) |
-| `synced` | Dropdowns gefüllt, Sync-Button idle | Model auswählen, Sync starten |
-| `sync_partial` | Toast zeigt Fehler-Summary | Erneut syncen, Models nutzen |
-| `sync_failed` | Error-Toast | Erneut syncen |
+| `no_models` | Dropdowns zeigen `empty:syncing` Message, Auto-Sync läuft bereits — Sync-Button disabled | Warten (kein User-Input nötig) |
+| `syncing` | Progress-Toast sichtbar, Sync-Button disabled, Dropdowns zeigen `empty:syncing` | Kein Cancel (kein Abbrechen-Pfad — vereinfachte Implementierung). Auto-Timeout nach 60s → `sync_failed` |
+| `synced` | Dropdowns gefüllt, Sync-Button `idle` | Model auswählen, Sync starten |
+| `sync_partial` | Toast zeigt Fehler-Summary (user-dismissible), Sync-Button zeigt ⚠ Badge (persistent bis nächster erfolgreicher Sync) | Toast dismissen, erneut syncen, erfolgreiche Models nutzen |
+| `sync_failed` | Error-Toast (user-dismissible), Dropdowns zeigen `empty:failed` | Toast dismissen, erneut syncen |
 
 ### Transitions
 
 | Current State | Trigger | UI Feedback | Next State | Business Rules |
 |---------------|---------|-------------|------------|----------------|
-| `no_models` | App-Start, Tabelle leer | Progress-Toast | `syncing` | Automatisch, kein User-Input |
-| `synced` | User klickt Sync-Button | Progress-Toast | `syncing` | -- |
-| `syncing` | Alle Models erfolgreich | Success-Toast "X Models synced" | `synced` | -- |
-| `syncing` | Teilerfolg | Partial-Toast "X synced, Y failed" | `sync_partial` | Erfolgreiche Models werden gespeichert |
-| `syncing` | Komplettfehler (API down) | Error-Toast | `sync_failed` | Bestehende DB-Daten bleiben unverändert |
+| `no_models` | App-Start, Tabelle leer | Progress-Toast, Dropdowns zeigen "Loading models... please wait." | `syncing` | Automatisch, kein User-Input. Sync-Button disabled |
+| `synced` | User klickt Sync-Button | Progress-Toast, Sync-Button disabled | `syncing` | -- |
 | `sync_partial` | User klickt Sync erneut | Progress-Toast | `syncing` | -- |
 | `sync_failed` | User klickt Sync erneut | Progress-Toast | `syncing` | -- |
+| `syncing` | Alle Models erfolgreich | Success-Toast "X Models synced" (auto-dismiss 3s) | `synced` | Sync-Button ⚠ Badge entfernt |
+| `syncing` | Teilerfolg | Partial-Toast "X synced, Y failed" (user-dismissible) | `sync_partial` | Erfolgreiche Models gespeichert. Sync-Button zeigt ⚠ Badge |
+| `syncing` | Komplettfehler (API down) | Error-Toast (user-dismissible) | `sync_failed` | Bestehende DB-Daten unverändert |
+| `syncing` | Timeout nach 60s ohne Response | Error-Toast (user-dismissible) | `sync_failed` | Auto-Timeout schützt gegen hängende Sync-Operation |
 
 ---
 
@@ -190,7 +197,8 @@
   - `inpaint`: Model hat `image` + `mask` Felder, ODER Description enthält "inpainting"
   - `outpaint`: Description enthält "outpainting" oder "expand", ODER hat `outpaint`-Parameter
   - `upscale`: Model in super-resolution Collection, ODER hat `scale`-Parameter + `image`-Input ohne `prompt`
-- **Dropdown-Filter:** txt2img-Dropdown zeigt nur Models mit `capabilities.txt2img = true`, analog für andere Modes
+- **Capability → Modal Section Mapping:** Jede Capability hat eine eigene Section im Modal mit eigenen Dropdowns: `txt2img` → TEXT TO IMAGE, `img2img` → IMAGE TO IMAGE, `upscale` → UPSCALE, `inpaint` → INPAINT, `outpaint` → OUTPAINT. Jeder Dropdown zeigt ausschließlich Models mit der passenden Capability. Kein Cross-Capability-Fallback (inpaint-Models erscheinen NICHT im img2img-Dropdown).
+- **Dropdown-Filter:** txt2img-Dropdown zeigt nur Models mit `capabilities.txt2img = true`, analog für alle 5 Modes
 - **Soft-Delete:** Models die nicht mehr in Collections sind: `is_active = false`. Bleiben in DB für historische Referenzen
 - **Delta-Sync:** Schema wird nur neu geparst wenn `latest_version.id` sich vom gespeicherten `version_hash` unterscheidet
 - **Concurrency:** Max 5 parallele Replicate API-Requests beim Sync

@@ -1,0 +1,1 @@
+const fs=require("fs");const p=process.argv[2];const d=fs.readFileSync(0,"utf8");fs.writeFileSync(p,d);console.log("ok",d.length);

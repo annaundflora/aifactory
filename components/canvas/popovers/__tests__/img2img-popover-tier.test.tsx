@@ -73,6 +73,15 @@ vi.mock("lucide-react", () => ({
   ChevronUpIcon: (props: Record<string, unknown>) => (
     <span data-testid="icon-chevron-up" {...props} />
   ),
+  Copy: (props: Record<string, unknown>) => (
+    <span data-testid="icon-copy" {...props} />
+  ),
+  Sparkle: (props: Record<string, unknown>) => (
+    <span data-testid="icon-sparkle" {...props} />
+  ),
+  ArrowUpRight: (props: Record<string, unknown>) => (
+    <span data-testid="icon-arrow-up-right" {...props} />
+  ),
 }));
 
 // Mock ReferenceBar (complex sub-component)

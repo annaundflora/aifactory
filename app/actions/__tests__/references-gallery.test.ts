@@ -4,6 +4,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mocks (mock_external strategy per slice spec)
 // ---------------------------------------------------------------------------
 
+vi.mock("@/lib/auth/guard", () => ({
+  requireAuth: vi.fn().mockResolvedValue({ userId: "user-001", email: "test@example.com" }),
+}));
+
 // Mock next/cache
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
@@ -29,6 +33,8 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("@/lib/db/queries", () => ({
   getGenerationReferences: vi.fn().mockResolvedValue([]),
+  getProject: vi.fn().mockResolvedValue({ id: "proj-xyz", name: "Test", userId: "user-001" }),
+  getGeneration: vi.fn(),
 }));
 
 vi.mock("@/lib/db/schema", () => ({

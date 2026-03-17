@@ -686,7 +686,7 @@ describe("createProject - Thumbnail fire-and-forget (Slice 17 AC-7)", () => {
     const result = await createProjectAction({ name: "New Project" });
 
     // Should have called the DB query
-    expect(mockCreateQuery).toHaveBeenCalledWith({ name: "New Project" });
+    expect(mockCreateQuery).toHaveBeenCalledWith({ name: "New Project", userId: "mock-user-id" });
 
     // AC-7: generateForProject should have been called with the project ID
     expect(mockGenerate).toHaveBeenCalledWith("new-proj-123");

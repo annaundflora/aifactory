@@ -22,10 +22,42 @@ vi.mock("@/lib/clients/storage", () => ({
 }));
 
 // Mock DB queries
+// Note: getProject is NOT used by thumbnail-service (it uses db.select directly),
+// but it IS needed by the server action tests (AC-9/AC-10) which import
+// @/app/actions/projects that uses getProject as getProjectQuery.
 vi.mock("@/lib/db/queries", () => ({
   getProject: vi.fn(),
   getGenerations: vi.fn(),
   updateProjectThumbnail: vi.fn(),
+  createProject: vi.fn(),
+  getProjects: vi.fn(),
+  renameProject: vi.fn(),
+  deleteProject: vi.fn(),
+}));
+
+// Mock auth guard (needed by server action tests)
+vi.mock("@/lib/auth/guard", () => ({
+  requireAuth: vi.fn().mockResolvedValue({ userId: "user-001" }),
+}));
+
+// Mock DB (direct db.select().from().where() used by thumbnail-service)
+const mockWhere = vi.fn();
+const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
+const mockSelect = vi.fn().mockReturnValue({ from: mockFrom });
+vi.mock("@/lib/db", () => ({
+  db: {
+    select: (...args: unknown[]) => mockSelect(...args),
+  },
+}));
+
+// Mock drizzle-orm eq
+vi.mock("drizzle-orm", () => ({
+  eq: vi.fn((col: unknown, val: unknown) => ({ col, val })),
+}));
+
+// Mock DB schema
+vi.mock("@/lib/db/schema", () => ({
+  projects: { id: "projects.id" },
 }));
 
 // Mock sharp
@@ -60,7 +92,6 @@ import { openRouterClient } from "@/lib/clients/openrouter";
 import { replicateRun } from "@/lib/clients/replicate";
 import { upload } from "@/lib/clients/storage";
 import {
-  getProject,
   getGenerations,
   updateProjectThumbnail,
 } from "@/lib/db/queries";
@@ -156,9 +187,9 @@ describe("Thumbnail Service", () => {
       callOrder.push(`updateThumbnail:${input.thumbnailStatus}`);
       return makeProject({ ...input });
     });
-    (getProject as Mock).mockImplementation(async () => {
-      callOrder.push("getProject");
-      return project;
+    mockWhere.mockImplementation(async () => {
+      callOrder.push("dbSelectProject");
+      return [project];
     });
     (openRouterClient.chat as Mock).mockImplementation(async () => {
       callOrder.push("openRouterChat");
@@ -201,7 +232,7 @@ describe("Thumbnail Service", () => {
     const project = makeProject({ name: "Dreamscape Gallery" });
 
     (updateProjectThumbnail as Mock).mockResolvedValue(project);
-    (getProject as Mock).mockResolvedValue(project);
+    mockWhere.mockResolvedValue([project]);
     (openRouterClient.chat as Mock).mockResolvedValue(
       "A surreal dreamscape gallery with floating paintings"
     );
@@ -258,7 +289,7 @@ describe("Thumbnail Service", () => {
     (sharp as unknown as Mock).mockReturnValue(sharpInst);
 
     (updateProjectThumbnail as Mock).mockResolvedValue(project);
-    (getProject as Mock).mockResolvedValue(project);
+    mockWhere.mockResolvedValue([project]);
     (openRouterClient.chat as Mock).mockResolvedValue("test prompt");
     (replicateRun as Mock).mockResolvedValue({
       output: bufferToStream(IMAGE_BUFFER),
@@ -293,7 +324,7 @@ describe("Thumbnail Service", () => {
     const r2Url = "https://r2.example.com/thumbnails/proj-001.png";
 
     (updateProjectThumbnail as Mock).mockResolvedValue(project);
-    (getProject as Mock).mockResolvedValue(project);
+    mockWhere.mockResolvedValue([project]);
     (openRouterClient.chat as Mock).mockResolvedValue("test prompt");
     (replicateRun as Mock).mockResolvedValue({
       output: bufferToStream(IMAGE_BUFFER),
@@ -322,7 +353,7 @@ describe("Thumbnail Service", () => {
     it("should set thumbnail_status to failed and not throw when OpenRouter fails", async () => {
       const project = makeProject();
       (updateProjectThumbnail as Mock).mockResolvedValue(project);
-      (getProject as Mock).mockResolvedValue(project);
+      mockWhere.mockResolvedValue([project]);
       (openRouterClient.chat as Mock).mockRejectedValue(
         new Error("OpenRouter API timeout")
       );
@@ -351,7 +382,7 @@ describe("Thumbnail Service", () => {
     it("should set thumbnail_status to failed and not throw when Replicate fails", async () => {
       const project = makeProject();
       (updateProjectThumbnail as Mock).mockResolvedValue(project);
-      (getProject as Mock).mockResolvedValue(project);
+      mockWhere.mockResolvedValue([project]);
       (openRouterClient.chat as Mock).mockResolvedValue("test prompt");
       (replicateRun as Mock).mockRejectedValue(
         new Error("Replicate API Fehler: 500")
@@ -384,7 +415,7 @@ describe("Thumbnail Service", () => {
       (sharp as unknown as Mock).mockReturnValue(sharpInst);
 
       (updateProjectThumbnail as Mock).mockResolvedValue(project);
-      (getProject as Mock).mockResolvedValue(project);
+      mockWhere.mockResolvedValue([project]);
       (openRouterClient.chat as Mock).mockResolvedValue("test prompt");
       (replicateRun as Mock).mockResolvedValue({
         output: bufferToStream(IMAGE_BUFFER),
@@ -410,7 +441,7 @@ describe("Thumbnail Service", () => {
     it("should set thumbnail_status to failed and not throw when R2 upload fails", async () => {
       const project = makeProject();
       (updateProjectThumbnail as Mock).mockResolvedValue(project);
-      (getProject as Mock).mockResolvedValue(project);
+      mockWhere.mockResolvedValue([project]);
       (openRouterClient.chat as Mock).mockResolvedValue("test prompt");
       (replicateRun as Mock).mockResolvedValue({
         output: bufferToStream(IMAGE_BUFFER),
@@ -500,7 +531,7 @@ describe("Thumbnail Service", () => {
 
     (getGenerations as Mock).mockResolvedValue([]);
     (updateProjectThumbnail as Mock).mockResolvedValue(project);
-    (getProject as Mock).mockResolvedValue(project);
+    mockWhere.mockResolvedValue([project]);
     (openRouterClient.chat as Mock).mockResolvedValue(
       "A thumbnail for empty project"
     );
@@ -524,8 +555,9 @@ describe("Thumbnail Service", () => {
       thumbnailStatus: "pending",
     });
 
-    // 2. Calls getProject to get the project name
-    expect(getProject).toHaveBeenCalledWith("proj-001");
+    // 2. Calls db.select().from(projects).where(...) to get the project name
+    expect(mockSelect).toHaveBeenCalled();
+    expect(mockWhere).toHaveBeenCalled();
 
     // 3. Calls OpenRouter with project name (not prompts list)
     expect(openRouterClient.chat).toHaveBeenCalledTimes(1);
