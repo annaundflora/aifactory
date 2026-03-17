@@ -127,7 +127,10 @@ export function UpscalePopover({
         data-testid="upscale-popover"
       >
         <PopoverHeader>
-          <PopoverTitle>Upscale</PopoverTitle>
+          <PopoverTitle className="flex items-center gap-2">
+            <ZoomIn className="size-4" />
+            Upscale
+          </PopoverTitle>
         </PopoverHeader>
 
         {/* Tier Toggle -- above scale buttons, no MaxQualityToggle for upscale */}
