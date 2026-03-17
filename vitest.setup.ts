@@ -1,12 +1,19 @@
-// Reduce verbose DOM snapshot output in testing-library errors
-if (typeof document !== 'undefined') {
-  import('@testing-library/dom').then(({ configure }) => {
-    configure({
-      getElementError: (message) => {
-        const error = new Error(message ?? undefined)
-        error.name = 'TestingLibraryElementError'
-        return error
-      },
-    })
-  }).catch(() => {})
-}
+import { vi } from 'vitest'
+
+// ---------------------------------------------------------------------------
+// Global mocks: prevent auth / db from requiring real env vars in tests
+// ---------------------------------------------------------------------------
+
+vi.mock('@/auth', () => ({
+  auth: vi.fn().mockResolvedValue({
+    user: { id: 'mock-user-id', email: 'test@example.com' },
+  }),
+}))
+
+vi.mock('@/lib/auth/guard', () => ({
+  requireAuth: vi.fn().mockResolvedValue({ userId: 'mock-user-id', email: 'test@example.com' }),
+}))
+
+vi.mock('@/lib/db', () => ({
+  db: {},
+}))

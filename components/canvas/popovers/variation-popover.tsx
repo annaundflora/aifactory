@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { Sparkles } from "lucide-react";
+import { Copy, Sparkles } from "lucide-react";
 import { useCanvasDetail } from "@/lib/canvas-detail-context";
 import {
   Popover,
@@ -10,13 +10,6 @@ import {
   PopoverHeader,
   PopoverTitle,
 } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { TierToggle } from "@/components/ui/tier-toggle";
@@ -30,11 +23,10 @@ import type { Tier } from "@/lib/types";
 // Types (exported for slice-14)
 // ---------------------------------------------------------------------------
 
-export type VariationStrength = "subtle" | "balanced" | "creative";
-
 export interface VariationParams {
   prompt: string;
-  strength: VariationStrength;
+  promptStyle: string;
+  negativePrompt: string;
   count: number;
   tier: Tier;
   imageParams?: Record<string, unknown>;
@@ -43,12 +35,6 @@ export interface VariationParams {
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-const STRENGTH_OPTIONS: { value: VariationStrength; label: string }[] = [
-  { value: "subtle", label: "Subtle" },
-  { value: "balanced", label: "Balanced" },
-  { value: "creative", label: "Creative" },
-];
 
 const COUNT_OPTIONS = [1, 2, 3, 4] as const;
 
@@ -77,7 +63,8 @@ export function VariationPopover({
 
   // Local form state
   const [prompt, setPrompt] = useState(generation.prompt ?? "");
-  const [strength, setStrength] = useState<VariationStrength>("balanced");
+  const [promptStyle, setPromptStyle] = useState(generation.promptStyle ?? "");
+  const [negativePrompt, setNegativePrompt] = useState(generation.negativePrompt ?? "");
   const [count, setCount] = useState<number>(1);
   const [tier, setTier] = useState<Tier>("draft");
   const [imageParams, setImageParams] = useState<Record<string, unknown>>({});
@@ -95,7 +82,8 @@ export function VariationPopover({
   useEffect(() => {
     if (isOpen) {
       setPrompt(generation.prompt ?? "");
-      setStrength("balanced");
+      setPromptStyle(generation.promptStyle ?? "");
+      setNegativePrompt(generation.negativePrompt ?? "");
       setCount(1);
       setTier("draft");
       setImageParams({});
@@ -118,14 +106,15 @@ export function VariationPopover({
   const handleGenerate = useCallback(() => {
     onGenerate({
       prompt,
-      strength,
+      promptStyle,
+      negativePrompt,
       count,
       tier,
       imageParams,
     });
     // Close the popover by setting activeToolId to null via toggle
     dispatch({ type: "SET_ACTIVE_TOOL", toolId: "variation" });
-  }, [onGenerate, prompt, strength, count, tier, imageParams, dispatch]);
+  }, [onGenerate, prompt, promptStyle, negativePrompt, count, tier, imageParams, dispatch]);
 
   return (
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
@@ -148,7 +137,7 @@ export function VariationPopover({
         {/* Header */}
         <PopoverHeader className="mb-3">
           <PopoverTitle className="flex items-center gap-2">
-            <Sparkles className="size-4" />
+            <Copy className="size-4" />
             Variation
           </PopoverTitle>
         </PopoverHeader>
@@ -173,38 +162,42 @@ export function VariationPopover({
             />
           </div>
 
-          {/* Strength Dropdown */}
+          {/* Style */}
           <div className="space-y-1.5">
             <label
-              htmlFor="variation-strength"
+              htmlFor="variation-style"
               className="text-xs font-medium text-muted-foreground"
             >
-              Strength
+              Style
             </label>
-            <Select
-              value={strength}
-              onValueChange={(value) =>
-                setStrength(value as VariationStrength)
-              }
+            <Textarea
+              id="variation-style"
+              data-testid="variation-style"
+              value={promptStyle}
+              onChange={(e) => setPromptStyle(e.target.value)}
+              placeholder="Style prompt..."
+              className="min-h-14 resize-none text-sm"
+              rows={2}
+            />
+          </div>
+
+          {/* Negative Prompt */}
+          <div className="space-y-1.5">
+            <label
+              htmlFor="variation-negative-prompt"
+              className="text-xs font-medium text-muted-foreground"
             >
-              <SelectTrigger
-                className="w-full"
-                data-testid="variation-strength-trigger"
-              >
-                <SelectValue placeholder="Select strength" />
-              </SelectTrigger>
-              <SelectContent>
-                {STRENGTH_OPTIONS.map((option) => (
-                  <SelectItem
-                    key={option.value}
-                    value={option.value}
-                    data-testid={`variation-strength-${option.value}`}
-                  >
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              Negative Prompt
+            </label>
+            <Textarea
+              id="variation-negative-prompt"
+              data-testid="variation-negative-prompt"
+              value={negativePrompt}
+              onChange={(e) => setNegativePrompt(e.target.value)}
+              placeholder="Negative prompt..."
+              className="min-h-14 resize-none text-sm"
+              rows={2}
+            />
           </div>
 
           {/* Count Selector */}

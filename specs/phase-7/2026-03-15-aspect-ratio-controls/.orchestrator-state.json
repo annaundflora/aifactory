@@ -1,0 +1,29 @@
+{
+  "spec_path": "specs/phase-7/2026-03-15-aspect-ratio-controls",
+  "feature_name": "aspect-ratio-controls",
+  "status": "completed",
+  "current_state": "feature_complete",
+  "current_slice_id": null,
+  "retry_count": 0,
+  "failed_stage": null,
+  "waves": [
+    { "id": 1, "slices": ["slice-01"] },
+    { "id": 2, "slices": ["slice-02"] },
+    { "id": 3, "slices": ["slice-03"] },
+    { "id": 4, "slices": ["slice-04", "slice-06"] },
+    { "id": 5, "slices": ["slice-05", "slice-07"] }
+  ],
+  "completed_slices": ["slice-01", "slice-02", "slice-03", "slice-04", "slice-05", "slice-06", "slice-07"],
+  "evidence_files": [
+    ".claude/evidence/aspect-ratio-controls/slice-01.json",
+    ".claude/evidence/aspect-ratio-controls/slice-02.json",
+    ".claude/evidence/aspect-ratio-controls/slice-03.json",
+    ".claude/evidence/aspect-ratio-controls/slice-04.json",
+    ".claude/evidence/aspect-ratio-controls/slice-05.json",
+    ".claude/evidence/aspect-ratio-controls/slice-06.json",
+    ".claude/evidence/aspect-ratio-controls/slice-07.json"
+  ],
+  "worktree_path": "worktrees/aspect-ratio-controls",
+  "branch": "feature/aspect-ratio-controls",
+  "issue_number": 14
+}

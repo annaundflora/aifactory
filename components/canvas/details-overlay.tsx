@@ -112,6 +112,36 @@ export function DetailsOverlay({ generation }: DetailsOverlayProps) {
           </p>
         </div>
 
+        {/* Style (nur wenn vorhanden) */}
+        {generation.promptStyle && generation.promptStyle.trim() !== "" && (
+          <div className="mb-3">
+            <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-1">
+              Style
+            </h3>
+            <p
+              className="text-sm text-foreground leading-relaxed"
+              data-testid="details-style"
+            >
+              {generation.promptStyle}
+            </p>
+          </div>
+        )}
+
+        {/* Negative Prompt (nur wenn vorhanden) */}
+        {generation.negativePrompt && generation.negativePrompt.trim() !== "" && (
+          <div className="mb-3">
+            <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-1">
+              Negative Prompt
+            </h3>
+            <p
+              className="text-sm text-foreground leading-relaxed"
+              data-testid="details-negative-prompt"
+            >
+              {generation.negativePrompt}
+            </p>
+          </div>
+        )}
+
         {/* Generation parameters */}
         <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
           {modelName && (

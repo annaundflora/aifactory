@@ -31,17 +31,6 @@ import type { Tier } from "@/lib/types";
 /** Polling interval for in-place generation (reuses WorkspaceContent pattern) */
 const GENERATION_POLL_INTERVAL_MS = 3000;
 
-/**
- * Maps variation strength labels to prompt_strength values for img2img.
- * Lower prompt_strength = closer to original (subtle),
- * Higher prompt_strength = more creative deviation.
- */
-const VARIATION_STRENGTH_MAP: Record<string, number> = {
-  subtle: 0.3,
-  balanced: 0.6,
-  creative: 0.85,
-};
-
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -261,13 +250,11 @@ export function CanvasDetailView({
     async (params: VariationParams) => {
       if (state.isGenerating) return;
 
-      // Resolve model from settings using the tier from params
+      // Resolve txt2img model for the selected tier
       const setting = modelSettings.find(
-        (s) => s.mode === "img2img" && s.tier === params.tier
+        (s) => s.mode === "txt2img" && s.tier === params.tier
       );
       const selectedModel = setting?.modelId ?? currentGeneration.modelId;
-      const promptStrength =
-        VARIATION_STRENGTH_MAP[params.strength] ?? 0.6;
 
       dispatch({ type: "SET_GENERATING", isGenerating: true });
 
@@ -275,12 +262,12 @@ export function CanvasDetailView({
         const result = await generateImages({
           projectId: currentGeneration.projectId,
           promptMotiv: params.prompt,
+          promptStyle: params.promptStyle,
+          negativePrompt: params.negativePrompt,
           modelIds: [selectedModel],
-          params: { prompt_strength: promptStrength, ...(params.imageParams ?? {}) },
+          params: { ...(params.imageParams ?? {}) },
           count: params.count,
-          generationMode: "img2img",
-          sourceImageUrl: currentGeneration.imageUrl ?? undefined,
-          strength: promptStrength,
+          generationMode: "txt2img",
           sourceGenerationId: currentGeneration.id,
         });
 

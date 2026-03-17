@@ -1,0 +1,31 @@
+{
+  "feature": "aspect-ratio-controls",
+  "slice": "slice-05",
+  "timestamp": "2026-03-16T11:05:00Z",
+  "status": "completed",
+  "implementation": {
+    "status": "completed",
+    "files_changed": ["components/workspace/prompt-area.tsx"],
+    "commit_hash": "b3bb3be"
+  },
+  "review": {
+    "verdict": "APPROVED",
+    "findings": [],
+    "iterations": 1
+  },
+  "deterministic_gate": {
+    "detected_stack": "TypeScript",
+    "lint_passed": true,
+    "typecheck_passed": true,
+    "lint_iterations": 1
+  },
+  "tests": {
+    "test_files": ["components/workspace/__tests__/prompt-area-image-params-merge.test.tsx"],
+    "test_count": { "unit": 0, "integration": 0, "acceptance": 6 },
+    "ac_coverage": { "total": 6, "covered": 6, "missing": [] }
+  },
+  "validation": {
+    "overall_status": "passed",
+    "retries": 0
+  }
+}

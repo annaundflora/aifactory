@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Minus, Plus } from "lucide-react";
+import { ArrowRightLeft, Minus, Plus } from "lucide-react";
 import { useCanvasDetail } from "@/lib/canvas-detail-context";
 import {
   Popover,
   PopoverContent,
   PopoverAnchor,
+  PopoverHeader,
+  PopoverTitle,
 } from "@/components/ui/popover";
 import { ReferenceBar } from "@/components/workspace/reference-bar";
 import { Button } from "@/components/ui/button";
@@ -329,6 +331,14 @@ export function Img2imgPopover({
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <div className="flex flex-col gap-4">
+          {/* ---- Header ---- */}
+          <PopoverHeader>
+            <PopoverTitle className="flex items-center gap-2">
+              <ArrowRightLeft className="size-4" />
+              Image to Image
+            </PopoverTitle>
+          </PopoverHeader>
+
           {/* ---- References Section ---- */}
           <section data-testid="references-section">
             <h3

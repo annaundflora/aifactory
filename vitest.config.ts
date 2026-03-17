@@ -7,16 +7,22 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
-    // setupFiles: ['./vitest.setup.ts'],
+    setupFiles: ['./vitest.setup.ts'],
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
       'worktrees/**',
     ],
+    server: {
+      deps: {
+        inline: ['next-auth'],
+      },
+    },
   },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, '.'),
+      'next/server': path.resolve(__dirname, 'node_modules/next/server.js'),
     },
   },
 })
