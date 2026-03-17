@@ -96,14 +96,14 @@ export interface UseAssistantRuntimeOptions {
   selectedModel: string;
   /** Ref to register the sendMessage function on the context */
   sendMessageRef: MutableRefObject<
-    ((content: string, imageUrl?: string) => void) | null
+    ((content: string, imageUrls?: string[]) => void) | null
   >;
   /** Ref to register the cancelStream function on the context */
   cancelStreamRef: MutableRefObject<(() => void) | null>;
 }
 
 export interface UseAssistantRuntimeReturn {
-  sendMessage: (content: string, imageUrl?: string) => void;
+  sendMessage: (content: string, imageUrls?: string[]) => void;
   isStreaming: boolean;
   cancelStream: () => void;
 }
@@ -340,7 +340,7 @@ export function useAssistantRuntime({
     async (
       sessionId: string,
       content: string,
-      imageUrl: string | undefined,
+      imageUrls: string[] | undefined,
       signal: AbortSignal
     ) => {
       try {
@@ -353,8 +353,8 @@ export function useAssistantRuntime({
           content,
           model: selectedModelRef.current,
         };
-        if (imageUrl) {
-          body.image_url = imageUrl;
+        if (imageUrls && imageUrls.length > 0) {
+          body.image_urls = imageUrls;
         }
 
         const response = await fetch(
@@ -403,7 +403,7 @@ export function useAssistantRuntime({
    * Main sendMessage function: creates session if needed, then sends message.
    */
   const sendMessage = useCallback(
-    async (content: string, imageUrl?: string) => {
+    async (content: string, imageUrls?: string[]) => {
       // Cancel any ongoing stream
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -422,7 +422,7 @@ export function useAssistantRuntime({
           id: `user-${Date.now()}`,
           role: "user",
           content,
-          imageUrl,
+          imageUrls,
         },
       });
 
@@ -442,7 +442,7 @@ export function useAssistantRuntime({
       await sendMessageToSession(
         currentSessionId,
         content,
-        imageUrl,
+        imageUrls,
         abortController.signal
       );
 

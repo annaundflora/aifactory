@@ -471,15 +471,15 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
   // AC-2: Send message
   // ---------------------------------------------------------------------------
   const handleSend = useCallback(
-    (text: string, imageUrl?: string) => {
+    (text: string, imageUrls?: string[]) => {
       const userMsg: ChatMessage = {
         id: `user-${crypto.randomUUID()}`,
         role: "user",
         content: text,
-        ...(imageUrl ? { imageUrl } : {}),
+        ...(imageUrls && imageUrls.length > 0 ? { imageUrls } : {}),
       };
       setMessages((prev) => [...prev, userMsg]);
-      sendMessageToBackend(text, imageUrl).catch((err) =>
+      sendMessageToBackend(text, imageUrls?.[0]).catch((err) =>
         console.error("[CanvasChatPanel] send failed:", err)
       );
     },

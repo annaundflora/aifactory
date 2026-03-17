@@ -63,8 +63,8 @@ export function AssistantPanelContent({
   });
 
   const handleSend = useCallback(
-    (text: string, imageUrl?: string) => {
-      sendMessage(text, imageUrl);
+    (text: string, imageUrls?: string[]) => {
+      sendMessage(text, imageUrls);
     },
     [sendMessage]
   );

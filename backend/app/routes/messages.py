@@ -38,7 +38,7 @@ async def send_message(session_id: str, request: SendMessageRequest):
 
     Raises:
         HTTPException 400: Session lifetime limit reached (100 messages).
-        HTTPException 422: Validation error (content, image_url, model).
+        HTTPException 422: Validation error (content, image_urls, model).
         HTTPException 429: Rate limit exceeded (30 messages/minute).
     """
     # Check rate limits
@@ -52,14 +52,16 @@ async def send_message(session_id: str, request: SendMessageRequest):
     # Record the message for rate limiting
     rate_limiter.record(session_id)
 
-    # Convert image_url to string if present
-    image_url_str = str(request.image_url) if request.image_url else None
+    # Convert image_urls to strings if present
+    image_url_strs = (
+        [str(u) for u in request.image_urls] if request.image_urls else None
+    )
 
     async def event_generator():
         async for sse_event in _service.stream_response(
             session_id=session_id,
             content=request.content,
-            image_url=image_url_str,
+            image_urls=image_url_strs,
             model=request.model,
         ):
             yield {

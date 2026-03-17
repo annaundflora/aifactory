@@ -118,10 +118,12 @@ function MessageBubble({
         )}
         data-testid={isError ? "bot-message-error" : undefined}
       >
-        {/* AC-6: Thumbnail inline in user message bubble (120x120, rounded) */}
-        {isUser && message.imageUrl && (
-          <div className="mb-2">
-            <ImagePreview src={message.imageUrl} size="md" />
+        {/* AC-6: Thumbnails inline in user message bubble (120x120, rounded) */}
+        {isUser && message.imageUrls && message.imageUrls.length > 0 && (
+          <div className="mb-2 flex gap-2 flex-wrap">
+            {message.imageUrls.map(url => (
+              <ImagePreview key={url} src={url} size="md" />
+            ))}
           </div>
         )}
 

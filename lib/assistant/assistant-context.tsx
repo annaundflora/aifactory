@@ -267,7 +267,7 @@ export interface PromptAssistantContextValue {
   isLoadingSession: boolean;
   /** Whether the current draft has been applied to the workspace */
   isApplied: boolean;
-  sendMessage: (content: string, imageUrl?: string) => void;
+  sendMessage: (content: string, imageUrls?: string[]) => void;
   cancelStream: () => void;
   setSelectedModel: (model: string) => void;
   /** Navigate to a specific view */
@@ -283,7 +283,7 @@ export interface PromptAssistantContextValue {
   sessionIdRef: MutableRefObject<string | null>;
   /** Ref for registering the sendMessage implementation from useAssistantRuntime */
   sendMessageRef: MutableRefObject<
-    ((content: string, imageUrl?: string) => void) | null
+    ((content: string, imageUrls?: string[]) => void) | null
   >;
   /** Ref for registering the cancelStream implementation from useAssistantRuntime */
   cancelStreamRef: MutableRefObject<(() => void) | null>;
@@ -350,7 +350,7 @@ export function PromptAssistantProvider({
     negativePrompt: string;
   } | null>(null);
   const sendMessageRef = useRef<
-    ((content: string, imageUrl?: string) => void) | null
+    ((content: string, imageUrls?: string[]) => void) | null
   >(null);
   const cancelStreamRef = useRef<(() => void) | null>(null);
   // Track whether auto-title has already been triggered for this session
@@ -360,9 +360,9 @@ export function PromptAssistantProvider({
   sessionIdRef.current = state.sessionId;
 
   const sendMessage = useCallback(
-    (content: string, imageUrl?: string) => {
+    (content: string, imageUrls?: string[]) => {
       if (sendMessageRef.current) {
-        sendMessageRef.current(content, imageUrl);
+        sendMessageRef.current(content, imageUrls);
 
         // AC-9: Auto-title after first user message is sent.
         // Trigger the title update asynchronously after the send.

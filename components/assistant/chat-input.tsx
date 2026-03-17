@@ -21,7 +21,7 @@ import { useTouchDropTarget } from "@/hooks/use-touch-drop-target";
 // ---------------------------------------------------------------------------
 
 export interface ChatInputProps {
-  onSend: (text: string, imageUrl?: string) => void;
+  onSend: (text: string, imageUrls?: string[]) => void;
   /** Whether the assistant is currently streaming a response */
   isStreaming?: boolean;
   /** Callback to stop the current stream (required when isStreaming is true) */
@@ -51,14 +51,14 @@ export function ChatInput({
   placeholder = "Nachricht eingeben...",
 }: ChatInputProps) {
   const [value, setValue] = useState("");
-  const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
+  const [pendingImageUrls, setPendingImageUrls] = useState<string[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const trimmed = value.trim();
-  // AC-10: Send is enabled when there's text OR a pending image
+  // AC-10: Send is enabled when there's text OR pending images
   const canSend =
-    (trimmed.length > 0 || !!pendingImageUrl) && !disabled && !isStreaming;
+    (trimmed.length > 0 || pendingImageUrls.length > 0) && !disabled && !isStreaming;
 
   // Auto-focus on mount when requested
   useEffect(() => {
@@ -83,25 +83,25 @@ export function ChatInput({
     [autoResize]
   );
 
-  // AC-5: Send message with content and optional imageUrl, then reset
+  // AC-5: Send message with content and optional imageUrls, then reset
   const handleSend = useCallback(() => {
     if (!canSend) return;
-    // When only an image is attached without text, send a default content
+    // When only images are attached without text, send a default content
     // to satisfy the backend's min_length=1 validation on the content field.
     const messageContent =
-      pendingImageUrl && !trimmed ? "Analysiere dieses Bild" : trimmed;
-    if (pendingImageUrl) {
-      onSend(messageContent, pendingImageUrl);
+      pendingImageUrls.length > 0 && !trimmed ? "Analysiere diese Bilder" : trimmed;
+    if (pendingImageUrls.length > 0) {
+      onSend(messageContent, pendingImageUrls);
     } else {
       onSend(messageContent);
     }
     setValue("");
-    setPendingImageUrl(null);
+    setPendingImageUrls([]);
     // Reset textarea height after clearing
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
-  }, [canSend, trimmed, pendingImageUrl, onSend]);
+  }, [canSend, trimmed, pendingImageUrls, onSend]);
 
   const handleStop = useCallback(() => {
     if (onStop) {
@@ -119,14 +119,14 @@ export function ChatInput({
     [handleSend]
   );
 
-  // AC-3: Store uploaded image URL
+  // AC-3: Append uploaded image URL (multi-image support)
   const handleUploadComplete = useCallback((url: string) => {
-    setPendingImageUrl(url);
+    setPendingImageUrls(prev => [...prev, url]);
   }, []);
 
-  // AC-4: Remove pending image
-  const handleRemoveImage = useCallback(() => {
-    setPendingImageUrl(null);
+  // AC-4: Remove pending image by index
+  const handleRemoveImage = useCallback((index: number) => {
+    setPendingImageUrls(prev => prev.filter((_, i) => i !== index));
   }, []);
 
   // Gallery drag-to-chat handlers
@@ -150,14 +150,14 @@ export function ChatInput({
     const data = e.dataTransfer.getData(GALLERY_DRAG_MIME_TYPE);
     if (data) {
       const parsed = JSON.parse(data) as GalleryDragPayload;
-      setPendingImageUrl(parsed.imageUrl);
+      setPendingImageUrls(prev => [...prev, parsed.imageUrl]);
     }
   }, []);
 
   // Touch drag drop target
   const handleTouchDrop = useCallback(
     (payload: GalleryDragPayload) => {
-      setPendingImageUrl(payload.imageUrl);
+      setPendingImageUrls(prev => [...prev, payload.imageUrl]);
     },
     []
   );
@@ -174,17 +174,20 @@ export function ChatInput({
       {...{ [GALLERY_DROP_TARGET_ATTR]: "chat-input" }}
       className={cn(showDropHighlight && "ring-2 ring-primary/50 bg-primary/5 rounded-lg")}
     >
-      {/* AC-3: Image preview area above textarea when pendingImageUrl is set */}
-      {pendingImageUrl && (
+      {/* AC-3: Image preview strip above textarea when pending images exist */}
+      {pendingImageUrls.length > 0 && (
         <div
-          className="border-t px-4 pt-3"
+          className="flex gap-2 overflow-x-auto border-t px-4 pt-3"
           data-testid="image-preview-area"
         >
-          <ImagePreview
-            src={pendingImageUrl}
-            onRemove={handleRemoveImage}
-            size="sm"
-          />
+          {pendingImageUrls.map((url, i) => (
+            <ImagePreview
+              key={url}
+              src={url}
+              onRemove={() => handleRemoveImage(i)}
+              size="sm"
+            />
+          ))}
         </div>
       )}
 
@@ -194,7 +197,7 @@ export function ChatInput({
           <ImageUploadButton
             onUploadComplete={handleUploadComplete}
             projectId={projectId ?? ""}
-            disabled={disabled || isStreaming || !!pendingImageUrl}
+            disabled={disabled || isStreaming || pendingImageUrls.length >= 5}
           />
         )}
 

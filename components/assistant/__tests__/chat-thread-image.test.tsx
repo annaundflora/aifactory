@@ -27,7 +27,7 @@ describe("ChatThread (Image in Messages)", () => {
         id: "msg-1",
         role: "user",
         content: "Analyze this image please",
-        imageUrl: "https://r2.example.com/uploads/photo.jpg",
+        imageUrls: ["https://r2.example.com/uploads/photo.jpg"],
       },
     ];
 
@@ -79,7 +79,7 @@ describe("ChatThread (Image in Messages)", () => {
         id: "msg-3",
         role: "user",
         content: "With image",
-        imageUrl: "https://r2.example.com/uploads/photo.jpg",
+        imageUrls: ["https://r2.example.com/uploads/photo.jpg"],
       },
     ];
 

@@ -118,21 +118,21 @@ class AssistantService:
         self,
         session_id: str,
         content: str,
-        image_url: Optional[str] = None,
+        image_urls: Optional[list[str]] = None,
         model: Optional[str] = None,
     ) -> AsyncGenerator[dict, None]:
         """Stream a response from the LangGraph agent as SSE events.
 
         Orchestrates:
         1. Rate limiting check (done by caller in route)
-        2. Build HumanMessage with optional image
+        2. Build HumanMessage with optional images
         3. Invoke LangGraph astream_events() with thread config
         4. Convert events to SSE format (text-delta, tool-call-result, text-done, error)
 
         Args:
             session_id: The session/thread ID for LangGraph config.
             content: The user message text.
-            image_url: Optional reference image URL.
+            image_urls: Optional list of reference image URLs.
             model: Optional LLM model override slug.
 
         Yields:
@@ -141,23 +141,24 @@ class AssistantService:
         try:
             # Build the human message
             message_content: list | str
-            if image_url:
-                message_content = [
-                    {"type": "text", "text": content},
-                    {"type": "image_url", "image_url": {"url": str(image_url)}},
-                ]
+            if image_urls:
+                message_content = [{"type": "text", "text": content}]
+                for url in image_urls:
+                    message_content.append(
+                        {"type": "image_url", "image_url": {"url": url}}
+                    )
             else:
                 message_content = content
 
             human_message = HumanMessage(content=message_content)
 
             # LangGraph config with thread_id for session persistence.
-            # Pass the actual image URL so analyze_image uses the correct R2 URL
-            # instead of whatever URL the LLM hallucinates.
+            # Pass the actual image URLs so analyze_image uses the correct R2 URLs
+            # instead of whatever URLs the LLM hallucinates.
             config = {
                 "configurable": {
                     "thread_id": session_id,
-                    "pending_image_url": str(image_url) if image_url else None,
+                    "pending_image_urls": image_urls or [],
                     "model": model,
                 }
             }

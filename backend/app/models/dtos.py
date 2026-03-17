@@ -21,11 +21,11 @@ ALLOWED_MODELS = [
 class SendMessageRequest(BaseModel):
     """DTO for POST /api/assistant/sessions/{id}/messages.
 
-    Validates user message content, optional image URL, and optional model selection.
+    Validates user message content, optional image URLs, and optional model selection.
 
     Fields:
         content: The user message text (1-5000 characters).
-        image_url: Optional URL to a reference image (must be a valid URL).
+        image_urls: Optional list of reference image URLs (max 5).
         model: Optional LLM model slug. Must be one of the allowed models.
     """
 
@@ -35,9 +35,10 @@ class SendMessageRequest(BaseModel):
         max_length=5000,
         description="User message content (1-5000 characters)",
     )
-    image_url: Optional[HttpUrl] = Field(
+    image_urls: Optional[list[HttpUrl]] = Field(
         default=None,
-        description="Optional reference image URL",
+        max_length=5,
+        description="Optional reference image URLs (max 5)",
     )
     model: Optional[Literal[
         "anthropic/claude-sonnet-4.6",

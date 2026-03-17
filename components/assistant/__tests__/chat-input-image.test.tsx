@@ -81,7 +81,7 @@ describe("ChatInput (Image Integration)", () => {
     // Verify onSend was called with text and imageUrl
     expect(defaultProps.onSend).toHaveBeenCalledWith(
       "Analyze this image",
-      "https://r2.example.com/uploads/photo.jpg"
+      ["https://r2.example.com/uploads/photo.jpg"]
     );
 
     // pendingImageUrl should be reset -- preview should be gone
@@ -114,7 +114,7 @@ describe("ChatInput (Image Integration)", () => {
 
     expect(defaultProps.onSend).toHaveBeenCalledWith(
       "Describe this",
-      "https://r2.example.com/uploads/photo.jpg"
+      ["https://r2.example.com/uploads/photo.jpg"]
     );
   });
 
@@ -219,8 +219,8 @@ describe("ChatInput (Image Integration)", () => {
     await user.click(sendBtn);
 
     expect(defaultProps.onSend).toHaveBeenCalledWith(
-      "Analysiere dieses Bild",
-      "https://r2.example.com/uploads/photo.jpg"
+      "Analysiere diese Bilder",
+      ["https://r2.example.com/uploads/photo.jpg"]
     );
   });
 });

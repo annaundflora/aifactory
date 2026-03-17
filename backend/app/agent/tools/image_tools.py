@@ -245,14 +245,16 @@ async def analyze_image(image_url: str, config: RunnableConfig = None) -> dict:
         Dict with keys: subject, style, mood, lighting, composition, palette.
         All values are non-empty English strings describing the image.
     """
-    # Extract session_id and actual image URL from LangGraph config.
+    # Extract session_id and actual image URLs from LangGraph config.
     # The LLM may hallucinate external URLs (e.g. Wikimedia) instead of
-    # using the actual R2 upload URL. pending_image_url contains the real URL.
+    # using the actual R2 upload URLs. pending_image_urls contains the real URLs.
     session_id = ""
     if config and "configurable" in config:
         session_id = config["configurable"].get("thread_id", "")
-        actual_url = config["configurable"].get("pending_image_url")
-        if actual_url:
+        pending_urls = config["configurable"].get("pending_image_urls", [])
+        if pending_urls:
+            # Use the first pending URL as override (pop semantics)
+            actual_url = pending_urls[0]
             logger.info(
                 "Overriding LLM-provided URL (%s) with actual upload URL (%s)",
                 image_url[:80],
