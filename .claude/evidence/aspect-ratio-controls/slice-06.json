@@ -1,0 +1,35 @@
+{
+  "feature": "aspect-ratio-controls",
+  "slice": "slice-06",
+  "timestamp": "2026-03-16T10:50:00Z",
+  "status": "completed",
+  "implementation": {
+    "status": "completed",
+    "files_changed": ["components/canvas/popovers/variation-popover.tsx", "components/canvas/popovers/img2img-popover.tsx", "components/canvas/canvas-detail-view.tsx"],
+    "commit_hash": "1b40a2e"
+  },
+  "review": {
+    "verdict": "APPROVED",
+    "findings": [],
+    "iterations": 1
+  },
+  "deterministic_gate": {
+    "detected_stack": "TypeScript",
+    "lint_passed": true,
+    "typecheck_passed": true,
+    "lint_iterations": 1
+  },
+  "tests": {
+    "test_files": [
+      "components/canvas/popovers/__tests__/variation-popover-params.test.tsx",
+      "components/canvas/popovers/__tests__/img2img-popover-params.test.tsx",
+      "tests/acceptance/test_slice_06_canvas_popovers_mount.test.ts"
+    ],
+    "test_count": { "unit": 0, "integration": 9, "acceptance": 6 },
+    "ac_coverage": { "total": 9, "covered": 9, "missing": [] }
+  },
+  "validation": {
+    "overall_status": "passed",
+    "retries": 0
+  }
+}

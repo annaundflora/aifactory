@@ -1,0 +1,31 @@
+{
+  "feature": "aspect-ratio-controls",
+  "slice": "slice-04",
+  "timestamp": "2026-03-16T10:50:00Z",
+  "status": "completed",
+  "implementation": {
+    "status": "completed",
+    "files_changed": ["components/workspace/prompt-area.tsx"],
+    "commit_hash": "2ae45d9"
+  },
+  "review": {
+    "verdict": "APPROVED",
+    "findings": [{"fixed": "imageParams not restored on img2img->txt2img switch"}],
+    "iterations": 2
+  },
+  "deterministic_gate": {
+    "detected_stack": "TypeScript",
+    "lint_passed": true,
+    "typecheck_passed": true,
+    "lint_iterations": 1
+  },
+  "tests": {
+    "test_files": ["components/workspace/prompt-area-parameter-panel.test.tsx"],
+    "test_count": { "unit": 0, "integration": 0, "acceptance": 8 },
+    "ac_coverage": { "total": 8, "covered": 8, "missing": [] }
+  },
+  "validation": {
+    "overall_status": "passed",
+    "retries": 0
+  }
+}
