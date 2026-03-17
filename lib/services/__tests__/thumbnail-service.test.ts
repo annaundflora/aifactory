@@ -92,6 +92,7 @@ import { openRouterClient } from "@/lib/clients/openrouter";
 import { replicateRun } from "@/lib/clients/replicate";
 import { upload } from "@/lib/clients/storage";
 import {
+  getProject,
   getGenerations,
   updateProjectThumbnail,
 } from "@/lib/db/queries";
@@ -163,6 +164,10 @@ const RESIZED_PNG_BUFFER = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0]);
 describe("Thumbnail Service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Restore db mock chain after clearAllMocks
+    mockSelect.mockReturnValue({ from: mockFrom });
+    mockFrom.mockReturnValue({ where: mockWhere });
 
     // Default sharp mock behavior
     const sharpInst = {
@@ -608,6 +613,10 @@ describe("Thumbnail Service", () => {
 describe("generateThumbnail Server Action", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Restore db mock chain after clearAllMocks
+    mockSelect.mockReturnValue({ from: mockFrom });
+    mockFrom.mockReturnValue({ where: mockWhere });
 
     // Default sharp mock behavior
     const sharpInst = {

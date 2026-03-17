@@ -1,5 +1,19 @@
 # TODO
 
+## URGENT
+
+- [ ] **API Keys rotieren** — Keys wurden versehentlich in Chat exponiert. Folgende Keys muessen neu generiert werden:
+  - [ ] GitHub Token (Settings > Developer Settings > Tokens)
+  - [ ] Google OAuth Secret (Google Cloud Console)
+  - [ ] OpenRouter API Key
+  - [ ] Replicate API Token
+  - [ ] Cloudflare R2 Access Key + Secret
+  - [ ] LangSmith API Key
+  - [ ] Tavily API Key
+  - [ ] Postgres Passwort (+ Container neu starten)
+  - [ ] AUTH_SECRET (`openssl rand -base64 32`)
+  - Nach Rotation: neue Keys in Hetzner `.env` eintragen und `docker compose -f docker-compose.prod.yml up -d` ausfuehren
+
 ## High Priority
 
 - [x] **Drag & Drop via Touch** — Touch-basiertes Drag & Drop implementieren (z.B. iPad-Support)
@@ -16,6 +30,7 @@
 
 ## Medium Priority
 
+- [ ] **Tool-Calls im Chat anzeigen** — Im Assistent- und Canvas-Chat sollen Tool-Aufrufe (z.B. web_search, draft_prompt, generate_image) sichtbar ausgegeben werden, damit der User sieht was der Agent gerade tut
 - [x] **Varianten-Verschiedenheit fixen** — Kreativitaet/Diversity der generierten Varianten verbessern
 - [ ] **Vitest Test-Suite reparieren** — 17 failing files / 109 failed tests / 1586 passed (Stand 2026-03-16). Details:
   - Infra-Tests (slice-13/14 Caddy/Docker) bereits geloescht — irrelevant fuer CI
