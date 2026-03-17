@@ -33,6 +33,9 @@ import { LLMComparison } from "@/components/prompt-improve/llm-comparison";
 import { AssistantTrigger } from "@/components/assistant/assistant-trigger";
 import { SectionLabel } from "@/components/shared/section-label";
 import { modelIdToDisplayName } from "@/lib/utils/model-display-name";
+import { resolveModel } from "@/lib/utils/resolve-model";
+import { useModelSchema } from "@/lib/hooks/use-model-schema";
+import { ParameterPanel, type SchemaProperties } from "@/components/workspace/parameter-panel";
 import { toast } from "sonner";
 
 // Re-export Generation type for callback
@@ -58,6 +61,7 @@ interface Txt2ImgState {
   promptStyle: string;
   negativePrompt: string;
   variantCount: number;
+  imageParams: Record<string, unknown>;
 }
 
 interface Img2ImgState {
@@ -66,6 +70,7 @@ interface Img2ImgState {
   negativePrompt: string;
   variantCount: number;
   referenceSlots: ReferenceSlotData[];
+  imageParams: Record<string, unknown>;
 }
 
 interface UpscaleState {
@@ -98,6 +103,7 @@ function createInitialModeStates(): ModeStates {
       promptStyle: "",
       negativePrompt: "",
       variantCount: 1,
+      imageParams: {},
     },
     img2img: {
       promptMotiv: "",
@@ -105,38 +111,12 @@ function createInitialModeStates(): ModeStates {
       negativePrompt: "",
       variantCount: 1,
       referenceSlots: [],
+      imageParams: {},
     },
     upscale: {
       sourceImageUrl: null,
       scale: DEFAULT_SCALE,
     },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Model Resolution Helper
-// ---------------------------------------------------------------------------
-
-/**
- * Resolve model ID and params from cached model settings based on mode, tier,
- * and maxQuality flag.
- *
- * effectiveTier = maxQuality ? "max" : tier
- *
- * Returns { modelId, modelParams } or undefined if no matching setting found.
- */
-function resolveModel(
-  settings: ModelSetting[],
-  mode: GenerationMode,
-  tier: Tier,
-): { modelId: string; modelParams: Record<string, unknown> } | undefined {
-  const setting = settings.find(
-    (s) => s.mode === mode && s.tier === tier
-  );
-  if (!setting) return undefined;
-  return {
-    modelId: setting.modelId,
-    modelParams: (setting.modelParams ?? {}) as Record<string, unknown>,
   };
 }
 
@@ -195,6 +175,25 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
   const [upscaleSourceImageUrl, setUpscaleSourceImageUrl] = useState<string | null>(null);
   const [upscaleScale, setUpscaleScale] = useState<2 | 4>(DEFAULT_SCALE);
 
+  // ----- imageParams state (user-selected model parameters like aspect_ratio) -----
+  const [imageParams, setImageParams] = useState<Record<string, unknown>>({});
+
+  // ----- Model schema for parameter controls -----
+  const resolvedModel = currentMode !== "upscale"
+    ? resolveModel(modelSettings, currentMode, tier)
+    : undefined;
+  const resolvedModelId = resolvedModel?.modelId;
+  const { schema: modelSchema, isLoading: isSchemaLoading } = useModelSchema(resolvedModelId);
+
+  // Reset imageParams when resolved model changes (e.g., tier change)
+  const prevModelIdRef = useRef<string | undefined>(resolvedModelId);
+  useEffect(() => {
+    if (prevModelIdRef.current !== resolvedModelId) {
+      setImageParams({});
+      prevModelIdRef.current = resolvedModelId;
+    }
+  }, [resolvedModelId]);
+
   // ----- Generation state -----
   const [isGenerating, startGeneration] = useTransition();
 
@@ -229,6 +228,7 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
           promptStyle,
           negativePrompt,
           variantCount,
+          imageParams,
         };
       } else if (currentMode === "img2img") {
         updated.img2img = {
@@ -237,6 +237,7 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
           negativePrompt,
           variantCount,
           referenceSlots,
+          imageParams,
         };
       } else if (currentMode === "upscale") {
         updated.upscale = {
@@ -255,6 +256,7 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
     referenceSlots,
     upscaleSourceImageUrl,
     upscaleScale,
+    imageParams,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -273,6 +275,7 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
           promptStyle,
           negativePrompt,
           variantCount,
+          imageParams,
         };
       } else if (currentMode === "img2img") {
         snapshot.img2img = {
@@ -281,6 +284,7 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
           negativePrompt,
           variantCount,
           referenceSlots,
+          imageParams,
         };
       } else if (currentMode === "upscale") {
         snapshot.upscale = {
@@ -301,6 +305,7 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
       } else if (targetMode === "img2img") {
         if (fromHasPrompt) {
           setReferenceSlots(snapshot.img2img.referenceSlots);
+          setImageParams(snapshot.img2img.imageParams);
         } else {
           const s = snapshot.img2img;
           setPromptMotiv(s.promptMotiv);
@@ -308,14 +313,19 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
           setNegativePrompt(s.negativePrompt);
           setVariantCount(s.variantCount);
           setReferenceSlots(s.referenceSlots);
+          setImageParams(s.imageParams);
         }
       } else if (targetMode === "txt2img") {
-        if (!fromHasPrompt) {
+        if (fromHasPrompt) {
+          // Prompts carry over; restore only txt2img-specific imageParams
+          setImageParams(snapshot.txt2img.imageParams);
+        } else {
           const s = snapshot.txt2img;
           setPromptMotiv(s.promptMotiv);
           setPromptStyle(s.promptStyle);
           setNegativePrompt(s.negativePrompt);
           setVariantCount(s.variantCount);
+          setImageParams(s.imageParams);
         }
       }
 
@@ -339,6 +349,7 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
       upscaleSourceImageUrl,
       upscaleScale,
       modeStates,
+      imageParams,
     ]
   );
 
@@ -675,7 +686,7 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
           promptStyle: promptStyle.trim() || undefined,
           negativePrompt: negativePrompt.trim() || undefined,
           modelIds: [resolved.modelId],
-          params: resolved.modelParams,
+          params: { ...resolved.modelParams, ...imageParams },
           count: variantCount,
           generationMode: "txt2img",
         });
@@ -711,7 +722,7 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
           promptStyle: promptStyle.trim() || undefined,
           negativePrompt: negativePrompt.trim() || undefined,
           modelIds: [resolved.modelId],
-          params: resolved.modelParams,
+          params: { ...resolved.modelParams, ...imageParams },
           count: variantCount,
           generationMode: "img2img",
           sourceImageUrl,
@@ -754,6 +765,7 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
     onGenerationsCreated,
     modelSettings,
     tier,
+    imageParams,
   ]);
 
   // ----- Keyboard shortcut (Cmd/Ctrl+Enter) on Motiv field -----
@@ -970,6 +982,16 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
               disabled={isGenerating}
               hiddenValues={currentMode === "upscale" ? ["max"] : []}
             />
+
+            {/* Parameter Controls (aspect ratio, megapixels, etc.) — hidden in upscale mode */}
+            {currentMode !== "upscale" && (
+              <ParameterPanel
+                schema={modelSchema as SchemaProperties | null}
+                isLoading={isSchemaLoading}
+                values={imageParams}
+                onChange={setImageParams}
+              />
+            )}
 
             {/* Variant Count Stepper — hidden in upscale mode */}
             {showVariants && (

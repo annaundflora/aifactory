@@ -1,0 +1,19 @@
+{
+  "files_claimed": [
+    { "file": "lib/utils/resolve-model.ts", "action": "create", "source_slice": "slice-01-resolve-model-utility" },
+    { "file": "lib/utils/resolve-model.test.ts", "action": "create", "source_slice": "slice-01-resolve-model-utility" },
+    { "file": "components/workspace/prompt-area.tsx", "action": "modify", "source_slice": "slice-01-resolve-model-utility" },
+    { "file": "lib/hooks/use-model-schema.ts", "action": "create", "source_slice": "slice-02-use-model-schema-hook" },
+    { "file": "lib/hooks/use-model-schema.test.ts", "action": "create", "source_slice": "slice-02-use-model-schema-hook" },
+    { "file": "components/workspace/parameter-panel.tsx", "action": "modify", "source_slice": "slice-03-parameter-panel-split" },
+    { "file": "components/workspace/parameter-panel.test.tsx", "action": "create", "source_slice": "slice-03-parameter-panel-split" },
+    { "file": "components/canvas/popovers/variation-popover.tsx", "action": "modify", "source_slice": "slice-06-canvas-popovers-mount" },
+    { "file": "components/canvas/popovers/img2img-popover.tsx", "action": "modify", "source_slice": "slice-06-canvas-popovers-mount" },
+    { "file": "components/canvas/canvas-detail-view.tsx", "action": "modify", "source_slice": "slice-07-canvas-handlers-merge" }
+  ],
+  "summary": {
+    "files_claimed": 10,
+    "new_files": 5,
+    "modified_files": 5
+  }
+}

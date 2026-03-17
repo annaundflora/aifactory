@@ -13,7 +13,10 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { TierToggle } from "@/components/ui/tier-toggle";
-import type { Generation } from "@/lib/db/queries";
+import { ParameterPanel, type SchemaProperties } from "@/components/workspace/parameter-panel";
+import { useModelSchema } from "@/lib/hooks/use-model-schema";
+import { resolveModel } from "@/lib/utils/resolve-model";
+import type { Generation, ModelSetting } from "@/lib/db/queries";
 import type { Tier } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -26,6 +29,7 @@ export interface VariationParams {
   negativePrompt: string;
   count: number;
   tier: Tier;
+  imageParams?: Record<string, unknown>;
 }
 
 // ---------------------------------------------------------------------------
@@ -41,6 +45,7 @@ const COUNT_OPTIONS = [1, 2, 3, 4] as const;
 export interface VariationPopoverProps {
   generation: Generation;
   onGenerate: (params: VariationParams) => void;
+  modelSettings?: ModelSetting[];
 }
 
 // ---------------------------------------------------------------------------
@@ -50,6 +55,7 @@ export interface VariationPopoverProps {
 export function VariationPopover({
   generation,
   onGenerate,
+  modelSettings = [],
 }: VariationPopoverProps) {
   const { state, dispatch } = useCanvasDetail();
 
@@ -61,6 +67,16 @@ export function VariationPopover({
   const [negativePrompt, setNegativePrompt] = useState(generation.negativePrompt ?? "");
   const [count, setCount] = useState<number>(1);
   const [tier, setTier] = useState<Tier>("draft");
+  const [imageParams, setImageParams] = useState<Record<string, unknown>>({});
+
+  // Resolve modelId from settings for schema fetching
+  const resolved = resolveModel(modelSettings, "img2img", tier);
+  const { schema, isLoading, error } = useModelSchema(resolved?.modelId);
+
+  // Reset imageParams when tier/model changes
+  useEffect(() => {
+    setImageParams({});
+  }, [resolved?.modelId]);
 
   // Reset form state when generation changes or popover reopens
   useEffect(() => {
@@ -70,6 +86,7 @@ export function VariationPopover({
       setNegativePrompt(generation.negativePrompt ?? "");
       setCount(1);
       setTier("draft");
+      setImageParams({});
     }
   }, [isOpen, generation.id]);
 
@@ -93,10 +110,11 @@ export function VariationPopover({
       negativePrompt,
       count,
       tier,
+      imageParams,
     });
     // Close the popover by setting activeToolId to null via toggle
     dispatch({ type: "SET_ACTIVE_TOOL", toolId: "variation" });
-  }, [onGenerate, prompt, promptStyle, negativePrompt, count, tier, dispatch]);
+  }, [onGenerate, prompt, promptStyle, negativePrompt, count, tier, imageParams, dispatch]);
 
   return (
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
@@ -219,6 +237,17 @@ export function VariationPopover({
               disabled={state.isGenerating}
             />
           </div>
+
+          {/* Parameter Controls (schema-based) */}
+          {!error && (
+            <ParameterPanel
+              schema={schema as SchemaProperties | null}
+              isLoading={isLoading}
+              values={imageParams}
+              onChange={setImageParams}
+              primaryFields={["aspect_ratio", "megapixels", "resolution"]}
+            />
+          )}
 
           {/* Generate Button */}
           <Button
