@@ -9,3 +9,4 @@ langchain-openai
 langgraph
 Pillow
 httpx
+tavily-python

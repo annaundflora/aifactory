@@ -4,7 +4,7 @@ Creates a compiled ReAct-style agent graph with custom state,
 OpenRouter LLM via langchain-openai, optional checkpointer support,
 and a post_process_node that updates state fields after tool execution.
 
-Tools: draft_prompt, refine_prompt, analyze_image, recommend_model, get_model_info
+Tools: draft_prompt, refine_prompt, analyze_image, recommend_model, get_model_info, web_search
 
 Graph structure:
     START -> assistant_node -> (has tool calls?) -> tools_node -> post_process_node -> assistant_node
@@ -28,12 +28,13 @@ from app.agent.state import PromptAssistantState
 from app.agent.tools.image_tools import analyze_image
 from app.agent.tools.model_tools import get_model_info, recommend_model
 from app.agent.tools.prompt_tools import draft_prompt, refine_prompt
+from app.agent.tools.search_tools import web_search
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 # Tool registry: all tools available to the agent.
-ALL_TOOLS = [draft_prompt, refine_prompt, analyze_image, recommend_model, get_model_info]
+ALL_TOOLS = [draft_prompt, refine_prompt, analyze_image, recommend_model, get_model_info, web_search]
 
 # Tool names whose results should update state fields via post_process_node.
 # Maps tool name -> state field to update.

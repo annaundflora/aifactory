@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     # Replicate API (for model recommendations)
     replicate_api_token: str = ""
 
+    # Tavily Search API (for web_search tool in Prompt Assistant)
+    tavily_api_key: str = ""
+
     # LangSmith Observability
     langsmith_api_key: str = ""
     langsmith_tracing: bool = False
