@@ -55,7 +55,6 @@ beforeAll(() => {
 // Test Data
 // ---------------------------------------------------------------------------
 
-import type { CollectionModel } from "@/lib/types/collection-model";
 import type { GenerationMode, Tier } from "@/lib/types";
 import { ModelModeSection } from "@/components/settings/model-mode-section";
 
@@ -82,8 +81,9 @@ const SETTINGS: MockModelSetting[] = [
   { id: "9", mode: "outpaint", tier: "quality", modelId: "owner/m9", modelParams: {}, createdAt: new Date(), updatedAt: new Date() },
 ];
 
-const COLLECTION_MODELS: CollectionModel[] = [
-  { url: "https://replicate.com/owner/m1", owner: "owner", name: "m1", description: "Model 1", cover_image_url: null, run_count: 100, created_at: "2024-01-01" },
+// Mock models matching the new Model type (from DB / Drizzle inferred)
+const MOCK_MODELS = [
+  { id: "uuid-1", replicateId: "owner/m1", owner: "owner", name: "m1", description: "Model 1", coverImageUrl: null, runCount: 100, collections: null, capabilities: { txt2img: true, img2img: false, upscale: false, inpaint: false, outpaint: false }, inputSchema: null, versionHash: null, isActive: true, lastSyncedAt: null, createdAt: new Date(), updatedAt: new Date() },
 ];
 
 // ---------------------------------------------------------------------------
@@ -95,9 +95,7 @@ function renderSection(mode: GenerationMode) {
     <ModelModeSection
       mode={mode}
       settings={SETTINGS as any}
-      collectionModels={COLLECTION_MODELS}
-      collectionError={null}
-      compatibilityMap={{}}
+      models={MOCK_MODELS as any}
       onModelChange={vi.fn()}
     />
   );

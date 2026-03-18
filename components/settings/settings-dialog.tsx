@@ -26,7 +26,6 @@ import { Loader2, RefreshCw, AlertTriangle } from "lucide-react";
 import type { GenerationMode, Tier } from "@/lib/types";
 import type { ModelSetting } from "@/lib/db/queries";
 import type { Model } from "@/lib/services/model-catalog-service";
-import type { CollectionModel } from "@/lib/types/collection-model";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -53,12 +52,19 @@ const SYNC_TIMEOUT_MS = 60_000;
 
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [settings, setSettings] = useState<ModelSetting[]>([]);
-  const [collectionModels, setCollectionModels] = useState<Model[]>([]);
-  const [collectionError, setCollectionError] = useState<string | null>(null);
+  const [modelsByMode, setModelsByMode] = useState<Record<GenerationMode, Model[]>>({
+    txt2img: [],
+    img2img: [],
+    upscale: [],
+    inpaint: [],
+    outpaint: [],
+  });
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Sync state
   const [syncState, setSyncState] = useState<SyncButtonState>("idle");
   const [failedCount, setFailedCount] = useState<number>(0);
+  const [hasEverSynced, setHasEverSynced] = useState<boolean>(false);
   const syncStateBeforeRef = useRef<SyncButtonState>("idle");
 
   // -------------------------------------------------------------------------
@@ -71,23 +77,64 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     setSettings(result);
   }, []);
 
-  const loadCollectionModels = useCallback(async () => {
-    const result = await getModels({});
-    if ("error" in result) {
-      setCollectionError(result.error);
-      setCollectionModels([]);
-    } else {
-      setCollectionError(null);
-      setCollectionModels(result);
+  const loadModels = useCallback(async () => {
+    const results = await Promise.all(
+      MODES.map(async (mode) => {
+        const result = await getModels({ capability: mode });
+        return { mode, result };
+      })
+    );
+
+    const newModelsByMode: Record<GenerationMode, Model[]> = {
+      txt2img: [],
+      img2img: [],
+      upscale: [],
+      inpaint: [],
+      outpaint: [],
+    };
+
+    let hasError = false;
+
+    for (const { mode, result } of results) {
+      if ("error" in result) {
+        hasError = true;
+      } else {
+        newModelsByMode[mode] = result;
+      }
+    }
+
+    setModelsByMode(newModelsByMode);
+    setLoadError(hasError ? "Could not load models" : null);
+
+    // If any mode has models, a sync has occurred at some point
+    const anyModels = Object.values(newModelsByMode).some((m) => m.length > 0);
+    if (anyModels) {
+      setHasEverSynced(true);
     }
   }, []);
 
   useEffect(() => {
     if (open) {
       loadSettings();
-      loadCollectionModels();
+      loadModels();
     }
-  }, [open, loadSettings, loadCollectionModels]);
+  }, [open, loadSettings, loadModels]);
+
+  // -------------------------------------------------------------------------
+  // Event-based refresh: listen to "model-settings-changed"
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    const handleModelSettingsChanged = () => {
+      loadModels();
+    };
+
+    window.addEventListener("model-settings-changed", handleModelSettingsChanged);
+
+    return () => {
+      window.removeEventListener("model-settings-changed", handleModelSettingsChanged);
+    };
+  }, [loadModels]);
 
   // -------------------------------------------------------------------------
   // Sync handler (streaming fetch)
@@ -155,6 +202,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               );
             } else if (event.type === "complete") {
               toast.dismiss(toastId);
+              setHasEverSynced(true);
 
               if (event.failed === 0) {
                 // Full success
@@ -173,7 +221,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               }
 
               // Reload models and notify other components
-              await loadCollectionModels();
+              await loadModels();
               window.dispatchEvent(new Event("model-settings-changed"));
             } else if (event.type === "error") {
               toast.dismiss(toastId);
@@ -202,7 +250,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     } finally {
       clearTimeout(timeoutId);
     }
-  }, [syncState, loadCollectionModels]);
+  }, [syncState, loadModels]);
 
   // -------------------------------------------------------------------------
   // Model change handler (auto-save)
@@ -288,6 +336,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   };
 
   // -------------------------------------------------------------------------
+  // Derived state: whether any mode has models (for empty:partial detection)
+  // -------------------------------------------------------------------------
+
+  const anyModeHasModels = Object.values(modelsByMode).some((m) => m.length > 0);
+
+  // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
 
@@ -311,10 +365,13 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               key={mode}
               mode={mode}
               settings={settings}
-              collectionModels={collectionModels as unknown as CollectionModel[]}
-              collectionError={collectionError}
-              compatibilityMap={{}}
+              models={modelsByMode[mode]}
               onModelChange={handleModelChange}
+              syncState={syncState}
+              hasEverSynced={hasEverSynced}
+              otherModesHaveModels={
+                anyModeHasModels && modelsByMode[mode].length === 0
+              }
             />
           ))}
         </div>

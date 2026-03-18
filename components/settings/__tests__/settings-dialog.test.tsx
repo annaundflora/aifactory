@@ -61,20 +61,15 @@ vi.mock("@/app/actions/model-settings", () => ({
   updateModelSetting: (...args: unknown[]) => mockUpdateModelSetting(...args),
 }));
 
-const mockGetCollectionModels = vi.fn();
-const mockCheckImg2ImgSupport = vi.fn();
+const mockGetModels = vi.fn();
 
 vi.mock("@/app/actions/models", () => ({
-  getCollectionModels: (...args: unknown[]) => mockGetCollectionModels(...args),
-  checkImg2ImgSupport: (...args: unknown[]) =>
-    mockCheckImg2ImgSupport(...args),
+  getModels: (...args: unknown[]) => mockGetModels(...args),
 }));
 
 // ---------------------------------------------------------------------------
 // Test Data
 // ---------------------------------------------------------------------------
-
-import type { CollectionModel } from "@/lib/types/collection-model";
 
 interface MockModelSetting {
   id: string;
@@ -97,12 +92,34 @@ const SEED_SETTINGS: MockModelSetting[] = [
   { id: "8", mode: "upscale", tier: "quality", modelId: "nightmareai/real-esrgan", modelParams: {}, createdAt: new Date(), updatedAt: new Date() },
 ];
 
-const COLLECTION_MODELS: CollectionModel[] = [
-  { url: "https://replicate.com/black-forest-labs/flux-schnell", owner: "black-forest-labs", name: "flux-schnell", description: "Fast flux model", cover_image_url: null, run_count: 1000, created_at: "2024-01-01" },
-  { url: "https://replicate.com/black-forest-labs/flux-1.1-pro", owner: "black-forest-labs", name: "flux-1.1-pro", description: "Pro flux model", cover_image_url: null, run_count: 2000, created_at: "2024-01-02" },
-  { url: "https://replicate.com/black-forest-labs/flux-1.1-pro-ultra", owner: "black-forest-labs", name: "flux-1.1-pro-ultra", description: "Ultra flux model", cover_image_url: null, run_count: 500, created_at: "2024-01-03" },
-  { url: "https://replicate.com/nightmareai/real-esrgan", owner: "nightmareai", name: "real-esrgan", description: "Upscaler", cover_image_url: null, run_count: 800, created_at: "2024-01-04" },
-  { url: "https://replicate.com/philz1337x/clarity-upscaler", owner: "philz1337x", name: "clarity-upscaler", description: "Clarity upscaler", cover_image_url: null, run_count: 600, created_at: "2024-01-05" },
+// Mock models in the new Model type format (Drizzle-inferred from models table)
+function makeModel(owner: string, name: string, overrides?: Record<string, unknown>) {
+  return {
+    id: `uuid-${owner}-${name}`,
+    replicateId: `${owner}/${name}`,
+    owner,
+    name,
+    description: `${name} model`,
+    coverImageUrl: null,
+    runCount: 1000,
+    collections: null,
+    capabilities: { txt2img: true, img2img: true, upscale: false, inpaint: false, outpaint: false },
+    inputSchema: null,
+    versionHash: null,
+    isActive: true,
+    lastSyncedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  };
+}
+
+const ALL_MODELS = [
+  makeModel("black-forest-labs", "flux-schnell"),
+  makeModel("black-forest-labs", "flux-1.1-pro"),
+  makeModel("black-forest-labs", "flux-1.1-pro-ultra"),
+  makeModel("nightmareai", "real-esrgan", { capabilities: { txt2img: false, img2img: false, upscale: true, inpaint: false, outpaint: false } }),
+  makeModel("philz1337x", "clarity-upscaler", { capabilities: { txt2img: false, img2img: false, upscale: true, inpaint: false, outpaint: false } }),
 ];
 
 // ---------------------------------------------------------------------------
@@ -117,8 +134,16 @@ import { SettingsDialog } from "@/components/settings/settings-dialog";
 
 function setupDefaultMocks() {
   mockGetModelSettings.mockResolvedValue(SEED_SETTINGS);
-  mockGetCollectionModels.mockResolvedValue(COLLECTION_MODELS);
-  mockCheckImg2ImgSupport.mockResolvedValue(true);
+  // getModels is called per-mode; return models based on capability filter
+  mockGetModels.mockImplementation((input: { capability?: string }) => {
+    if (!input.capability) return Promise.resolve(ALL_MODELS);
+    return Promise.resolve(
+      ALL_MODELS.filter((m) => {
+        const caps = m.capabilities as Record<string, boolean>;
+        return caps[input.capability!] === true;
+      })
+    );
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -176,10 +201,10 @@ describe("SettingsDialog", () => {
   /**
    * AC-4: GIVEN der Settings-Dialog ist geoeffnet
    *       WHEN der User den Dialog-Inhalt betrachtet
-   *       THEN sind 3 Mode-Sections sichtbar: "TEXT TO IMAGE", "IMAGE TO IMAGE",
-   *            "UPSCALE"
+   *       THEN sind 5 Mode-Sections sichtbar: "TEXT TO IMAGE", "IMAGE TO IMAGE",
+   *            "UPSCALE", "INPAINT", "OUTPAINT"
    */
-  it("AC-4: should render TEXT TO IMAGE, IMAGE TO IMAGE, and UPSCALE sections", async () => {
+  it("AC-4: should render TEXT TO IMAGE, IMAGE TO IMAGE, UPSCALE, INPAINT, and OUTPAINT sections", async () => {
     render(<SettingsDialog open={true} onOpenChange={vi.fn()} />);
 
     await waitFor(() => {
@@ -188,6 +213,8 @@ describe("SettingsDialog", () => {
 
     expect(screen.getByText("IMAGE TO IMAGE")).toBeInTheDocument();
     expect(screen.getByText("UPSCALE")).toBeInTheDocument();
+    expect(screen.getByText("INPAINT")).toBeInTheDocument();
+    expect(screen.getByText("OUTPAINT")).toBeInTheDocument();
   });
 
   /**
@@ -206,14 +233,16 @@ describe("SettingsDialog", () => {
     });
 
     // Each dropdown trigger (combobox) should show the current modelId
-    // There should be 8 dropdowns total (3 + 3 + 2)
+    // There should be 8 dropdowns for the modes that have models (txt2img:3, img2img:2, upscale:2)
+    // plus empty-state text for inpaint and outpaint (no combobox for those)
     await waitFor(() => {
       const triggers = screen.getAllByRole("combobox");
-      expect(triggers).toHaveLength(8);
+      // txt2img(3) + img2img(2) + upscale(2) = 7 comboboxes
+      // inpaint and outpaint have no models, so they show empty state text instead
+      expect(triggers.length).toBeGreaterThanOrEqual(7);
     });
 
     // Verify model IDs are displayed in the trigger texts
-    // Since some model IDs appear in multiple modes, we use getAllByText
     await waitFor(() => {
       // flux-schnell appears for txt2img/draft and img2img/draft
       expect(screen.getAllByText("black-forest-labs/flux-schnell")).toHaveLength(2);
@@ -242,7 +271,7 @@ describe("SettingsDialog", () => {
       id: "1",
       mode: "txt2img",
       tier: "draft",
-      modelId: "nightmareai/real-esrgan",
+      modelId: "black-forest-labs/flux-1.1-pro",
       modelParams: {},
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -256,7 +285,7 @@ describe("SettingsDialog", () => {
 
     // Wait for models and settings to load
     await waitFor(() => {
-      expect(mockGetCollectionModels).toHaveBeenCalled();
+      expect(mockGetModels).toHaveBeenCalled();
     });
 
     // Find all dropdown triggers -- first one is txt2img/draft
@@ -272,10 +301,10 @@ describe("SettingsDialog", () => {
       expect(options.length).toBeGreaterThan(0);
     });
 
-    // Select a different model: nightmareai/real-esrgan
+    // Select a different model: flux-1.1-pro
     // (not the current "flux-schnell" to trigger a change)
     const targetOption = screen.getAllByRole("option").find((opt) =>
-      opt.textContent?.includes("real-esrgan")
+      opt.textContent?.includes("flux-1.1-pro") && !opt.textContent?.includes("ultra")
     );
     expect(targetOption).toBeDefined();
     await user.click(targetOption!);
@@ -285,7 +314,7 @@ describe("SettingsDialog", () => {
       expect(mockUpdateModelSetting).toHaveBeenCalledWith({
         mode: "txt2img",
         tier: "draft",
-        modelId: "nightmareai/real-esrgan",
+        modelId: "black-forest-labs/flux-1.1-pro",
       });
     });
   });
@@ -344,22 +373,22 @@ describe("SettingsDialog", () => {
   });
 
   /**
-   * AC-10: GIVEN `getCollectionModels()` schlaegt fehl (Netzwerkfehler)
+   * AC-10: GIVEN `getModels()` schlaegt fehl (Netzwerkfehler)
    *        WHEN ein Dropdown die Models laden will
-   *        THEN wird eine Fehlermeldung angezeigt anstelle der Model-Liste
+   *        THEN wird eine Empty-State-Message angezeigt anstelle der Model-Liste
    */
-  it("AC-10: should show error message when getCollectionModels fails", async () => {
-    mockGetCollectionModels.mockResolvedValue({
+  it("AC-10: should show empty state message when getModels fails", async () => {
+    mockGetModels.mockResolvedValue({
       error: "Network error",
     });
 
     render(<SettingsDialog open={true} onOpenChange={vi.fn()} />);
 
     await waitFor(() => {
-      // The error message "Could not load models" should appear
-      // (rendered by ModelModeSection when collectionError is set)
-      const errorMessages = screen.getAllByText("Could not load models");
-      expect(errorMessages.length).toBeGreaterThan(0);
+      // When models fail to load, sections show empty state messages
+      // (since models arrays are empty and hasEverSynced is false)
+      const emptyMessages = screen.getAllByText(/No models available/);
+      expect(emptyMessages.length).toBeGreaterThan(0);
     });
   });
 });

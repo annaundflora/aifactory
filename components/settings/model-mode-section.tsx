@@ -10,19 +10,22 @@ import {
 } from "@/components/ui/select";
 import type { GenerationMode, Tier } from "@/lib/types";
 import type { ModelSetting } from "@/lib/db/queries";
-import type { CollectionModel } from "@/lib/types/collection-model";
+import type { Model } from "@/lib/services/model-catalog-service";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
+type EmptyState = "empty:syncing" | "empty:never-synced" | "empty:failed" | "empty:partial" | null;
+
 interface ModelModeSectionProps {
   mode: GenerationMode;
   settings: ModelSetting[];
-  collectionModels: CollectionModel[];
-  collectionError: string | null;
-  compatibilityMap: Record<string, boolean>;
+  models: Model[];
   onModelChange: (mode: GenerationMode, tier: Tier, modelId: string) => void;
+  syncState?: "idle" | "syncing" | "sync_partial";
+  hasEverSynced?: boolean;
+  otherModesHaveModels?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -51,6 +54,13 @@ const TIER_LABELS: Record<Tier, string> = {
   max: "Max",
 };
 
+const EMPTY_STATE_MESSAGES: Record<Exclude<EmptyState, null>, string> = {
+  "empty:syncing": "Loading models... please wait.",
+  "empty:never-synced": 'No models available. Click "Sync Models" to load.',
+  "empty:failed": 'Sync failed. Click "Sync Models" to retry.',
+  "empty:partial": 'No models for this mode yet. Click "Sync Models" to retry.',
+};
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -58,10 +68,11 @@ const TIER_LABELS: Record<Tier, string> = {
 export function ModelModeSection({
   mode,
   settings,
-  collectionModels,
-  collectionError,
-  compatibilityMap,
+  models,
   onModelChange,
+  syncState = "idle",
+  hasEverSynced = false,
+  otherModesHaveModels = false,
 }: ModelModeSectionProps) {
   const tiers = TIERS_BY_MODE[mode];
 
@@ -78,6 +89,9 @@ export function ModelModeSection({
     },
     [mode, onModelChange]
   );
+
+  // Determine the empty state for this section
+  const emptyState: EmptyState = models.length === 0 ? determineEmptyState(syncState, hasEverSynced, otherModesHaveModels) : null;
 
   return (
     <div className="space-y-3">
@@ -97,9 +111,9 @@ export function ModelModeSection({
               <span className="text-sm font-medium w-16 shrink-0">
                 {TIER_LABELS[tier]}
               </span>
-              {collectionError ? (
-                <p className="text-sm text-destructive">
-                  Could not load models
+              {emptyState ? (
+                <p className="text-sm text-muted-foreground" data-testid={`empty-state-${mode}`}>
+                  {EMPTY_STATE_MESSAGES[emptyState]}
                 </p>
               ) : (
                 <Select
@@ -112,29 +126,23 @@ export function ModelModeSection({
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {collectionModels
-                      .filter((model) => {
-                        if (mode !== "img2img") return true;
-                        const modelId = `${model.owner}/${model.name}`;
-                        return compatibilityMap[modelId] !== false;
-                      })
-                      .map((model) => {
-                        const modelId = `${model.owner}/${model.name}`;
+                    {models.map((model) => {
+                      const modelId = model.replicateId;
 
-                        return (
-                          <SelectItem
-                            key={modelId}
-                            value={modelId}
-                          >
-                            <span className="flex flex-col">
-                              <span className="font-medium">{model.name}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {model.owner}
-                              </span>
+                      return (
+                        <SelectItem
+                          key={modelId}
+                          value={modelId}
+                        >
+                          <span className="flex flex-col">
+                            <span className="font-medium">{model.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {model.owner}
                             </span>
-                          </SelectItem>
-                        );
-                      })}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               )}
@@ -144,4 +152,30 @@ export function ModelModeSection({
       </div>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function determineEmptyState(
+  syncState: "idle" | "syncing" | "sync_partial",
+  hasEverSynced: boolean,
+  otherModesHaveModels: boolean
+): Exclude<EmptyState, null> {
+  if (syncState === "syncing") {
+    return "empty:syncing";
+  }
+  if (syncState === "sync_partial" && otherModesHaveModels) {
+    return "empty:partial";
+  }
+  if (!hasEverSynced) {
+    return "empty:never-synced";
+  }
+  // hasEverSynced is true, not syncing, not partial with other modes having models
+  // This means the last sync failed or completed with no models for this mode
+  if (otherModesHaveModels) {
+    return "empty:partial";
+  }
+  return "empty:failed";
 }
