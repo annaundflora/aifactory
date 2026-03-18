@@ -1,6 +1,6 @@
 import { eq, desc, sql, and, asc, or } from "drizzle-orm";
 import { db } from "./index";
-import { projects, generations, assistantSessions, referenceImages, generationReferences, modelSettings } from "./schema";
+import { projects, generations, assistantSessions, referenceImages, generationReferences, modelSettings, models } from "./schema";
 
 // ---------------------------------------------------------------------------
 // Types (inferred from schema)
@@ -11,6 +11,7 @@ export type AssistantSession = typeof assistantSessions.$inferSelect;
 export type ReferenceImage = typeof referenceImages.$inferSelect;
 export type GenerationReference = typeof generationReferences.$inferSelect;
 export type ModelSetting = typeof modelSettings.$inferSelect;
+export type Model = typeof models.$inferSelect;
 
 // ---------------------------------------------------------------------------
 // Project Queries
@@ -527,4 +528,68 @@ export async function seedModelSettingsDefaults(): Promise<void> {
     .onConflictDoNothing({
       target: [modelSettings.mode, modelSettings.tier],
     });
+}
+
+// ---------------------------------------------------------------------------
+// Model Queries (Catalog Reads)
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns all active models (is_active = true).
+ */
+export async function getActiveModels(): Promise<Model[]> {
+  return db
+    .select()
+    .from(models)
+    .where(eq(models.isActive, true));
+}
+
+/**
+ * Returns active models that have a specific capability set to true.
+ * Uses JSONB `capabilities->>'capability' = 'true'` filter.
+ */
+export async function getModelsByCapability(capability: string): Promise<Model[]> {
+  return db
+    .select()
+    .from(models)
+    .where(
+      and(
+        eq(models.isActive, true),
+        sql`${models.capabilities}->>${capability} = 'true'`
+      )
+    );
+}
+
+/**
+ * Returns a single active model by its replicate_id (owner/name format),
+ * or null if not found or inactive.
+ */
+export async function getModelByReplicateId(replicateId: string): Promise<Model | null> {
+  const [model] = await db
+    .select()
+    .from(models)
+    .where(
+      and(
+        eq(models.replicateId, replicateId),
+        eq(models.isActive, true)
+      )
+    );
+  return model ?? null;
+}
+
+/**
+ * Returns the input_schema JSONB for the model with the given replicate_id,
+ * or null if the model is not found, is inactive, or has no schema.
+ */
+export async function getModelSchema(replicateId: string): Promise<unknown | null> {
+  const [row] = await db
+    .select({ inputSchema: models.inputSchema })
+    .from(models)
+    .where(
+      and(
+        eq(models.replicateId, replicateId),
+        eq(models.isActive, true)
+      )
+    );
+  return row?.inputSchema ?? null;
 }
