@@ -60,6 +60,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     outpaint: [],
   });
 
+  const [, setLoadError] = useState<string | null>(null);
+
   // Sync state
   const [syncState, setSyncState] = useState<SyncButtonState>("idle");
   const [failedCount, setFailedCount] = useState<number>(0);
