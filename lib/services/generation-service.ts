@@ -8,7 +8,8 @@ import {
   updateGeneration,
   type Generation,
 } from "@/lib/db/queries";
-import { ModelSchemaService, getImg2ImgFieldName } from "@/lib/services/model-schema-service";
+import { ModelCatalogService } from "@/lib/services/model-catalog-service";
+import { getImg2ImgFieldName, type SchemaProperties } from "@/lib/services/capability-detection";
 import type { ReferenceRole, ReferenceStrength } from "@/lib/types/reference";
 
 const MODEL_ID_REGEX = /^[a-z0-9-]+\/[a-z0-9._-]+$/;
@@ -279,7 +280,8 @@ async function buildReplicateInput(
   }
 
   if (generation.generationMode === "img2img") {
-    const schema = await ModelSchemaService.getSchema(generation.modelId);
+    const rawSchema = await ModelCatalogService.getSchema(generation.modelId);
+    const schema = (rawSchema ?? {}) as SchemaProperties;
     const img2imgField = getImg2ImgFieldName(schema);
 
     if (img2imgField) {
