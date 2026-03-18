@@ -9,7 +9,7 @@
 
 import { detectCapabilities, resolveSchemaRefs } from "@/lib/services/capability-detection";
 import { getModelByReplicateId, upsertModel, deactivateModelsNotIn } from "@/lib/db/queries";
-import type { SchemaProperties, Capabilities } from "@/lib/services/capability-detection";
+import type { SchemaProperties } from "@/lib/services/capability-detection";
 
 // ---------------------------------------------------------------------------
 // Types
