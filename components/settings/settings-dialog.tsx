@@ -69,6 +69,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [syncFailed, setSyncFailed] = useState<boolean>(false);
   const syncStateBeforeRef = useRef<SyncButtonState>("idle");
 
+  // Track whether an auto-sync has already been triggered for this component
+  // lifetime to avoid re-triggering on dialog reopen (AC-7)
+  const autoSyncTriggeredRef = useRef(false);
+
   // -------------------------------------------------------------------------
   // Data loading
   // -------------------------------------------------------------------------
@@ -79,7 +83,13 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     setSettings(result);
   }, []);
 
-  const loadModels = useCallback(async () => {
+  /**
+   * Load models for all capability modes.
+   * Returns `true` if the catalog is confirmed empty: all getModels calls
+   * succeeded and every result was an empty array. Returns `false` if any
+   * call returned models or if any call errored (we cannot confirm empty).
+   */
+  const loadModels = useCallback(async (): Promise<boolean> => {
     const results = await Promise.all(
       MODES.map(async (mode) => {
         const result = await getModels({ capability: mode });
@@ -113,30 +123,11 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     if (anyModels) {
       setHasEverSynced(true);
     }
+
+    // Catalog is confirmed empty only when ALL calls succeeded (no errors)
+    // and none returned any models.
+    return !hasError && !anyModels;
   }, []);
-
-  useEffect(() => {
-    if (open) {
-      loadSettings();
-      loadModels();
-    }
-  }, [open, loadSettings, loadModels]);
-
-  // -------------------------------------------------------------------------
-  // Event-based refresh: listen to "model-settings-changed"
-  // -------------------------------------------------------------------------
-
-  useEffect(() => {
-    const handleModelSettingsChanged = () => {
-      loadModels();
-    };
-
-    window.addEventListener("model-settings-changed", handleModelSettingsChanged);
-
-    return () => {
-      window.removeEventListener("model-settings-changed", handleModelSettingsChanged);
-    };
-  }, [loadModels]);
 
   // -------------------------------------------------------------------------
   // Sync handler (streaming fetch)
@@ -259,6 +250,49 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       clearTimeout(timeoutId);
     }
   }, [syncState, loadModels]);
+
+  // Keep a ref to the latest handleSync so the mount effect can call it
+  // without adding handleSync to its dependency array (avoids re-running the
+  // effect on every syncState change).
+  const handleSyncRef = useRef(handleSync);
+  useEffect(() => {
+    handleSyncRef.current = handleSync;
+  }, [handleSync]);
+
+  // -------------------------------------------------------------------------
+  // Mount effect: load data + auto-sync when catalog is empty
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (open) {
+      loadSettings();
+      loadModels().then((catalogEmpty) => {
+        // Auto-sync: when the catalog is completely empty and no auto-sync
+        // has been triggered yet, start a sync automatically (AC-1).
+        // This avoids the user having to manually sync on first app start.
+        if (catalogEmpty && !autoSyncTriggeredRef.current) {
+          autoSyncTriggeredRef.current = true;
+          handleSyncRef.current();
+        }
+      });
+    }
+  }, [open, loadSettings, loadModels]);
+
+  // -------------------------------------------------------------------------
+  // Event-based refresh: listen to "model-settings-changed"
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    const handleModelSettingsChanged = () => {
+      loadModels();
+    };
+
+    window.addEventListener("model-settings-changed", handleModelSettingsChanged);
+
+    return () => {
+      window.removeEventListener("model-settings-changed", handleModelSettingsChanged);
+    };
+  }, [loadModels]);
 
   // -------------------------------------------------------------------------
   // Model change handler (auto-save)
