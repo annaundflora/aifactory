@@ -1,4 +1,4 @@
-import { eq, desc, sql, and, asc, or } from "drizzle-orm";
+import { eq, desc, sql, and, asc, or, notInArray } from "drizzle-orm";
 import { db } from "./index";
 import { projects, generations, assistantSessions, referenceImages, generationReferences, modelSettings, models } from "./schema";
 
@@ -592,4 +592,92 @@ export async function getModelSchema(replicateId: string): Promise<unknown | nul
       )
     );
   return row?.inputSchema ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Model Write Queries (Sync Service)
+// ---------------------------------------------------------------------------
+
+/**
+ * Data shape for upserting a model into the `models` table.
+ * Uses Drizzle `onConflictDoUpdate` on the `replicate_id` unique index.
+ */
+export interface ModelUpsertData {
+  replicateId: string;
+  owner: string;
+  name: string;
+  description: string | null;
+  coverImageUrl: string | null;
+  runCount: number | null;
+  collections: string[] | null;
+  capabilities: { [key: string]: boolean };
+  inputSchema: unknown | null;
+  versionHash: string | null;
+}
+
+/**
+ * Inserts a new model or updates an existing one based on `replicate_id`.
+ * On conflict (existing `replicate_id`), all fields are updated and
+ * `updated_at` is set to the current time.
+ */
+export async function upsertModel(data: ModelUpsertData): Promise<void> {
+  await db
+    .insert(models)
+    .values({
+      replicateId: data.replicateId,
+      owner: data.owner,
+      name: data.name,
+      description: data.description,
+      coverImageUrl: data.coverImageUrl,
+      runCount: data.runCount,
+      collections: data.collections,
+      capabilities: data.capabilities,
+      inputSchema: data.inputSchema,
+      versionHash: data.versionHash,
+      isActive: true,
+      lastSyncedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [models.replicateId],
+      set: {
+        owner: data.owner,
+        name: data.name,
+        description: data.description,
+        coverImageUrl: data.coverImageUrl,
+        runCount: data.runCount,
+        collections: data.collections,
+        capabilities: data.capabilities,
+        inputSchema: data.inputSchema,
+        versionHash: data.versionHash,
+        isActive: true,
+        lastSyncedAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+}
+
+/**
+ * Soft-deletes models whose `replicate_id` is NOT in the provided list.
+ * Sets `is_active = false` for those models.
+ * Only affects currently active models.
+ */
+export async function deactivateModelsNotIn(activeReplicateIds: string[]): Promise<void> {
+  if (activeReplicateIds.length === 0) {
+    // If no active IDs provided, deactivate all active models
+    await db
+      .update(models)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(models.isActive, true));
+    return;
+  }
+
+  await db
+    .update(models)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(
+      and(
+        eq(models.isActive, true),
+        notInArray(models.replicateId, activeReplicateIds)
+      )
+    );
 }
