@@ -59,7 +59,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     inpaint: [],
     outpaint: [],
   });
-  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Sync state
   const [syncState, setSyncState] = useState<SyncButtonState>("idle");
