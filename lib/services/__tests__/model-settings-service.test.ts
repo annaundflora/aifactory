@@ -1,15 +1,19 @@
 /**
  * Unit & Acceptance Tests for ModelSettingsService
- * Slice: slice-02-model-settings-service
+ * Slice: slice-07-service-replace (updated from slice-02)
  *
  * Mocking Strategy: mock_external
  *   - DB query functions from lib/db/queries are mocked
- *   - ModelSchemaService is mocked (external API dependency)
+ *   - getModelByReplicateId is mocked (DB dependency for capability lookup)
  *
- * ACs covered: AC-9, AC-10, AC-11, AC-12, AC-13, AC-14, AC-15, AC-16
+ * ACs covered:
+ *   - slice-02: AC-9, AC-10, AC-15, AC-16 (getAll, update)
+ *   - slice-07: AC-5, AC-6, AC-7, AC-8, AC-9, AC-10, AC-11, AC-12 (checkCompatibility DB-backed)
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import fs from 'fs'
+import path from 'path'
 
 // ---------------------------------------------------------------------------
 // Mock the DB query functions
@@ -18,23 +22,14 @@ const mockGetAllModelSettings = vi.fn()
 const mockGetModelSettingByModeTier = vi.fn()
 const mockUpsertModelSetting = vi.fn()
 const mockSeedModelSettingsDefaults = vi.fn()
+const mockGetModelByReplicateId = vi.fn()
 
 vi.mock('@/lib/db/queries', () => ({
   getAllModelSettings: (...args: unknown[]) => mockGetAllModelSettings(...args),
   getModelSettingByModeTier: (...args: unknown[]) => mockGetModelSettingByModeTier(...args),
   upsertModelSetting: (...args: unknown[]) => mockUpsertModelSetting(...args),
   seedModelSettingsDefaults: (...args: unknown[]) => mockSeedModelSettingsDefaults(...args),
-}))
-
-// ---------------------------------------------------------------------------
-// Mock the ModelSchemaService
-// ---------------------------------------------------------------------------
-const mockSupportsImg2Img = vi.fn()
-
-vi.mock('@/lib/services/model-schema-service', () => ({
-  ModelSchemaService: {
-    supportsImg2Img: (...args: unknown[]) => mockSupportsImg2Img(...args),
-  },
+  getModelByReplicateId: (...args: unknown[]) => mockGetModelByReplicateId(...args),
 }))
 
 // Import AFTER mocks
@@ -57,6 +52,26 @@ const DEFAULT_SETTINGS = [
   { id: 'uuid-8', mode: 'upscale', tier: 'quality', modelId: 'philz1337x/crystal-upscaler', modelParams: { scale: 4 }, createdAt: NOW, updatedAt: NOW },
 ]
 
+/**
+ * Helper: create a mock Model object with capabilities JSONB.
+ */
+function makeModel(replicateId: string, capabilities: Record<string, boolean>) {
+  return {
+    id: `model-${replicateId.replace('/', '-')}`,
+    replicateId,
+    displayName: replicateId,
+    description: null,
+    inputSchema: {},
+    capabilities,
+    isActive: true,
+    runCount: 0,
+    coverImageUrl: null,
+    collectionSlugs: [],
+    createdAt: NOW,
+    updatedAt: NOW,
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -67,7 +82,7 @@ describe('ModelSettingsService', () => {
   })
 
   describe('getAll()', () => {
-    // AC-9: GIVEN ModelSettingsService.getAll() wird aufgerufen und die Tabelle ist leer
+    // AC-9 (slice-02): GIVEN ModelSettingsService.getAll() wird aufgerufen und die Tabelle ist leer
     //       WHEN der Service die Abfrage ausfuehrt
     //       THEN werden zuerst Defaults geseeded und danach die 8 Default-Eintraege zurueckgegeben
     it('AC-9: should seed defaults and return 8 entries when table is empty', async () => {
@@ -88,7 +103,7 @@ describe('ModelSettingsService', () => {
       expect(result).toEqual(DEFAULT_SETTINGS)
     })
 
-    // AC-10: GIVEN ModelSettingsService.getAll() wird aufgerufen und die Tabelle hat Eintraege
+    // AC-10 (slice-02): GIVEN ModelSettingsService.getAll() wird aufgerufen und die Tabelle hat Eintraege
     //        WHEN der Service die Abfrage ausfuehrt
     //        THEN werden die vorhandenen Eintraege zurueckgegeben ohne erneutes Seeding
     it('AC-10: should return existing entries without seeding when table has data', async () => {
@@ -106,72 +121,159 @@ describe('ModelSettingsService', () => {
     })
   })
 
-  describe('checkCompatibility()', () => {
-    // AC-11: GIVEN ein Model mit modelId="compatible/model" das img2img unterstuetzt (Schema hat img2img-Feld)
-    //        WHEN ModelSettingsService.checkCompatibility("compatible/model", "img2img") aufgerufen wird
-    //        THEN wird true zurueckgegeben
-    it('AC-11: should return true for img2img-compatible model', async () => {
-      mockSupportsImg2Img.mockResolvedValueOnce(true)
+  // =========================================================================
+  // Slice-07: checkCompatibility (DB-backed capabilities)
+  // =========================================================================
 
-      const result = await ModelSettingsService.checkCompatibility('compatible/model', 'img2img')
+  describe('checkCompatibility (DB-backed capabilities) [slice-07]', () => {
+    // AC-5: GIVEN model-settings-service.ts importiert ModelCatalogService statt ModelSchemaService
+    //       WHEN die Imports der Datei geprueft werden
+    //       THEN existiert KEIN Import von model-schema-service mehr
+    it('AC-5 (S07): should not import from model-schema-service', () => {
+      const filePath = path.resolve(__dirname, '..', 'model-settings-service.ts')
+      const source = fs.readFileSync(filePath, 'utf-8')
+
+      // Must NOT import from model-schema-service
+      expect(source).not.toMatch(/from\s+['"]@\/lib\/services\/model-schema-service['"]/)
+      expect(source).not.toContain('model-schema-service')
+      expect(source).not.toContain('ModelSchemaService')
+    })
+
+    // AC-6: GIVEN ein Model mit replicate_id = "owner/model" und capabilities = { txt2img: true, img2img: true, upscale: false, inpaint: false, outpaint: false } in der DB
+    //       WHEN checkCompatibility("owner/model", "img2img") aufgerufen wird
+    //       THEN wird true zurueckgegeben (Capability-Read aus DB statt Live-API)
+    it('AC-6 (S07): should return true when model has img2img capability in DB', async () => {
+      mockGetModelByReplicateId.mockResolvedValueOnce(
+        makeModel('owner/model', { txt2img: true, img2img: true, upscale: false, inpaint: false, outpaint: false })
+      )
+
+      const result = await ModelSettingsService.checkCompatibility('owner/model', 'img2img')
 
       expect(result).toBe(true)
-      expect(mockSupportsImg2Img).toHaveBeenCalledWith('compatible/model')
-      expect(mockSupportsImg2Img).toHaveBeenCalledTimes(1)
+      expect(mockGetModelByReplicateId).toHaveBeenCalledWith('owner/model')
+      expect(mockGetModelByReplicateId).toHaveBeenCalledTimes(1)
     })
 
-    // AC-12: GIVEN ein Model mit modelId="incompatible/model" das kein img2img-Feld im Schema hat
-    //        WHEN ModelSettingsService.checkCompatibility("incompatible/model", "img2img") aufgerufen wird
-    //        THEN wird false zurueckgegeben
-    it('AC-12: should return false for model without img2img support', async () => {
-      mockSupportsImg2Img.mockResolvedValueOnce(false)
+    // AC-7: GIVEN ein Model mit replicate_id = "owner/model" und capabilities = { txt2img: true, img2img: false, upscale: false, inpaint: false, outpaint: false } in der DB
+    //       WHEN checkCompatibility("owner/model", "img2img") aufgerufen wird
+    //       THEN wird false zurueckgegeben
+    it('AC-7 (S07): should return false when model lacks img2img capability in DB', async () => {
+      mockGetModelByReplicateId.mockResolvedValueOnce(
+        makeModel('owner/model', { txt2img: true, img2img: false, upscale: false, inpaint: false, outpaint: false })
+      )
 
-      const result = await ModelSettingsService.checkCompatibility('incompatible/model', 'img2img')
+      const result = await ModelSettingsService.checkCompatibility('owner/model', 'img2img')
 
       expect(result).toBe(false)
-      expect(mockSupportsImg2Img).toHaveBeenCalledWith('incompatible/model')
+      expect(mockGetModelByReplicateId).toHaveBeenCalledWith('owner/model')
     })
 
-    // AC-13: GIVEN ein beliebiges Model
-    //        WHEN ModelSettingsService.checkCompatibility("any/model", "txt2img") aufgerufen wird
-    //        THEN wird true zurueckgegeben (txt2img ist immer kompatibel)
-    it('AC-13: should return true for any model with txt2img mode', async () => {
+    // AC-8: GIVEN ein Model mit capabilities.inpaint = true in der DB
+    //       WHEN checkCompatibility("owner/model", "inpaint") aufgerufen wird
+    //       THEN wird true zurueckgegeben (neue Capability-Pruefung fuer inpaint)
+    it('AC-8 (S07): should return true when model has inpaint capability in DB', async () => {
+      mockGetModelByReplicateId.mockResolvedValueOnce(
+        makeModel('owner/model', { txt2img: true, img2img: false, upscale: false, inpaint: true, outpaint: false })
+      )
+
+      const result = await ModelSettingsService.checkCompatibility('owner/model', 'inpaint')
+
+      expect(result).toBe(true)
+      expect(mockGetModelByReplicateId).toHaveBeenCalledWith('owner/model')
+    })
+
+    // AC-9: GIVEN ein Model mit capabilities.outpaint = false in der DB
+    //       WHEN checkCompatibility("owner/model", "outpaint") aufgerufen wird
+    //       THEN wird false zurueckgegeben (neue Capability-Pruefung fuer outpaint)
+    it('AC-9 (S07): should return false when model lacks outpaint capability in DB', async () => {
+      mockGetModelByReplicateId.mockResolvedValueOnce(
+        makeModel('owner/model', { txt2img: true, img2img: false, upscale: false, inpaint: false, outpaint: false })
+      )
+
+      const result = await ModelSettingsService.checkCompatibility('owner/model', 'outpaint')
+
+      expect(result).toBe(false)
+      expect(mockGetModelByReplicateId).toHaveBeenCalledWith('owner/model')
+    })
+
+    // AC-10: GIVEN ein Model mit capabilities.upscale = true in der DB
+    //        WHEN checkCompatibility("owner/model", "upscale") aufgerufen wird
+    //        THEN wird true zurueckgegeben (upscale jetzt auch DB-basiert statt always-true)
+    it('AC-10 (S07): should return true when model has upscale capability in DB', async () => {
+      mockGetModelByReplicateId.mockResolvedValueOnce(
+        makeModel('owner/model', { txt2img: true, img2img: false, upscale: true, inpaint: false, outpaint: false })
+      )
+
+      const result = await ModelSettingsService.checkCompatibility('owner/model', 'upscale')
+
+      expect(result).toBe(true)
+      expect(mockGetModelByReplicateId).toHaveBeenCalledWith('owner/model')
+    })
+
+    // AC-11: GIVEN ein Model mit replicate_id = "owner/unknown" das NICHT in der DB existiert
+    //        WHEN checkCompatibility("owner/unknown", "img2img") aufgerufen wird
+    //        THEN wird true zurueckgegeben (Fallback: erlauben wenn DB-Lookup fehlschlaegt)
+    it('AC-11 (S07): should return true as fallback when model is not found in DB', async () => {
+      mockGetModelByReplicateId.mockResolvedValueOnce(null)
+
+      const result = await ModelSettingsService.checkCompatibility('owner/unknown', 'img2img')
+
+      expect(result).toBe(true)
+      expect(mockGetModelByReplicateId).toHaveBeenCalledWith('owner/unknown')
+    })
+
+    // AC-12: GIVEN checkCompatibility wird mit mode = "txt2img" aufgerufen
+    //        WHEN beliebiges modelId uebergeben wird
+    //        THEN wird true zurueckgegeben (txt2img ist immer kompatibel, kein DB-Lookup noetig)
+    it('AC-12 (S07): should return true for txt2img without DB lookup', async () => {
       const result = await ModelSettingsService.checkCompatibility('any/model', 'txt2img')
 
       expect(result).toBe(true)
-      // supportsImg2Img should NOT be called for txt2img mode
-      expect(mockSupportsImg2Img).not.toHaveBeenCalled()
+      // getModelByReplicateId should NOT be called for txt2img mode
+      expect(mockGetModelByReplicateId).not.toHaveBeenCalled()
     })
 
-    // AC-14: GIVEN ein beliebiges Model
-    //        WHEN ModelSettingsService.checkCompatibility("any/model", "upscale") aufgerufen wird
-    //        THEN wird true zurueckgegeben (upscale-Kompatibilitaet wird nicht per Schema geprueft)
-    it('AC-14: should return true for any model with upscale mode', async () => {
-      const result = await ModelSettingsService.checkCompatibility('any/model', 'upscale')
+    // Additional: DB error fallback — should return true when DB query throws
+    it('should return true as fallback when DB query throws an error', async () => {
+      mockGetModelByReplicateId.mockRejectedValueOnce(new Error('DB connection failed'))
+
+      const result = await ModelSettingsService.checkCompatibility('owner/model', 'img2img')
 
       expect(result).toBe(true)
-      // supportsImg2Img should NOT be called for upscale mode
-      expect(mockSupportsImg2Img).not.toHaveBeenCalled()
+    })
+
+    // Additional: null capabilities — should return true when capabilities is null
+    it('should return true when model exists but capabilities is null', async () => {
+      const modelWithNullCaps = makeModel('owner/model', {} as Record<string, boolean>)
+      modelWithNullCaps.capabilities = null as unknown as Record<string, boolean>
+      mockGetModelByReplicateId.mockResolvedValueOnce(modelWithNullCaps)
+
+      const result = await ModelSettingsService.checkCompatibility('owner/model', 'img2img')
+
+      expect(result).toBe(true)
     })
   })
 
   describe('update()', () => {
-    // AC-15: GIVEN ModelSettingsService.update("img2img", "quality", "new/model") wird aufgerufen
+    // AC-15 (slice-02): GIVEN ModelSettingsService.update("img2img", "quality", "new/model") wird aufgerufen
     //        WHEN checkCompatibility("new/model", "img2img") false zurueckgibt
     //        THEN gibt update() ein Error-Objekt zurueck { error: "Model does not support this mode" } und schreibt NICHT in die DB
     it('AC-15: should return error object when model is incompatible with mode', async () => {
-      mockSupportsImg2Img.mockResolvedValueOnce(false)
+      // Model has img2img: false in DB capabilities
+      mockGetModelByReplicateId.mockResolvedValueOnce(
+        makeModel('new/model', { txt2img: true, img2img: false, upscale: false, inpaint: false, outpaint: false })
+      )
 
       const result = await ModelSettingsService.update('img2img', 'quality', 'new/model')
 
       expect(result).toEqual({ error: 'Model does not support this mode' })
       // Verify DB was NOT written to
       expect(mockUpsertModelSetting).not.toHaveBeenCalled()
-      // Verify compatibility check was performed
-      expect(mockSupportsImg2Img).toHaveBeenCalledWith('new/model')
+      // Verify DB lookup was performed
+      expect(mockGetModelByReplicateId).toHaveBeenCalledWith('new/model')
     })
 
-    // AC-16: GIVEN ModelSettingsService.update("txt2img", "draft", "valid/model") wird aufgerufen
+    // AC-16 (slice-02): GIVEN ModelSettingsService.update("txt2img", "draft", "valid/model") wird aufgerufen
     //        WHEN checkCompatibility true zurueckgibt
     //        THEN wird die upsertModelSetting Query aufgerufen und der aktualisierte Eintrag zurueckgegeben
     it('AC-16: should upsert and return updated setting when model is compatible', async () => {
@@ -184,7 +286,7 @@ describe('ModelSettingsService', () => {
         createdAt: NOW,
         updatedAt: new Date('2026-03-14T14:00:00Z'),
       }
-      // txt2img is always compatible, so supportsImg2Img should not be called
+      // txt2img is always compatible, so getModelByReplicateId should not be called
       mockUpsertModelSetting.mockResolvedValueOnce(updatedEntry)
 
       const result = await ModelSettingsService.update('txt2img', 'draft', 'valid/model')

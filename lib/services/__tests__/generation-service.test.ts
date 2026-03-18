@@ -23,21 +23,24 @@ vi.mock("@/lib/clients/storage", () => ({
 // Mock DB queries
 vi.mock("@/lib/db/queries", () => ({
   createGeneration: vi.fn(),
+  createGenerationReferences: vi.fn(),
   getGeneration: vi.fn(),
   updateGeneration: vi.fn(),
   getGenerations: vi.fn(),
 }));
 
-// Mock ModelSchemaService — keep real getImg2ImgFieldName (pure function used by buildReplicateInput)
-vi.mock("@/lib/services/model-schema-service", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/services/model-schema-service")>();
+// Mock ModelCatalogService (replaces ModelSchemaService since slice-07)
+vi.mock("@/lib/services/model-catalog-service", () => ({
+  ModelCatalogService: {
+    getSchema: vi.fn(),
+  },
+}));
+
+// Mock capability-detection — keep real getImg2ImgFieldName (pure function used by buildReplicateInput)
+vi.mock("@/lib/services/capability-detection", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/services/capability-detection")>();
   return {
     ...actual,
-    ModelSchemaService: {
-      getSchema: vi.fn(),
-      supportsImg2Img: vi.fn(),
-      clearCache: vi.fn(),
-    },
   };
 });
 
@@ -61,7 +64,7 @@ import {
   updateGeneration,
 } from "@/lib/db/queries";
 import type { Generation } from "@/lib/db/queries";
-import { ModelSchemaService } from "@/lib/services/model-schema-service";
+import { ModelCatalogService } from "@/lib/services/model-catalog-service";
 import sharp from "sharp";
 
 // Previously imported from @/lib/models — module deleted in slice-13 cleanup.
@@ -944,7 +947,7 @@ describe("GenerationService", () => {
       });
       (createGeneration as Mock).mockResolvedValue(gen);
       setupProcessingMocks();
-      (ModelSchemaService.getSchema as Mock).mockResolvedValue({ image: {} });
+      (ModelCatalogService.getSchema as Mock).mockResolvedValue({ image: {} });
 
       await GenerationService.generate(
         "proj-001",
@@ -981,7 +984,7 @@ describe("GenerationService", () => {
         negativePrompt: "blurry",
       });
       (createGeneration as Mock).mockResolvedValue(gen);
-      (ModelSchemaService.getSchema as Mock).mockResolvedValue({
+      (ModelCatalogService.getSchema as Mock).mockResolvedValue({
         image: { type: "string", format: "uri" },
         prompt: { type: "string" },
       });
@@ -1030,7 +1033,7 @@ describe("GenerationService", () => {
         modelParams: { prompt_strength: 0.4 },
       });
       (createGeneration as Mock).mockResolvedValue(gen);
-      (ModelSchemaService.getSchema as Mock).mockResolvedValue({
+      (ModelCatalogService.getSchema as Mock).mockResolvedValue({
         image_prompt: { type: "string", format: "uri" },
         prompt: { type: "string" },
       });
@@ -1078,7 +1081,7 @@ describe("GenerationService", () => {
         modelParams: { prompt_strength: 0.85 },
       });
       (createGeneration as Mock).mockResolvedValue(gen);
-      (ModelSchemaService.getSchema as Mock).mockResolvedValue({
+      (ModelCatalogService.getSchema as Mock).mockResolvedValue({
         init_image: { type: "string", format: "uri" },
         prompt: { type: "string" },
       });
@@ -1206,7 +1209,7 @@ describe("GenerationService", () => {
         .mockResolvedValueOnce(gen3);
 
       setupProcessingMocks();
-      (ModelSchemaService.getSchema as Mock).mockResolvedValue({ image: {} });
+      (ModelCatalogService.getSchema as Mock).mockResolvedValue({ image: {} });
 
       const result = await GenerationService.generate(
         "proj-001",
@@ -1569,6 +1572,182 @@ describe("GenerationService", () => {
       // Verify no DB record was created and no Replicate call was made
       expect(createGeneration).not.toHaveBeenCalled();
       expect(ReplicateClient.run).not.toHaveBeenCalled();
+    });
+  });
+
+  // =========================================================================
+  // Slice-07: Service-Ersetzung — buildReplicateInput uses ModelCatalogService
+  // =========================================================================
+
+  describe("buildReplicateInput (ModelCatalogService integration) [slice-07]", () => {
+    const SOURCE_IMAGE_URL = "https://r2.example.com/source/image.png";
+
+    /** Helper: set up standard mocks for fire-and-forget processing */
+    function setupProcessingMocks07() {
+      (ReplicateClient.run as Mock).mockResolvedValue({
+        output: bufferToStream(PNG_BUFFER),
+        predictionId: "pred-s07",
+        seed: 42,
+      });
+      (StorageService.upload as Mock).mockResolvedValue("https://r2.example.com/result.png");
+      (updateGeneration as Mock).mockResolvedValue(makeGeneration({ status: "completed" }));
+    }
+
+    // AC-1: GIVEN generation-service.ts importiert ModelCatalogService statt ModelSchemaService
+    //       WHEN buildReplicateInput() fuer ein img2img-Generation mit modelId = "owner/model" aufgerufen wird
+    //       THEN wird ModelCatalogService.getSchema("owner/model") aufgerufen (NICHT ModelSchemaService.getSchema())
+    //       und das zurueckgegebene Schema an getImg2ImgFieldName() uebergeben
+    it('AC-1: should call ModelCatalogService.getSchema instead of ModelSchemaService.getSchema for img2img', async () => {
+      const gen = makeGeneration({
+        id: "gen-s07-ac1",
+        generationMode: "img2img",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        modelId: "owner/model",
+        modelParams: { prompt_strength: 0.6 },
+      });
+      (createGeneration as Mock).mockResolvedValue(gen);
+      (ModelCatalogService.getSchema as Mock).mockResolvedValue({
+        image: { type: "string" },
+        prompt: { type: "string" },
+      });
+      setupProcessingMocks07();
+
+      await GenerationService.generate(
+        "proj-001",
+        "A fox",
+        "",
+        undefined,
+        ["owner/model"],
+        {},
+        1,
+        "img2img",
+        SOURCE_IMAGE_URL,
+        0.6
+      );
+
+      // Wait for fire-and-forget processing
+      await vi.waitFor(() => {
+        expect(ModelCatalogService.getSchema).toHaveBeenCalledTimes(1);
+      });
+
+      // Verify ModelCatalogService.getSchema was called with the model ID
+      expect(ModelCatalogService.getSchema).toHaveBeenCalledWith("owner/model");
+
+      // Verify Replicate was called with the resolved image field from getImg2ImgFieldName
+      await vi.waitFor(() => {
+        expect(ReplicateClient.run).toHaveBeenCalledTimes(1);
+      });
+      const replicateInput = (ReplicateClient.run as Mock).mock.calls[0][1];
+      expect(replicateInput.image).toBe(SOURCE_IMAGE_URL);
+    });
+
+    // AC-2: GIVEN generation-service.ts importiert getImg2ImgFieldName aus capability-detection.ts
+    //       WHEN die Imports der Datei geprueft werden
+    //       THEN existiert KEIN Import von model-schema-service mehr
+    it('AC-2: should not import from model-schema-service', () => {
+      const filePath = path.resolve(__dirname, "..", "generation-service.ts");
+      const source = fs.readFileSync(filePath, "utf-8");
+
+      // Must NOT import from model-schema-service
+      expect(source).not.toMatch(/from\s+['"]@\/lib\/services\/model-schema-service['"]/);
+      expect(source).not.toContain("model-schema-service");
+
+      // Must import from model-catalog-service and capability-detection
+      expect(source).toMatch(/from\s+['"]@\/lib\/services\/model-catalog-service['"]/);
+      expect(source).toMatch(/from\s+['"]@\/lib\/services\/capability-detection['"]/);
+    });
+
+    // AC-3: GIVEN ein Model mit Schema { input_images: { type: "array" }, prompt: { type: "string" } } in der DB
+    //       WHEN buildReplicateInput() fuer eine img2img-Generation mit 2 References aufgerufen wird
+    //       THEN wird input_images als Feld-Key verwendet und die Reference-URLs als Array zugewiesen
+    it('AC-3: should assign reference URLs as array to input_images field', async () => {
+      const refs = [
+        { referenceImageId: "ref-1", imageUrl: "https://r2.example.com/ref1.png", role: "style", strength: "medium", slotPosition: 1, width: 512, height: 512 },
+        { referenceImageId: "ref-2", imageUrl: "https://r2.example.com/ref2.png", role: "composition", strength: "strong", slotPosition: 2, width: 512, height: 512 },
+      ];
+      const gen = makeGeneration({
+        id: "gen-s07-ac3",
+        generationMode: "img2img",
+        sourceImageUrl: null,
+        modelId: "owner/model",
+        modelParams: { prompt_strength: 0.6 },
+      });
+      (createGeneration as Mock).mockResolvedValue(gen);
+      // Mock createGenerationReferences (needed for references path)
+      const { createGenerationReferences } = await import("@/lib/db/queries");
+      (createGenerationReferences as Mock).mockResolvedValue([]);
+      (ModelCatalogService.getSchema as Mock).mockResolvedValue({
+        input_images: { type: "array" },
+        prompt: { type: "string" },
+      });
+      setupProcessingMocks07();
+
+      await GenerationService.generate(
+        "proj-001",
+        "A fox",
+        "",
+        undefined,
+        ["owner/model"],
+        {},
+        1,
+        "img2img",
+        undefined,
+        0.6,
+        refs
+      );
+
+      await vi.waitFor(() => {
+        expect(ReplicateClient.run).toHaveBeenCalledTimes(1);
+      });
+
+      const replicateInput = (ReplicateClient.run as Mock).mock.calls[0][1];
+      // input_images should be an array of reference URLs sorted by slotPosition
+      expect(replicateInput.input_images).toEqual([
+        "https://r2.example.com/ref1.png",
+        "https://r2.example.com/ref2.png",
+      ]);
+    });
+
+    // AC-4: GIVEN ein Model mit Schema { image: { type: "string" }, prompt: { type: "string" } } in der DB
+    //       und eine einzelne sourceImageUrl
+    //       WHEN buildReplicateInput() fuer eine img2img-Generation ohne References aufgerufen wird
+    //       THEN wird image als Feld-Key verwendet und sourceImageUrl als einzelner String zugewiesen
+    it('AC-4: should assign sourceImageUrl as single string to image field', async () => {
+      const gen = makeGeneration({
+        id: "gen-s07-ac4",
+        generationMode: "img2img",
+        sourceImageUrl: SOURCE_IMAGE_URL,
+        modelId: "owner/model",
+        modelParams: { prompt_strength: 0.6 },
+      });
+      (createGeneration as Mock).mockResolvedValue(gen);
+      (ModelCatalogService.getSchema as Mock).mockResolvedValue({
+        image: { type: "string" },
+        prompt: { type: "string" },
+      });
+      setupProcessingMocks07();
+
+      await GenerationService.generate(
+        "proj-001",
+        "A fox",
+        "",
+        undefined,
+        ["owner/model"],
+        {},
+        1,
+        "img2img",
+        SOURCE_IMAGE_URL,
+        0.6
+      );
+
+      await vi.waitFor(() => {
+        expect(ReplicateClient.run).toHaveBeenCalledTimes(1);
+      });
+
+      const replicateInput = (ReplicateClient.run as Mock).mock.calls[0][1];
+      // image field should be a single string (not array) for backwards-compatibility
+      expect(replicateInput.image).toBe(SOURCE_IMAGE_URL);
+      expect(typeof replicateInput.image).toBe("string");
     });
   });
 });
