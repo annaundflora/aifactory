@@ -8,3 +8,9 @@
 {"ts":"2026-03-18T00:06:00Z","slice":"slice-04-sync-service","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
 {"ts":"2026-03-18T00:06:01Z","slice":"slice-06-server-actions","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
 {"ts":"2026-03-18T00:06:02Z","slice":"slice-07-service-replace","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-18T00:06:30Z","slice":"slice-04-sync-service","gate":"lint","result":"PASSED","attempt":2}
+{"ts":"2026-03-18T00:06:31Z","slice":"slice-06-server-actions","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-03-18T00:06:32Z","slice":"slice-07-service-replace","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-03-18T00:07:00Z","slice":"slice-04-sync-service","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-18T00:07:01Z","slice":"slice-06-server-actions","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-18T00:07:02Z","slice":"slice-07-service-replace","gate":"tests","result":"PASSED","retries":0}

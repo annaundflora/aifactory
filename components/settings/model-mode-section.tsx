@@ -33,12 +33,16 @@ const MODE_LABELS: Record<GenerationMode, string> = {
   txt2img: "TEXT TO IMAGE",
   img2img: "IMAGE TO IMAGE",
   upscale: "UPSCALE",
+  inpaint: "INPAINT",
+  outpaint: "OUTPAINT",
 };
 
 const TIERS_BY_MODE: Record<GenerationMode, Tier[]> = {
   txt2img: ["draft", "quality", "max"],
-  img2img: ["draft", "quality", "max"],
-  upscale: ["draft", "quality"],
+  img2img: ["draft", "quality"],
+  upscale: ["quality", "max"],
+  inpaint: ["quality"],
+  outpaint: ["quality"],
 };
 
 const TIER_LABELS: Record<Tier, string> = {
