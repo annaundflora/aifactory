@@ -283,6 +283,40 @@ export const modelSettings = pgTable(
 );
 
 // -----------------------------------------------
+// models
+// -----------------------------------------------
+export const models = pgTable(
+  "models",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    replicateId: varchar("replicate_id", { length: 255 }).notNull(),
+    owner: varchar("owner", { length: 100 }).notNull(),
+    name: varchar("name", { length: 100 }).notNull(),
+    description: text("description"),
+    coverImageUrl: text("cover_image_url"),
+    runCount: integer("run_count"),
+    collections: text("collections").array(),
+    capabilities: jsonb("capabilities").notNull(),
+    inputSchema: jsonb("input_schema"),
+    versionHash: varchar("version_hash", { length: 64 }),
+    isActive: boolean("is_active").notNull().default(true),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("models_replicate_id_idx").on(table.replicateId),
+    index("models_is_active_idx").on(table.isActive),
+  ]
+);
+
+// -----------------------------------------------
 // users (Auth.js)
 // -----------------------------------------------
 export const users = pgTable("users", {
