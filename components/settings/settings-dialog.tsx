@@ -65,6 +65,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [syncState, setSyncState] = useState<SyncButtonState>("idle");
   const [failedCount, setFailedCount] = useState<number>(0);
   const [hasEverSynced, setHasEverSynced] = useState<boolean>(false);
+  const [syncFailed, setSyncFailed] = useState<boolean>(false);
   const syncStateBeforeRef = useRef<SyncButtonState>("idle");
 
   // -------------------------------------------------------------------------
@@ -146,6 +147,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     // Remember previous state for error recovery
     syncStateBeforeRef.current = syncState;
     setSyncState("syncing");
+    setSyncFailed(false);
 
     const toastId = toast.loading("Syncing Models...");
 
@@ -164,6 +166,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         toast.dismiss(toastId);
         toast.error(`Sync failed: HTTP ${response.status}`, { duration: Infinity });
         setSyncState(syncStateBeforeRef.current);
+        setSyncFailed(true);
         return;
       }
 
@@ -171,6 +174,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         toast.dismiss(toastId);
         toast.error("Sync failed: No response body", { duration: Infinity });
         setSyncState(syncStateBeforeRef.current);
+        setSyncFailed(true);
         return;
       }
 
@@ -203,6 +207,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             } else if (event.type === "complete") {
               toast.dismiss(toastId);
               setHasEverSynced(true);
+              setSyncFailed(false);
 
               if (event.failed === 0) {
                 // Full success
@@ -229,6 +234,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 duration: Infinity,
               });
               setSyncState(syncStateBeforeRef.current);
+              setSyncFailed(true);
             }
           } catch {
             // Malformed JSON line, skip
@@ -237,6 +243,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       }
     } catch (err: unknown) {
       toast.dismiss(toastId);
+      setSyncFailed(true);
 
       if (err instanceof DOMException && err.name === "AbortError") {
         toast.error("Sync timed out", { duration: Infinity });
@@ -369,6 +376,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               onModelChange={handleModelChange}
               syncState={syncState}
               hasEverSynced={hasEverSynced}
+              syncFailed={syncFailed}
               otherModesHaveModels={
                 anyModeHasModels && modelsByMode[mode].length === 0
               }

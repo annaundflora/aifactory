@@ -25,6 +25,7 @@ interface ModelModeSectionProps {
   onModelChange: (mode: GenerationMode, tier: Tier, modelId: string) => void;
   syncState?: "idle" | "syncing" | "sync_partial";
   hasEverSynced?: boolean;
+  syncFailed?: boolean;
   otherModesHaveModels?: boolean;
 }
 
@@ -72,6 +73,7 @@ export function ModelModeSection({
   onModelChange,
   syncState = "idle",
   hasEverSynced = false,
+  syncFailed = false,
   otherModesHaveModels = false,
 }: ModelModeSectionProps) {
   const tiers = TIERS_BY_MODE[mode];
@@ -91,7 +93,7 @@ export function ModelModeSection({
   );
 
   // Determine the empty state for this section
-  const emptyState: EmptyState = models.length === 0 ? determineEmptyState(syncState, hasEverSynced, otherModesHaveModels) : null;
+  const emptyState: EmptyState = models.length === 0 ? determineEmptyState(syncState, hasEverSynced, syncFailed, otherModesHaveModels) : null;
 
   return (
     <div className="space-y-3">
@@ -161,6 +163,7 @@ export function ModelModeSection({
 function determineEmptyState(
   syncState: "idle" | "syncing" | "sync_partial",
   hasEverSynced: boolean,
+  syncFailed: boolean,
   otherModesHaveModels: boolean
 ): Exclude<EmptyState, null> {
   if (syncState === "syncing") {
@@ -169,11 +172,16 @@ function determineEmptyState(
   if (syncState === "sync_partial" && otherModesHaveModels) {
     return "empty:partial";
   }
+  // Check syncFailed before hasEverSynced so that a failed first sync
+  // correctly returns "empty:failed" instead of "empty:never-synced"
+  if (syncFailed) {
+    return "empty:failed";
+  }
   if (!hasEverSynced) {
     return "empty:never-synced";
   }
   // hasEverSynced is true, not syncing, not partial with other modes having models
-  // This means the last sync failed or completed with no models for this mode
+  // This means the sync completed but produced no models for this mode
   if (otherModesHaveModels) {
     return "empty:partial";
   }
