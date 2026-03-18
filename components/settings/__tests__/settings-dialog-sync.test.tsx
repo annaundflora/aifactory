@@ -32,11 +32,11 @@ beforeAll(() => {
     })),
   });
 
-  global.ResizeObserver = vi.fn().mockImplementation(() => ({
-    observe: vi.fn(),
-    unobserve: vi.fn(),
-    disconnect: vi.fn(),
-  }));
+  global.ResizeObserver = class ResizeObserver {
+    observe = vi.fn();
+    unobserve = vi.fn();
+    disconnect = vi.fn();
+  } as unknown as typeof globalThis.ResizeObserver;
 
   Element.prototype.scrollTo = vi.fn() as unknown as typeof Element.prototype.scrollTo;
 
@@ -625,7 +625,7 @@ describe("SettingsDialog Sync-Button", () => {
     mockToast.warning.mockReset();
     mockToast.error.mockReset();
     mockToast.dismiss.mockReset();
-    mockGetModels.mockReset().mockResolvedValue([]);
+    mockGetModels.mockReset().mockResolvedValue([{ id: "m1", name: "Model 1" }]);
 
     const successEvents = [
       { type: "complete", synced: 120, failed: 0, new: 5, updated: 3 },
