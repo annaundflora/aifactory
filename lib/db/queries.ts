@@ -519,8 +519,9 @@ export async function seedModelSettingsDefaults(): Promise<void> {
     { mode: "txt2img", tier: "max", modelId: "black-forest-labs/flux-2-max", modelParams: {} },
     { mode: "img2img", tier: "draft", modelId: "black-forest-labs/flux-schnell", modelParams: { prompt_strength: 0.6 } },
     { mode: "img2img", tier: "quality", modelId: "black-forest-labs/flux-2-pro", modelParams: { prompt_strength: 0.6 } },
-    { mode: "upscale", tier: "quality", modelId: "philz1337x/crystal-upscaler", modelParams: { scale: 4 } },
-    { mode: "upscale", tier: "max", modelId: "nightmareai/real-esrgan", modelParams: { scale: 2 } },
+    { mode: "img2img", tier: "max", modelId: "black-forest-labs/flux-2-max", modelParams: { prompt_strength: 0.6 } },
+    { mode: "upscale", tier: "draft", modelId: "philz1337x/crystal-upscaler", modelParams: { scale: 4 } },
+    { mode: "upscale", tier: "quality", modelId: "nightmareai/real-esrgan", modelParams: { scale: 2 } },
     { mode: "inpaint", tier: "quality", modelId: "", modelParams: {} },
     { mode: "outpaint", tier: "quality", modelId: "", modelParams: {} },
   ];

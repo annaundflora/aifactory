@@ -243,7 +243,7 @@ describe("SettingsDialog", () => {
     });
 
     // Verify model IDs are displayed in the trigger texts
-    // TIERS_BY_MODE: txt2img=[draft,quality,max], img2img=[draft,quality], upscale=[quality,max]
+    // TIERS_BY_MODE: txt2img=[draft,quality,max], img2img=[draft,quality,max], upscale=[draft,quality]
     await waitFor(() => {
       // flux-schnell appears for txt2img/draft and img2img/draft
       expect(screen.getAllByText("black-forest-labs/flux-schnell")).toHaveLength(2);

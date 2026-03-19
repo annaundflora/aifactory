@@ -165,15 +165,15 @@ describe("TIERS_BY_MODE", () => {
    *       WHEN TIERS_BY_MODE["img2img"] abgefragt wird
    *       THEN ist der Wert ["draft", "quality"] (NICHT mehr ["draft", "quality", "max"])
    */
-  it('AC-5: should map img2img to draft, quality only (no max)', () => {
+  it('AC-5: should map img2img to draft, quality, max', () => {
     renderSection("img2img");
 
     expect(screen.getByText("Draft")).toBeInTheDocument();
     expect(screen.getByText("Quality")).toBeInTheDocument();
-    expect(screen.queryByText("Max")).not.toBeInTheDocument();
+    expect(screen.getByText("Max")).toBeInTheDocument();
 
     const triggers = screen.getAllByRole("combobox");
-    expect(triggers).toHaveLength(2);
+    expect(triggers).toHaveLength(3);
   });
 
   /**
@@ -181,12 +181,12 @@ describe("TIERS_BY_MODE", () => {
    *       WHEN TIERS_BY_MODE["upscale"] abgefragt wird
    *       THEN ist der Wert ["quality", "max"] (NICHT mehr ["draft", "quality"])
    */
-  it('AC-6: should map upscale to quality, max only (no draft)', () => {
+  it('AC-6: should map upscale to draft, quality', () => {
     renderSection("upscale");
 
-    expect(screen.queryByText("Draft")).not.toBeInTheDocument();
+    expect(screen.getByText("Draft")).toBeInTheDocument();
     expect(screen.getByText("Quality")).toBeInTheDocument();
-    expect(screen.getByText("Max")).toBeInTheDocument();
+    expect(screen.queryByText("Max")).not.toBeInTheDocument();
 
     const triggers = screen.getAllByRole("combobox");
     expect(triggers).toHaveLength(2);

@@ -68,11 +68,11 @@ describe('seedModelSettingsDefaults (slice-08-types-seed)', () => {
   /**
    * AC-9: GIVEN seedModelSettingsDefaults() wird aufgerufen auf eine leere model_settings-Tabelle
    *       WHEN die eingefuegten Rows gezaehlt werden
-   *       THEN sind es exakt 9 Rows: txt2img/draft, txt2img/quality, txt2img/max,
-   *            img2img/draft, img2img/quality, upscale/quality, upscale/max,
+   *       THEN sind es exakt 10 Rows: txt2img/draft, txt2img/quality, txt2img/max,
+   *            img2img/draft, img2img/quality, img2img/max, upscale/draft, upscale/quality,
    *            inpaint/quality, outpaint/quality
    */
-  it('AC-9: should insert exactly 9 default rows', async () => {
+  it('AC-9: should insert exactly 10 default rows', async () => {
     await seedModelSettingsDefaults()
 
     // Verify insert was called
@@ -81,17 +81,18 @@ describe('seedModelSettingsDefaults (slice-08-types-seed)', () => {
 
     // Extract the values passed to insert
     const valuesCall = mockChain.values.mock.calls[0][0]
-    expect(valuesCall).toHaveLength(9)
+    expect(valuesCall).toHaveLength(10)
 
-    // Verify all 9 expected mode/tier combinations exist
+    // Verify all 10 expected mode/tier combinations exist
     const expectedCombinations = [
       { mode: 'txt2img', tier: 'draft' },
       { mode: 'txt2img', tier: 'quality' },
       { mode: 'txt2img', tier: 'max' },
       { mode: 'img2img', tier: 'draft' },
       { mode: 'img2img', tier: 'quality' },
+      { mode: 'img2img', tier: 'max' },
+      { mode: 'upscale', tier: 'draft' },
       { mode: 'upscale', tier: 'quality' },
-      { mode: 'upscale', tier: 'max' },
       { mode: 'inpaint', tier: 'quality' },
       { mode: 'outpaint', tier: 'quality' },
     ]
@@ -121,25 +122,19 @@ describe('seedModelSettingsDefaults (slice-08-types-seed)', () => {
    *        WHEN die img2img-Rows geprueft werden
    *        THEN existiert KEINE Row mit mode = "img2img" und tier = "max"
    */
-  it('AC-10: should not include img2img/max row', async () => {
+  it('AC-10: should include img2img/max row (matches original tiers)', async () => {
     await seedModelSettingsDefaults()
 
     const valuesCall = mockChain.values.mock.calls[0][0]
 
-    // Verify no img2img/max combination exists
-    const img2imgMax = valuesCall.find(
-      (v: { mode: string; tier: string }) =>
-        v.mode === 'img2img' && v.tier === 'max'
-    )
-    expect(img2imgMax, 'img2img/max should NOT exist in seed data').toBeUndefined()
-
-    // Verify img2img rows are only draft and quality
+    // Verify img2img has draft, quality, max
     const img2imgRows = valuesCall.filter(
       (v: { mode: string }) => v.mode === 'img2img'
     )
-    expect(img2imgRows).toHaveLength(2)
+    expect(img2imgRows).toHaveLength(3)
     expect(img2imgRows.map((r: { tier: string }) => r.tier).sort()).toEqual([
       'draft',
+      'max',
       'quality',
     ])
   })
@@ -149,25 +144,18 @@ describe('seedModelSettingsDefaults (slice-08-types-seed)', () => {
    *        WHEN die upscale-Rows geprueft werden
    *        THEN existiert KEINE Row mit mode = "upscale" und tier = "draft"
    */
-  it('AC-11: should not include upscale/draft row', async () => {
+  it('AC-11: should include upscale/draft row (matches original tiers)', async () => {
     await seedModelSettingsDefaults()
 
     const valuesCall = mockChain.values.mock.calls[0][0]
 
-    // Verify no upscale/draft combination exists
-    const upscaleDraft = valuesCall.find(
-      (v: { mode: string; tier: string }) =>
-        v.mode === 'upscale' && v.tier === 'draft'
-    )
-    expect(upscaleDraft, 'upscale/draft should NOT exist in seed data').toBeUndefined()
-
-    // Verify upscale rows are only quality and max
+    // Verify upscale has draft and quality
     const upscaleRows = valuesCall.filter(
       (v: { mode: string }) => v.mode === 'upscale'
     )
     expect(upscaleRows).toHaveLength(2)
     expect(upscaleRows.map((r: { tier: string }) => r.tier).sort()).toEqual([
-      'max',
+      'draft',
       'quality',
     ])
   })
