@@ -74,12 +74,19 @@ vi.mock('sharp', () => {
   }
 })
 
-// Mock model-schema-service
-vi.mock('@/lib/services/model-schema-service', () => ({
-  ModelSchemaService: {
+// Mock model-catalog-service
+vi.mock('@/lib/services/model-catalog-service', () => ({
+  ModelCatalogService: {
     getSchema: vi.fn().mockResolvedValue({}),
+    getByReplicateId: vi.fn(),
   },
+}))
+
+// Mock capability-detection
+vi.mock('@/lib/services/capability-detection', () => ({
   getImg2ImgFieldName: vi.fn().mockReturnValue(null),
+  getMaxImageCount: vi.fn().mockReturnValue(0),
+  resolveSchemaRefs: vi.fn(),
 }))
 
 // UUID v4 regex pattern

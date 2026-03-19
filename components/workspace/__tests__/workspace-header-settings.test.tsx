@@ -50,10 +50,12 @@ vi.mock("next/navigation", () => ({
 
 // Mock sonner toast
 vi.mock("sonner", () => ({
-  toast: {
+  toast: Object.assign(vi.fn(), {
     error: vi.fn(),
     success: vi.fn(),
-  },
+    loading: vi.fn().mockReturnValue("toast-id"),
+    dismiss: vi.fn(),
+  }),
 }));
 
 // Mock server actions used by WorkspaceHeader
@@ -70,8 +72,8 @@ vi.mock("@/app/actions/model-settings", () => ({
 }));
 
 vi.mock("@/app/actions/models", () => ({
-  getCollectionModels: vi.fn().mockResolvedValue([]),
-  checkImg2ImgSupport: vi.fn().mockResolvedValue(true),
+  getModels: vi.fn().mockResolvedValue([]),
+  getModelSchema: vi.fn().mockResolvedValue({ properties: {} }),
 }));
 
 // Mock ThemeToggle to isolate WorkspaceHeader logic

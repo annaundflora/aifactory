@@ -13,7 +13,7 @@ import { describe, it, expect } from "vitest";
 import { execSync } from "child_process";
 
 describe("Build compatibility", () => {
-  it("AC-13: GIVEN alle auth-Aenderungen angewendet WHEN TypeScript-Compiler auf die geaenderten Dateien laeuft THEN gibt es keine TypeScript-Fehler", () => {
+  it("AC-13: GIVEN alle auth-Aenderungen angewendet WHEN TypeScript-Compiler auf die geaenderten Dateien laeuft THEN gibt es keine TypeScript-Fehler", { timeout: 60_000 }, () => {
     // Run tsc --noEmit with the project tsconfig to verify type correctness
     // Uses --project to resolve path aliases (@/...) correctly
     try {

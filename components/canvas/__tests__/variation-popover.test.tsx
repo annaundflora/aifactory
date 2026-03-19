@@ -57,6 +57,9 @@ vi.mock("lucide-react", () => ({
   Sparkles: (props: Record<string, unknown>) => (
     <span data-testid="icon-sparkles" {...props} />
   ),
+  ChevronDown: (props: Record<string, unknown>) => (
+    <span data-testid="icon-chevron-down" {...props} />
+  ),
   CheckIcon: (props: Record<string, unknown>) => (
     <span data-testid="icon-check" {...props} />
   ),
@@ -378,6 +381,7 @@ describe("VariationPopover", () => {
       negativePrompt: "",
       count: 1,
       tier: "draft",
+      imageParams: {},
     });
 
     // Popover should close (activeToolId toggled to null)
@@ -424,6 +428,7 @@ describe("VariationPopover", () => {
       negativePrompt: "",
       count: 3,
       tier: "draft",
+      imageParams: {},
     });
   });
 

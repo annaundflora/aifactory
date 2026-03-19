@@ -51,7 +51,7 @@ const {
   mockUpscaleImage,
   mockFetchGenerations,
   mockDeleteGeneration,
-  mockGetCollectionModels,
+  mockGetModels,
   mockCheckImg2ImgSupport,
   mockGetModelSettings,
   mockToastFn,
@@ -62,7 +62,7 @@ const {
   mockUpscaleImage: vi.fn(),
   mockFetchGenerations: vi.fn(),
   mockDeleteGeneration: vi.fn(),
-  mockGetCollectionModels: vi.fn(),
+  mockGetModels: vi.fn(),
   mockCheckImg2ImgSupport: vi.fn(),
   mockGetModelSettings: vi.fn(),
   mockToastFn: vi.fn(),
@@ -95,8 +95,8 @@ vi.mock("@/app/actions/model-settings", () => ({
 
 // Mock model actions
 vi.mock("@/app/actions/models", () => ({
-  getCollectionModels: (...args: unknown[]) => mockGetCollectionModels(...args),
-  checkImg2ImgSupport: (...args: unknown[]) => mockCheckImg2ImgSupport(...args),
+  getModels: (...args: unknown[]) => mockGetModels(...args),
+  getModelSchema: (...args: unknown[]) => mockCheckImg2ImgSupport(...args),
 }));
 
 // Mock references server action (transitive dep via details-overlay -> provenance-row + img2img handler)
@@ -363,10 +363,9 @@ describe("In-Place Generation Flow", () => {
     expect(callArgs.promptMotiv).toBe("A dramatic sunset");
     expect(callArgs.modelIds).toEqual(["black-forest-labs/flux-2-max"]);
     expect(callArgs.count).toBe(2);
-    expect(callArgs.generationMode).toBe("txt2img");
-    // No source image for txt2img variations
-    expect(callArgs.sourceImageUrl).toBeUndefined();
-    expect(callArgs.strength).toBeUndefined();
+    expect(callArgs.generationMode).toBe("img2img");
+    // Source image from current generation is passed for img2img variations
+    expect(callArgs.sourceImageUrl).toBe("https://example.com/current.png");
 
     // Popover should close
     await waitFor(() => {
@@ -831,7 +830,7 @@ describe("CanvasModelSelector", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    mockGetCollectionModels.mockResolvedValue([]);
+    mockGetModels.mockResolvedValue([]);
     mockCheckImg2ImgSupport.mockResolvedValue(true);
     mockGetModelSettings.mockResolvedValue([]);
     capturedDrawerOnConfirm = null;
@@ -871,8 +870,8 @@ describe("CanvasModelSelector", () => {
   // -------------------------------------------------------------------------
 
   /**
-   * AC-10 (updated): Model resolution is now settings-based via txt2img mode.
-   * GIVEN modelSettings contain a txt2img/draft entry with modelId "stability-ai/sdxl"
+   * AC-10 (updated): Model resolution is now settings-based via img2img mode.
+   * GIVEN modelSettings contain a img2img/draft entry with modelId "stability-ai/sdxl"
    * WHEN the user clicks "Generate" in the Variation-Popover
    * THEN generateImages is called with the settings-resolved model, not the image's original model.
    */
@@ -881,7 +880,7 @@ describe("CanvasModelSelector", () => {
 
     // Provide model settings so the handler resolves from settings
     mockGetModelSettings.mockResolvedValue([
-      { id: "ms-1", mode: "txt2img", tier: "draft", modelId: "stability-ai/sdxl", modelParams: {}, createdAt: new Date(), updatedAt: new Date() },
+      { id: "ms-1", mode: "img2img", tier: "draft", modelId: "stability-ai/sdxl", modelParams: {}, createdAt: new Date(), updatedAt: new Date() },
     ]);
 
     mockGenerateImages.mockResolvedValue([
@@ -932,46 +931,36 @@ describe("CanvasModelSelector", () => {
   // -------------------------------------------------------------------------
 
   /**
-   * AC-11 (updated for slice-08): CanvasModelSelector now uses local state.
-   * GIVEN the user selects a model that doesn't support img2img
+   * AC-11 (updated for slice-12): The model drawer now only shows img2img-capable
+   * models via getModels({ capability: "img2img" }). No auto-switch is needed.
+   * GIVEN the user selects a model from the drawer
    * WHEN the selector processes the selection
-   * THEN it auto-switches to the first img2img-capable model and shows a toast.
-   * Note: selectedModelId no longer exists in context -- the selector manages state locally.
+   * THEN it sets the selected model directly (all drawer models are img2img-capable).
    */
-  it("AC-11: should auto-switch to first img2img-capable model and show toast when incompatible model is selected", async () => {
+  it("AC-11: should set selected model directly from drawer confirmation", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
-    const compatibleModels = [
+    const catalogModels = [
       {
-        url: "https://replicate.com/no-img2img/model-bad",
-        owner: "no-img2img",
-        name: "model-bad",
-        description: "No img2img",
-        cover_image_url: null,
-        run_count: 100,
-        created_at: "2024-01-01",
-      },
-      {
-        url: "https://replicate.com/good-vendor/img2img-model",
+        id: "uuid-good-vendor-img2img-model",
+        replicateId: "good-vendor/img2img-model",
         owner: "good-vendor",
         name: "img2img-model",
         description: "Supports img2img",
-        cover_image_url: null,
-        run_count: 200,
-        created_at: "2024-01-02",
+        coverImageUrl: null,
+        runCount: 200,
+        collections: null,
+        capabilities: { txt2img: true, img2img: true },
+        inputSchema: null,
+        versionHash: null,
+        isActive: true,
+        lastSyncedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       },
     ];
 
-    mockGetCollectionModels.mockResolvedValue(compatibleModels);
-
-    // checkImg2ImgSupport call sequence:
-    // 1. Initial check for selected model (no-img2img/model-bad) -> false
-    // 2. Iteration: no-img2img/model-bad (cache miss due to React state) -> false
-    // 3. Iteration: good-vendor/img2img-model -> true
-    mockCheckImg2ImgSupport
-      .mockResolvedValueOnce(false)  // initial check
-      .mockResolvedValueOnce(false)  // iteration: bad model again
-      .mockResolvedValueOnce(true);  // iteration: good model
+    mockGetModels.mockResolvedValue(catalogModels);
 
     render(
       <CanvasDetailProvider initialGenerationId="gen-autoswitch">
@@ -990,34 +979,23 @@ describe("CanvasModelSelector", () => {
     // The ModelBrowserDrawer should now be open
     await screen.findByTestId("model-browser-drawer");
 
-    // Wait for collection models to load (fetchModels is called on drawer open)
+    // Wait for catalog models to load (fetchModels is called on drawer open)
     await waitFor(() => {
-      expect(mockGetCollectionModels).toHaveBeenCalledTimes(1);
+      expect(mockGetModels).toHaveBeenCalledTimes(1);
     });
 
-    // Allow the state update from getCollectionModels to settle
+    // Allow the state update from getModels to settle
     await act(async () => {
       await Promise.resolve();
     });
 
-    // Now programmatically call the captured onConfirm with the bad model
-    // (simulating the user selecting a model in the drawer and clicking confirm)
+    // Programmatically call the captured onConfirm with a catalog model
     expect(capturedDrawerOnConfirm).not.toBeNull();
     await act(async () => {
-      capturedDrawerOnConfirm!([
-        { owner: "no-img2img", name: "model-bad" },
-      ]);
+      capturedDrawerOnConfirm!(catalogModels);
     });
 
-    // Wait for the auto-switch to happen
-    await waitFor(() => {
-      // Toast should have been called with an img2img incompatibility message
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.stringContaining("img2img")
-      );
-    });
-
-    // After auto-switch, the selector should display the compatible model name
+    // The selector should display the selected model name
     await waitFor(() => {
       const selectorBtn = screen.getByTestId("canvas-model-selector");
       expect(selectorBtn).toHaveTextContent("img2img-model");

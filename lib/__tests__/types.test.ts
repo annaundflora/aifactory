@@ -4,16 +4,13 @@ import { VALID_TIERS, VALID_GENERATION_MODES } from "@/lib/types";
 
 describe("Type definitions", () => {
   // ---------------------------------------------------------------------------
-  // AC-1: GIVEN lib/types.ts wird importiert
-  //        WHEN der Typ Tier verwendet wird
-  //        THEN akzeptiert er exakt die Werte "draft", "quality", "max" und keine anderen
+  // Tier type (unchanged from prior slices)
   // ---------------------------------------------------------------------------
+
   it("should accept draft, quality, max as valid Tier values", () => {
-    // Runtime validation via the VALID_TIERS constant
     expect(VALID_TIERS).toEqual(["draft", "quality", "max"]);
     expect(VALID_TIERS).toHaveLength(3);
 
-    // Type-level assertions: valid values are assignable
     const draft: Tier = "draft";
     const quality: Tier = "quality";
     const max: Tier = "max";
@@ -21,59 +18,80 @@ describe("Type definitions", () => {
     expect(quality).toBe("quality");
     expect(max).toBe("max");
 
-    // Type-level: Tier is exactly the union "draft" | "quality" | "max"
     expectTypeOf<Tier>().toEqualTypeOf<"draft" | "quality" | "max">();
   });
 
   // ---------------------------------------------------------------------------
-  // AC-2: GIVEN lib/types.ts wird importiert
-  //        WHEN der Typ GenerationMode verwendet wird
-  //        THEN akzeptiert er exakt die Werte "txt2img", "img2img", "upscale" und keine anderen
+  // AC-1: GIVEN lib/types.ts
+  //       WHEN der Type GenerationMode geprueft wird
+  //       THEN akzeptiert er exakt die 5 Werte
+  //            "txt2img" | "img2img" | "upscale" | "inpaint" | "outpaint"
   // ---------------------------------------------------------------------------
-  it("should accept txt2img, img2img, upscale as valid GenerationMode values", () => {
-    // Runtime validation via the VALID_GENERATION_MODES constant
-    expect(VALID_GENERATION_MODES).toEqual(["txt2img", "img2img", "upscale"]);
-    expect(VALID_GENERATION_MODES).toHaveLength(3);
+  it("AC-1: should accept all 5 generation modes including inpaint and outpaint", () => {
+    // Type-level: GenerationMode is exactly the 5-member union
+    expectTypeOf<GenerationMode>().toEqualTypeOf<
+      "txt2img" | "img2img" | "upscale" | "inpaint" | "outpaint"
+    >();
 
-    // Type-level assertions: valid values are assignable
+    // Runtime: all 5 values are assignable
     const txt2img: GenerationMode = "txt2img";
     const img2img: GenerationMode = "img2img";
     const upscale: GenerationMode = "upscale";
+    const inpaint: GenerationMode = "inpaint";
+    const outpaint: GenerationMode = "outpaint";
+
     expect(txt2img).toBe("txt2img");
     expect(img2img).toBe("img2img");
     expect(upscale).toBe("upscale");
-
-    // Type-level: GenerationMode is exactly the union
-    expectTypeOf<GenerationMode>().toEqualTypeOf<
-      "txt2img" | "img2img" | "upscale"
-    >();
+    expect(inpaint).toBe("inpaint");
+    expect(outpaint).toBe("outpaint");
   });
 
   // ---------------------------------------------------------------------------
-  // AC-3: GIVEN lib/types.ts wird importiert
-  //        WHEN der Typ UpdateModelSettingInput verwendet wird
-  //        THEN hat er die Felder mode: GenerationMode, tier: Tier, modelId: string
+  // AC-2: GIVEN lib/types.ts
+  //       WHEN das Array VALID_GENERATION_MODES geprueft wird
+  //       THEN enthaelt es exakt
+  //            ["txt2img", "img2img", "upscale", "inpaint", "outpaint"]
+  //            (5 Eintraege, Reihenfolge beibehalten)
+  // ---------------------------------------------------------------------------
+  it("AC-2: should export VALID_GENERATION_MODES with exactly 5 entries in order", () => {
+    expect(VALID_GENERATION_MODES).toEqual([
+      "txt2img",
+      "img2img",
+      "upscale",
+      "inpaint",
+      "outpaint",
+    ]);
+    expect(VALID_GENERATION_MODES).toHaveLength(5);
+
+    // Verify each element by index for strict ordering
+    expect(VALID_GENERATION_MODES[0]).toBe("txt2img");
+    expect(VALID_GENERATION_MODES[1]).toBe("img2img");
+    expect(VALID_GENERATION_MODES[2]).toBe("upscale");
+    expect(VALID_GENERATION_MODES[3]).toBe("inpaint");
+    expect(VALID_GENERATION_MODES[4]).toBe("outpaint");
+  });
+
+  // ---------------------------------------------------------------------------
+  // UpdateModelSettingInput DTO (unchanged from prior slices)
   // ---------------------------------------------------------------------------
   it("should have mode, tier, and modelId fields with correct types", () => {
-    // Type-level: verify the interface shape
     expectTypeOf<UpdateModelSettingInput>().toHaveProperty("mode");
     expectTypeOf<UpdateModelSettingInput>().toHaveProperty("tier");
     expectTypeOf<UpdateModelSettingInput>().toHaveProperty("modelId");
 
-    // Verify the field types match expected types
     expectTypeOf<UpdateModelSettingInput["mode"]>().toEqualTypeOf<GenerationMode>();
     expectTypeOf<UpdateModelSettingInput["tier"]>().toEqualTypeOf<Tier>();
     expectTypeOf<UpdateModelSettingInput["modelId"]>().toEqualTypeOf<string>();
 
-    // Runtime: verify a valid object can be constructed
     const input: UpdateModelSettingInput = {
-      mode: "txt2img",
-      tier: "draft",
+      mode: "inpaint",
+      tier: "quality",
       modelId: "owner/model-name",
     };
     expect(input).toEqual({
-      mode: "txt2img",
-      tier: "draft",
+      mode: "inpaint",
+      tier: "quality",
       modelId: "owner/model-name",
     });
   });

@@ -3,9 +3,9 @@ import {
   getModelSettingByModeTier,
   upsertModelSetting,
   seedModelSettingsDefaults,
+  getModelByReplicateId,
   type ModelSetting,
 } from "@/lib/db/queries";
-import { ModelSchemaService } from "@/lib/services/model-schema-service";
 
 export const ModelSettingsService = {
   /**
@@ -63,20 +63,42 @@ export const ModelSettingsService = {
 
   /**
    * Checks whether a model is compatible with the given mode.
-   * - txt2img: always compatible (every model supports text-to-image)
-   * - upscale: always compatible (not schema-checked)
-   * - img2img: delegates to ModelSchemaService.supportsImg2Img()
+   * - txt2img: always compatible (every model supports text-to-image), no DB lookup
+   * - img2img, upscale, inpaint, outpaint: reads `capabilities` JSONB from DB
+   * - Fallback: true when model not found in DB (allow selection, don't block)
    */
   async checkCompatibility(modelId: string, mode: string): Promise<boolean> {
-    // txt2img and upscale are always considered compatible
-    if (mode !== "img2img") {
+    // txt2img is always compatible — no DB lookup needed
+    if (mode === "txt2img") {
       return true;
     }
 
     try {
-      return await ModelSchemaService.supportsImg2Img(modelId);
+      const model = await getModelByReplicateId(modelId);
+
+      // Fallback: model not in DB → allow selection
+      if (!model) {
+        return true;
+      }
+
+      const capabilities = model.capabilities as Record<string, boolean> | null;
+
+      // Fallback: no capabilities data → allow selection
+      if (!capabilities) {
+        return true;
+      }
+
+      // Check the specific capability for the requested mode
+      const capabilityValue = capabilities[mode];
+
+      // If the capability key doesn't exist, fallback to true
+      if (capabilityValue === undefined) {
+        return true;
+      }
+
+      return capabilityValue === true;
     } catch {
-      // If schema fetch fails, fallback: allow selection (no filter)
+      // If DB lookup fails, fallback: allow selection (no filter)
       return true;
     }
   },

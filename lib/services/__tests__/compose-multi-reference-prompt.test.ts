@@ -22,9 +22,14 @@ vi.mock("@/lib/db/queries", () => ({
   updateGeneration: vi.fn(),
 }));
 
-vi.mock("@/lib/services/model-schema-service", () => ({
-  ModelSchemaService: { getSchema: vi.fn() },
+vi.mock("@/lib/services/model-catalog-service", () => ({
+  ModelCatalogService: { getSchema: vi.fn() },
+}));
+
+vi.mock("@/lib/services/capability-detection", () => ({
   getImg2ImgFieldName: vi.fn(),
+  getMaxImageCount: vi.fn().mockReturnValue(0),
+  resolveSchemaRefs: vi.fn(),
 }));
 
 vi.mock("sharp", () => ({

@@ -36,6 +36,9 @@ beforeAll(() => {
 // ---------------------------------------------------------------------------
 
 vi.mock("lucide-react", () => ({
+  ChevronDown: (props: Record<string, unknown>) => (
+    <span data-testid="chevron-down" {...props} />
+  ),
   ChevronDownIcon: (props: Record<string, unknown>) => (
     <span data-testid="chevron-down-icon" {...props} />
   ),
@@ -97,12 +100,12 @@ const updatedSchema: SchemaProperties = {
     default: "photorealistic",
     title: "Style",
   },
-  strength: {
+  creativity: {
     type: "number",
     minimum: 0,
     maximum: 1,
     default: 0.5,
-    title: "Strength",
+    title: "Creativity",
   },
 };
 
@@ -154,6 +157,7 @@ describe("ParameterPanel", () => {
         isLoading={false}
         values={{}}
         onChange={mockOnChange}
+        primaryFields={["aspect_ratio", "num_inference_steps", "guidance_scale"]}
       />
     );
 
@@ -209,12 +213,15 @@ describe("ParameterPanel", () => {
    * THEN werden die Controls entsprechend dem neuen Schema aktualisiert
    */
   it("AC-2: should re-render controls when model schema changes", () => {
+    const allPrimary = ["aspect_ratio", "num_inference_steps", "guidance_scale", "style", "creativity"];
+
     const { rerender } = render(
       <ParameterPanel
         schema={schemaWithMixedProperties}
         isLoading={false}
         values={{}}
         onChange={mockOnChange}
+        primaryFields={allPrimary}
       />
     );
 
@@ -230,6 +237,7 @@ describe("ParameterPanel", () => {
         isLoading={false}
         values={{}}
         onChange={mockOnChange}
+        primaryFields={allPrimary}
       />
     );
 
@@ -240,7 +248,7 @@ describe("ParameterPanel", () => {
 
     // New properties should be rendered
     expect(screen.getByText("Style")).toBeInTheDocument();
-    expect(screen.getByText("Strength")).toBeInTheDocument();
+    expect(screen.getByText("Creativity")).toBeInTheDocument();
   });
 
   /**

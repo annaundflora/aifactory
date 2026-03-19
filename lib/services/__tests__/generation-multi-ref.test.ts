@@ -27,18 +27,21 @@ vi.mock("@/lib/db/queries", () => ({
   getGenerations: vi.fn(),
 }));
 
-// Mock ModelSchemaService — keep real getImg2ImgFieldName (pure function)
-vi.mock("@/lib/services/model-schema-service", async (importOriginal) => {
+// Mock ModelCatalogService (generation-service imports from model-catalog-service)
+vi.mock("@/lib/services/model-catalog-service", () => ({
+  ModelCatalogService: {
+    getSchema: vi.fn(),
+    getByReplicateId: vi.fn(),
+  },
+}));
+
+// Mock capability-detection — keep real getImg2ImgFieldName (pure function)
+vi.mock("@/lib/services/capability-detection", async (importOriginal) => {
   const actual = await importOriginal<
-    typeof import("@/lib/services/model-schema-service")
+    typeof import("@/lib/services/capability-detection")
   >();
   return {
     ...actual,
-    ModelSchemaService: {
-      getSchema: vi.fn(),
-      supportsImg2Img: vi.fn(),
-      clearCache: vi.fn(),
-    },
   };
 });
 
@@ -71,7 +74,7 @@ import {
   updateGeneration,
 } from "@/lib/db/queries";
 import type { Generation } from "@/lib/db/queries";
-import { ModelSchemaService } from "@/lib/services/model-schema-service";
+import { ModelCatalogService } from "@/lib/services/model-catalog-service";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -187,8 +190,8 @@ describe("buildReplicateInput - Multi-Reference", () => {
       }),
     ];
 
-    // ModelSchemaService.getSchema returns schema with input_images field
-    (ModelSchemaService.getSchema as Mock).mockResolvedValue({
+    // ModelCatalogService.getSchema returns schema with input_images field
+    (ModelCatalogService.getSchema as Mock).mockResolvedValue({
       input_images: { type: "array" },
     });
 
@@ -243,7 +246,7 @@ describe("buildReplicateInput - Multi-Reference", () => {
     const sourceUrl = "https://r2.example/source.png";
 
     // Schema with input_images (isArray: true)
-    (ModelSchemaService.getSchema as Mock).mockResolvedValue({
+    (ModelCatalogService.getSchema as Mock).mockResolvedValue({
       input_images: { type: "array" },
     });
 
@@ -281,7 +284,7 @@ describe("buildReplicateInput - Multi-Reference", () => {
     const sourceUrl = "https://r2.example/source.png";
 
     // Schema with image_prompt (isArray: false)
-    (ModelSchemaService.getSchema as Mock).mockResolvedValue({
+    (ModelCatalogService.getSchema as Mock).mockResolvedValue({
       image_prompt: { type: "string" },
     });
 
@@ -331,7 +334,7 @@ describe("buildReplicateInput - Multi-Reference", () => {
       }),
     ];
 
-    (ModelSchemaService.getSchema as Mock).mockResolvedValue({
+    (ModelCatalogService.getSchema as Mock).mockResolvedValue({
       input_images: { type: "array" },
     });
 
@@ -392,7 +395,7 @@ describe("buildReplicateInput - Multi-Reference", () => {
   it("AC-8: should not call composeMultiReferencePrompt when references array is empty", async () => {
     const sourceUrl = "https://r2.example/source.png";
 
-    (ModelSchemaService.getSchema as Mock).mockResolvedValue({
+    (ModelCatalogService.getSchema as Mock).mockResolvedValue({
       input_images: { type: "array" },
     });
 
@@ -546,7 +549,7 @@ describe("createGenerationReferences - via generate()", () => {
       }),
     ];
 
-    (ModelSchemaService.getSchema as Mock).mockResolvedValue({
+    (ModelCatalogService.getSchema as Mock).mockResolvedValue({
       input_images: { type: "array" },
     });
 

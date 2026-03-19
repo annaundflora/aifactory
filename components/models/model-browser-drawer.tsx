@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { type CollectionModel } from "@/lib/types/collection-model";
+import { type Model } from "@/lib/services/model-catalog-service";
 import { useModelFilters, type SortOption } from "@/lib/hooks/use-model-filters";
 import { ModelCard } from "@/components/models/model-card";
 // @deprecated - This component is no longer used in production.
@@ -34,11 +34,11 @@ const MAX_SELECTED = 3;
 
 export interface ModelBrowserDrawerProps {
   open: boolean;
-  models: CollectionModel[];
-  selectedModels: CollectionModel[];
+  models: Model[];
+  selectedModels: Model[];
   isLoading: boolean;
   error?: string;
-  onConfirm: (models: CollectionModel[]) => void;
+  onConfirm: (models: Model[]) => void;
   onClose: () => void;
   onRetry: () => void;
 }
@@ -59,7 +59,7 @@ export function ModelBrowserDrawer({
 }: ModelBrowserDrawerProps) {
   // ---- Temp selection state (discarded on close without confirm) ----------
   const [tempSelectedModels, setTempSelectedModels] = useState<
-    CollectionModel[]
+    Model[]
   >([]);
 
   // ---- Search, filter & sort state ----------------------------------------
@@ -124,7 +124,7 @@ export function ModelBrowserDrawer({
 
   // ---- Selection helpers -------------------------------------------------
   const isSelected = useCallback(
-    (model: CollectionModel) =>
+    (model: Model) =>
       tempSelectedModels.some(
         (m) => m.owner === model.owner && m.name === model.name,
       ),
@@ -134,7 +134,7 @@ export function ModelBrowserDrawer({
   const atMaxSelection = tempSelectedModels.length >= MAX_SELECTED;
 
   const handleSelect = useCallback(
-    (model: CollectionModel) => {
+    (model: Model) => {
       setTempSelectedModels((prev) => {
         const idx = prev.findIndex(
           (m) => m.owner === model.owner && m.name === model.name,
@@ -181,7 +181,7 @@ export function ModelBrowserDrawer({
   }, []);
 
   // ---- Favorite toggle handler (optimistic) ----------------------------
-  const handleFavoriteToggle = useCallback((model: CollectionModel) => {
+  const handleFavoriteToggle = useCallback((model: Model) => {
     const key = `${model.owner}/${model.name}`;
     setFavoriteIds((prev) => {
       const next = new Set(prev);

@@ -15,15 +15,17 @@ export type Tier = "draft" | "quality" | "max";
  * - txt2img: text-to-image generation
  * - img2img: image-to-image transformation
  * - upscale: image upscaling
+ * - inpaint: inpainting (image + mask based editing)
+ * - outpaint: outpainting (expanding image boundaries)
  */
-export type GenerationMode = "txt2img" | "img2img" | "upscale";
+export type GenerationMode = "txt2img" | "img2img" | "upscale" | "inpaint" | "outpaint";
 
 // ---------------------------------------------------------------------------
 // Validation Constants
 // ---------------------------------------------------------------------------
 
 export const VALID_TIERS: readonly Tier[] = ["draft", "quality", "max"] as const;
-export const VALID_GENERATION_MODES: readonly GenerationMode[] = ["txt2img", "img2img", "upscale"] as const;
+export const VALID_GENERATION_MODES: readonly GenerationMode[] = ["txt2img", "img2img", "upscale", "inpaint", "outpaint"] as const;
 
 // ---------------------------------------------------------------------------
 // DTOs

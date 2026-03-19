@@ -1,25 +1,25 @@
 import { useMemo } from 'react';
-import type { CollectionModel } from '@/lib/types/collection-model';
+import type { Model } from '@/lib/services/model-catalog-service';
 
 export type SortOption = 'popular' | 'newest';
 
 /**
- * Custom hook for client-side filtering and sorting of CollectionModel arrays.
+ * Custom hook for client-side filtering and sorting of Model arrays.
  *
  * - Search: case-insensitive match against name and description (null-safe)
  * - Owner filter: single-select; null or '' disables the filter
  * - Both filters are combined with AND logic
  * - owners: unique list in first-occurrence order (no duplicates)
- * - sortBy: "popular" sorts by run_count desc, "newest" sorts by created_at desc
+ * - sortBy: "popular" sorts by runCount desc, "newest" sorts by createdAt desc
  * - Stateless: accepts searchQuery, ownerFilter, and sortBy as parameters
  * - Uses useMemo to avoid recomputation on unrelated renders
  */
 export function useModelFilters(
-  models: CollectionModel[],
+  models: Model[],
   searchQuery: string,
   ownerFilter: string | null,
   sortBy: SortOption = 'newest',
-): { filteredModels: CollectionModel[]; owners: string[] } {
+): { filteredModels: Model[]; owners: string[] } {
   const owners = useMemo(() => {
     const seen = new Set<string>();
     const result: string[] = [];
@@ -37,7 +37,7 @@ export function useModelFilters(
     const hasSearch = query.length > 0;
     const hasOwner = ownerFilter !== null && ownerFilter !== '';
 
-    let result: CollectionModel[];
+    let result: Model[];
 
     if (!hasSearch && !hasOwner) {
       result = [...models];
@@ -60,9 +60,13 @@ export function useModelFilters(
     }
 
     if (sortBy === 'newest') {
-      result.sort((a, b) => b.created_at.localeCompare(a.created_at));
+      result.sort((a, b) => {
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return bTime - aTime;
+      });
     } else {
-      result.sort((a, b) => b.run_count - a.run_count);
+      result.sort((a, b) => (b.runCount ?? 0) - (a.runCount ?? 0));
     }
 
     return result;

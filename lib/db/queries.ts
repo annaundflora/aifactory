@@ -1,6 +1,6 @@
-import { eq, desc, sql, and, asc, or } from "drizzle-orm";
+import { eq, desc, sql, and, asc, or, notInArray } from "drizzle-orm";
 import { db } from "./index";
-import { projects, generations, assistantSessions, referenceImages, generationReferences, modelSettings } from "./schema";
+import { projects, generations, assistantSessions, referenceImages, generationReferences, modelSettings, models } from "./schema";
 
 // ---------------------------------------------------------------------------
 // Types (inferred from schema)
@@ -11,6 +11,7 @@ export type AssistantSession = typeof assistantSessions.$inferSelect;
 export type ReferenceImage = typeof referenceImages.$inferSelect;
 export type GenerationReference = typeof generationReferences.$inferSelect;
 export type ModelSetting = typeof modelSettings.$inferSelect;
+export type Model = typeof models.$inferSelect;
 
 // ---------------------------------------------------------------------------
 // Project Queries
@@ -506,8 +507,10 @@ export async function upsertModelSetting(
 }
 
 /**
- * Seeds the 8 default model settings rows.
+ * Seeds the 9 default model settings rows.
  * Uses ON CONFLICT DO NOTHING for idempotency — existing rows are not overwritten.
+ *
+ * Rows: txt2img(3) + img2img(2) + upscale(2) + inpaint(1) + outpaint(1) = 9
  */
 export async function seedModelSettingsDefaults(): Promise<void> {
   const defaults = [
@@ -517,8 +520,10 @@ export async function seedModelSettingsDefaults(): Promise<void> {
     { mode: "img2img", tier: "draft", modelId: "black-forest-labs/flux-schnell", modelParams: { prompt_strength: 0.6 } },
     { mode: "img2img", tier: "quality", modelId: "black-forest-labs/flux-2-pro", modelParams: { prompt_strength: 0.6 } },
     { mode: "img2img", tier: "max", modelId: "black-forest-labs/flux-2-max", modelParams: { prompt_strength: 0.6 } },
-    { mode: "upscale", tier: "draft", modelId: "nightmareai/real-esrgan", modelParams: { scale: 2 } },
-    { mode: "upscale", tier: "quality", modelId: "philz1337x/crystal-upscaler", modelParams: { scale: 4 } },
+    { mode: "upscale", tier: "draft", modelId: "philz1337x/crystal-upscaler", modelParams: { scale: 4 } },
+    { mode: "upscale", tier: "quality", modelId: "nightmareai/real-esrgan", modelParams: { scale: 2 } },
+    { mode: "inpaint", tier: "quality", modelId: "", modelParams: {} },
+    { mode: "outpaint", tier: "quality", modelId: "", modelParams: {} },
   ];
 
   await db
@@ -527,4 +532,156 @@ export async function seedModelSettingsDefaults(): Promise<void> {
     .onConflictDoNothing({
       target: [modelSettings.mode, modelSettings.tier],
     });
+}
+
+// ---------------------------------------------------------------------------
+// Model Queries (Catalog Reads)
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns all active models (is_active = true).
+ */
+export async function getActiveModels(): Promise<Model[]> {
+  return db
+    .select()
+    .from(models)
+    .where(eq(models.isActive, true));
+}
+
+/**
+ * Returns active models that have a specific capability set to true.
+ * Uses JSONB `capabilities->>'capability' = 'true'` filter.
+ */
+export async function getModelsByCapability(capability: string): Promise<Model[]> {
+  return db
+    .select()
+    .from(models)
+    .where(
+      and(
+        eq(models.isActive, true),
+        sql`${models.capabilities}->>${capability} = 'true'`
+      )
+    );
+}
+
+/**
+ * Returns a single active model by its replicate_id (owner/name format),
+ * or null if not found or inactive.
+ */
+export async function getModelByReplicateId(replicateId: string): Promise<Model | null> {
+  const [model] = await db
+    .select()
+    .from(models)
+    .where(
+      and(
+        eq(models.replicateId, replicateId),
+        eq(models.isActive, true)
+      )
+    );
+  return model ?? null;
+}
+
+/**
+ * Returns the input_schema JSONB for the model with the given replicate_id,
+ * or null if the model is not found, is inactive, or has no schema.
+ */
+export async function getModelSchema(replicateId: string): Promise<unknown | null> {
+  const [row] = await db
+    .select({ inputSchema: models.inputSchema })
+    .from(models)
+    .where(
+      and(
+        eq(models.replicateId, replicateId),
+        eq(models.isActive, true)
+      )
+    );
+  return row?.inputSchema ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Model Write Queries (Sync Service)
+// ---------------------------------------------------------------------------
+
+/**
+ * Data shape for upserting a model into the `models` table.
+ * Uses Drizzle `onConflictDoUpdate` on the `replicate_id` unique index.
+ */
+export interface ModelUpsertData {
+  replicateId: string;
+  owner: string;
+  name: string;
+  description: string | null;
+  coverImageUrl: string | null;
+  runCount: number | null;
+  collections: string[] | null;
+  capabilities: { [key: string]: boolean };
+  inputSchema: unknown | null;
+  versionHash: string | null;
+}
+
+/**
+ * Inserts a new model or updates an existing one based on `replicate_id`.
+ * On conflict (existing `replicate_id`), all fields are updated and
+ * `updated_at` is set to the current time.
+ */
+export async function upsertModel(data: ModelUpsertData): Promise<void> {
+  await db
+    .insert(models)
+    .values({
+      replicateId: data.replicateId,
+      owner: data.owner,
+      name: data.name,
+      description: data.description,
+      coverImageUrl: data.coverImageUrl,
+      runCount: data.runCount,
+      collections: data.collections,
+      capabilities: data.capabilities,
+      inputSchema: data.inputSchema,
+      versionHash: data.versionHash,
+      isActive: true,
+      lastSyncedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [models.replicateId],
+      set: {
+        owner: data.owner,
+        name: data.name,
+        description: data.description,
+        coverImageUrl: data.coverImageUrl,
+        runCount: data.runCount,
+        collections: data.collections,
+        capabilities: data.capabilities,
+        inputSchema: data.inputSchema,
+        versionHash: data.versionHash,
+        isActive: true,
+        lastSyncedAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+}
+
+/**
+ * Soft-deletes models whose `replicate_id` is NOT in the provided list.
+ * Sets `is_active = false` for those models.
+ * Only affects currently active models.
+ */
+export async function deactivateModelsNotIn(activeReplicateIds: string[]): Promise<void> {
+  if (activeReplicateIds.length === 0) {
+    // If no active IDs provided, deactivate all active models
+    await db
+      .update(models)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(models.isActive, true));
+    return;
+  }
+
+  await db
+    .update(models)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(
+      and(
+        eq(models.isActive, true),
+        notInArray(models.replicateId, activeReplicateIds)
+      )
+    );
 }

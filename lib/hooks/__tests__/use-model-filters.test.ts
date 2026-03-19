@@ -2,18 +2,26 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useModelFilters } from '../use-model-filters';
-import type { CollectionModel } from '@/lib/types/collection-model';
+import type { Model } from '@/lib/services/model-catalog-service';
 
-/** Helper to create a CollectionModel with sensible defaults. */
+/** Helper to create a Model with sensible defaults. */
 function makeModel(
-  overrides: Partial<CollectionModel> & Pick<CollectionModel, 'owner' | 'name'>,
-): CollectionModel {
+  overrides: Partial<Model> & Pick<Model, 'owner' | 'name'>,
+): Model {
   return {
-    url: `https://replicate.com/${overrides.owner}/${overrides.name}`,
+    id: `uuid-${overrides.owner}-${overrides.name}`,
+    replicateId: `${overrides.owner}/${overrides.name}`,
     description: null,
-    cover_image_url: null,
-    run_count: 0,
-    created_at: '2025-01-15T00:00:00Z',
+    coverImageUrl: null,
+    runCount: 0,
+    collections: ['text-to-image'],
+    capabilities: { txt2img: true, img2img: false, upscale: false, inpaint: false, outpaint: false },
+    inputSchema: null,
+    versionHash: null,
+    isActive: true,
+    lastSyncedAt: null,
+    createdAt: new Date('2025-01-15T00:00:00Z'),
+    updatedAt: new Date('2025-01-15T00:00:00Z'),
     ...overrides,
   };
 }

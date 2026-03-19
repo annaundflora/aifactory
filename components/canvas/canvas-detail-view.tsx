@@ -31,6 +31,13 @@ import type { Tier } from "@/lib/types";
 /** Polling interval for in-place generation (reuses WorkspaceContent pattern) */
 const GENERATION_POLL_INTERVAL_MS = 3000;
 
+/** Maps the VariationStrength enum to the numeric prompt_strength param. */
+const VARIATION_STRENGTH_MAP: Record<string, number> = {
+  subtle: 0.3,
+  balanced: 0.6,
+  creative: 0.85,
+};
+
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -250,11 +257,13 @@ export function CanvasDetailView({
     async (params: VariationParams) => {
       if (state.isGenerating) return;
 
-      // Resolve txt2img model for the selected tier
+      // Resolve img2img model for the selected tier
       const setting = modelSettings.find(
-        (s) => s.mode === "txt2img" && s.tier === params.tier
+        (s) => s.mode === "img2img" && s.tier === params.tier
       );
       const selectedModel = setting?.modelId ?? currentGeneration.modelId;
+      const promptStrength =
+        VARIATION_STRENGTH_MAP[params.strength ?? "balanced"] ?? 0.6;
 
       dispatch({ type: "SET_GENERATING", isGenerating: true });
 
@@ -265,9 +274,10 @@ export function CanvasDetailView({
           promptStyle: params.promptStyle,
           negativePrompt: params.negativePrompt,
           modelIds: [selectedModel],
-          params: { ...(params.imageParams ?? {}) },
+          params: { prompt_strength: promptStrength, ...(params.imageParams ?? {}) },
           count: params.count,
-          generationMode: "txt2img",
+          generationMode: "img2img",
+          sourceImageUrl: currentGeneration.imageUrl ?? undefined,
           sourceGenerationId: currentGeneration.id,
         });
 

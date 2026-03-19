@@ -54,6 +54,9 @@ beforeAll(() => {
 // ---------------------------------------------------------------------------
 
 vi.mock("lucide-react", () => ({
+  Copy: (props: Record<string, unknown>) => (
+    <span data-testid="icon-copy" {...props} />
+  ),
   Sparkles: (props: Record<string, unknown>) => (
     <span data-testid="icon-sparkles" {...props} />
   ),

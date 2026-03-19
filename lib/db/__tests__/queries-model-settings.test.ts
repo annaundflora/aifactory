@@ -219,8 +219,8 @@ describe('model_settings query functions', () => {
 
   // AC-7: GIVEN eine leere model_settings Tabelle
   //       WHEN seedModelSettingsDefaults() aufgerufen wird
-  //       THEN existieren danach exakt 8 Eintraege (gleiche Daten wie in architecture.md -> "Seed Data")
-  it('AC-7: should seed 8 default entries into empty table', async () => {
+  //       THEN existieren danach exakt 10 Eintraege (updated: +inpaint, +outpaint, img2img has max, upscale has draft)
+  it('AC-7: should seed 10 default entries into empty table', async () => {
     mockChain = createChainableMock(undefined)
 
     await seedModelSettingsDefaults()
@@ -229,15 +229,17 @@ describe('model_settings query functions', () => {
     expect(mockChain.insert).toHaveBeenCalled()
     expect(mockChain.values).toHaveBeenCalled()
 
-    // Verify the values call received an array of 8 defaults
+    // Verify the values call received an array of 10 defaults
     const valuesCall = mockChain.values.mock.calls[0][0]
-    expect(valuesCall).toHaveLength(8)
+    expect(valuesCall).toHaveLength(10)
 
     // Verify expected seed data structure
     const modes = valuesCall.map((v: { mode: string }) => v.mode)
     expect(modes).toContain('txt2img')
     expect(modes).toContain('img2img')
     expect(modes).toContain('upscale')
+    expect(modes).toContain('inpaint')
+    expect(modes).toContain('outpaint')
 
     const tiers = valuesCall.map((v: { tier: string }) => v.tier)
     expect(tiers).toContain('draft')
@@ -253,20 +255,20 @@ describe('model_settings query functions', () => {
     expect(img2imgQuality.modelParams).toEqual({ prompt_strength: 0.6 })
 
     const upscaleDraft = valuesCall.find((v: { mode: string; tier: string }) => v.mode === 'upscale' && v.tier === 'draft')
-    expect(upscaleDraft.modelId).toBe('nightmareai/real-esrgan')
-    expect(upscaleDraft.modelParams).toEqual({ scale: 2 })
+    expect(upscaleDraft.modelId).toBe('philz1337x/crystal-upscaler')
+    expect(upscaleDraft.modelParams).toEqual({ scale: 4 })
 
     const upscaleQuality = valuesCall.find((v: { mode: string; tier: string }) => v.mode === 'upscale' && v.tier === 'quality')
-    expect(upscaleQuality.modelId).toBe('philz1337x/crystal-upscaler')
-    expect(upscaleQuality.modelParams).toEqual({ scale: 4 })
+    expect(upscaleQuality.modelId).toBe('nightmareai/real-esrgan')
+    expect(upscaleQuality.modelParams).toEqual({ scale: 2 })
 
     // Verify onConflictDoNothing was used for idempotency
     expect(mockChain.onConflictDoNothing).toHaveBeenCalled()
   })
 
-  // AC-8: GIVEN 8 bestehende Eintraege in model_settings
+  // AC-8: GIVEN 9 bestehende Eintraege in model_settings
   //       WHEN seedModelSettingsDefaults() erneut aufgerufen wird
-  //       THEN bleiben exakt 8 Eintraege bestehen (ON CONFLICT DO NOTHING, idempotent), keine Duplikate
+  //       THEN bleiben exakt 10 Eintraege bestehen (ON CONFLICT DO NOTHING, idempotent), keine Duplikate
   it('AC-8: should not create duplicates when seedModelSettingsDefaults called twice', async () => {
     // First call
     mockChain = createChainableMock(undefined)
@@ -276,7 +278,7 @@ describe('model_settings query functions', () => {
     expect(firstInsertCall).toBe(1)
     expect(mockChain.onConflictDoNothing).toHaveBeenCalledTimes(1)
 
-    // Second call (simulates calling again with 8 existing entries)
+    // Second call (simulates calling again with 9 existing entries)
     vi.clearAllMocks()
     mockChain = createChainableMock(undefined)
     await seedModelSettingsDefaults()
@@ -286,8 +288,8 @@ describe('model_settings query functions', () => {
     expect(mockChain.insert).toHaveBeenCalledTimes(1)
     expect(mockChain.onConflictDoNothing).toHaveBeenCalledTimes(1)
 
-    // Verify the same 8 values are passed each time (idempotent payload)
+    // Verify the same 10 values are passed each time (idempotent payload)
     const valuesCall = mockChain.values.mock.calls[0][0]
-    expect(valuesCall).toHaveLength(8)
+    expect(valuesCall).toHaveLength(10)
   })
 })

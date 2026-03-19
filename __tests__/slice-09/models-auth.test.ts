@@ -1,7 +1,7 @@
 /**
  * Slice 09: Server Action Auth - Models
  *
- * Acceptance tests for all 3 server actions in app/actions/models.ts.
+ * Acceptance tests for server actions in app/actions/models.ts.
  * Tests verify that:
  * - requireAuth() is called as the first guard in every action
  * - Unauthenticated calls return { error: "Unauthorized" } without external API calls
@@ -9,8 +9,8 @@
  *
  * Mocking strategy (per orchestrator instruction):
  * - requireAuth() is mocked to simulate authenticated/unauthenticated states
- * - CollectionModelService and ModelSchemaService are mocked to verify they are NOT
- *   called when unauthenticated and ARE called when authenticated
+ * - ModelCatalogService is mocked to verify it is NOT called when unauthenticated
+ *   and IS called when authenticated
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -24,19 +24,41 @@ vi.mock("@/lib/auth/guard", () => ({
   requireAuth: vi.fn(),
 }));
 
-// Mock the collection model service
-vi.mock("@/lib/services/collection-model-service", () => ({
-  CollectionModelService: {
-    getCollectionModels: vi.fn(),
+// Mock the model catalog service
+vi.mock("@/lib/services/model-catalog-service", () => ({
+  ModelCatalogService: {
+    getAll: vi.fn(),
+    getByCapability: vi.fn(),
+    getSchema: vi.fn(),
   },
 }));
 
-// Mock the model schema service
-vi.mock("@/lib/services/model-schema-service", () => ({
-  ModelSchemaService: {
-    supportsImg2Img: vi.fn(),
-    getSchema: vi.fn(),
+// Mock the capability detection module
+vi.mock("@/lib/services/capability-detection", () => ({
+  resolveSchemaRefs: vi.fn(),
+}));
+
+// Mock the db module
+vi.mock("@/lib/db", () => ({
+  db: {
+    update: vi.fn().mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(undefined),
+      }),
+    }),
   },
+}));
+
+// Mock drizzle schema
+vi.mock("@/lib/db/schema", () => ({
+  models: {
+    replicateId: "replicate_id",
+  },
+}));
+
+// Mock drizzle-orm
+vi.mock("drizzle-orm", () => ({
+  eq: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -44,11 +66,9 @@ vi.mock("@/lib/services/model-schema-service", () => ({
 // ---------------------------------------------------------------------------
 
 import { requireAuth } from "@/lib/auth/guard";
-import { CollectionModelService } from "@/lib/services/collection-model-service";
-import { ModelSchemaService } from "@/lib/services/model-schema-service";
+import { ModelCatalogService } from "@/lib/services/model-catalog-service";
 import {
-  getCollectionModels,
-  checkImg2ImgSupport,
+  getModels,
   getModelSchema,
 } from "@/app/actions/models";
 
@@ -57,11 +77,8 @@ import {
 // ---------------------------------------------------------------------------
 
 const mockRequireAuth = vi.mocked(requireAuth);
-const mockGetCollectionModels = vi.mocked(
-  CollectionModelService.getCollectionModels
-);
-const mockSupportsImg2Img = vi.mocked(ModelSchemaService.supportsImg2Img);
-const mockGetSchema = vi.mocked(ModelSchemaService.getSchema);
+const mockGetAll = vi.mocked(ModelCatalogService.getAll);
+const mockGetSchema = vi.mocked(ModelCatalogService.getSchema);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -79,7 +96,7 @@ beforeEach(() => {
 });
 
 // =========================================================================
-// AC-5 through AC-7: Unauthenticated access returns Unauthorized
+// Unauthenticated access returns Unauthorized
 // =========================================================================
 
 describe("Unauthenticated access -- all models actions return Unauthorized", () => {
@@ -87,35 +104,25 @@ describe("Unauthenticated access -- all models actions return Unauthorized", () 
     mockRequireAuth.mockResolvedValue(UNAUTHORIZED);
   });
 
-  it('AC-5: GIVEN kein User ist eingeloggt WHEN getCollectionModels() aufgerufen wird THEN gibt die Action { error: "Unauthorized" } zurueck OHNE Replicate-API-Aufruf', async () => {
-    const result = await getCollectionModels();
+  it('GIVEN kein User ist eingeloggt WHEN getModels() aufgerufen wird THEN gibt die Action { error: "Unauthorized" } zurueck OHNE DB-Aufruf', async () => {
+    const result = await getModels({});
 
     expect(result).toEqual({ error: "Unauthorized" });
-    // Verify NO API call was made
-    expect(mockGetCollectionModels).not.toHaveBeenCalled();
+    // Verify NO service call was made
+    expect(mockGetAll).not.toHaveBeenCalled();
   });
 
-  it('AC-6: GIVEN kein User ist eingeloggt WHEN checkImg2ImgSupport({ modelId: "owner/model" }) aufgerufen wird THEN gibt die Action { error: "Unauthorized" } zurueck (statt false)', async () => {
-    const result = await checkImg2ImgSupport({ modelId: "owner/model" });
-
-    expect(result).toEqual({ error: "Unauthorized" });
-    // Verify it returns { error } and NOT boolean false
-    expect(result).not.toBe(false);
-    // Verify NO API call was made
-    expect(mockSupportsImg2Img).not.toHaveBeenCalled();
-  });
-
-  it('AC-7: GIVEN kein User ist eingeloggt WHEN getModelSchema({ modelId: "owner/model" }) aufgerufen wird THEN gibt die Action { error: "Unauthorized" } zurueck', async () => {
+  it('GIVEN kein User ist eingeloggt WHEN getModelSchema({ modelId: "owner/model" }) aufgerufen wird THEN gibt die Action { error: "Unauthorized" } zurueck', async () => {
     const result = await getModelSchema({ modelId: "owner/model" });
 
     expect(result).toEqual({ error: "Unauthorized" });
-    // Verify NO API call was made
+    // Verify NO service call was made
     expect(mockGetSchema).not.toHaveBeenCalled();
   });
 });
 
 // =========================================================================
-// AC-11: getCollectionModels with valid session
+// Authenticated access delegates to services
 // =========================================================================
 
 describe("Authenticated access -- models actions delegate to services", () => {
@@ -123,24 +130,32 @@ describe("Authenticated access -- models actions delegate to services", () => {
     mockRequireAuth.mockResolvedValue(FAKE_USER);
   });
 
-  it("AC-11: GIVEN User ist eingeloggt mit gueltiger Session WHEN getCollectionModels() aufgerufen wird THEN wird CollectionModelService.getCollectionModels() aufgerufen und das Ergebnis zurueckgegeben", async () => {
+  it("GIVEN User ist eingeloggt WHEN getModels({}) aufgerufen wird THEN wird ModelCatalogService.getAll() aufgerufen und das Ergebnis zurueckgegeben", async () => {
     const fakeModels = [
       {
-        url: "https://replicate.com/stability-ai/sdxl",
+        id: "uuid-1",
+        replicateId: "stability-ai/sdxl",
         owner: "stability-ai",
         name: "sdxl",
         description: "Stable Diffusion XL",
-        cover_image_url: null,
-        run_count: 100000,
-        created_at: "2024-01-01",
+        coverImageUrl: null,
+        runCount: 100000,
+        collections: ["text-to-image"],
+        capabilities: { txt2img: true, img2img: false, upscale: false, inpaint: false, outpaint: false },
+        inputSchema: null,
+        versionHash: null,
+        isActive: true,
+        lastSyncedAt: null,
+        createdAt: new Date("2024-01-01"),
+        updatedAt: new Date("2024-01-01"),
       },
     ];
-    mockGetCollectionModels.mockResolvedValue(fakeModels);
+    mockGetAll.mockResolvedValue(fakeModels as any);
 
-    const result = await getCollectionModels();
+    const result = await getModels({});
 
     // Verify the service was called
-    expect(mockGetCollectionModels).toHaveBeenCalledOnce();
+    expect(mockGetAll).toHaveBeenCalledOnce();
     // Verify the result is the service response
     expect(result).toEqual(fakeModels);
   });

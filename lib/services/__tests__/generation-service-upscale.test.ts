@@ -27,16 +27,19 @@ vi.mock("@/lib/db/queries", () => ({
   createGenerationReferences: vi.fn(),
 }));
 
-// Mock ModelSchemaService
-vi.mock("@/lib/services/model-schema-service", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/services/model-schema-service")>();
+// Mock ModelCatalogService
+vi.mock("@/lib/services/model-catalog-service", () => ({
+  ModelCatalogService: {
+    getSchema: vi.fn(),
+    getByReplicateId: vi.fn(),
+  },
+}));
+
+// Mock capability-detection — keep real functions (pure)
+vi.mock("@/lib/services/capability-detection", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/services/capability-detection")>();
   return {
     ...actual,
-    ModelSchemaService: {
-      getSchema: vi.fn(),
-      supportsImg2Img: vi.fn(),
-      clearCache: vi.fn(),
-    },
   };
 });
 

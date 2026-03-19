@@ -62,7 +62,7 @@ const {
   mockUpscaleImage,
   mockFetchGenerations,
   mockDeleteGeneration,
-  mockGetCollectionModels,
+  mockGetModels,
   mockCheckImg2ImgSupport,
   mockGetModelSettings,
   mockToastFn,
@@ -73,7 +73,7 @@ const {
   mockUpscaleImage: vi.fn(),
   mockFetchGenerations: vi.fn(),
   mockDeleteGeneration: vi.fn(),
-  mockGetCollectionModels: vi.fn(),
+  mockGetModels: vi.fn(),
   mockCheckImg2ImgSupport: vi.fn(),
   mockGetModelSettings: vi.fn(),
   mockToastFn: vi.fn(),
@@ -111,8 +111,8 @@ vi.mock("@/app/actions/model-settings", () => ({
 
 // Mock model actions
 vi.mock("@/app/actions/models", () => ({
-  getCollectionModels: (...args: unknown[]) => mockGetCollectionModels(...args),
-  checkImg2ImgSupport: (...args: unknown[]) => mockCheckImg2ImgSupport(...args),
+  getModels: (...args: unknown[]) => mockGetModels(...args),
+  getModelSchema: (...args: unknown[]) => mockCheckImg2ImgSupport(...args),
 }));
 
 // Mock sonner toast
@@ -440,16 +440,9 @@ describe("handleImg2imgGenerate with tier parameter", () => {
     const popover = await screen.findByTestId("img2img-popover");
     expect(popover).toBeInTheDocument();
 
-    // Switch tier to "Quality" first (scoped to popover)
-    const qualityButton = within(popover).getByText("Quality");
-    await user.click(qualityButton);
-
-    // Enable MaxQuality
-    const maxQualityToggle = await screen.findByTestId("max-quality-toggle");
-    await user.click(maxQualityToggle);
-
-    // Verify MaxQuality is on
-    expect(maxQualityToggle).toHaveAttribute("aria-pressed", "true");
+    // Switch tier to "Max" directly via TierToggle
+    const maxButton = within(popover).getByText("Max");
+    await user.click(maxButton);
 
     // Click Generate
     const generateBtn = screen.getByTestId("generate-button");

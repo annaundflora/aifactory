@@ -23,10 +23,13 @@ import type { Tier } from "@/lib/types";
 // Types (exported for slice-14)
 // ---------------------------------------------------------------------------
 
+export type VariationStrength = "subtle" | "balanced" | "creative";
+
 export interface VariationParams {
   prompt: string;
   promptStyle: string;
   negativePrompt: string;
+  strength?: VariationStrength;
   count: number;
   tier: Tier;
   imageParams?: Record<string, unknown>;
