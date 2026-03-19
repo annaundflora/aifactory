@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, type DragEvent, type ChangeEvent, type ClipboardEvent } from "react";
 import { uploadSourceImage } from "@/app/actions/upload";
 import { Loader2, X } from "lucide-react";
+import { GALLERY_DRAG_MIME_TYPE, type GalleryDragPayload } from "@/lib/constants/drag-types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -91,6 +92,10 @@ export function ImageDropzone({ projectId, onUpload, initialUrl }: ImageDropzone
   // ---------------------------------------------------------------------------
 
   const handleDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
+    const hasFiles = e.dataTransfer.types.includes("Files");
+    const isGallery = Array.from(e.dataTransfer.types).includes(GALLERY_DRAG_MIME_TYPE);
+    if (!hasFiles && !isGallery) return;
+
     e.preventDefault();
     e.stopPropagation();
     setState((current) => {
@@ -108,9 +113,26 @@ export function ImageDropzone({ projectId, onUpload, initialUrl }: ImageDropzone
   }, []);
 
   const handleDrop = useCallback(
-    (e: DragEvent<HTMLDivElement>) => {
+    async (e: DragEvent<HTMLDivElement>) => {
       e.preventDefault();
       e.stopPropagation();
+
+      // Gallery drag takes precedence — image already has a URL
+      const galleryData = e.dataTransfer.getData(GALLERY_DRAG_MIME_TYPE);
+      if (galleryData) {
+        try {
+          const parsed: GalleryDragPayload = JSON.parse(galleryData);
+          if (parsed.imageUrl) {
+            const { width, height } = await readImageDimensions(parsed.imageUrl);
+            setImageInfo({ url: parsed.imageUrl, filename: "", width, height });
+            setState("preview");
+            onUpload(parsed.imageUrl);
+            return;
+          }
+        } catch {
+          // Invalid payload, fall through
+        }
+      }
 
       const file = e.dataTransfer.files?.[0];
       if (!file) {
@@ -120,7 +142,7 @@ export function ImageDropzone({ projectId, onUpload, initialUrl }: ImageDropzone
 
       processFile(file);
     },
-    [processFile]
+    [processFile, readImageDimensions, onUpload]
   );
 
   // ---------------------------------------------------------------------------

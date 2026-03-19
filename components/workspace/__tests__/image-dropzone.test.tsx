@@ -93,6 +93,7 @@ function fireDrop(element: HTMLElement, file: File) {
   const dataTransfer = {
     files: [file],
     types: ["Files"],
+    getData: () => "",
   };
   fireEvent.drop(element, { dataTransfer });
 }
@@ -574,5 +575,59 @@ describe("ImageDropzone Acceptance", () => {
     });
 
     expect(onUpload).toHaveBeenCalledWith(R2_URL);
+  });
+
+  // --------------------------------------------------------------------------
+  // AC-13: Gallery-Drag legt Bild direkt als Preview ab (kein Upload noetig)
+  // GIVEN `ImageDropzone` im `empty`-State
+  // WHEN ein Bild aus der Gallery per Drag & Drop abgelegt wird
+  //      (Custom MIME type "application/x-aifactory-generation")
+  // THEN wechselt die Komponente direkt in den `preview`-State mit der
+  //      imageUrl aus dem Gallery-Payload; `onUpload` wird mit der URL
+  //      aufgerufen; `uploadSourceImage` wird NICHT aufgerufen
+  // --------------------------------------------------------------------------
+  it("AC-13: should accept gallery drag and show preview without uploading", async () => {
+    const onUpload = vi.fn();
+    render(<ImageDropzone projectId={PROJECT_ID} onUpload={onUpload} />);
+
+    const dropzone = screen.getByTestId("image-dropzone");
+
+    const galleryPayload = JSON.stringify({
+      generationId: "gen-123",
+      imageUrl: R2_URL,
+    });
+
+    // Fire dragOver with gallery MIME type so dropzone highlights
+    fireEvent.dragOver(dropzone, {
+      dataTransfer: {
+        types: ["application/x-aifactory-generation"],
+      },
+    });
+    expect(dropzone).toHaveAttribute("data-state", "drag-over");
+
+    // Drop with gallery MIME type
+    fireEvent.drop(dropzone, {
+      dataTransfer: {
+        files: [],
+        types: ["application/x-aifactory-generation"],
+        getData: (type: string) =>
+          type === "application/x-aifactory-generation" ? galleryPayload : "",
+      },
+    });
+
+    // Should transition to preview
+    await waitFor(() => {
+      expect(screen.getByTestId("image-dropzone")).toHaveAttribute("data-state", "preview");
+    });
+
+    // Thumbnail shows gallery image URL
+    const thumbnail = screen.getByTestId("image-thumbnail");
+    expect(thumbnail).toHaveAttribute("src", R2_URL);
+
+    // onUpload called with the gallery image URL
+    expect(onUpload).toHaveBeenCalledWith(R2_URL);
+
+    // uploadSourceImage was NOT called — no upload needed
+    expect(mockUploadSourceImage).not.toHaveBeenCalled();
   });
 });
