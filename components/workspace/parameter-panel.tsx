@@ -78,6 +78,7 @@ const INTERNAL_FIELDS = new Set([
   "mask_url",
   // img2img control fields
   "prompt_strength",
+  "strength",
   // Inpainting fields
   "inpaint_prompt",
   "inpaint_strength",
@@ -282,7 +283,7 @@ export function ParameterPanel({
   onChange,
   primaryFields = DEFAULT_PRIMARY_FIELDS,
 }: ParameterPanelProps) {
-  const [advancedOpen, setAdvancedOpen] = useState(true);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const { primary, advanced } = useMemo(() => {
     if (!schema) return { primary: [], advanced: [] };
