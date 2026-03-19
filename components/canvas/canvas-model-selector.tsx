@@ -109,7 +109,7 @@ export function CanvasModelSelector({
       const newModelId =
         model.replicateId ??
         ("owner" in model && "name" in model
-          ? `${(model as Record<string, string>).owner}/${(model as Record<string, string>).name}`
+          ? `${(model as unknown as Record<string, string>).owner}/${(model as unknown as Record<string, string>).name}`
           : undefined);
       if (newModelId) {
         setSelectedModelId(newModelId);
