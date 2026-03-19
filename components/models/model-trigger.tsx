@@ -1,15 +1,15 @@
 "use client";
 
 import { X } from "lucide-react";
-import { type CollectionModel } from "@/lib/types/collection-model";
+import { type Model } from "@/lib/services/model-catalog-service";
 
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
 
 export interface ModelTriggerProps {
-  models: CollectionModel[];
-  onRemove: (model: CollectionModel) => void;
+  models: Model[];
+  onRemove: (model: Model) => void;
   onBrowse: () => void;
 }
 
@@ -32,9 +32,9 @@ export function ModelTrigger({ models, onRemove, onBrowse }: ModelTriggerProps) 
           >
             {/* Thumbnail 32x32 */}
             <div className="h-8 w-8 shrink-0 overflow-hidden rounded">
-              {model.cover_image_url ? (
+              {model.coverImageUrl ? (
                 <img
-                  src={model.cover_image_url}
+                  src={model.coverImageUrl}
                   alt={`${model.name} cover`}
                   loading="lazy"
                   className="h-full w-full object-cover"

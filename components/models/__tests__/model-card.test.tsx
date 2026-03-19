@@ -5,21 +5,29 @@ import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 
 import { ModelCard } from "@/components/models/model-card";
-import { type CollectionModel } from "@/lib/types/collection-model";
+import { type Model } from "@/lib/services/model-catalog-service";
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
-function createModel(overrides: Partial<CollectionModel> = {}): CollectionModel {
+function createModel(overrides: Partial<Model> = {}): Model {
   return {
-    url: "https://replicate.com/acme/test-model",
+    id: "uuid-test-1",
+    replicateId: "acme/test-model",
     owner: "acme",
     name: "test-model",
     description: "A short description of the model for testing purposes.",
-    cover_image_url: "https://example.com/cover.jpg",
-    run_count: 1_500_000,
-    created_at: "2025-01-15T00:00:00Z",
+    coverImageUrl: "https://example.com/cover.jpg",
+    runCount: 1_500_000,
+    collections: ["text-to-image"],
+    capabilities: { txt2img: true, img2img: false, upscale: false, inpaint: false, outpaint: false },
+    inputSchema: null,
+    versionHash: null,
+    isActive: true,
+    lastSyncedAt: null,
+    createdAt: new Date("2025-01-15T00:00:00Z"),
+    updatedAt: new Date("2025-01-15T00:00:00Z"),
     ...overrides,
   };
 }
@@ -48,7 +56,7 @@ describe("AC-1: Full card with all fields", () => {
     // Cover image with correct src
     const img = screen.getByRole("img", { name: model.name });
     expect(img).toBeInTheDocument();
-    expect(img).toHaveAttribute("src", model.cover_image_url);
+    expect(img).toHaveAttribute("src", model.coverImageUrl);
     expect(img).toHaveAttribute("loading", "lazy");
 
     // Image wrapper has aspect-video for 16:9
@@ -88,7 +96,7 @@ describe("AC-2: Fallback gradient when cover_image_url is null", () => {
      *       THEN wird statt eines <img>-Tags ein Fallback-Gradient-Div mit fester 16:9-Hoehe angezeigt
      *       AND kein <img>-Tag ist im DOM vorhanden
      */
-    const model = createModel({ cover_image_url: null });
+    const model = createModel({ coverImageUrl: null });
     const { container } = render(
       <ModelCard model={model} selected={false} disabled={false} onSelect={noop} />
     );

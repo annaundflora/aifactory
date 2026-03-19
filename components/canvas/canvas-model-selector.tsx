@@ -2,8 +2,7 @@
 
 import { useState, useCallback, useMemo, useRef } from "react";
 import { ChevronDown, Library } from "lucide-react";
-import { toast } from "sonner";
-import { getCollectionModels, checkImg2ImgSupport } from "@/app/actions/models";
+import { getModels } from "@/app/actions/models";
 import { ModelBrowserDrawer } from "@/components/models/model-browser-drawer";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { CollectionModel } from "@/lib/types/collection-model";
+import type { Model } from "@/lib/services/model-catalog-service";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -58,29 +57,22 @@ export function CanvasModelSelector({
     prevInitialModelIdRef.current = initialModelId;
   }
 
-  // Collection models state for the browser drawer
-  const [collectionModels, setCollectionModels] = useState<CollectionModel[]>(
-    []
-  );
+  // Models state for the browser drawer
+  const [catalogModels, setCatalogModels] = useState<Model[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [modelError, setModelError] = useState<string | undefined>();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // Cache of img2img support per model (to avoid re-fetching)
-  const [img2imgCache, setImg2imgCache] = useState<Map<string, boolean>>(
-    new Map()
-  );
-
-  // Fetch collection models when the drawer opens
+  // Fetch models from the catalog when the drawer opens
   const fetchModels = useCallback(async () => {
     setIsLoadingModels(true);
     setModelError(undefined);
     try {
-      const result = await getCollectionModels();
+      const result = await getModels({ capability: "img2img" });
       if ("error" in result) {
         setModelError(result.error);
       } else {
-        setCollectionModels(result);
+        setCatalogModels(result);
       }
     } catch {
       setModelError("Modelle konnten nicht geladen werden");
@@ -95,66 +87,27 @@ export function CanvasModelSelector({
     fetchModels();
   }, [fetchModels]);
 
-  // The currently selected model as a CollectionModel (for the drawer)
+  // The currently selected model as a Model (for the drawer)
   const selectedModels = useMemo(() => {
     if (!selectedModelId) return [];
-    const parts = selectedModelId.split("/");
-    if (parts.length !== 2) return [];
-    const match = collectionModels.find(
-      (m) => m.owner === parts[0] && m.name === parts[1]
+    const match = catalogModels.find(
+      (m) => m.replicateId === selectedModelId
     );
     return match ? [match] : [];
-  }, [selectedModelId, collectionModels]);
+  }, [selectedModelId, catalogModels]);
 
   // Handle model selection from the drawer
+  // All models returned by getModels({ capability: "img2img" }) are already
+  // img2img-capable, so no additional compatibility check is needed.
   const handleConfirm = useCallback(
-    async (models: CollectionModel[]) => {
+    async (models: Model[]) => {
       if (models.length === 0) return;
       // Only take the first model (single selection for canvas)
       const model = models[0];
-      const newModelId = `${model.owner}/${model.name}`;
-
-      // Check img2img support via server action
-      let supportsImg2img = img2imgCache.get(newModelId);
-      if (supportsImg2img === undefined) {
-        try {
-          const checkResult = await checkImg2ImgSupport({ modelId: newModelId });
-          supportsImg2img = typeof checkResult === "boolean" ? checkResult : true;
-          setImg2imgCache((prev) => new Map(prev).set(newModelId, supportsImg2img!));
-        } catch {
-          // If we can't determine, assume it supports img2img
-          supportsImg2img = true;
-        }
-      }
-
-      if (!supportsImg2img) {
-        // AC-11: Auto-switch to first img2img-capable model
-        toast("Dieses Modell unterstuetzt kein img2img. Es wird automatisch ein kompatibles Modell gewaehlt.");
-        // Try to find first img2img-capable model from the collection
-        for (const m of collectionModels) {
-          const mId = `${m.owner}/${m.name}`;
-          let supports = img2imgCache.get(mId);
-          if (supports === undefined) {
-            try {
-              const checkRes = await checkImg2ImgSupport({ modelId: mId });
-              supports = typeof checkRes === "boolean" ? checkRes : true;
-              setImg2imgCache((prev) => new Map(prev).set(mId, supports!));
-            } catch {
-              continue;
-            }
-          }
-          if (supports) {
-            setSelectedModelId(mId);
-            return;
-          }
-        }
-        // If no compatible model found, keep the current one
-        return;
-      }
-
+      const newModelId = model.replicateId;
       setSelectedModelId(newModelId);
     },
-    [img2imgCache, collectionModels]
+    []
   );
 
   return (
@@ -190,7 +143,7 @@ export function CanvasModelSelector({
 
       <ModelBrowserDrawer
         open={drawerOpen}
-        models={collectionModels}
+        models={catalogModels}
         selectedModels={selectedModels}
         isLoading={isLoadingModels}
         error={modelError}

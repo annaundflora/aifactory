@@ -32,10 +32,10 @@ vi.mock("@/lib/services/model-settings-service", () => ({
   },
 }));
 
-// Mock the model schema service (transitive dependency of ModelSettingsService)
-vi.mock("@/lib/services/model-schema-service", () => ({
-  ModelSchemaService: {
-    supportsImg2Img: vi.fn(),
+// Mock the model catalog service (transitive dependency of ModelSettingsService)
+vi.mock("@/lib/services/model-catalog-service", () => ({
+  ModelCatalogService: {
+    getByReplicateId: vi.fn(),
     getSchema: vi.fn(),
   },
 }));

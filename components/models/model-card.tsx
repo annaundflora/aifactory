@@ -6,19 +6,19 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { formatRunCount } from "@/lib/utils/format-run-count";
-import { type CollectionModel } from "@/lib/types/collection-model";
+import { type Model } from "@/lib/services/model-catalog-service";
 
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
 
 export interface ModelCardProps {
-  model: CollectionModel;
+  model: Model;
   selected: boolean;
   disabled: boolean;
-  onSelect: (model: CollectionModel) => void;
+  onSelect: (model: Model) => void;
   isFavorite?: boolean;
-  onFavoriteToggle?: (model: CollectionModel) => void;
+  onFavoriteToggle?: (model: Model) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -54,10 +54,10 @@ export function ModelCard({ model, selected, disabled, onSelect, isFavorite = fa
       )}
     >
       {/* Cover image / Fallback gradient */}
-      {model.cover_image_url ? (
+      {model.coverImageUrl ? (
         <div className="relative w-full aspect-video overflow-hidden">
           <img
-            src={model.cover_image_url}
+            src={model.coverImageUrl}
             alt={model.name}
             loading="lazy"
             className="w-full h-full object-cover"
@@ -123,7 +123,7 @@ export function ModelCard({ model, selected, disabled, onSelect, isFavorite = fa
         {/* Run count badge */}
         <div className="mt-1">
           <Badge variant="secondary" className="text-xs">
-            {formatRunCount(model.run_count)}
+            {formatRunCount(model.runCount ?? 0)}
           </Badge>
         </div>
       </CardContent>

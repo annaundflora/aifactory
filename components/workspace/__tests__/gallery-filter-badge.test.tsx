@@ -121,8 +121,8 @@ vi.mock("@/lib/db/queries", () => ({
 
 // Mock model actions (used by CanvasModelSelector in CanvasDetailView)
 vi.mock("@/app/actions/models", () => ({
-  getCollectionModels: vi.fn().mockResolvedValue([]),
-  checkImg2ImgSupport: vi.fn().mockResolvedValue(true),
+  getModels: vi.fn().mockResolvedValue([]),
+  getModelSchema: vi.fn().mockResolvedValue({ properties: {} }),
 }));
 
 // Mock ModelBrowserDrawer

@@ -51,7 +51,7 @@ const {
   mockUpscaleImage,
   mockFetchGenerations,
   mockDeleteGeneration,
-  mockGetCollectionModels,
+  mockGetModels,
   mockCheckImg2ImgSupport,
   mockGetModelSettings,
   mockToastFn,
@@ -62,7 +62,7 @@ const {
   mockUpscaleImage: vi.fn(),
   mockFetchGenerations: vi.fn(),
   mockDeleteGeneration: vi.fn(),
-  mockGetCollectionModels: vi.fn(),
+  mockGetModels: vi.fn(),
   mockCheckImg2ImgSupport: vi.fn(),
   mockGetModelSettings: vi.fn(),
   mockToastFn: vi.fn(),
@@ -95,8 +95,8 @@ vi.mock("@/app/actions/model-settings", () => ({
 
 // Mock model actions
 vi.mock("@/app/actions/models", () => ({
-  getCollectionModels: (...args: unknown[]) => mockGetCollectionModels(...args),
-  checkImg2ImgSupport: (...args: unknown[]) => mockCheckImg2ImgSupport(...args),
+  getModels: (...args: unknown[]) => mockGetModels(...args),
+  getModelSchema: (...args: unknown[]) => mockCheckImg2ImgSupport(...args),
 }));
 
 // Mock references server action (transitive dep via details-overlay -> provenance-row + img2img handler)
@@ -831,7 +831,7 @@ describe("CanvasModelSelector", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    mockGetCollectionModels.mockResolvedValue([]);
+    mockGetModels.mockResolvedValue([]);
     mockCheckImg2ImgSupport.mockResolvedValue(true);
     mockGetModelSettings.mockResolvedValue([]);
     capturedDrawerOnConfirm = null;
@@ -962,9 +962,9 @@ describe("CanvasModelSelector", () => {
       },
     ];
 
-    mockGetCollectionModels.mockResolvedValue(compatibleModels);
+    mockGetModels.mockResolvedValue(compatibleModels);
 
-    // checkImg2ImgSupport call sequence:
+    // getModelSchema call sequence:
     // 1. Initial check for selected model (no-img2img/model-bad) -> false
     // 2. Iteration: no-img2img/model-bad (cache miss due to React state) -> false
     // 3. Iteration: good-vendor/img2img-model -> true
@@ -992,10 +992,10 @@ describe("CanvasModelSelector", () => {
 
     // Wait for collection models to load (fetchModels is called on drawer open)
     await waitFor(() => {
-      expect(mockGetCollectionModels).toHaveBeenCalledTimes(1);
+      expect(mockGetModels).toHaveBeenCalledTimes(1);
     });
 
-    // Allow the state update from getCollectionModels to settle
+    // Allow the state update from getModels to settle
     await act(async () => {
       await Promise.resolve();
     });

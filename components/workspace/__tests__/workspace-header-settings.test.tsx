@@ -70,8 +70,8 @@ vi.mock("@/app/actions/model-settings", () => ({
 }));
 
 vi.mock("@/app/actions/models", () => ({
-  getCollectionModels: vi.fn().mockResolvedValue([]),
-  checkImg2ImgSupport: vi.fn().mockResolvedValue(true),
+  getModels: vi.fn().mockResolvedValue([]),
+  getModelSchema: vi.fn().mockResolvedValue({ properties: {} }),
 }));
 
 // Mock ThemeToggle to isolate WorkspaceHeader logic

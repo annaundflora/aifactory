@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 
 import { ModelBrowserDrawer, type ModelBrowserDrawerProps } from "@/components/models/model-browser-drawer";
-import { type CollectionModel } from "@/lib/types/collection-model";
+import { type Model } from "@/lib/services/model-catalog-service";
 
 // Note: getFavoriteModels and toggleFavoriteModel were removed from @/app/actions/models
 // in slice-13. The component now uses local no-op stubs.
@@ -14,20 +14,28 @@ import { type CollectionModel } from "@/lib/types/collection-model";
 // Fixtures
 // ---------------------------------------------------------------------------
 
-function createModel(overrides: Partial<CollectionModel> = {}): CollectionModel {
+function createModel(overrides: Partial<Model> = {}): Model {
   return {
-    url: "https://replicate.com/acme/test-model",
+    id: "uuid-test-1",
+    replicateId: "acme/test-model",
     owner: "acme",
     name: "test-model",
     description: "A short description of the model for testing purposes.",
-    cover_image_url: "https://example.com/cover.jpg",
-    run_count: 1_500_000,
-    created_at: "2025-01-15T00:00:00Z",
+    coverImageUrl: "https://example.com/cover.jpg",
+    runCount: 1_500_000,
+    collections: ["text-to-image"],
+    capabilities: { txt2img: true, img2img: false, upscale: false, inpaint: false, outpaint: false },
+    inputSchema: null,
+    versionHash: null,
+    isActive: true,
+    lastSyncedAt: null,
+    createdAt: new Date("2025-01-15T00:00:00Z"),
+    updatedAt: new Date("2025-01-15T00:00:00Z"),
     ...overrides,
   };
 }
 
-const FOUR_MODELS: CollectionModel[] = [
+const FOUR_MODELS: Model[] = [
   createModel({ owner: "black-forest-labs", name: "flux-schnell", description: "Flux Schnell is a fast model." }),
   createModel({ owner: "black-forest-labs", name: "flux-dev", description: "Flux Dev for development." }),
   createModel({ owner: "stability-ai", name: "sdxl", description: "Stable Diffusion XL model." }),

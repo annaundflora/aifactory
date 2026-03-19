@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import { createElement, type ReactNode } from "react";
 
-import { type CollectionModel } from "@/lib/types/collection-model";
+import { type Model } from "@/lib/services/model-catalog-service";
 import type { ReferenceSlotData } from "@/lib/types/reference";
 
 // ---------------------------------------------------------------------------
@@ -70,12 +70,12 @@ vi.mock("@/lib/models", () => ({
 
 // Mock server actions: models
 const mockGetModelSchema = vi.fn();
-const mockGetCollectionModels = vi.fn();
+const mockGetModels = vi.fn();
 const mockGetProjectSelectedModels = vi.fn();
 const mockSaveProjectSelectedModels = vi.fn();
 vi.mock("@/app/actions/models", () => ({
   getModelSchema: (...args: unknown[]) => mockGetModelSchema(...args),
-  getCollectionModels: (...args: unknown[]) => mockGetCollectionModels(...args),
+  getModels: (...args: unknown[]) => mockGetModels(...args),
   getProjectSelectedModels: (...args: unknown[]) => mockGetProjectSelectedModels(...args),
   saveProjectSelectedModels: (...args: unknown[]) => mockSaveProjectSelectedModels(...args),
 }));
@@ -213,15 +213,23 @@ import { PromptArea } from "@/components/workspace/prompt-area";
 // Fixtures
 // ---------------------------------------------------------------------------
 
-const COLLECTION_MODELS: CollectionModel[] = [
+const COLLECTION_MODELS: Model[] = [
   {
-    url: "https://replicate.com/stability-ai/sdxl",
+    id: "uuid-sdxl",
+    replicateId: "stability-ai/sdxl",
     owner: "stability-ai",
     name: "sdxl",
     description: "SDXL model with img2img support",
-    cover_image_url: "https://example.com/sdxl.jpg",
-    run_count: 3_000_000,
-    created_at: "2025-01-15T00:00:00Z",
+    coverImageUrl: "https://example.com/sdxl.jpg",
+    runCount: 3_000_000,
+    collections: ["text-to-image"],
+    capabilities: { txt2img: true, img2img: true, upscale: false, inpaint: false, outpaint: false },
+    inputSchema: null,
+    versionHash: null,
+    isActive: true,
+    lastSyncedAt: null,
+    createdAt: new Date("2025-01-15T00:00:00Z"),
+    updatedAt: new Date("2025-01-15T00:00:00Z"),
   },
 ];
 
