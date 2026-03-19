@@ -51,7 +51,12 @@ export function useModelSchema(
           return;
         }
 
-        if ("error" in result) {
+        // Defensive: guard against undefined/null result (e.g. network failure)
+        if (result == null || typeof result !== "object") {
+          console.error("useModelSchema: unexpected result", result);
+          setError("Schema konnte nicht geladen werden");
+          setSchema(null);
+        } else if ("error" in result) {
           console.error("useModelSchema: server returned error", result.error);
           setError(result.error);
           setSchema(null);

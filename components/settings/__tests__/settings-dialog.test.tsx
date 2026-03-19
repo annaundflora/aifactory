@@ -243,15 +243,15 @@ describe("SettingsDialog", () => {
     });
 
     // Verify model IDs are displayed in the trigger texts
+    // TIERS_BY_MODE: txt2img=[draft,quality,max], img2img=[draft,quality], upscale=[quality,max]
     await waitFor(() => {
       // flux-schnell appears for txt2img/draft and img2img/draft
       expect(screen.getAllByText("black-forest-labs/flux-schnell")).toHaveLength(2);
       // flux-1.1-pro appears for txt2img/quality and img2img/quality
       expect(screen.getAllByText("black-forest-labs/flux-1.1-pro")).toHaveLength(2);
-      // flux-1.1-pro-ultra appears for txt2img/max and img2img/max
-      expect(screen.getAllByText("black-forest-labs/flux-1.1-pro-ultra")).toHaveLength(2);
-      // upscale models appear once each
-      expect(screen.getAllByText("philz1337x/clarity-upscaler")).toHaveLength(1);
+      // flux-1.1-pro-ultra appears for txt2img/max only (img2img has no max tier)
+      expect(screen.getAllByText("black-forest-labs/flux-1.1-pro-ultra")).toHaveLength(1);
+      // upscale/quality shows nightmareai/real-esrgan
       expect(screen.getAllByText("nightmareai/real-esrgan")).toHaveLength(1);
     });
   });

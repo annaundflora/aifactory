@@ -440,16 +440,9 @@ describe("handleImg2imgGenerate with tier parameter", () => {
     const popover = await screen.findByTestId("img2img-popover");
     expect(popover).toBeInTheDocument();
 
-    // Switch tier to "Quality" first (scoped to popover)
-    const qualityButton = within(popover).getByText("Quality");
-    await user.click(qualityButton);
-
-    // Enable MaxQuality
-    const maxQualityToggle = await screen.findByTestId("max-quality-toggle");
-    await user.click(maxQualityToggle);
-
-    // Verify MaxQuality is on
-    expect(maxQualityToggle).toHaveAttribute("aria-pressed", "true");
+    // Switch tier to "Max" directly via TierToggle
+    const maxButton = within(popover).getByText("Max");
+    await user.click(maxButton);
 
     // Click Generate
     const generateBtn = screen.getByTestId("generate-button");

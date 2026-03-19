@@ -30,7 +30,8 @@ export interface CanvasModelSelectorProps {
  * Formats a model ID like "black-forest-labs/flux-2-max" into a shorter
  * display name like "flux-2-max" (just the model name portion).
  */
-function formatModelDisplayName(modelId: string): string {
+function formatModelDisplayName(modelId: string | undefined): string {
+  if (!modelId) return "Select Model";
   const parts = modelId.split("/");
   return parts.length > 1 ? parts[1] : modelId;
 }
@@ -104,8 +105,15 @@ export function CanvasModelSelector({
       if (models.length === 0) return;
       // Only take the first model (single selection for canvas)
       const model = models[0];
-      const newModelId = model.replicateId;
-      setSelectedModelId(newModelId);
+      // Support both Model shape (replicateId) and legacy { owner, name }
+      const newModelId =
+        model.replicateId ??
+        ("owner" in model && "name" in model
+          ? `${(model as Record<string, string>).owner}/${(model as Record<string, string>).name}`
+          : undefined);
+      if (newModelId) {
+        setSelectedModelId(newModelId);
+      }
     },
     []
   );

@@ -71,6 +71,9 @@ beforeAll(() => {
 // ---------------------------------------------------------------------------
 
 vi.mock("lucide-react", () => ({
+  ArrowRightLeft: (props: Record<string, unknown>) => (
+    <span data-testid="icon-arrow-right-left" {...props} />
+  ),
   Minus: (props: Record<string, unknown>) => (
     <span data-testid="icon-minus" {...props} />
   ),

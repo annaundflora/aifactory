@@ -36,6 +36,9 @@ beforeAll(() => {
 // ---------------------------------------------------------------------------
 
 vi.mock("lucide-react", () => ({
+  ChevronDown: (props: Record<string, unknown>) => (
+    <span data-testid="chevron-down" {...props} />
+  ),
   ChevronDownIcon: (props: Record<string, unknown>) => (
     <span data-testid="chevron-down-icon" {...props} />
   ),

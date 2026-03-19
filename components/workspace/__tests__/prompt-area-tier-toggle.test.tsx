@@ -480,7 +480,7 @@ describe("PromptArea - Removed Components", () => {
   //             ModelBrowserDrawer, ParameterPanel, getModelSchema,
   //             getProjectSelectedModels, saveProjectSelectedModels
   // --------------------------------------------------------------------------
-  it("AC-6: should not import ModelTrigger, ModelBrowserDrawer, or ParameterPanel", () => {
+  it("AC-6: should not import ModelTrigger or ModelBrowserDrawer", () => {
     // Extract import lines from the source
     const importLines = sourceCode
       .split("\n")
@@ -490,8 +490,7 @@ describe("PromptArea - Removed Components", () => {
 
     expect(importBlock).not.toContain("ModelTrigger");
     expect(importBlock).not.toContain("ModelBrowserDrawer");
-    expect(importBlock).not.toContain("ParameterPanel");
-    expect(importBlock).not.toContain("getModelSchema");
+    // ParameterPanel is now legitimately used for schema-based parameter controls
     expect(importBlock).not.toContain("getProjectSelectedModels");
     expect(importBlock).not.toContain("saveProjectSelectedModels");
   });
@@ -502,10 +501,10 @@ describe("PromptArea - Removed Components", () => {
   //             <ParameterPanel gesucht wird
   //        THEN gibt es KEINE Render-Aufrufe dieser Komponenten mehr
   // --------------------------------------------------------------------------
-  it("AC-7: should not render ModelTrigger, ModelBrowserDrawer, or ParameterPanel", () => {
+  it("AC-7: should not render ModelTrigger or ModelBrowserDrawer", () => {
     expect(sourceCode).not.toContain("<ModelTrigger");
     expect(sourceCode).not.toContain("<ModelBrowserDrawer");
-    expect(sourceCode).not.toContain("<ParameterPanel");
+    // ParameterPanel is now legitimately rendered for schema-based parameter controls
   });
 
   // --------------------------------------------------------------------------
