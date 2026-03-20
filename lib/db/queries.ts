@@ -1,4 +1,4 @@
-import { eq, desc, sql, and, asc, or, notInArray } from "drizzle-orm";
+import { eq, desc, sql, and, asc, or, notInArray, lt } from "drizzle-orm";
 import { db } from "./index";
 import { projects, generations, assistantSessions, referenceImages, generationReferences, modelSettings, models } from "./schema";
 
@@ -135,6 +135,33 @@ export async function updateGeneration(
     throw new Error(`Generation not found: ${id}`);
   }
   return generation;
+}
+
+const STALE_PENDING_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Mark generations stuck in "pending" for longer than the threshold as "failed".
+ * Returns the number of rows updated.
+ */
+export async function failStalePendingGenerations(
+  projectId: string
+): Promise<number> {
+  const cutoff = new Date(Date.now() - STALE_PENDING_THRESHOLD_MS);
+  const result = await db
+    .update(generations)
+    .set({
+      status: "failed",
+      errorMessage: "Generation abgebrochen: Server-Timeout (kein Ergebnis erhalten)",
+    })
+    .where(
+      and(
+        eq(generations.projectId, projectId),
+        eq(generations.status, "pending"),
+        lt(generations.createdAt, cutoff)
+      )
+    )
+    .returning({ id: generations.id });
+  return result.length;
 }
 
 export async function deleteGeneration(id: string): Promise<void> {

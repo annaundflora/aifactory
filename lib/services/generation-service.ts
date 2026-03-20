@@ -436,8 +436,19 @@ async function generate(
           console.error(`Generation ${gen.id} unexpected error:`, err);
         }
       }
-    })().catch((err) => {
+    })().catch(async (err) => {
       console.error("Unexpected error in multi-model generation batch:", err);
+      for (const gen of pendingGenerations) {
+        try {
+          const current = await getGeneration(gen.id);
+          if (current.status === "pending") {
+            await updateGeneration(gen.id, {
+              status: "failed",
+              errorMessage: "Unerwarteter Server-Fehler bei der Verarbeitung",
+            });
+          }
+        } catch { /* best effort */ }
+      }
     });
 
     return pendingGenerations;
@@ -473,8 +484,19 @@ async function generate(
         console.error(`Generation ${gen.id} unexpected error:`, err);
       }
     }
-  })().catch((err) => {
+  })().catch(async (err) => {
     console.error("Unexpected error in generation batch:", err);
+    for (const gen of pendingGenerations) {
+      try {
+        const current = await getGeneration(gen.id);
+        if (current.status === "pending") {
+          await updateGeneration(gen.id, {
+            status: "failed",
+            errorMessage: "Unerwarteter Server-Fehler bei der Verarbeitung",
+          });
+        }
+      } catch { /* best effort */ }
+    }
   });
 
   // Return pending generations immediately for optimistic UI
@@ -580,8 +602,17 @@ async function upscale(input: UpscaleInput): Promise<Generation> {
         errorMessage,
       });
     }
-  })().catch((err) => {
+  })().catch(async (err) => {
     console.error("Unexpected error in upscale processing:", err);
+    try {
+      const current = await getGeneration(generation.id);
+      if (current.status === "pending") {
+        await updateGeneration(generation.id, {
+          status: "failed",
+          errorMessage: "Unerwarteter Server-Fehler beim Upscaling",
+        });
+      }
+    } catch { /* best effort */ }
   });
 
   // Return the pending generation immediately

@@ -9,6 +9,7 @@ import {
   deleteGeneration as deleteGenerationFromDb,
   getSiblingsByBatchId,
   getVariantFamily,
+  failStalePendingGenerations,
   type Generation,
 } from "@/lib/db/queries";
 import { StorageService } from "@/lib/clients/storage";
@@ -212,6 +213,9 @@ export async function fetchGenerations(
   } catch {
     return { error: "Not found" };
   }
+
+  // Auto-fail generations stuck in "pending" for too long (server crash recovery)
+  await failStalePendingGenerations(projectId);
 
   return getGenerations(projectId);
 }
