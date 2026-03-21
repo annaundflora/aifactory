@@ -28,7 +28,12 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { TierToggle } from "@/components/ui/tier-toggle";
 import type { Tier } from "@/lib/types";
-import { Loader2, Sparkles, Minus, Plus } from "lucide-react";
+import { Loader2, Sparkles, Minus, Plus, Eraser, ChevronDown } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { LLMComparison } from "@/components/prompt-improve/llm-comparison";
 import { AssistantTrigger } from "@/components/assistant/assistant-trigger";
 import { SectionLabel } from "@/components/shared/section-label";
@@ -203,12 +208,28 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
   // ----- LLM comparison -----
   const [showImprove, setShowImprove] = useState(false);
 
+  // ----- Collapsible prompt fields -----
+  const [styleOpen, setStyleOpen] = useState(false);
+  const [negativeOpen, setNegativeOpen] = useState(false);
+
   // ----- Assistant Panel state (lifted to workspace-content) -----
   const assistantOpen = assistantOpenProp ?? false;
 
   const handleAssistantToggle = useCallback(() => {
     onAssistantToggle?.();
   }, [onAssistantToggle]);
+
+  const handleClearAll = useCallback(() => {
+    setPromptMotiv("");
+    setPromptStyle("");
+    setNegativePrompt("");
+    setImageParams({});
+    setVariantCount(1);
+    setReferenceSlots([]);
+    setUpscaleSourceImageUrl(null);
+    setUpscaleScale(DEFAULT_SCALE);
+    setShowImprove(false);
+  }, []);
 
   // Session history navigation is now handled inside AssistantSheetContent via context.setActiveView
 
@@ -862,8 +883,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
           {/* ── Group: Prompt Composition ── */}
           {showPromptFields && (
             <div className="space-y-3">
-              <SectionLabel>Prompt</SectionLabel>
-
               {/* Motiv Textarea (required) */}
               <div className="space-y-2">
                 <Label htmlFor="prompt-motiv-textarea" className="text-sm font-bold font-display [letter-spacing:-0.5px]">
@@ -877,40 +896,76 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
                   onChange={handleMotivChange}
                   onKeyDown={handleMotivKeyDown}
                   placeholder="Describe the main subject of your image..."
-                  rows={3}
+                  rows={5}
                   className={textareaClass}
                 />
               </div>
 
-              {/* Style / Modifier Textarea (optional) */}
-              <div className="space-y-2">
-                <Label htmlFor="prompt-style-textarea" className="text-sm font-bold font-display [letter-spacing:-0.5px]">Style / Modifier</Label>
-                <textarea
-                  id="prompt-style-textarea"
-                  data-testid="prompt-style-textarea"
-                  ref={styleRef}
-                  value={promptStyle}
-                  onChange={handleStyleChange}
-                  placeholder="Add style, mood, or modifier keywords..."
-                  rows={2}
-                  className={textareaClass}
-                />
-              </div>
+              {/* Style / Modifier — collapsible */}
+              <Collapsible open={styleOpen} onOpenChange={setStyleOpen}>
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
+                    data-testid="prompt-style-toggle"
+                  >
+                    <span className="flex items-center gap-2">
+                      Style / Modifier
+                      {!!promptStyle.trim() && (
+                        <span className="size-1.5 rounded-full bg-emerald-500" aria-label="has content" />
+                      )}
+                    </span>
+                    <ChevronDown
+                      className={`size-4 transition-transform ${styleOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <textarea
+                    id="prompt-style-textarea"
+                    data-testid="prompt-style-textarea"
+                    ref={styleRef}
+                    value={promptStyle}
+                    onChange={handleStyleChange}
+                    placeholder="Add style, mood, or modifier keywords..."
+                    rows={2}
+                    className={`${textareaClass} mt-2`}
+                  />
+                </CollapsibleContent>
+              </Collapsible>
 
-              {/* Negative Prompt */}
-              <div className="space-y-2">
-                <Label htmlFor="negative-prompt-textarea" className="text-sm font-bold font-display [letter-spacing:-0.5px]">Negative Prompt</Label>
-                <textarea
-                  id="negative-prompt-textarea"
-                  data-testid="negative-prompt-textarea"
-                  ref={negativeRef}
-                  value={negativePrompt}
-                  onChange={handleNegativePromptChange}
-                  placeholder="What to avoid in the image..."
-                  rows={2}
-                  className={textareaClass}
-                />
-              </div>
+              {/* Negative Prompt — collapsible */}
+              <Collapsible open={negativeOpen} onOpenChange={setNegativeOpen}>
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
+                    data-testid="prompt-negative-toggle"
+                  >
+                    <span className="flex items-center gap-2">
+                      Negative Prompt
+                      {!!negativePrompt.trim() && (
+                        <span className="size-1.5 rounded-full bg-emerald-500" aria-label="has content" />
+                      )}
+                    </span>
+                    <ChevronDown
+                      className={`size-4 transition-transform ${negativeOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <textarea
+                    id="negative-prompt-textarea"
+                    data-testid="negative-prompt-textarea"
+                    ref={negativeRef}
+                    value={negativePrompt}
+                    onChange={handleNegativePromptChange}
+                    placeholder="What to avoid in the image..."
+                    rows={2}
+                    className={`${textareaClass} mt-2`}
+                  />
+                </CollapsibleContent>
+              </Collapsible>
 
               {/* Prompt Tools */}
               <div className="flex gap-2">
@@ -923,10 +978,20 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
                   onClick={() => setShowImprove(true)}
                   disabled={!promptMotiv.trim() || showImprove}
                   data-testid="improve-btn"
-                  className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors border-[#E5E5E3] text-foreground dark:border-[#2A2A2A] dark:text-white disabled:pointer-events-none disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors border-[#E5E5E3] text-muted-foreground dark:border-[#2A2A2A] disabled:pointer-events-none disabled:opacity-50 hover:text-foreground"
                 >
                   <Sparkles className="size-3.5 text-primary" />
                   Improve
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  disabled={isGenerating}
+                  data-testid="clear-all-btn"
+                  className="ml-auto inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors border-[#E5E5E3] text-muted-foreground dark:border-[#2A2A2A] disabled:pointer-events-none disabled:opacity-50 hover:text-foreground"
+                >
+                  <Eraser className="size-3.5 text-primary" />
+                  Clear
                 </button>
               </div>
 
