@@ -1,0 +1,13 @@
+{
+  "feature": "model-catalog",
+  "slice": "slice-12-cleanup",
+  "timestamp": "2026-03-18T00:18:00Z",
+  "status": "completed",
+  "implementation": { "status": "completed", "files_changed": ["lib/services/collection-model-service.ts (DELETE)", "lib/services/model-schema-service.ts (DELETE)", "lib/types/collection-model.ts (DELETE)", "components/models/model-card.tsx", "components/models/model-trigger.tsx", "components/models/model-browser-drawer.tsx", "components/canvas/canvas-model-selector.tsx", "lib/hooks/use-model-filters.ts"], "commit_hash": "782dc2b" },
+  "review": { "verdict": "APPROVED", "findings": [] },
+  "deterministic_gate": { "detected_stack": "TypeScript", "lint_passed": true, "typecheck_passed": true, "lint_iterations": 0 },
+  "tests": { "test_files": ["__tests__/slice-12/cleanup-verification.test.ts", "__tests__/slice-12/consumer-migration-unit.test.ts", "__tests__/slice-12/cleanup-integration.test.ts"], "ac_coverage": { "total": 11, "covered": 11 } },
+  "validation": { "overall_status": "passed", "full_suite": "216 files, 1867 tests, 0 failures" },
+  "retries": 3,
+  "review_iterations": 0
+}

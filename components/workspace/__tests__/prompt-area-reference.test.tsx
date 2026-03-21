@@ -141,11 +141,6 @@ vi.mock("@/components/prompt-improve/llm-comparison", () => ({
   LLMComparison: () => null,
 }));
 
-// Mock ModelBrowserDrawer
-vi.mock("@/components/models/model-browser-drawer", () => ({
-  ModelBrowserDrawer: () => createElement("div", { "data-testid": "mock-model-browser-drawer" }),
-}));
-
 // ---------------------------------------------------------------------------
 // ReferenceBar mock: captures props to verify slots passed, renders testids
 // ---------------------------------------------------------------------------

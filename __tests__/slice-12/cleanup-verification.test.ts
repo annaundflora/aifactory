@@ -220,9 +220,7 @@ describe('Consumer migration to Model type', () => {
    */
   it('AC-8: GIVEN all consumer files WHEN inspected THEN they import Model type (not CollectionModel) and the files exist', () => {
     const consumerFiles = [
-      path.join(PROJECT_ROOT, 'components', 'models', 'model-browser-drawer.tsx'),
       path.join(PROJECT_ROOT, 'components', 'models', 'model-trigger.tsx'),
-      path.join(PROJECT_ROOT, 'components', 'canvas', 'canvas-model-selector.tsx'),
       path.join(PROJECT_ROOT, 'lib', 'hooks', 'use-model-filters.ts'),
     ]
 
@@ -246,28 +244,4 @@ describe('Consumer migration to Model type', () => {
     }
   })
 
-  /**
-   * AC-9: GIVEN canvas-model-selector.tsx importiert getCollectionModels und checkImg2ImgSupport
-   *       WHEN diese Imports auf die neuen Server Actions umgestellt werden
-   *       THEN verwendet die Datei getModels statt getCollectionModels (aus Slice 06)
-   *            und die Funktionalitaet bleibt erhalten
-   */
-  it('AC-9: GIVEN canvas-model-selector.tsx WHEN inspected THEN it uses getModels (not getCollectionModels) from app/actions/models', () => {
-    const filePath = path.join(PROJECT_ROOT, 'components', 'canvas', 'canvas-model-selector.tsx')
-    expect(fs.existsSync(filePath), `Expected ${filePath} to exist`).toBe(true)
-
-    const content = fs.readFileSync(filePath, 'utf-8')
-
-    // Must NOT reference getCollectionModels
-    expect(content).not.toMatch(/getCollectionModels/)
-
-    // Must NOT reference checkImg2ImgSupport (legacy function)
-    expect(content).not.toMatch(/checkImg2ImgSupport/)
-
-    // Must import getModels from the server actions
-    expect(content).toMatch(/import\s+.*\bgetModels\b.*from\s+['"]@\/app\/actions\/models['"]/)
-
-    // Must call getModels (not getCollectionModels) somewhere in the file
-    expect(content).toMatch(/getModels\s*\(/)
-  })
 })

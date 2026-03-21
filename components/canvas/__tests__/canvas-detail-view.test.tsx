@@ -47,15 +47,10 @@ vi.mock("@/lib/utils", () => ({
   generateDownloadFilename: vi.fn().mockReturnValue("image.png"),
 }));
 
-// Mock model actions (used by CanvasModelSelector)
+// Mock model actions
 vi.mock("@/app/actions/models", () => ({
   getModels: vi.fn().mockResolvedValue([]),
   getModelSchema: vi.fn().mockResolvedValue({ properties: {} }),
-}));
-
-// Mock ModelBrowserDrawer (complex external component)
-vi.mock("@/components/models/model-browser-drawer", () => ({
-  ModelBrowserDrawer: () => null,
 }));
 
 // Mock ModelSelector (used by CanvasChatPanel in its header)

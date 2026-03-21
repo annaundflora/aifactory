@@ -98,59 +98,6 @@ export const generations = pgTable(
 );
 
 // -----------------------------------------------
-// favorite_models
-// -----------------------------------------------
-/**
- * @deprecated Use `model_settings` table instead. This table is no longer
- * read or written by any production code and will be removed in a future migration.
- */
-export const favoriteModels = pgTable(
-  "favorite_models",
-  {
-    id: uuid("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    modelId: varchar("model_id", { length: 255 }).notNull(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => [
-    index("favorite_models_model_id_idx").on(table.modelId),
-    index("favorite_models_user_id_idx").on(table.userId),
-    uniqueIndex("favorite_models_user_id_model_id_idx").on(table.userId, table.modelId),
-  ]
-);
-
-// -----------------------------------------------
-// project_selected_models
-// -----------------------------------------------
-/**
- * @deprecated Use `model_settings` table instead. This table is no longer
- * read or written by any production code and will be removed in a future migration.
- */
-export const projectSelectedModels = pgTable(
-  "project_selected_models",
-  {
-    id: uuid("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    projectId: uuid("project_id")
-      .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
-    modelId: varchar("model_id", { length: 255 }).notNull(),
-    position: integer("position").notNull().default(0),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => [index("project_selected_models_project_id_idx").on(table.projectId)]
-);
-
-// -----------------------------------------------
 // assistant_sessions
 // -----------------------------------------------
 export const assistantSessions = pgTable(
@@ -195,7 +142,6 @@ export const assistantImages = pgTable(
       .notNull()
       .references(() => assistantSessions.id, { onDelete: "cascade" }),
     imageUrl: text("image_url").notNull(),
-    analysisResult: jsonb("analysis_result"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

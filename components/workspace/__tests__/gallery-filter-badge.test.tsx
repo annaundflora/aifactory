@@ -119,15 +119,10 @@ vi.mock("@/lib/db/queries", () => ({
   updateProjectThumbnail: vi.fn(),
 }));
 
-// Mock model actions (used by CanvasModelSelector in CanvasDetailView)
+// Mock model actions
 vi.mock("@/app/actions/models", () => ({
   getModels: vi.fn().mockResolvedValue([]),
   getModelSchema: vi.fn().mockResolvedValue({ properties: {} }),
-}));
-
-// Mock ModelBrowserDrawer
-vi.mock("@/components/models/model-browser-drawer", () => ({
-  ModelBrowserDrawer: () => null,
 }));
 
 // Mock lib/utils

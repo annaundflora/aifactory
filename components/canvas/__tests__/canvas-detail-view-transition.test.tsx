@@ -67,11 +67,6 @@ vi.mock("@/app/actions/models", () => ({
   getModelSchema: vi.fn().mockResolvedValue({ properties: {} }),
 }));
 
-// Mock ModelBrowserDrawer
-vi.mock("@/components/models/model-browser-drawer", () => ({
-  ModelBrowserDrawer: () => null,
-}));
-
 // Mock ModelSelector (used by CanvasChatPanel in its header)
 vi.mock("@/components/assistant/model-selector", () => ({
   ModelSelector: () => null,

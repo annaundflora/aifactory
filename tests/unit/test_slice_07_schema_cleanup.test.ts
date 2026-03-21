@@ -29,11 +29,13 @@ describe('schema.ts after legacy cleanup', () => {
     expect(schemaModule.generations).toBeDefined()
   })
 
-  it('AC-6: should still export favoriteModels table', () => {
-    expect(schemaModule.favoriteModels).toBeDefined()
+  it('AC-6: should NOT export removed favoriteModels table', () => {
+    const exportedKeys = Object.keys(schemaModule)
+    expect(exportedKeys).not.toContain('favoriteModels')
   })
 
-  it('AC-6: should still export projectSelectedModels table', () => {
-    expect(schemaModule.projectSelectedModels).toBeDefined()
+  it('AC-6: should NOT export removed projectSelectedModels table', () => {
+    const exportedKeys = Object.keys(schemaModule)
+    expect(exportedKeys).not.toContain('projectSelectedModels')
   })
 })

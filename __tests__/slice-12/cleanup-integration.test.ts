@@ -80,8 +80,6 @@ describe('Model type re-export chain integrity', () => {
     const consumerFiles = [
       'components/models/model-card.tsx',
       'components/models/model-trigger.tsx',
-      'components/models/model-browser-drawer.tsx',
-      'components/canvas/canvas-model-selector.tsx',
       'lib/hooks/use-model-filters.ts',
     ]
 
@@ -157,30 +155,6 @@ describe('Complete CollectionModel elimination', () => {
       violations,
       `Found references to "checkImg2ImgSupport" in:\n${violations.join('\n')}`,
     ).toHaveLength(0)
-  })
-})
-
-// =========================================================================
-// canvas-model-selector.tsx: getModels integration with server actions
-// =========================================================================
-
-describe('canvas-model-selector.tsx — Server Action integration', () => {
-  const filePath = path.join(PROJECT_ROOT, 'components', 'canvas', 'canvas-model-selector.tsx')
-
-  it('should import getModels from app/actions/models (the Slice 06 server action)', () => {
-    expect(fs.existsSync(filePath)).toBe(true)
-    const content = fs.readFileSync(filePath, 'utf-8')
-
-    // Must import getModels from the server action module
-    expect(content).toMatch(/import\s+\{[^}]*\bgetModels\b[^}]*\}\s+from\s+['"]@\/app\/actions\/models['"]/)
-  })
-
-  it('should import Model type from model-catalog-service (not from collection-model)', () => {
-    expect(fs.existsSync(filePath)).toBe(true)
-    const content = fs.readFileSync(filePath, 'utf-8')
-
-    expect(content).toMatch(/import\s+.*\bModel\b.*from\s+['"]@\/lib\/services\/model-catalog-service['"]/)
-    expect(content).not.toMatch(/from\s+['"][^'"]*collection-model['"]/)
   })
 })
 

@@ -167,7 +167,7 @@ function renderEnumSelect(
         value={currentValue}
         onValueChange={(v) => onValueChange(key, v)}
       >
-        <SelectTrigger id={`param-${key}`}>
+        <SelectTrigger id={`param-${key}`} className="w-full">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -328,9 +328,9 @@ export function ParameterPanel({
 
   return (
     <div className="space-y-4" data-testid="parameter-panel">
-      {/* Primary fields - always visible */}
+      {/* Primary fields - always visible, 2-column grid */}
       {primary.length > 0 && (
-        <div className="space-y-4" data-testid="parameter-panel-primary">
+        <div className="grid grid-cols-2 gap-4" data-testid="parameter-panel-primary">
           {primary.map(([key, prop]) => renderField(key, prop, values, handleChange))}
         </div>
       )}

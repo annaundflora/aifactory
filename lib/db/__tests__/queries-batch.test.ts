@@ -76,8 +76,6 @@ vi.mock('@/lib/db/schema', () => ({
     sourceImageUrl: 'source_image_url',
     sourceGenerationId: 'source_generation_id',
   },
-  favoriteModels: { modelId: 'model_id', createdAt: 'created_at' },
-  projectSelectedModels: { projectId: 'project_id', modelId: 'model_id', position: 'position' },
   assistantSessions: { id: 'id', projectId: 'project_id', lastMessageAt: 'last_message_at' },
   referenceImages: { id: 'id', projectId: 'project_id', createdAt: 'created_at' },
   generationReferences: { generationId: 'generation_id', slotPosition: 'slot_position' },

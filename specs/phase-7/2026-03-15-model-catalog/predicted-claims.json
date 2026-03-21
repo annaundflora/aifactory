@@ -1,0 +1,30 @@
+{
+  "files_claimed": [
+    { "file": "lib/db/schema.ts", "action": "modify", "source_slice": "slice-01-db-schema" },
+    { "file": "drizzle/0011_add_models_table.sql", "action": "create", "source_slice": "slice-01-db-schema" },
+    { "file": "lib/services/capability-detection.ts", "action": "create", "source_slice": "slice-02-capability-detection" },
+    { "file": "lib/services/capability-detection.test.ts", "action": "create", "source_slice": "slice-02-capability-detection" },
+    { "file": "lib/services/model-catalog-service.ts", "action": "create", "source_slice": "slice-03-catalog-service" },
+    { "file": "lib/db/queries.ts", "action": "modify", "source_slice": "slice-03-catalog-service" },
+    { "file": "lib/services/model-catalog-service.test.ts", "action": "create", "source_slice": "slice-03-catalog-service" },
+    { "file": "lib/services/model-sync-service.ts", "action": "create", "source_slice": "slice-04-sync-service" },
+    { "file": "lib/services/model-sync-service.test.ts", "action": "create", "source_slice": "slice-04-sync-service" },
+    { "file": "app/api/models/sync/route.ts", "action": "create", "source_slice": "slice-05-sync-route" },
+    { "file": "app/actions/models.ts", "action": "modify", "source_slice": "slice-06-server-actions" },
+    { "file": "lib/services/generation-service.ts", "action": "modify", "source_slice": "slice-07-service-replace" },
+    { "file": "lib/services/model-settings-service.ts", "action": "modify", "source_slice": "slice-07-service-replace" },
+    { "file": "lib/types.ts", "action": "modify", "source_slice": "slice-08-types-seed" },
+    { "file": "components/settings/model-mode-section.tsx", "action": "modify", "source_slice": "slice-08-types-seed" },
+    { "file": "components/settings/settings-dialog.tsx", "action": "modify", "source_slice": "slice-09-sync-button" },
+    { "file": "lib/hooks/use-model-schema.ts", "action": "modify", "source_slice": "slice-11-auto-sync" },
+    { "file": "lib/services/collection-model-service.ts", "action": "delete", "source_slice": "slice-12-cleanup" },
+    { "file": "lib/services/model-schema-service.ts", "action": "delete", "source_slice": "slice-12-cleanup" },
+    { "file": "lib/types/collection-model.ts", "action": "delete", "source_slice": "slice-12-cleanup" }
+  ],
+  "summary": {
+    "files_claimed": 20,
+    "new_files": 8,
+    "modified_files": 9,
+    "deleted_files": 3
+  }
+}

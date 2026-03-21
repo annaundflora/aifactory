@@ -80,7 +80,6 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       const email = user.email;
       if (!email) return false;
 
-      console.log("[auth] signIn attempt:", email, "| allowed:", allowedEmails);
       return allowedEmails.includes(email.toLowerCase());
     },
     session({ session, user }) {

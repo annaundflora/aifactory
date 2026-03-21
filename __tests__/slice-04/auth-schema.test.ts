@@ -7,8 +7,6 @@ import {
   sessions,
   projects,
   generations,
-  favoriteModels,
-  projectSelectedModels,
   assistantSessions,
   assistantImages,
   referenceImages,
@@ -335,8 +333,6 @@ describe('slice-04-db-auth-tables: Auth Schema', () => {
     const existingTables = [
       { name: 'projects', table: projects },
       { name: 'generations', table: generations },
-      { name: 'favorite_models', table: favoriteModels },
-      { name: 'project_selected_models', table: projectSelectedModels },
       { name: 'assistant_sessions', table: assistantSessions },
       { name: 'assistant_images', table: assistantImages },
       { name: 'reference_images', table: referenceImages },
@@ -344,7 +340,7 @@ describe('slice-04-db-auth-tables: Auth Schema', () => {
       { name: 'model_settings', table: modelSettings },
     ]
 
-    it('should still export all 9 pre-existing tables (8 original + model_settings)', () => {
+    it('should still export all 7 pre-existing tables (6 original + model_settings)', () => {
       for (const { name, table } of existingTables) {
         expect(table, `Table "${name}" should still be exported`).toBeDefined()
         expect(

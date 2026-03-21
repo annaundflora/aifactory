@@ -1,0 +1,23 @@
+{
+  "spec_path": "specs/phase-7/2026-03-15-model-catalog",
+  "feature_name": "model-catalog",
+  "status": "completed",
+  "current_state": "feature_complete",
+  "current_slice_id": null,
+  "retry_count": 0,
+  "failed_stage": null,
+  "waves": [
+    { "wave": 1, "slices": ["slice-01-db-schema", "slice-02-capability-detection"], "parallel": true },
+    { "wave": 2, "slices": ["slice-03-catalog-service"], "parallel": false },
+    { "wave": 3, "slices": ["slice-04-sync-service", "slice-06-server-actions", "slice-07-service-replace"], "parallel": true },
+    { "wave": 4, "slices": ["slice-05-sync-route", "slice-08-types-seed"], "parallel": true },
+    { "wave": 5, "slices": ["slice-09-sync-button", "slice-10-dropdown-filter"], "parallel": false },
+    { "wave": 6, "slices": ["slice-11-auto-sync"], "parallel": false },
+    { "wave": 7, "slices": ["slice-12-cleanup"], "parallel": false }
+  ],
+  "completed_slices": ["slice-01-db-schema", "slice-02-capability-detection", "slice-03-catalog-service", "slice-04-sync-service", "slice-06-server-actions", "slice-07-service-replace", "slice-05-sync-route", "slice-08-types-seed", "slice-09-sync-button", "slice-10-dropdown-filter", "slice-11-auto-sync", "slice-12-cleanup"],
+  "evidence_files": [],
+  "worktree_path": "worktrees/model-catalog",
+  "branch": "feature/model-catalog",
+  "issue_number": 16
+}

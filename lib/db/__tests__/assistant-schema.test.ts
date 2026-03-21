@@ -212,7 +212,6 @@ describe('assistant_images schema', () => {
      *       `id` (UUID PK, gen_random_uuid()),
      *       `session_id` (UUID NOT NULL FK auf assistant_sessions.id, ON DELETE CASCADE),
      *       `image_url` (TEXT NOT NULL),
-     *       `analysis_result` (JSONB nullable),
      *       `created_at` (TIMESTAMP WITH TZ, NOT NULL, Default NOW())
      *       und einem Index auf `session_id`
      */
@@ -225,7 +224,6 @@ describe('assistant_images schema', () => {
       'id',
       'session_id',
       'image_url',
-      'analysis_result',
       'created_at',
     ]
 
@@ -259,10 +257,6 @@ describe('assistant_images schema', () => {
     expect(columnMap['image_url'].columnType).toBe('PgText')
     expect(columnMap['image_url'].notNull).toBe(true)
 
-    // analysis_result: JSONB nullable
-    expect(columnMap['analysis_result'].columnType).toBe('PgJsonb')
-    expect(columnMap['analysis_result'].notNull).toBe(false)
-
     // created_at: TIMESTAMP WITH TZ, NOT NULL, Default NOW()
     expect(columnMap['created_at'].columnType).toBe('PgTimestamp')
     expect(columnMap['created_at'].notNull).toBe(true)
@@ -292,9 +286,6 @@ describe('assistant_images schema', () => {
 
     expectTypeOf<AssistantImageSelect>().toHaveProperty('imageUrl')
     expectTypeOf<AssistantImageSelect['imageUrl']>().toEqualTypeOf<string>()
-
-    expectTypeOf<AssistantImageSelect>().toHaveProperty('analysisResult')
-    expectTypeOf<AssistantImageSelect['analysisResult']>().toEqualTypeOf<unknown>()
 
     expectTypeOf<AssistantImageSelect>().toHaveProperty('createdAt')
     expectTypeOf<AssistantImageSelect['createdAt']>().toEqualTypeOf<Date>()
@@ -495,7 +486,7 @@ describe('drizzle-kit push', () => {
 
     // assistant_images is a valid pgTable
     expect(imagesConfig.name).toBe('assistant_images')
-    expect(imagesConfig.columns.length).toBe(5)
+    expect(imagesConfig.columns.length).toBe(4)
     expect(imagesConfig.indexes.length).toBe(1)
     expect(imagesConfig.foreignKeys.length).toBe(1)
 

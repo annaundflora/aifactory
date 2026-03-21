@@ -154,11 +154,6 @@ vi.mock("lucide-react", () => {
   };
 });
 
-// Mock ModelBrowserDrawer -- complex external component
-vi.mock("@/components/models/model-browser-drawer", () => ({
-  ModelBrowserDrawer: () => null,
-}));
-
 // Mock download utils
 vi.mock("@/lib/utils", () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(" "),

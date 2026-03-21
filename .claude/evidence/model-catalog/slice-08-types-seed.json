@@ -1,0 +1,13 @@
+{
+  "feature": "model-catalog",
+  "slice": "slice-08-types-seed",
+  "timestamp": "2026-03-18T00:09:01Z",
+  "status": "completed",
+  "implementation": { "status": "completed", "files_changed": ["lib/types.ts", "components/settings/model-mode-section.tsx", "lib/db/queries.ts"], "commit_hash": "ef47dec" },
+  "review": { "verdict": "APPROVED", "findings": [] },
+  "deterministic_gate": { "detected_stack": "TypeScript", "lint_passed": true, "lint_iterations": 0 },
+  "tests": { "test_files": ["lib/__tests__/types.test.ts", "components/settings/__tests__/model-mode-section.test.tsx", "lib/db/__tests__/queries-seed.test.ts"], "ac_coverage": { "total": 11, "covered": 11 } },
+  "validation": { "overall_status": "passed" },
+  "retries": 0,
+  "review_iterations": 0
+}
