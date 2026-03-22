@@ -128,7 +128,7 @@ export function ModelModeSection({
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {models.map((model) => {
+                    {[...models].sort((a, b) => a.name.localeCompare(b.name)).map((model) => {
                       const modelId = model.replicateId;
 
                       return (
