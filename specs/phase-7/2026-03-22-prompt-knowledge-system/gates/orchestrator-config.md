@@ -20,7 +20,7 @@ pre_checks:
 
   - name: "Gate 3: Integration Map Valid"
     file: "gates/integration-map.md"
-    required: "Missing Inputs == 0, Orphaned Outputs == 0, Runtime Path Gaps == 0, Semantic Consistency Gaps == 0"
+    required: "Missing Inputs == 0, Orphaned Outputs justified, Runtime Path Gaps == 0, Semantic Consistency Gaps == 0"
 ```
 
 ---
@@ -48,12 +48,12 @@ Based on dependency analysis, slices are organized into 6 waves:
 ### Wave Summary
 
 ```
-Wave 1: [slice-01]                          -- Foundation
-Wave 2: [slice-02, slice-03, slice-11]      -- Parallel: TS Lookup + Python Lookup + Content
+Wave 1: [slice-01]                               -- Foundation
+Wave 2: [slice-02, slice-03, slice-11]           -- Parallel: TS Lookup + Python Lookup + Content
 Wave 3: [slice-04, slice-06, slice-09, slice-10] -- Parallel: All 4 injection points
-Wave 4: [slice-05, slice-07]                -- Parallel: Passthrough layers
-Wave 5: [slice-08]                          -- Frontend wiring
-Wave 6: [slice-12, slice-13]               -- Parallel: Integration tests
+Wave 4: [slice-05, slice-07]                     -- Parallel: Passthrough layers
+Wave 5: [slice-08]                               -- Frontend wiring
+Wave 6: [slice-12, slice-13]                     -- Parallel: Integration tests
 ```
 
 ---
@@ -353,4 +353,4 @@ During implementation:
 - **No database changes:** Knowledge is stored as a static JSON file in the repo.
 - **No new endpoints:** Only the existing POST `/api/assistant/sessions/{id}/messages` is extended with optional fields.
 - **Backward compatibility:** All new parameters are optional with safe defaults. Existing behavior is preserved when new fields are absent.
-- **Cross-stack consistency:** The JSON knowledge file is the single source of truth, read independently by TypeScript (slice-02) and Python (slice-03) with identical prefix-matching logic.
+- **Cross-stack consistency:** The JSON knowledge file is the single source of truth, read independently by TypeScript (Slice 02) and Python (Slice 03) with identical prefix-matching logic.

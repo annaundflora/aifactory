@@ -48,14 +48,20 @@
 8. [ ] **Slice 08:** Frontend POST body omits new fields when no workspace context
 9. [ ] **Slice 13:** Integration test: Assistant system prompt with Flux model contains Flux tips
 
-### Flow 5: Canvas Chat with Model Context
+### Flow 5: Assistant with Seedream Model + img2img
+
+1. [ ] **Slice 06:** `build_assistant_system_prompt("seedream-5", "img2img")` returns base prompt + Seedream knowledge section
+2. [ ] **Slice 08:** Frontend sends `image_model_id: "google/seedream-5"` and `generation_mode: "img2img"` in POST body
+3. [ ] **Slice 13:** Integration test: Assistant system prompt with Seedream model contains Seedream tips
+
+### Flow 6: Canvas Chat with Model Context
 
 1. [ ] **Slice 09:** `build_canvas_system_prompt({"model_id": "flux-2-pro", ...})` returns prompt with knowledge block after context section
 2. [ ] **Slice 09:** `build_canvas_system_prompt(None)` returns base prompt only (no crash)
 3. [ ] **Slice 09:** `build_canvas_system_prompt({"model_id": "unknown-model"})` returns prompt with fallback knowledge
 4. [ ] **Slice 13:** Integration test: Canvas prompt with Seedream model contains Seedream tips
 
-### Flow 6: recommend_model with Knowledge Enrichment
+### Flow 7: recommend_model with Knowledge Enrichment
 
 1. [ ] **Slice 10:** `_match_model("product photography", ["photorealistic"], available_models)` returns reason with knowledge-specific strengths (not static reason_de)
 2. [ ] **Slice 10:** `_match_model` with no-match returns `None` unchanged
@@ -76,10 +82,12 @@
 - [ ] **Slice 08 AC-4:** Upscale mode does not send `generation_mode` (only txt2img/img2img allowed)
 - [ ] **Slice 09 AC-4:** Empty dict image_context handled gracefully
 - [ ] **Slice 09 AC-7:** Knowledge lookup exception does not crash canvas prompt builder
+- [ ] **Slice 10 AC-5:** Knowledge file unavailable: falls back to static reason_de
 
 ### Backward Compatibility
 
 - [ ] **Slice 04 AC-7:** `improve(prompt, modelId)` with 2 args compiles (Default txt2img)
+- [ ] **Slice 05 AC-2:** `improvePrompt` without generationMode calls improve without 3rd param
 - [ ] **Slice 06 AC-2:** `build_assistant_system_prompt(None, None)` returns identical base prompt
 - [ ] **Slice 06 AC-7:** Config without image_model_id/generation_mode keys works
 - [ ] **Slice 07 AC-2:** POST without new fields validates (200)
@@ -88,7 +96,7 @@
 
 ### Prefix Matching
 
-- [ ] **Slice 02 AC-1:** Longest prefix wins (`flux-2-pro` over `flux-2`)
+- [ ] **Slice 02 AC-1:** Longest prefix wins (`flux-2-pro-ultra` matches `flux-2-pro` not `flux-2`)
 - [ ] **Slice 02 AC-7:** Slash stripping (`owner/model-name` -> `model-name`)
 - [ ] **Slice 02 AC-8:** Model ID without slash works
 - [ ] **Slice 03 AC-1:** Python longest prefix matching identical to TS
@@ -101,7 +109,7 @@
 
 ### Mode Handling
 
-- [ ] **Slice 02 AC-4:** txt2img mode includes mode-specific tips
+- [ ] **Slice 02 AC-4:** txt2img mode includes mode-specific tips alongside model tips
 - [ ] **Slice 02 AC-5:** Missing mode section returns model tips only (no crash)
 - [ ] **Slice 02 AC-6:** Undefined mode returns model tips only
 
@@ -113,7 +121,7 @@
 |---|-------------------|--------|---------------|
 | 1 | JSON schema shared between TS and Python lookups | 01 -> 02, 03 | Slice 03 AC-12: identical outputs for identical inputs |
 | 2 | Knowledge content consumed by lookups | 11 -> 02, 03 | Slice 12 + 13 integration tests with real JSON |
-| 3 | TS Lookup consumed by Improver service | 02 -> 04 | Slice 04 AC-1: buildSystemPrompt uses knowledge |
+| 3 | TS Lookup consumed by Improver service | 02 -> 04 | Slice 04 AC-1: buildSystemPrompt uses knowledge tips |
 | 4 | Python Lookup consumed by Assistant prompt | 03 -> 06 | Slice 06 AC-1: build_assistant_system_prompt uses knowledge |
 | 5 | Python Lookup consumed by Canvas prompt | 03 -> 09 | Slice 09 AC-1: build_canvas_system_prompt uses knowledge |
 | 6 | Python Lookup consumed by recommend_model | 03 -> 10 | Slice 10 AC-1: _match_model uses knowledge strengths |
