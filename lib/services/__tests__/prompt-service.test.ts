@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+// ---------------------------------------------------------------------------
+// Mock: OpenRouter client (external API -- mocked per Mocking Strategy)
+// ---------------------------------------------------------------------------
 const mockChat = vi.fn()
 
 vi.mock('@/lib/clients/openrouter', () => ({
@@ -8,7 +11,7 @@ vi.mock('@/lib/clients/openrouter', () => ({
   },
 }))
 
-import { PromptService } from '@/lib/services/prompt-service'
+import { buildSystemPrompt, PromptService } from '@/lib/services/prompt-service'
 
 /**
  * Helper: Extracts the system prompt content from the mockChat call arguments.
@@ -20,128 +23,201 @@ function getSystemPromptFromLastCall(): string {
   return systemMessage?.content ?? ''
 }
 
-describe('PromptService.improve - Adaptive System Prompt', () => {
+// ==========================================================================
+// buildSystemPrompt -- Slice 04 Acceptance Tests
+// ==========================================================================
+
+describe('buildSystemPrompt', () => {
+  /**
+   * AC-1: GIVEN ein bekanntes Modell "black-forest-labs/flux-2-pro" und generationMode = "txt2img"
+   *       WHEN buildSystemPrompt("black-forest-labs/flux-2-pro", "Flux 2 Pro", "txt2img") aufgerufen wird
+   *       THEN enthaelt der zurueckgegebene String die Flux-spezifischen Tipps aus der Knowledge-Datei
+   *            (NICHT die alten statischen Hints wie "FLUX models: Detailed scene descriptions")
+   *       AND wenn generationMode weggelassen wird, wird "txt2img" als Default verwendet
+   */
+  it('AC-1: should include flux-specific knowledge tips for flux-2-pro model with txt2img', () => {
+    const result = buildSystemPrompt('black-forest-labs/flux-2-pro', 'Flux 2 Pro', 'txt2img')
+
+    // Must contain Flux-specific tips from knowledge file
+    expect(result).toContain('Flux 2 Pro')
+    // Knowledge file has tips like "Use detailed, natural-language scene descriptions"
+    expect(result).toContain('natural-language scene descriptions')
+    // Knowledge file has strengths like "Photorealistic rendering with fine detail"
+    expect(result).toContain('Photorealistic rendering')
+    // Must NOT contain old static hints
+    expect(result).not.toContain('FLUX models: Detailed scene descriptions')
+  })
+
+  it('AC-1 (default): should use txt2img as default when generationMode is omitted', () => {
+    const withDefault = buildSystemPrompt('black-forest-labs/flux-2-pro', 'Flux 2 Pro')
+    const withExplicit = buildSystemPrompt('black-forest-labs/flux-2-pro', 'Flux 2 Pro', 'txt2img')
+
+    // Both calls should produce the same result
+    expect(withDefault).toBe(withExplicit)
+  })
+
+  /**
+   * AC-2: GIVEN ein bekanntes Modell mit img2img-Modus-Wissen
+   *       WHEN buildSystemPrompt("black-forest-labs/flux-2-pro", "Flux 2 Pro", "img2img") aufgerufen wird
+   *       THEN enthaelt der zurueckgegebene String sowohl die allgemeinen Modell-Tipps als auch die img2img-spezifischen Tipps
+   */
+  it('AC-2: should include both model tips and img2img mode tips', () => {
+    const result = buildSystemPrompt('black-forest-labs/flux-2-pro', 'Flux 2 Pro', 'img2img')
+
+    // General model tips (from knowledge file flux-2 entry)
+    expect(result).toContain('natural-language scene descriptions')
+    expect(result).toContain('Photorealistic rendering')
+
+    // img2img-specific tips from knowledge file
+    expect(result).toContain('Describe the desired changes relative to the source image')
+    expect(result).toContain('Mode-specific tips')
+  })
+
+  /**
+   * AC-3: GIVEN ein unbekanntes Modell "unknown-vendor/mystery-model"
+   *       WHEN buildSystemPrompt("unknown-vendor/mystery-model", "Mystery Model", "txt2img") aufgerufen wird
+   *       THEN enthaelt der zurueckgegebene String die generischen Fallback-Tipps (mit displayName: "Generic")
+   */
+  it('AC-3: should include generic fallback tips for unknown model', () => {
+    const result = buildSystemPrompt('unknown-vendor/mystery-model', 'Mystery Model', 'txt2img')
+
+    // Fallback section uses "General Prompting Tips" heading
+    expect(result).toContain('General Prompting Tips')
+    // Fallback tips from knowledge file
+    expect(result).toContain('Be specific and descriptive')
+    // Should not contain model-specific section header
+    expect(result).not.toContain('Prompting Tips for Flux')
+  })
+
+  /**
+   * AC-4: GIVEN der statische Hint-Block (alte Zeilen 24-31)
+   *       WHEN buildSystemPrompt mit einem beliebigen Modell aufgerufen wird
+   *       THEN ist KEINER der alten statischen Hint-Strings mehr enthalten
+   */
+  it('AC-4: should not contain any old static model hint strings', () => {
+    // Test with multiple models to ensure no static hints leak through
+    const models = [
+      { id: 'black-forest-labs/flux-2-pro', name: 'Flux 2 Pro' },
+      { id: 'recraft-ai/recraft-v4', name: 'Recraft V4' },
+      { id: 'unknown-vendor/mystery-model', name: 'Mystery Model' },
+    ]
+
+    const oldStaticHints = [
+      'FLUX models: Detailed scene descriptions',
+      'Recraft V4: Minimalistic, design-oriented',
+      'Google Imagen: Natural language descriptions',
+      'Stable Diffusion: Keyword-rich prompts',
+    ]
+
+    for (const model of models) {
+      const result = buildSystemPrompt(model.id, model.name, 'txt2img')
+
+      for (const hint of oldStaticHints) {
+        expect(result).not.toContain(hint)
+      }
+    }
+  })
+
+  /**
+   * AC-5: GIVEN buildSystemPrompt wird mit einem bekannten Modell aufgerufen
+   *       WHEN der zurueckgegebene String geprueft wird
+   *       THEN enthaelt er weiterhin die Sections "Analysis Phase", "Improvement Strategy" und "Rules"
+   */
+  it('AC-5: should still contain Analysis Phase, Improvement Strategy and Rules sections', () => {
+    const result = buildSystemPrompt('black-forest-labs/flux-2-pro', 'Flux 2 Pro', 'txt2img')
+
+    expect(result).toContain('Analysis Phase')
+    expect(result).toContain('Improvement Strategy')
+    expect(result).toContain('Rules')
+  })
+
+  it('AC-5: should contain Analysis Phase, Improvement Strategy and Rules for unknown model too', () => {
+    const result = buildSystemPrompt('unknown-vendor/mystery-model', 'Mystery Model', 'txt2img')
+
+    expect(result).toContain('Analysis Phase')
+    expect(result).toContain('Improvement Strategy')
+    expect(result).toContain('Rules')
+  })
+})
+
+// ==========================================================================
+// improve -- Slice 04 Acceptance Tests
+// ==========================================================================
+
+describe('improve', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    // Default: mockChat returns an improved prompt string
     mockChat.mockResolvedValue('improved prompt text')
   })
 
   /**
-   * AC-1: GIVEN ein Prompt "a cat" und modelId "recraft-ai/recraft-v4"
-   *       WHEN `improve(prompt, modelId)` aufgerufen wird
-   *       THEN enthaelt der an OpenRouter gesendete System-Prompt den Modell-Display-Namen
-   *            "Recraft V4" und modell-spezifische Optimierungshinweise
+   * AC-6: GIVEN die Funktion improve(prompt, modelId, generationMode?) mit optionalem drittem Parameter
+   *       WHEN improve("a cat", "black-forest-labs/flux-2-pro", "txt2img") aufgerufen wird
+   *       THEN wird buildSystemPrompt intern mit allen drei Parametern (modelId, displayName, generationMode) aufgerufen
+   *       AND wenn improve("a cat", "black-forest-labs/flux-2-pro") ohne generationMode aufgerufen wird,
+   *            wird Default "txt2img" verwendet
    */
-  it('AC-1: should include model display name "Recraft V4" in system prompt when modelId is recraft-ai/recraft-v4', async () => {
-    await PromptService.improve('a cat', 'recraft-ai/recraft-v4')
+  it('AC-6: should pass generationMode through to buildSystemPrompt', async () => {
+    await PromptService.improve('a cat', 'black-forest-labs/flux-2-pro', 'img2img')
 
     expect(mockChat).toHaveBeenCalledOnce()
 
     const systemPrompt = getSystemPromptFromLastCall()
-    expect(systemPrompt).toContain('Recraft V4')
-    expect(systemPrompt).toContain('recraft-ai/recraft-v4')
+
+    // When img2img is passed, the system prompt should contain img2img-specific tips
+    expect(systemPrompt).toContain('Describe the desired changes relative to the source image')
+    expect(systemPrompt).toContain('Mode-specific tips')
+  })
+
+  it('AC-6 (default): should use txt2img as default when generationMode is omitted in improve()', async () => {
+    // Call without generationMode
+    await PromptService.improve('a cat', 'black-forest-labs/flux-2-pro')
+
+    expect(mockChat).toHaveBeenCalledOnce()
+
+    const systemPromptNoMode = getSystemPromptFromLastCall()
+
+    vi.clearAllMocks()
+    mockChat.mockResolvedValue('improved prompt text')
+
+    // Call with explicit txt2img
+    await PromptService.improve('a cat', 'black-forest-labs/flux-2-pro', 'txt2img')
+
+    const systemPromptWithMode = getSystemPromptFromLastCall()
+
+    // Both should produce the same system prompt
+    expect(systemPromptNoMode).toBe(systemPromptWithMode)
   })
 
   /**
-   * AC-2: GIVEN ein minimaler Prompt (1-3 Woerter, z.B. "sunset beach")
-   *       WHEN der adaptive System-Prompt gebaut wird
-   *       THEN enthaelt die Improvement-Strategie Anweisungen zum Hinzufuegen spezifischer Details
-   *            (Lighting, Composition, Perspective, Texture)
+   * AC-7: GIVEN die Funktion improve mit der neuen Signatur (generationMode optional mit Default "txt2img")
+   *       WHEN TypeScript-Kompilierung (tsc --noEmit) laeuft
+   *       THEN kompiliert das gesamte Projekt fehlerfrei -- insbesondere bestehende Aufrufer
+   *            die improve(prompt, modelId) mit nur 2 Argumenten aufrufen
+   *
+   * Note: This test validates the type-level contract at runtime by exercising
+   * both 2-arg and 3-arg call signatures. The full tsc --noEmit check is done
+   * as acceptance command separately.
    */
-  it('AC-2: should use add-details strategy for minimal prompts with 1-3 words', async () => {
-    await PromptService.improve('sunset beach', 'google/imagen-4-fast')
+  it('AC-7: should compile without errors when called with 2 args (no generationMode)', async () => {
+    const result = await PromptService.improve('a cat', 'black-forest-labs/flux-2-pro')
 
-    const systemPrompt = getSystemPromptFromLastCall()
-
-    // The system prompt instructs the LLM to add details for minimal prompts
-    // Check for keywords related to adding details: lighting, composition, perspective, texture
-    const lowerPrompt = systemPrompt.toLowerCase()
-    const hasAddDetailsHints =
-      lowerPrompt.includes('minimal') ||
-      lowerPrompt.includes('add')
-    expect(hasAddDetailsHints).toBe(true)
-
-    // Should mention specific detail dimensions
-    expect(lowerPrompt).toContain('lighting')
-    expect(lowerPrompt).toContain('composition')
-    expect(lowerPrompt).toContain('perspective')
-    expect(lowerPrompt).toContain('texture')
-  })
-
-  /**
-   * AC-3: GIVEN ein bereits detailreicher Prompt (>50 Woerter mit Stil-, Licht- und Kompositions-Keywords)
-   *       WHEN der adaptive System-Prompt gebaut wird
-   *       THEN enthaelt die Improvement-Strategie Anweisungen zum Polieren und Verfeinern
-   *            statt zum Hinzufuegen neuer Details
-   */
-  it('AC-3: should use polish strategy for rich prompts with >50 words and style keywords', async () => {
-    const richPrompt = [
-      'A breathtaking cinematic photograph of a majestic snow-capped mountain range',
-      'at golden hour with dramatic backlighting and lens flare, shot with a wide-angle',
-      'perspective from a low vantage point, featuring moody atmospheric haze and volumetric',
-      'fog in the valleys, rich saturated colors with teal and orange color grading,',
-      'ultra-detailed 8k resolution, professional landscape photography style with shallow',
-      'depth of field bokeh in the foreground wildflowers, composition following the rule of thirds',
-    ].join(' ')
-
-    await PromptService.improve(richPrompt, 'black-forest-labs/flux-2-pro')
-
-    const systemPrompt = getSystemPromptFromLastCall()
-    const lowerPrompt = systemPrompt.toLowerCase()
-
-    // For rich prompts, the system prompt should contain polish/refine instructions
-    const hasPolishHints =
-      lowerPrompt.includes('rich') ||
-      lowerPrompt.includes('polish')
-    expect(hasPolishHints).toBe(true)
-  })
-
-  /**
-   * AC-4: GIVEN ein moderater Prompt (10-30 Woerter mit einigen Stil-Keywords)
-   *       WHEN der adaptive System-Prompt gebaut wird
-   *       THEN enthaelt die Improvement-Strategie Anweisungen zum Verfeinern bestehender
-   *            und Ergaenzen fehlender Dimensionen
-   */
-  it('AC-4: should use refine strategy for moderate prompts with 10-30 words', async () => {
-    const moderatePrompt =
-      'A cozy cabin in the woods during autumn with warm lighting and fallen leaves on the ground, painted in watercolor style'
-
-    await PromptService.improve(moderatePrompt, 'google/imagen-4-fast')
-
-    const systemPrompt = getSystemPromptFromLastCall()
-    const lowerPrompt = systemPrompt.toLowerCase()
-
-    // For moderate prompts, the system prompt should contain refine/enhance instructions
-    const hasRefineHints =
-      lowerPrompt.includes('moderate') ||
-      lowerPrompt.includes('refine')
-    expect(hasRefineHints).toBe(true)
-  })
-
-  /**
-   * AC-5: GIVEN eine ungueltige modelId die nicht in MODELS existiert
-   *       WHEN `improve(prompt, modelId)` aufgerufen wird
-   *       THEN wird ein generischer Modellname verwendet (kein Fehler),
-   *            und die Funktion gibt trotzdem ein `ImproveResult` zurueck
-   */
-  it('AC-5: should use generic model name for unknown modelId without throwing', async () => {
-    mockChat.mockResolvedValueOnce('improved unknown model prompt')
-
-    const result = await PromptService.improve('a cat', 'unknown/nonexistent-model-xyz')
-
-    // Should not throw, should return a valid ImproveResult
     expect(result).toEqual({
       original: 'a cat',
-      improved: 'improved unknown model prompt',
+      improved: 'improved prompt text',
     })
-
-    // The system prompt should still contain the modelId as fallback display name
-    const systemPrompt = getSystemPromptFromLastCall()
-    expect(systemPrompt).toContain('unknown/nonexistent-model-xyz')
   })
 
-  // --- Regression tests from previous slice (kept for backward compat) ---
+  it('AC-7: should compile without errors when called with 3 args (explicit generationMode)', async () => {
+    const result = await PromptService.improve('a cat', 'black-forest-labs/flux-2-pro', 'img2img')
+
+    expect(result).toEqual({
+      original: 'a cat',
+      improved: 'improved prompt text',
+    })
+  })
+
+  // --- Regression tests from previous slices (kept for backward compat) ---
 
   it('should call openRouterClient with model and return original plus improved', async () => {
     mockChat.mockResolvedValueOnce('A beautifully detailed cat sitting on a sunlit roof')

@@ -80,6 +80,7 @@ const defaultProps = {
   prompt: 'A cat on a roof',
   modelId: 'flux-2-pro',
   modelDisplayName: 'FLUX 2 Pro',
+  generationMode: 'txt2img' as const,
   onAdopt: vi.fn(),
   onDiscard: vi.fn(),
 }
@@ -338,10 +339,11 @@ describe('LLMComparison Modal', () => {
       expect(mockImprovePrompt).toHaveBeenCalledTimes(1)
     })
 
-    // Verify modelId was passed to the action
+    // Verify modelId was passed to the action (with default generationMode from defaultProps)
     expect(mockImprovePrompt).toHaveBeenCalledWith({
       prompt: 'A cat on a roof',
       modelId: 'flux-2-pro',
+      generationMode: 'txt2img',
     })
   })
 
@@ -363,5 +365,123 @@ describe('LLMComparison Modal', () => {
 
     // onDiscard should be called via onOpenChange(false)
     expect(onDiscard).toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Tests: LLMComparison generationMode Passthrough (Slice 05)
+// ---------------------------------------------------------------------------
+
+describe('LLMComparison generationMode Passthrough (Slice 05)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  // -------------------------------------------------------------------------
+  // AC-3: generationMode Prop wird an improvePrompt Action weitergegeben
+  // -------------------------------------------------------------------------
+
+  /**
+   * AC-3: GIVEN `LLMComparison` wird mit `generationMode="img2img"` gerendert
+   *       WHEN die Komponente `improvePrompt` aufruft
+   *       THEN enthaelt der Action-Aufruf `generationMode: "img2img"` im Input-Objekt
+   */
+  it('AC-3: should pass generationMode to improvePrompt action call', async () => {
+    mockImprovePrompt.mockResolvedValueOnce({
+      original: 'A cat on a roof',
+      improved: 'A majestic feline perched on a sunlit rooftop',
+    })
+
+    renderModal({
+      prompt: 'A cat on a roof',
+      modelId: 'black-forest-labs/flux-2-pro',
+      modelDisplayName: 'FLUX 2 Pro',
+      generationMode: 'img2img' as const,
+    })
+
+    // Wait for the improvePrompt call to happen (on mount via useEffect)
+    await waitFor(() => {
+      expect(mockImprovePrompt).toHaveBeenCalledTimes(1)
+    })
+
+    // Verify generationMode: "img2img" was included in the action call
+    expect(mockImprovePrompt).toHaveBeenCalledWith({
+      prompt: 'A cat on a roof',
+      modelId: 'black-forest-labs/flux-2-pro',
+      generationMode: 'img2img',
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // AC-5: TypeScript-Kompilierung mit neuem Prop (runtime type check)
+  // -------------------------------------------------------------------------
+
+  /**
+   * AC-5: GIVEN `generationMode` wird als neues Prop in `LLMComparisonProps` definiert
+   *       WHEN `pnpm exec tsc --noEmit` ausgefuehrt wird
+   *       THEN kompiliert das gesamte Projekt fehlerfrei
+   *
+   * This is a runtime type-safety test: LLMComparison accepts generationMode
+   * as a required prop and renders without errors for each valid mode.
+   */
+  it('AC-5: should accept generationMode as a required prop', () => {
+    mockImprovePrompt.mockReturnValue(new Promise(() => {}))
+
+    // Render with generationMode="txt2img" (default mode)
+    const { unmount: unmount1 } = render(
+      <LLMComparison
+        prompt="test prompt"
+        modelId="flux-2-pro"
+        modelDisplayName="FLUX 2 Pro"
+        generationMode="txt2img"
+        onAdopt={vi.fn()}
+        onDiscard={vi.fn()}
+      />
+    )
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    unmount1()
+
+    // Render with generationMode="img2img"
+    const { unmount: unmount2 } = render(
+      <LLMComparison
+        prompt="test prompt"
+        modelId="flux-2-pro"
+        modelDisplayName="FLUX 2 Pro"
+        generationMode="img2img"
+        onAdopt={vi.fn()}
+        onDiscard={vi.fn()}
+      />
+    )
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    unmount2()
+  })
+
+  // -------------------------------------------------------------------------
+  // Additional: generationMode="txt2img" is also forwarded correctly
+  // -------------------------------------------------------------------------
+
+  it('should pass generationMode="txt2img" to improvePrompt action call', async () => {
+    mockImprovePrompt.mockResolvedValueOnce({
+      original: 'A sunset',
+      improved: 'A breathtaking sunset over the ocean',
+    })
+
+    renderModal({
+      prompt: 'A sunset',
+      modelId: 'flux-2-pro',
+      generationMode: 'txt2img' as const,
+    })
+
+    await waitFor(() => {
+      expect(mockImprovePrompt).toHaveBeenCalledTimes(1)
+    })
+
+    expect(mockImprovePrompt).toHaveBeenCalledWith({
+      prompt: 'A sunset',
+      modelId: 'flux-2-pro',
+      generationMode: 'txt2img',
+    })
   })
 })

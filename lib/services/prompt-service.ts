@@ -1,9 +1,21 @@
 import { openRouterClient } from "@/lib/clients/openrouter";
 import { modelIdToDisplayName } from "@/lib/utils/model-display-name";
+import {
+  getPromptKnowledge,
+  formatKnowledgeForPrompt,
+} from "@/lib/services/prompt-knowledge";
+import type { GenerationMode } from "@/lib/types";
 
 const MODEL = "google/gemini-3.1-pro-preview";
 
-function buildSystemPrompt(modelId: string, modelDisplayName: string): string {
+export function buildSystemPrompt(
+  modelId: string,
+  modelDisplayName: string,
+  generationMode: GenerationMode = "txt2img",
+): string {
+  const knowledgeResult = getPromptKnowledge(modelId, generationMode);
+  const knowledgeSection = formatKnowledgeForPrompt(knowledgeResult);
+
   return `You are an expert prompt engineer for AI image generation.
 
 ## Analysis Phase
@@ -22,13 +34,8 @@ Based on your analysis:
 ## Model Optimization
 The target model is: ${modelId} (${modelDisplayName})
 Optimize the prompt for this specific model's strengths:
-- FLUX models: Detailed scene descriptions, specific art styles, lighting keywords
-- Recraft V4: Design-focused language, clean compositions, professional aesthetics
-- Seedream: Dreamlike qualities, atmospheric descriptions, cinematic framing
-- Imagen: Natural language descriptions, photorealistic detail cues
-- GPT Image: Balanced descriptions, creative concepts
-- Ideogram: Text rendering support, graphic design terminology
-- Gemini Flash: Quick, efficient prompts with clear subject and style
+
+${knowledgeSection}
 
 ## Rules
 - Keep the core intent and subject of the original prompt
@@ -41,9 +48,13 @@ export interface ImproveResult {
   improved: string;
 }
 
-async function improve(prompt: string, modelId: string): Promise<ImproveResult> {
+async function improve(
+  prompt: string,
+  modelId: string,
+  generationMode: GenerationMode = "txt2img",
+): Promise<ImproveResult> {
   const modelDisplayName = modelIdToDisplayName(modelId);
-  const systemPrompt = buildSystemPrompt(modelId, modelDisplayName);
+  const systemPrompt = buildSystemPrompt(modelId, modelDisplayName, generationMode);
 
   const improved = await openRouterClient.chat({
     model: MODEL,

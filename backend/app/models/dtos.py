@@ -48,6 +48,15 @@ class SendMessageRequest(BaseModel):
         default=None,
         description="Optional LLM model slug",
     )
+    image_model_id: Optional[str] = Field(
+        default=None,
+        max_length=200,
+        description="Optional image generation model ID (e.g. 'flux-2-pro')",
+    )
+    generation_mode: Optional[Literal["txt2img", "img2img"]] = Field(
+        default=None,
+        description="Optional generation mode: 'txt2img' or 'img2img'",
+    )
 
 
 # ---------------------------------------------------------------------------

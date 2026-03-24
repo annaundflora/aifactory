@@ -1,0 +1,30 @@
+{
+  "spec_path": "specs/phase-7/2026-03-22-prompt-knowledge-system",
+  "status": "completed",
+  "phase": "completed",
+  "started_at": "2026-03-23T12:00:00Z",
+  "detected_stack": "TypeScript + Python (hybrid)",
+  "total_slices": 13,
+  "current_slice_index": 13,
+  "slices": [
+    { "number": 1, "name": "Knowledge JSON Schema + Fallback-Skeleton", "status": "approved", "retries": 0 },
+    { "number": 2, "name": "TS Lookup-Funktion (Prefix-Matching)", "status": "approved", "retries": 0 },
+    { "number": 3, "name": "Python Lookup-Funktion (Prefix-Matching)", "status": "approved", "retries": 0 },
+    { "number": 4, "name": "Improver buildSystemPrompt + Knowledge-Injection", "status": "approved", "retries": 1 },
+    { "number": 5, "name": "Improver generationMode Durchreichung (Action + UI)", "status": "approved", "retries": 1 },
+    { "number": 6, "name": "Assistant System-Prompt dynamisch machen", "status": "approved", "retries": 0 },
+    { "number": 7, "name": "Assistant DTO + Route + Service", "status": "approved", "retries": 0 },
+    { "number": 8, "name": "Assistant Frontend (image_model_id senden)", "status": "approved", "retries": 0 },
+    { "number": 9, "name": "Canvas Chat Knowledge-Injection", "status": "approved", "retries": 0 },
+    { "number": 10, "name": "recommend_model Knowledge-Enrichment", "status": "approved", "retries": 0 },
+    { "number": 11, "name": "Knowledge-Inhalt fuer alle 8 Modell-Familien", "status": "approved", "retries": 0 },
+    { "number": 12, "name": "Integration-Test Improver E2E", "status": "approved", "retries": 0 },
+    { "number": 13, "name": "Integration-Test Assistant + Canvas Chat", "status": "approved", "retries": 0 }
+  ],
+  "approved_slices": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+  "failed_slices": [],
+  "gate3_retries": 0,
+  "last_action": "Gate 3 APPROVED - Ready for Orchestration",
+  "completed_at": "2026-03-23T13:10:00Z",
+  "last_updated": "2026-03-23T13:10:00Z"
+}

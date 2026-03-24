@@ -287,6 +287,10 @@ export interface PromptAssistantContextValue {
   >;
   /** Ref for registering the cancelStream implementation from useAssistantRuntime */
   cancelStreamRef: MutableRefObject<(() => void) | null>;
+  /** Ref holding the current workspace image model ID, kept in sync with variationData.modelId */
+  imageModelIdRef: MutableRefObject<string | null>;
+  /** Ref holding the current generation mode — set externally (e.g. by prompt-area) */
+  generationModeRef: MutableRefObject<string | null>;
 }
 
 const PromptAssistantContext =
@@ -356,8 +360,18 @@ export function PromptAssistantProvider({
   // Track whether auto-title has already been triggered for this session
   const autoTitleSentRef = useRef<string | null>(null);
 
+  // Slice 08: Refs for workspace image model and generation mode
+  // imageModelIdRef is kept in sync with variationData.modelId below
+  const imageModelIdRef = useRef<string | null>(null);
+  // generationModeRef can be set externally (e.g. by prompt-area or assistant-panel)
+  const generationModeRef = useRef<string | null>(null);
+
   // Keep sessionIdRef in sync with reducer state
   sessionIdRef.current = state.sessionId;
+
+  // Slice 08: Keep imageModelIdRef in sync with workspace variationData.modelId
+  // This ensures sendMessageToSession always reads the CURRENT model (AC-5)
+  imageModelIdRef.current = variationData?.modelId ?? null;
 
   const sendMessage = useCallback(
     (content: string, imageUrls?: string[]) => {
@@ -571,6 +585,8 @@ export function PromptAssistantProvider({
       sessionIdRef,
       sendMessageRef,
       cancelStreamRef,
+      imageModelIdRef,
+      generationModeRef,
     }),
     [
       state,

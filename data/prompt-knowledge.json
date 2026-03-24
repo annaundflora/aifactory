@@ -1,0 +1,284 @@
+{
+  "models": {
+    "flux-2": {
+      "displayName": "Flux 2 Pro/Max",
+      "promptStyle": "natural",
+      "negativePrompts": {
+        "supported": false,
+        "note": "Flux 2 does not support negative prompts. Use semantic negatives in the main prompt instead, e.g. 'without text' rather than a negative prompt."
+      },
+      "strengths": [
+        "Photorealistic rendering with fine detail",
+        "Strong prompt adherence for complex scenes",
+        "Excellent text rendering in images"
+      ],
+      "tips": [
+        "Use detailed, natural-language scene descriptions rather than keyword lists",
+        "Specify lighting, camera angle, and atmosphere explicitly",
+        "Include art style references when aiming for non-photorealistic output",
+        "Describe spatial relationships between subjects clearly",
+        "Mention material textures and surface qualities for realism"
+      ],
+      "avoid": [
+        "Keyword-style tag lists separated by commas",
+        "Negative prompt syntax or embedded negatives",
+        "Overly short prompts with minimal detail"
+      ],
+      "modes": {
+        "txt2img": {
+          "tips": [
+            "Start with the main subject, then layer in environment and mood",
+            "Specify aspect ratio intent in the description if composition matters",
+            "Use cinematic or photographic framing terms for dynamic compositions"
+          ]
+        },
+        "img2img": {
+          "tips": [
+            "Describe the desired changes relative to the source image",
+            "Focus on what should change rather than re-describing the entire scene",
+            "Mention style transfer goals explicitly if changing artistic direction"
+          ]
+        }
+      }
+    },
+    "flux-schnell": {
+      "displayName": "Flux Schnell",
+      "promptStyle": "natural",
+      "negativePrompts": {
+        "supported": false,
+        "note": "Flux Schnell does not support negative prompts. Use positive rephrasing in the main prompt, e.g. 'sharp focus' instead of 'no blur'."
+      },
+      "strengths": [
+        "Very fast generation with good quality",
+        "Natural language understanding from the Flux family",
+        "Solid prompt adherence for straightforward scenes"
+      ],
+      "tips": [
+        "Write concise natural-language descriptions focused on the main subject",
+        "Keep prompts shorter than Flux 2 Pro since Schnell is optimized for speed",
+        "Specify the most important visual elements first as token priority matters",
+        "Use camera and lens references for photographic quality"
+      ],
+      "avoid": [
+        "Keyword-style comma-separated tag lists",
+        "Overly complex multi-subject scenes that need Pro/Max capacity",
+        "Quality tags like '8k masterpiece' which waste token attention"
+      ]
+    },
+    "nano-banana": {
+      "displayName": "Nano Banana 2",
+      "promptStyle": "natural",
+      "negativePrompts": {
+        "supported": false,
+        "note": "No separate negative prompt parameter. Embed semantic negatives in the main prompt, e.g. 'no extra fingers, avoid watermarks'."
+      },
+      "strengths": [
+        "Flash-speed generation at professional quality",
+        "Web-search grounding for current real-world data",
+        "Strong text rendering in 10+ languages",
+        "Supports up to 14 reference images for style transfer"
+      ],
+      "tips": [
+        "Write detailed natural-language descriptions; more detail yields closer results",
+        "Use photography terminology like camera types and lighting setups",
+        "Leverage reference images for complex style transfer and edits",
+        "Specify depth and spatial layering for realistic scene composition"
+      ],
+      "avoid": [
+        "Keyword-only prompts without descriptive context",
+        "Relying on a separate negative prompt field that does not exist",
+        "Very short prompts that produce generic output"
+      ],
+      "modes": {
+        "txt2img": {
+          "tips": [
+            "Front-load the subject and action, then add environment and style",
+            "Reference specific camera models like GoPro or Fujifilm for photographic style",
+            "Include lighting setup details such as 'three-point softbox' for studio looks"
+          ]
+        },
+        "img2img": {
+          "tips": [
+            "Describe the target changes clearly: background swap, color shift, or style change",
+            "Combine multiple reference images when blending styles or elements",
+            "Mention which aspects of the source image to preserve"
+          ]
+        }
+      }
+    },
+    "gpt-image": {
+      "displayName": "GPT Image 1.5",
+      "promptStyle": "natural",
+      "negativePrompts": {
+        "supported": false,
+        "note": "GPT Image does not support negative prompts. Rephrase positively, e.g. 'empty scene' instead of 'no people'."
+      },
+      "strengths": [
+        "Near-perfect text rendering in images",
+        "Precise prompt following with 10-20 objects",
+        "Conversational iteration within a session"
+      ],
+      "tips": [
+        "Structure prompts as: background/scene, subject, key details, constraints, intended use",
+        "Put text in quotes or ALL CAPS and add 'EXACT, verbatim' for accurate rendering",
+        "Name the intended use like 'for a billboard ad' to set quality mode",
+        "Add explicit light sources to prevent overly dark output",
+        "Repeat exact style wording across prompts for consistency"
+      ],
+      "avoid": [
+        "Omitting light source descriptions which causes dark images",
+        "Changing style phrasing between iterations which breaks consistency",
+        "Keyword-style tag lists instead of natural descriptions"
+      ]
+    },
+    "seedream": {
+      "displayName": "Seedream 4.5/5",
+      "promptStyle": "natural",
+      "negativePrompts": {
+        "supported": true,
+        "note": "Supports negative prompts. Keep to 15-25 terms maximum; more terms confuse the model."
+      },
+      "strengths": [
+        "Native 4K output resolution",
+        "Excellent text rendering for posters and UI mockups",
+        "Strong character consistency across generations",
+        "Responsive to photography terminology"
+      ],
+      "tips": [
+        "Structure prompts as: subject, action/pose, environment, style, technical details",
+        "Aim for 30-100 words; under 15 is too generic, over 150 causes conflicts",
+        "Use photography terms like lens type and lighting setup for realism",
+        "Describe spatial depth and layering explicitly for complex scenes"
+      ],
+      "avoid": [
+        "Prompts over 150 words which cause element conflicts",
+        "CFG guidance above 10 which leads to oversaturation and artifacts",
+        "Keyword-only prompts without natural sentence structure"
+      ],
+      "modes": {
+        "txt2img": {
+          "tips": [
+            "Start with the main subject and action, then layer setting and mood",
+            "Include text content in quotes if the image should contain readable text",
+            "Keep CFG guidance between 5.5 and 7.5 for best results"
+          ]
+        },
+        "img2img": {
+          "tips": [
+            "Describe modifications relative to the source image clearly",
+            "Focus on style transfer goals or specific element changes",
+            "Use depth descriptions to guide spatial modifications"
+          ]
+        }
+      }
+    },
+    "stable-diffusion": {
+      "displayName": "Stable Diffusion 3.5",
+      "promptStyle": "natural",
+      "negativePrompts": {
+        "supported": true,
+        "note": "Full negative prompt support. Use terms like 'worst quality, low quality, blurry, watermark, bad anatomy' for best results."
+      },
+      "strengths": [
+        "Full negative prompt support for precise exclusion",
+        "Strong artist and art style recognition",
+        "Good natural language understanding at 8.1B parameters"
+      ],
+      "tips": [
+        "Write natural-language descriptions; keyword weighting syntax has no effect on SD 3.5",
+        "Leverage detailed negative prompts to exclude unwanted elements",
+        "Reference specific artists or art movements for reliable style matching",
+        "Keep CFG around 4.4 with moderate guidance for balanced output"
+      ],
+      "avoid": [
+        "Keyword weighting syntax like (term:1.3) which SD 3.5 ignores completely",
+        "BREAK or [[term]] tokens which have no effect on this version",
+        "Very high CFG values that cause oversaturation"
+      ]
+    },
+    "recraft": {
+      "displayName": "Recraft V4",
+      "promptStyle": "natural",
+      "negativePrompts": {
+        "supported": false,
+        "note": "Recraft does not use a negative prompt field. Describe what you want positively and use style presets for control."
+      },
+      "strengths": [
+        "True SVG vector output, unique among generators",
+        "Accurate long text rendering including full paragraphs",
+        "Over 100 curated professional style presets"
+      ],
+      "tips": [
+        "Structure prompts as: image style, main content, detailed description, background, style details",
+        "Use the colors parameter with HEX codes for brand-accurate colors",
+        "Lower the artistic level setting for closer prompt adherence",
+        "Reference design movements like Swiss Style or Bauhaus for vector work"
+      ],
+      "avoid": [
+        "Expecting raster-only output; Recraft defaults to vector when appropriate",
+        "Overly vague style descriptions when precise presets are available",
+        "Ignoring the built-in style presets which outperform manual style prompting"
+      ]
+    },
+    "ideogram": {
+      "displayName": "Ideogram 3",
+      "promptStyle": "natural",
+      "negativePrompts": {
+        "supported": true,
+        "note": "Negative prompts available on paid plans. Use them to exclude unwanted text or visual elements."
+      },
+      "strengths": [
+        "Best-in-class text rendering for logos, signs, and posters",
+        "Accurate multi-line typography in various styles",
+        "Magic Prompt feature for automatic prompt refinement"
+      ],
+      "tips": [
+        "Place text content in quotes for accurate rendering in the image",
+        "Specify typography style explicitly such as serif, sans-serif, or handwritten",
+        "Disable Magic Prompt when you need full manual control over output",
+        "Different style modes use different underlying models so choose carefully"
+      ],
+      "avoid": [
+        "Relying on Magic Prompt for precise technical compositions",
+        "Mixing too many text elements which reduces per-element accuracy",
+        "Ignoring the style mode selector which significantly affects output"
+      ]
+    },
+    "hunyuan": {
+      "displayName": "Hunyuan Image 3",
+      "promptStyle": "natural",
+      "negativePrompts": {
+        "supported": true,
+        "note": "Supports negative prompts. Works similarly to Stable Diffusion negative prompt handling."
+      },
+      "strengths": [
+        "Handles prompts over 1000 characters with strong comprehension",
+        "Bilingual text rendering in Chinese and English",
+        "Large 80B parameter model with strong world knowledge"
+      ],
+      "tips": [
+        "Write long, detailed prompts; the model handles 1000+ characters well",
+        "Use scientific or geographic terms for accurate real-world depictions",
+        "Include bilingual text in quotes when rendering Chinese and English together",
+        "Specify camera and lens details for photorealistic output"
+      ],
+      "avoid": [
+        "Very short prompts that underutilize the model's long-context strength",
+        "Keyword-only prompts; use full natural sentences for best results",
+        "Expecting non-photorealistic styles without explicit art direction"
+      ]
+    }
+  },
+  "fallback": {
+    "displayName": "Generic",
+    "tips": [
+      "Be specific and descriptive in your prompt",
+      "Include details about subject, setting, lighting, and style",
+      "Use clear, unambiguous language to describe the desired output"
+    ],
+    "avoid": [
+      "Vague or overly brief prompts",
+      "Contradictory instructions in the same prompt"
+    ]
+  }
+}

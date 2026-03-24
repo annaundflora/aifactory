@@ -102,7 +102,7 @@ vi.mock("lucide-react", () => {
     ZoomIn: stub("ZoomIn"), Download: stub("Download"), Trash2: stub("Trash2"),
     Sparkles: stub("Sparkles"), Library: stub("Library"), Star: stub("Star"),
     ChevronLeft: stub("ChevronLeft"), ChevronRight: stub("ChevronRight"),
-    PanelLeftOpen: stub("PanelLeftOpen"),
+    PanelLeftOpen: stub("PanelLeftOpen"), Eraser: stub("Eraser"),
   };
 });
 
@@ -169,6 +169,8 @@ vi.mock("@/lib/assistant/assistant-context", () => ({
     sessionIdRef: { current: null },
     sendMessageRef: { current: null },
     cancelStreamRef: { current: null },
+    imageModelIdRef: { current: null },
+    generationModeRef: { current: null },
   }),
   getWorkspaceFieldsForChip: () => null,
 }));

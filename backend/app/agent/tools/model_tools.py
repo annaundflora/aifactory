@@ -17,6 +17,7 @@ import logging
 
 from langchain_core.tools import tool
 
+from app.agent.prompt_knowledge import get_prompt_knowledge
 from app.services.model_service import model_service
 
 logger = logging.getLogger(__name__)
@@ -95,13 +96,65 @@ def _match_model(
 
                 # Check all parts of the pattern tuple match somewhere in owner/name
                 if all(p.lower() in full_id for p in pattern_tuple):
+                    model_id = f"{model.get('owner', '')}/{model.get('name', '')}"
+                    reason = _enrich_reason_with_knowledge(
+                        model_id, rule["reason_de"]
+                    )
                     return {
-                        "id": f"{model.get('owner', '')}/{model.get('name', '')}",
+                        "id": model_id,
                         "name": model.get("name", ""),
-                        "reason": rule["reason_de"],
+                        "reason": reason,
                     }
 
     return None
+
+
+def _enrich_reason_with_knowledge(model_id: str, static_reason: str) -> str:
+    """Enrich a static match reason with model-specific strengths from knowledge.
+
+    Looks up the model in prompt-knowledge.json and, if strengths are found,
+    builds a German-language reason string incorporating those strengths.
+    Falls back to the static reason_de if the lookup fails or yields no strengths.
+
+    Args:
+        model_id: Full model ID in "owner/name" format.
+        static_reason: The static reason_de string from _MATCHING_RULES.
+
+    Returns:
+        An enriched reason string, or the static reason if enrichment is not possible.
+    """
+    try:
+        knowledge = get_prompt_knowledge(model_id)
+    except Exception:
+        logger.debug(
+            "Knowledge lookup failed for '%s', using static reason", model_id
+        )
+        return static_reason
+
+    if knowledge.get("kind") != "model":
+        return static_reason
+
+    model_knowledge = knowledge.get("model")
+    if not model_knowledge:
+        return static_reason
+
+    strengths = model_knowledge.get("strengths")
+    if not strengths or not isinstance(strengths, list) or len(strengths) == 0:
+        return static_reason
+
+    display_name = knowledge.get("displayName", "Dieses Modell")
+
+    # Format strengths into a readable German sentence
+    if len(strengths) == 1:
+        strengths_text = strengths[0]
+    elif len(strengths) == 2:
+        strengths_text = f"{strengths[0]} und {strengths[1]}"
+    else:
+        strengths_text = ", ".join(strengths[:-1]) + f" und {strengths[-1]}"
+
+    return (
+        f"{display_name} eignet sich besonders gut dank: {strengths_text}."
+    )
 
 
 def _get_default_model(available_models: list[dict]) -> dict:

@@ -63,6 +63,8 @@ async def send_message(session_id: str, request: SendMessageRequest):
             content=request.content,
             image_urls=image_url_strs,
             model=request.model,
+            image_model_id=request.image_model_id,
+            generation_mode=request.generation_mode,
         ):
             yield {
                 "event": sse_event["event"],
