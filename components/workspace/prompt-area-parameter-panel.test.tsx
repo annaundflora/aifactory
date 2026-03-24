@@ -252,6 +252,8 @@ vi.mock("@/lib/assistant/assistant-context", () => ({
     sessionIdRef: { current: null },
     sendMessageRef: { current: null },
     cancelStreamRef: { current: null },
+    imageModelIdRef: { current: null },
+    generationModeRef: { current: null },
   }),
   getWorkspaceFieldsForChip: () => null,
 }));

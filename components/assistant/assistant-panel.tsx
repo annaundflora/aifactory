@@ -49,6 +49,8 @@ export function AssistantPanelContent({
     sessionIdRef,
     sendMessageRef,
     cancelStreamRef,
+    imageModelIdRef,
+    generationModeRef,
   } = usePromptAssistant();
 
   const { variationData } = useWorkspaceVariation();
@@ -60,6 +62,8 @@ export function AssistantPanelContent({
     selectedModel,
     sendMessageRef,
     cancelStreamRef,
+    imageModelIdRef,
+    generationModeRef,
   });
 
   const handleSend = useCallback(

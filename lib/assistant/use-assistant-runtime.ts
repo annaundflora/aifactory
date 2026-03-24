@@ -100,6 +100,10 @@ export interface UseAssistantRuntimeOptions {
   >;
   /** Ref to register the cancelStream function on the context */
   cancelStreamRef: MutableRefObject<(() => void) | null>;
+  /** Ref holding the current workspace image model ID (e.g. "black-forest-labs/flux-2-pro") */
+  imageModelIdRef?: MutableRefObject<string | null>;
+  /** Ref holding the current generation mode (only "txt2img" | "img2img" are sent to backend) */
+  generationModeRef?: MutableRefObject<string | null>;
 }
 
 export interface UseAssistantRuntimeReturn {
@@ -119,6 +123,8 @@ export function useAssistantRuntime({
   selectedModel,
   sendMessageRef,
   cancelStreamRef,
+  imageModelIdRef,
+  generationModeRef,
 }: UseAssistantRuntimeOptions): UseAssistantRuntimeReturn {
   const abortControllerRef = useRef<AbortController | null>(null);
   const streamingRef = useRef(false);
@@ -355,6 +361,19 @@ export function useAssistantRuntime({
         };
         if (imageUrls && imageUrls.length > 0) {
           body.image_urls = imageUrls;
+        }
+
+        // Include workspace image model ID if available (Slice 08)
+        const currentImageModelId = imageModelIdRef?.current;
+        if (currentImageModelId) {
+          body.image_model_id = currentImageModelId;
+        }
+
+        // Include generation mode only if it is "txt2img" or "img2img" (Slice 08)
+        // Backend Literal only accepts these two values; other modes (upscale, inpaint, outpaint) are omitted
+        const currentGenerationMode = generationModeRef?.current;
+        if (currentGenerationMode === "txt2img" || currentGenerationMode === "img2img") {
+          body.generation_mode = currentGenerationMode;
         }
 
         const response = await fetch(
