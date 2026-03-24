@@ -9,7 +9,7 @@ import {
   type PromptHistoryEntry,
 } from "@/lib/services/prompt-history-service";
 import { requireAuth } from "@/lib/auth/guard";
-import type { GenerationMode } from "@/lib/types";
+import { VALID_GENERATION_MODES, type GenerationMode } from "@/lib/types";
 
 // UUID v4 format validation
 const UUID_REGEX =
@@ -85,6 +85,13 @@ export async function improvePrompt(input: {
 
   if (!modelId) {
     return { error: "modelId darf nicht leer sein" };
+  }
+
+  if (
+    input.generationMode !== undefined &&
+    !VALID_GENERATION_MODES.includes(input.generationMode)
+  ) {
+    return { error: "Ungueltiger Generierungsmodus" };
   }
 
   try {
