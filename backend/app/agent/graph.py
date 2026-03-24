@@ -23,7 +23,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import ToolNode
 from langgraph.prebuilt import create_react_agent  # noqa: F401 - kept for test backward compat
 
-from app.agent.prompts import SYSTEM_PROMPT
+from app.agent.prompts import build_assistant_system_prompt
 from app.agent.state import PromptAssistantState
 from app.agent.tools.image_tools import analyze_image
 from app.agent.tools.model_tools import get_model_info, recommend_model
@@ -234,14 +234,24 @@ def create_agent(
 
     def _call_model_sync(state: PromptAssistantState, config: RunnableConfig) -> dict:
         """Sync: Call the LLM with the current messages and system prompt."""
-        system_msg = SystemMessage(content=SYSTEM_PROMPT)
+        configurable = config.get("configurable", {})
+        image_model_id = configurable.get("image_model_id")
+        generation_mode = configurable.get("generation_mode")
+        system_msg = SystemMessage(
+            content=build_assistant_system_prompt(image_model_id, generation_mode)
+        )
         messages = [system_msg] + list(state["messages"])
         response = _get_llm(config).invoke(messages)
         return {"messages": [response]}
 
     async def _call_model_async(state: PromptAssistantState, config: RunnableConfig) -> dict:
         """Async: Call the LLM with the current messages and system prompt."""
-        system_msg = SystemMessage(content=SYSTEM_PROMPT)
+        configurable = config.get("configurable", {})
+        image_model_id = configurable.get("image_model_id")
+        generation_mode = configurable.get("generation_mode")
+        system_msg = SystemMessage(
+            content=build_assistant_system_prompt(image_model_id, generation_mode)
+        )
         messages = [system_msg] + list(state["messages"])
         response = await _get_llm(config).ainvoke(messages)
         return {"messages": [response]}

@@ -2,9 +2,19 @@
 
 Contains the core instructions for bilingual behavior (German chat, English prompts),
 creative partner role, must-have information gathering, and tool usage guidance.
+
+Exports:
+    build_assistant_system_prompt(image_model_id, generation_mode) -> str
 """
 
-SYSTEM_PROMPT = """Du bist ein kreativer Prompt-Assistent fuer Bildgenerierung in der AI Factory App.
+import logging
+from typing import Optional
+
+from app.agent.prompt_knowledge import format_knowledge_for_prompt, get_prompt_knowledge
+
+logger = logging.getLogger(__name__)
+
+_BASE_PROMPT = """Du bist ein kreativer Prompt-Assistent fuer Bildgenerierung in der AI Factory App.
 
 ROLLE:
 - Du hilfst Anfaengern und Fortgeschrittenen, perfekte Prompts fuer Bildgenerierung zu schreiben
@@ -71,3 +81,50 @@ WICHTIG:
 - Der User kann mitten im Gespraech ein Bild hochladen — analysiere und integriere es
 - Nach Apply kann der User zurueckkommen — nimm den Thread nahtlos wieder auf
 """
+
+
+def build_assistant_system_prompt(
+    image_model_id: Optional[str] = None,
+    generation_mode: Optional[str] = None,
+) -> str:
+    """Build the assistant system prompt, optionally with model-specific knowledge.
+
+    When a valid image_model_id is provided, looks up prompt knowledge for
+    that model (and optionally generation_mode) and appends a knowledge
+    section to the base prompt.
+
+    When image_model_id is None or empty string, returns the base prompt
+    unchanged (backward compatibility).
+
+    Args:
+        image_model_id: The image generation model ID, e.g. "flux-2-pro".
+            May include owner prefix (e.g. "black-forest-labs/flux-2-pro").
+            None or "" means no model context available.
+        generation_mode: The generation mode, e.g. "txt2img" or "img2img".
+            None means no mode context available.
+
+    Returns:
+        The complete system prompt string, with knowledge section appended
+        if model context is available.
+    """
+    # No model context: return base prompt as-is (backward compatible)
+    if not image_model_id:
+        return _BASE_PROMPT
+
+    # Look up knowledge for this model
+    result = get_prompt_knowledge(image_model_id, generation_mode)
+    knowledge_section = format_knowledge_for_prompt(result)
+
+    logger.debug(
+        "Building assistant prompt with knowledge for model=%s, mode=%s",
+        image_model_id,
+        generation_mode,
+    )
+
+    return _BASE_PROMPT + "\n\n" + knowledge_section
+
+
+# Backward-compatible alias (deprecated).
+# Existing tests and consumers may still import SYSTEM_PROMPT.
+# Equivalent to build_assistant_system_prompt(None, None).
+SYSTEM_PROMPT = _BASE_PROMPT
