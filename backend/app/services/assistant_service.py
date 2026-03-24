@@ -120,6 +120,8 @@ class AssistantService:
         content: str,
         image_urls: Optional[list[str]] = None,
         model: Optional[str] = None,
+        image_model_id: Optional[str] = None,
+        generation_mode: Optional[str] = None,
     ) -> AsyncGenerator[dict, None]:
         """Stream a response from the LangGraph agent as SSE events.
 
@@ -134,6 +136,8 @@ class AssistantService:
             content: The user message text.
             image_urls: Optional list of reference image URLs.
             model: Optional LLM model override slug.
+            image_model_id: Optional image generation model ID for knowledge injection.
+            generation_mode: Optional generation mode ('txt2img' or 'img2img').
 
         Yields:
             Dicts with 'event' and 'data' keys for SSE formatting.
@@ -160,6 +164,8 @@ class AssistantService:
                     "thread_id": session_id,
                     "pending_image_urls": image_urls or [],
                     "model": model,
+                    "image_model_id": image_model_id,
+                    "generation_mode": generation_mode,
                 }
             }
 
