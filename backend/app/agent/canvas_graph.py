@@ -30,6 +30,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import ToolNode
 from langgraph.prebuilt.chat_agent_executor import AgentState
 
+from app.agent.prompt_knowledge import format_knowledge_for_prompt, get_prompt_knowledge
 from app.agent.tools.image_tools import generate_image
 from app.config import settings
 
@@ -208,7 +209,7 @@ WICHTIG:
 - Nach dem Tool-Aufruf erklaert das Frontend die Generierung
 """
 
-    if image_context:
+    if image_context is not None:
         # Cast image_url to str (may be HttpUrl Pydantic object) and truncate prompt
         # to max 2000 characters to prevent prompt injection via oversized input.
         image_url = str(image_context.get("image_url", ""))
@@ -235,7 +236,23 @@ Beziehe dich beim Generieren auf diesen Kontext:
 - Baue auf dem Original-Prompt auf und verbessere ihn gemaess der Bearbeitungsanfrage
 - Bei action="img2img" kann der User das Bild von "{image_url}" als Referenz nutzen
 """
-        return base_prompt + context_section
+        # Knowledge injection: append model-specific prompting tips after context_section
+        knowledge_section = ""
+        if model_id:
+            try:
+                knowledge_result = get_prompt_knowledge(model_id, None)
+                formatted = format_knowledge_for_prompt(knowledge_result)
+                if formatted:
+                    knowledge_section = f"\n{formatted}\n"
+            except Exception:
+                logger.warning(
+                    "Failed to load prompt knowledge for model '%s' in canvas, "
+                    "continuing without knowledge section",
+                    model_id,
+                    exc_info=True,
+                )
+
+        return base_prompt + context_section + knowledge_section
 
     return base_prompt
 
