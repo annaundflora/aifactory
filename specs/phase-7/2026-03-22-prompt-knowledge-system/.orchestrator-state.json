@@ -2,8 +2,8 @@
   "spec_path": "/home/dev/aifactory/worktrees/prompt-knowledge-system/specs/phase-7/2026-03-22-prompt-knowledge-system",
   "feature_name": "prompt-knowledge-system",
   "status": "in_progress",
-  "current_state": "deterministic_gate",
-  "current_slice_id": "slice-01",
+  "current_state": "implementing",
+  "current_slice_id": "slice-02",
   "retry_count": 0,
   "failed_stage": null,
   "waves": [
@@ -14,8 +14,8 @@
     {"wave": 5, "slices": ["slice-08"]},
     {"wave": 6, "slices": ["slice-12", "slice-13"]}
   ],
-  "completed_slices": [],
-  "evidence_files": [],
+  "completed_slices": ["slice-01"],
+  "evidence_files": ["slice-01.json"],
   "worktree_path": "/home/dev/aifactory/worktrees/prompt-knowledge-system",
   "branch": "feature/prompt-knowledge-system",
   "github_available": true,

@@ -1,0 +1,3 @@
+{"ts":"2026-03-24T06:30:00Z","slice":"slice-01","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-24T06:31:00Z","slice":"slice-01","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-03-24T06:32:00Z","slice":"slice-01","gate":"tests","result":"PASSED","retries":0}
