@@ -9,6 +9,7 @@ import {
   type PromptHistoryEntry,
 } from "@/lib/services/prompt-history-service";
 import { requireAuth } from "@/lib/auth/guard";
+import type { GenerationMode } from "@/lib/types";
 
 // UUID v4 format validation
 const UUID_REGEX =
@@ -68,6 +69,7 @@ export async function toggleFavorite(input: {
 export async function improvePrompt(input: {
   prompt: string;
   modelId: string;
+  generationMode?: GenerationMode;
 }): Promise<ImproveResult | { error: string }> {
   const auth = await requireAuth();
   if ("error" in auth) {
@@ -86,7 +88,7 @@ export async function improvePrompt(input: {
   }
 
   try {
-    return await PromptService.improve(prompt, modelId);
+    return await PromptService.improve(prompt, modelId, input.generationMode);
   } catch (error) {
     console.error("Prompt improvement failed:", error);
     return {

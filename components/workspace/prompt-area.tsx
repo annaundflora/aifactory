@@ -1004,6 +1004,7 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
                   prompt={promptMotiv}
                   modelId={mid}
                   modelDisplayName={modelIdToDisplayName(mid)}
+                  generationMode={currentMode}
                   onAdopt={(improved) => {
                     setPromptMotiv(improved);
                     setShowImprove(false);

@@ -11,11 +11,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { improvePrompt } from "@/app/actions/prompts";
+import type { GenerationMode } from "@/lib/types";
 
 interface LLMComparisonProps {
   prompt: string;
   modelId: string;
   modelDisplayName: string;
+  generationMode: GenerationMode;
   onAdopt: (improved: string) => void;
   onDiscard: () => void;
 }
@@ -24,6 +26,7 @@ export function LLMComparison({
   prompt,
   modelId,
   modelDisplayName,
+  generationMode,
   onAdopt,
   onDiscard,
 }: LLMComparisonProps) {
@@ -35,7 +38,7 @@ export function LLMComparison({
 
   useEffect(() => {
     startTransition(async () => {
-      const response = await improvePrompt({ prompt, modelId });
+      const response = await improvePrompt({ prompt, modelId, generationMode });
 
       if ("error" in response) {
         toast("Prompt-Verbesserung fehlgeschlagen");
