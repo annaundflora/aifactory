@@ -46,8 +46,11 @@ def _load_knowledge_file() -> dict:
     The file path is resolved relative to the repository root
     (three levels up from this module: backend/app/agent/ -> repo root).
 
-    If the file is not found or contains invalid JSON, a warning is logged
-    and an embedded fallback with generic knowledge is returned and cached.
+    If the file is not found, a warning is logged and an embedded fallback
+    with generic knowledge is returned and cached.
+
+    If the file contains malformed JSON, an error is logged and the exception
+    is re-raised so the app fails fast on startup (architecture: fail-fast).
 
     Returns:
         Parsed JSON data with 'models' and 'fallback' keys.
@@ -73,12 +76,12 @@ def _load_knowledge_file() -> dict:
         )
         _cached_data = _EMBEDDED_FALLBACK
     except json.JSONDecodeError as exc:
-        logger.warning(
-            "Invalid JSON in knowledge file %s: %s, using embedded fallback",
+        logger.error(
+            "Malformed JSON in knowledge file %s: %s",
             file_path,
             exc,
         )
-        _cached_data = _EMBEDDED_FALLBACK
+        raise
 
     return _cached_data
 
