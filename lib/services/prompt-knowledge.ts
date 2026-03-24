@@ -40,6 +40,26 @@ export type PromptKnowledgeLookupResult =
   | PromptKnowledgeFallbackResult;
 
 // ---------------------------------------------------------------------------
+// Embedded fallback (used when prompt-knowledge.json is missing or unreadable)
+// ---------------------------------------------------------------------------
+
+const EMBEDDED_FALLBACK: PromptKnowledgeFile = {
+  models: {},
+  fallback: {
+    displayName: "Generic",
+    tips: [
+      "Be specific and descriptive about what you want to see in the image",
+      "Include details about style, lighting, composition, and mood",
+      "Mention the medium or art style (e.g., oil painting, digital art, photograph)",
+    ],
+    avoid: [
+      "Vague or overly short prompts with no visual detail",
+      "Contradictory instructions in the same prompt",
+    ],
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Module-level cache
 // ---------------------------------------------------------------------------
 
@@ -50,10 +70,19 @@ function loadKnowledgeFile(): PromptKnowledgeFile {
     return cachedData;
   }
 
-  const filePath = join(process.cwd(), "data", "prompt-knowledge.json");
-  const raw = readFileSync(filePath, "utf-8");
-  cachedData = JSON.parse(raw) as PromptKnowledgeFile;
-  return cachedData;
+  try {
+    const filePath = join(process.cwd(), "data", "prompt-knowledge.json");
+    const raw = readFileSync(filePath, "utf-8");
+    cachedData = JSON.parse(raw) as PromptKnowledgeFile;
+    return cachedData;
+  } catch (error) {
+    console.warn(
+      "[prompt-knowledge] Failed to load prompt-knowledge.json, using embedded fallback:",
+      error instanceof Error ? error.message : error,
+    );
+    cachedData = EMBEDDED_FALLBACK;
+    return cachedData;
+  }
 }
 
 // ---------------------------------------------------------------------------

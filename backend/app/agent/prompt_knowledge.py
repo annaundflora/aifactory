@@ -23,18 +23,34 @@ logger = logging.getLogger(__name__)
 _cached_data: Optional[dict] = None
 
 
+_EMBEDDED_FALLBACK: dict = {
+    "models": {},
+    "fallback": {
+        "displayName": "Generic",
+        "tips": [
+            "Be specific and descriptive in your prompts",
+            "Include details about style, lighting, composition, and mood",
+            "Use clear, concise language",
+        ],
+        "avoid": [
+            "Vague or overly short prompts",
+            "Contradictory instructions",
+        ],
+    },
+}
+
+
 def _load_knowledge_file() -> dict:
     """Load and cache prompt-knowledge.json from the repo data/ directory.
 
     The file path is resolved relative to the repository root
     (three levels up from this module: backend/app/agent/ -> repo root).
 
+    If the file is not found or contains invalid JSON, a warning is logged
+    and an embedded fallback with generic knowledge is returned and cached.
+
     Returns:
         Parsed JSON data with 'models' and 'fallback' keys.
-
-    Raises:
-        FileNotFoundError: If the knowledge file does not exist.
-        json.JSONDecodeError: If the file contains invalid JSON.
     """
     global _cached_data
 
@@ -48,8 +64,21 @@ def _load_knowledge_file() -> dict:
 
     logger.debug("Loading prompt knowledge from %s", file_path)
 
-    with open(file_path, "r", encoding="utf-8") as f:
-        _cached_data = json.load(f)
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            _cached_data = json.load(f)
+    except FileNotFoundError:
+        logger.warning(
+            "Knowledge file not found at %s, using embedded fallback", file_path
+        )
+        _cached_data = _EMBEDDED_FALLBACK
+    except json.JSONDecodeError as exc:
+        logger.warning(
+            "Invalid JSON in knowledge file %s: %s, using embedded fallback",
+            file_path,
+            exc,
+        )
+        _cached_data = _EMBEDDED_FALLBACK
 
     return _cached_data
 
