@@ -39,6 +39,7 @@ import { AssistantTrigger } from "@/components/assistant/assistant-trigger";
 import { SectionLabel } from "@/components/shared/section-label";
 import { modelIdToDisplayName } from "@/lib/utils/model-display-name";
 import { resolveModel } from "@/lib/utils/resolve-model";
+import { usePromptAssistant } from "@/lib/assistant/assistant-context";
 import { useModelSchema } from "@/lib/hooks/use-model-schema";
 import { ParameterPanel, type SchemaProperties } from "@/components/workspace/parameter-panel";
 import { toast } from "sonner";
@@ -198,6 +199,11 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
       prevModelIdRef.current = resolvedModelId;
     }
   }, [resolvedModelId]);
+
+  // ----- Sync current model + mode to Assistant context refs -----
+  const { imageModelIdRef, generationModeRef } = usePromptAssistant();
+  imageModelIdRef.current = resolvedModelId ?? null;
+  generationModeRef.current = currentMode;
 
   // ----- Generation state -----
   const [isGenerating, startGeneration] = useTransition();
