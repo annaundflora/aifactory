@@ -1,7 +1,7 @@
 ---
 title: Roadmap
 created: 2026-03-02
-updated: 2026-03-15
+updated: 2026-03-24
 ---
 
 # Roadmap: POD Design Studio
@@ -37,6 +37,19 @@ Phasen 0-5 sind abgeschlossen. Die App hat alle Features: E2E Generation, Prompt
 | Default-Modelle für Draft/Quality | ✅ Entschieden | P5 | Implementiert in Draft/Quality Mode |
 | Hetzner Server-Typ | ⏳ Research | P6 | CPX vs. CX, RAM/CPU für Next.js + PostgreSQL |
 | Reverse Proxy | ⏳ Entscheiden | P6 | Caddy (einfacher) vs. Nginx (bewährter) |
+
+## Offene Bugs
+
+| Bug | Priority | Status | Log | Phase |
+|-----|----------|--------|-----|-------|
+| Assistant erhaelt kein Modell-Kontext beim ersten Oeffnen | Hoch | Neu | [BUG](specs/phase-7/2026-03-22-prompt-knowledge-system/gates/BUG-assistant-no-model-context.md) | P7: Prompt Knowledge |
+| recommend_model Knowledge-Enrichment greift nicht | Hoch | Neu | Gleiche Root Cause wie Assistant-Bug, siehe [QA](specs/phase-7/2026-03-22-prompt-knowledge-system/gates/qa-manual-2026-03-24.md) | P7: Prompt Knowledge |
+
+## Improvements
+
+| Improvement | Priority | Status | Phase |
+|-------------|----------|--------|-------|
+| Canvas Chat: aktuell eingestelltes Modell/Tier beruecksichtigen statt nur Bild-Modell | Niedrig | Offen | P7: Prompt Knowledge |
 
 ## Gelöste Bugs
 

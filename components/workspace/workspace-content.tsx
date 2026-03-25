@@ -336,6 +336,7 @@ export function WorkspaceContent({
       )}
 
       {/* Gallery-View: hidden (not unmounted) when detail view is open */}
+      <PromptAssistantProvider>
       <TouchDragProvider>
       <div
         className="flex h-[calc(100dvh-3.5rem)] gap-3 overflow-hidden bg-muted/40 p-3"
@@ -442,19 +443,18 @@ export function WorkspaceContent({
               role="separator"
               aria-orientation="vertical"
             />
-            <PromptAssistantProvider projectId={projectId}>
               <AssistantPanelContent
                 open={assistantOpen}
                 onClose={handleAssistantClose}
                 projectId={projectId}
               />
-            </PromptAssistantProvider>
           </div>
         </div>
 
       </div>
       <TouchDragOverlay />
       </TouchDragProvider>
+      </PromptAssistantProvider>
     </>
   );
 }
