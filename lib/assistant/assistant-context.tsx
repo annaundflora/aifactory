@@ -302,7 +302,6 @@ const PromptAssistantContext =
 
 export interface PromptAssistantProviderProps {
   children: ReactNode;
-  projectId: string;
 }
 
 // ---------------------------------------------------------------------------
