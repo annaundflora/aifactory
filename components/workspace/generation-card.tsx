@@ -138,6 +138,7 @@ export function GenerationCard({ generation, onSelect }: GenerationCardProps) {
       <img
         src={generation.imageUrl ?? ""}
         alt={generation.prompt}
+        crossOrigin="anonymous"
         className="block w-full h-auto object-cover"
         style={generation.imageUrl ? { viewTransitionName: `canvas-image-${generation.id}` } : undefined}
         loading="lazy"

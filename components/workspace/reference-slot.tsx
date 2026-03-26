@@ -354,6 +354,7 @@ export function ReferenceSlot({
         <img
           src={slotData.imageUrl}
           alt={slotData.originalFilename ?? `Reference @${slotData.slotPosition}`}
+          crossOrigin="anonymous"
           className="size-[80px] shrink-0 rounded object-cover"
           data-testid="reference-thumbnail"
         />
@@ -417,6 +418,7 @@ export function ReferenceSlot({
         <img
           src={slotData.imageUrl}
           alt={slotData.originalFilename ?? `Reference @${slotData.slotPosition}`}
+          crossOrigin="anonymous"
           className="size-[80px] shrink-0 rounded object-cover"
           data-testid="reference-thumbnail"
         />

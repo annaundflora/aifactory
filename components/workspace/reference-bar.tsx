@@ -213,6 +213,7 @@ export function ReferenceBar({
                 <img
                   src={slot.imageUrl}
                   alt={`Reference @${slot.slotPosition}`}
+                  crossOrigin="anonymous"
                   className="size-6 rounded-sm object-cover"
                 />
                 <span

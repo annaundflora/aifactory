@@ -31,6 +31,7 @@ export function TouchDragOverlay() {
       <img
         src={state.payload.imageUrl}
         alt=""
+        crossOrigin="anonymous"
         style={{
           width: "100%",
           height: "100%",

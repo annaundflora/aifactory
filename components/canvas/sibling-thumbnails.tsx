@@ -97,6 +97,7 @@ export function SiblingThumbnails({
               <img
                 src={sibling.imageUrl}
                 alt={sibling.prompt || "Sibling image"}
+                crossOrigin="anonymous"
                 className="h-full w-full object-cover"
               />
             ) : (

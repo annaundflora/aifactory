@@ -94,6 +94,7 @@ export function CanvasImage({ generation, isLoading = false }: CanvasImageProps)
         <img
           src={generation.imageUrl}
           alt={generation.prompt || "Generated image"}
+          crossOrigin="anonymous"
           className={`max-h-full max-w-full object-contain transition-opacity ${
             imgState === "loaded" ? "opacity-100" : "opacity-0"
           }`}
