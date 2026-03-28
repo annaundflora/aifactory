@@ -51,7 +51,8 @@ SAMPLE_KNOWLEDGE_FALLBACK = {
 }
 
 FORMATTED_MODEL_KNOWLEDGE = (
-    "## Prompting Tips for Flux 2 Pro/Max\n\n"
+    "## Aktuell ausgewaehltes Modell: Flux 2 Pro/Max\n\n"
+    "Der User arbeitet gerade mit **Flux 2 Pro/Max**. Beruecksichtige die folgenden modellspezifischen Hinweise bei der Prompt-Erstellung.\n\n"
     "Prompt style: Natural language descriptions\n"
     "Negative prompts: Not supported. Flux 2 does not support negative prompts.\n\n"
     "**Strengths:**\n"
@@ -152,7 +153,7 @@ class TestBuildCanvasSystemPromptKnowledgeInjection:
         assert "flux-2-pro" in result
 
         # Must contain Flux-specific knowledge block
-        assert "Prompting Tips for Flux 2 Pro/Max" in result
+        assert "Aktuell ausgewaehltes Modell: Flux 2 Pro/Max" in result
         assert "Natural language descriptions" in result
         assert "Photorealistic rendering" in result
 
@@ -266,8 +267,8 @@ class TestBuildCanvasSystemPromptKnowledgeInjection:
         result_without_slash = build_canvas_system_prompt(image_context_without_slash)
 
         # Both must contain flux knowledge
-        assert "Prompting Tips for Flux 2 Pro/Max" in result_with_slash
-        assert "Prompting Tips for Flux 2 Pro/Max" in result_without_slash
+        assert "Aktuell ausgewaehltes Modell: Flux 2 Pro/Max" in result_with_slash
+        assert "Aktuell ausgewaehltes Modell: Flux 2 Pro/Max" in result_without_slash
 
         # The knowledge blocks should be the same (only context_section differs
         # because model_id value is rendered differently in the context section)
@@ -295,7 +296,7 @@ class TestBuildCanvasSystemPromptKnowledgeInjection:
         # Find positions of the three sections
         base_prompt_marker = "Bild-Bearbeitungs-Assistent"
         context_section_marker = "AKTUELLES BILD"
-        knowledge_marker = "Prompting Tips for Flux 2 Pro/Max"
+        knowledge_marker = "Aktuell ausgewaehltes Modell: Flux 2 Pro/Max"
 
         base_pos = result.find(base_prompt_marker)
         context_pos = result.find(context_section_marker)

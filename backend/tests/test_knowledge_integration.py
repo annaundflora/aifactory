@@ -128,7 +128,7 @@ class TestAssistantKnowledgeIntegration:
         assert result == _BASE_PROMPT
 
         # Must NOT contain any knowledge section markers
-        assert "Prompting Tips for" not in result
+        assert "Aktuell ausgewaehltes Modell:" not in result
         assert "General Prompting Tips" not in result
         assert "**Tips:**" not in result
         assert "**Strengths:**" not in result
@@ -199,7 +199,7 @@ class TestCanvasChatKnowledgeIntegration:
         )
 
         # Verify the knowledge section header is present
-        assert "Prompting Tips for Seedream" in result
+        assert "Aktuell ausgewaehltes Modell: Seedream" in result
 
     # AC-6: Kein Crash bei None image_context
     def test_none_image_context_returns_base_prompt(self):
@@ -216,7 +216,7 @@ class TestCanvasChatKnowledgeIntegration:
         assert "Bild-Bearbeitungs-Assistent" in result
 
         # Must NOT contain any knowledge section
-        assert "Prompting Tips for" not in result
+        assert "Aktuell ausgewaehltes Modell:" not in result
         assert "General Prompting Tips" not in result
 
         # Must NOT contain context section

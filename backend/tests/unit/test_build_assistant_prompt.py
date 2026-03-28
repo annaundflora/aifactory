@@ -69,7 +69,8 @@ SAMPLE_KNOWLEDGE_FALLBACK = {
 }
 
 FORMATTED_MODEL_KNOWLEDGE = (
-    "## Prompting Tips for Flux 2 Pro/Max\n\n"
+    "## Aktuell ausgewaehltes Modell: Flux 2 Pro/Max\n\n"
+    "Der User arbeitet gerade mit **Flux 2 Pro/Max**. Beruecksichtige die folgenden modellspezifischen Hinweise bei der Prompt-Erstellung.\n\n"
     "Prompt style: Natural language descriptions\n"
     "Negative prompts: Not supported. Flux 2 does not support negative prompts.\n\n"
     "**Tips:**\n"
@@ -156,14 +157,14 @@ class TestBuildAssistantSystemPrompt:
         assert _BASE_PROMPT in result
 
         # Must contain the knowledge section (appended after base)
-        assert "Prompting Tips for Flux 2 Pro/Max" in result
+        assert "Aktuell ausgewaehltes Modell: Flux 2 Pro/Max" in result
 
         # The result must be LONGER than the base prompt (knowledge appended)
         assert len(result) > len(_BASE_PROMPT)
 
         # Knowledge section must come AFTER the base prompt (appended, not inserted)
         base_end_pos = result.find(_BASE_PROMPT) + len(_BASE_PROMPT)
-        knowledge_pos = result.find("Prompting Tips for Flux 2 Pro/Max")
+        knowledge_pos = result.find("Aktuell ausgewaehltes Modell: Flux 2 Pro/Max")
         assert knowledge_pos > base_end_pos, (
             "Knowledge section must be appended after the base prompt"
         )
@@ -229,7 +230,7 @@ class TestBuildAssistantSystemPrompt:
         assert result_with_prefix == result_without_prefix
 
         # Both must contain flux knowledge
-        assert "Prompting Tips for Flux 2 Pro/Max" in result_with_prefix
+        assert "Aktuell ausgewaehltes Modell: Flux 2 Pro/Max" in result_with_prefix
 
     # AC-5: Leerer String behandelt wie None
     def test_empty_string_treated_as_no_model(self):

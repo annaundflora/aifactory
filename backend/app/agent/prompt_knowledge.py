@@ -197,7 +197,9 @@ def format_knowledge_for_prompt(result: dict) -> str:
         model = result["model"]
         mode = result.get("mode")
 
-        lines.append(f"## Prompting Tips for {result['displayName']}")
+        lines.append(f"## Aktuell ausgewaehltes Modell: {result['displayName']}")
+        lines.append("")
+        lines.append(f"Der User arbeitet gerade mit **{result['displayName']}**. Beruecksichtige die folgenden modellspezifischen Hinweise bei der Prompt-Erstellung.")
         lines.append("")
 
         prompt_style = (
