@@ -1,4 +1,6 @@
 import { auth } from "@/auth";
+import { db } from "@/lib/db";
+import { users } from "@/lib/db/schema";
 
 // ---------------------------------------------------------------------------
 // Auth Guard — Discriminated Union Return Types
@@ -14,6 +16,26 @@ export type AuthError = { error: string };
 export type AuthResult = AuthSuccess | AuthError;
 
 // ---------------------------------------------------------------------------
+// Dev user for AUTH_DISABLED mode.
+// Uses a fixed UUID so all dev data belongs to the same user.
+// ---------------------------------------------------------------------------
+const DEV_USER: AuthSuccess = {
+  userId: "00000000-0000-0000-0000-000000000000",
+  email: "dev@localhost",
+};
+
+let devUserSeeded = false;
+
+async function ensureDevUser() {
+  if (devUserSeeded) return;
+  await db
+    .insert(users)
+    .values({ id: DEV_USER.userId, email: DEV_USER.email, name: "Dev User" })
+    .onConflictDoNothing();
+  devUserSeeded = true;
+}
+
+// ---------------------------------------------------------------------------
 // requireAuth()
 //
 // Reusable helper for Server Actions. Call as the first line of every action.
@@ -23,6 +45,12 @@ export type AuthResult = AuthSuccess | AuthError;
 // ---------------------------------------------------------------------------
 
 export async function requireAuth(): Promise<AuthResult> {
+  // Dev mode: skip auth entirely when AUTH_DISABLED is set
+  if (process.env.AUTH_DISABLED === "true") {
+    await ensureDevUser();
+    return DEV_USER;
+  }
+
   const session = await auth();
 
   // No session at all (user not logged in, or session expired)

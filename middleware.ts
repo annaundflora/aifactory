@@ -13,6 +13,11 @@ import type { NextRequest } from "next/server";
  * `config.matcher` below so this middleware function never runs for them.
  */
 export function middleware(req: NextRequest) {
+  // Dev mode: skip auth entirely when AUTH_DISABLED is set
+  if (process.env.AUTH_DISABLED === "true") {
+    return NextResponse.next();
+  }
+
   // Auth.js v5 sets "authjs.session-token" (HTTP) or
   // "__Secure-authjs.session-token" (HTTPS).
   const hasSession =

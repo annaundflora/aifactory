@@ -19,9 +19,14 @@ function assertEnv(name: string): string {
   return value;
 }
 
-assertEnv("AUTH_SECRET");
-assertEnv("AUTH_GOOGLE_ID");
-assertEnv("AUTH_GOOGLE_SECRET");
+// When auth is disabled for dev, skip all env validation and provider setup.
+const authDisabled = process.env.AUTH_DISABLED === "true";
+
+if (!authDisabled) {
+  assertEnv("AUTH_SECRET");
+  assertEnv("AUTH_GOOGLE_ID");
+  assertEnv("AUTH_GOOGLE_SECRET");
+}
 
 /**
  * Parse the ALLOWED_EMAILS env var into a lowercase, trimmed array.
@@ -31,6 +36,7 @@ assertEnv("AUTH_GOOGLE_SECRET");
  * allowed email is required per architecture (Validation Rules).
  */
 function getAllowedEmails(): string[] {
+  if (authDisabled) return [];
   const raw = assertEnv("ALLOWED_EMAILS");
   const emails = raw
     .split(",")
