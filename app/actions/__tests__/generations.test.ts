@@ -60,7 +60,6 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
     id: "gen-001",
     projectId: "proj-001",
     prompt: "A fox",
-    negativePrompt: null,
     modelId: "black-forest-labs/flux-2-pro",
     modelParams: {},
     status: "pending",
@@ -627,8 +626,6 @@ describe("generateImages img2img extensions", () => {
     expect(GenerationService.generate).toHaveBeenCalledWith(
       "proj-001",          // projectId
       "A fox",             // promptMotiv
-      "",                  // promptStyle (defaults to '')
-      undefined,           // negativePrompt
       ["black-forest-labs/flux-2-pro"], // modelIds
       {},                  // params
       1,                   // count
@@ -665,8 +662,6 @@ describe("generateImages img2img extensions", () => {
     expect(GenerationService.generate).toHaveBeenCalledWith(
       "proj-001",
       "A fox",
-      "",
-      undefined,
       ["black-forest-labs/flux-2-pro"],
       {},
       1,

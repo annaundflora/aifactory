@@ -62,9 +62,7 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
     projectId: "proj-001",
     prompt: "A fox",
     promptMotiv: "A fox",
-    promptStyle: "",
     isFavorite: false,
-    negativePrompt: null,
     modelId: "black-forest-labs/flux-2-pro",
     modelParams: {},
     status: "pending",
@@ -131,8 +129,8 @@ describe("generateImages - Multi-Reference Integration", () => {
     expect(GenerationService.generate).toHaveBeenCalledTimes(1);
     const callArgs = (GenerationService.generate as Mock).mock.calls[0];
 
-    // The 11th argument (index 10) is references
-    const passedReferences = callArgs[10];
+    // The 9th argument (index 8) is references
+    const passedReferences = callArgs[8];
     expect(passedReferences).toEqual(references);
     expect(passedReferences).toHaveLength(1);
     expect(passedReferences[0]).toMatchObject({
@@ -194,7 +192,7 @@ describe("generateImages - Multi-Reference Integration", () => {
     // Assert: references array is passed through completely
     expect(GenerationService.generate).toHaveBeenCalledTimes(1);
     const passedReferences = (GenerationService.generate as Mock).mock
-      .calls[0][10];
+      .calls[0][8];
     expect(passedReferences).toHaveLength(2);
     expect(passedReferences[0].referenceImageId).toBe("ref-1");
     expect(passedReferences[1].referenceImageId).toBe("ref-2");
@@ -229,7 +227,7 @@ describe("generateImages - Multi-Reference Integration", () => {
 
     // Assert: references passed as empty array (server action passes it through as-is)
     const passedReferences = (GenerationService.generate as Mock).mock
-      .calls[0][10];
+      .calls[0][8];
     expect(passedReferences).toEqual([]);
 
     // Assert: validateTotalMegapixels NOT called for empty references

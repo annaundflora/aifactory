@@ -81,9 +81,7 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
     projectId: "proj-001",
     prompt: "A fox",
     promptMotiv: "",
-    promptStyle: "",
     isFavorite: false,
-    negativePrompt: null,
     modelId: "black-forest-labs/flux-2-pro",
     modelParams: {},
     status: "pending",
@@ -157,8 +155,6 @@ describe("GenerationService", () => {
     const result = await GenerationService.generate(
       "proj-001",
       "A fox",
-      "",
-      undefined,
       ["black-forest-labs/flux-2-pro"],
       {},
       2
@@ -208,8 +204,6 @@ describe("GenerationService", () => {
     await GenerationService.generate(
       "proj-001",
       "A fox",
-      "",
-      undefined,
       ["black-forest-labs/flux-2-pro"],
       {},
       1
@@ -266,8 +260,6 @@ describe("GenerationService", () => {
     await GenerationService.generate(
       "proj-001",
       "A fox",
-      "",
-      undefined,
       ["black-forest-labs/flux-2-pro"],
       {},
       1
@@ -308,8 +300,6 @@ describe("GenerationService", () => {
     await GenerationService.generate(
       "proj-001",
       "A fox",
-      "",
-      undefined,
       ["black-forest-labs/flux-2-pro"],
       {},
       1
@@ -361,8 +351,6 @@ describe("GenerationService", () => {
     await GenerationService.generate(
       "proj-001",
       "A fox",
-      "",
-      undefined,
       ["black-forest-labs/flux-2-pro"],
       {},
       3
@@ -418,8 +406,6 @@ describe("GenerationService", () => {
     await GenerationService.generate(
       "proj-001",
       "A fox",
-      "",
-      undefined,
       ["black-forest-labs/flux-2-pro"],
       {},
       1
@@ -528,8 +514,6 @@ describe("GenerationService", () => {
     const result = await GenerationService.generate(
       "proj-001",
       "A cat",
-      "",
-      undefined,
       ["newowner/new-model"],
       {},
       1
@@ -552,8 +536,6 @@ describe("GenerationService", () => {
       GenerationService.generate(
         "proj-001",
         "A cat",
-        "",
-        undefined,
         ["invalid"],
         {},
         1
@@ -595,8 +577,6 @@ describe("GenerationService", () => {
       const result = await GenerationService.generate(
         "proj-001",
         "A fox",
-        "",
-        undefined,
         ["owner/model-a"],
         { width: 1024 },
         3
@@ -645,8 +625,6 @@ describe("GenerationService", () => {
       const result = await GenerationService.generate(
         "proj-001",
         "A fox",
-        "",
-        undefined,
         ["owner/model-a", "owner/model-b"],
         {},
         1
@@ -695,8 +673,6 @@ describe("GenerationService", () => {
       const result = await GenerationService.generate(
         "proj-001",
         "A fox",
-        "",
-        undefined,
         ["owner/m1", "owner/m2", "owner/m3"],
         {},
         1
@@ -754,8 +730,6 @@ describe("GenerationService", () => {
       const result = await GenerationService.generate(
         "proj-001",
         "A fox",
-        "",
-        undefined,
         ["owner/model-a", "owner/model-b"],
         {},
         1
@@ -798,8 +772,6 @@ describe("GenerationService", () => {
         GenerationService.generate(
           "proj-001",
           "A fox",
-          "",
-          undefined,
           [],
           {},
           1
@@ -818,8 +790,6 @@ describe("GenerationService", () => {
         GenerationService.generate(
           "proj-001",
           "A fox",
-          "",
-          undefined,
           ["owner/m1", "owner/m2", "owner/m3", "owner/m4"],
           {},
           1
@@ -838,8 +808,6 @@ describe("GenerationService", () => {
         GenerationService.generate(
           "proj-001",
           "A fox",
-          "",
-          undefined,
           ["UPPER/Case"],
           {},
           1
@@ -872,8 +840,6 @@ describe("GenerationService", () => {
       const result = await GenerationService.generate(
         "proj-001",
         "A fox",
-        "",
-        undefined,
         ["owner/model-a", "owner/model-b"],
         { width: 1024, height: 768 },  // custom params passed — should be IGNORED in multi-model
         4  // count=4 passed — should be IGNORED in multi-model
@@ -919,8 +885,6 @@ describe("GenerationService", () => {
       await GenerationService.generate(
         "proj-001",
         "A fox",
-        "",
-        undefined,
         ["black-forest-labs/flux-2-pro"],
         {},
         1
@@ -952,8 +916,6 @@ describe("GenerationService", () => {
       await GenerationService.generate(
         "proj-001",
         "A fox",
-        "",
-        undefined,
         ["black-forest-labs/flux-2-pro"],
         {},
         1,
@@ -974,14 +936,13 @@ describe("GenerationService", () => {
     // AC-3: GIVEN ein generate()-Aufruf mit generationMode: "img2img", sourceImageUrl und strength: 0.6,
     //       und das Modell-Schema enthaelt den Parameter "image"
     //       WHEN buildReplicateInput den Replicate-Input aufbaut
-    //       THEN enthaelt der Input image: <sourceImageUrl> und prompt_strength: 0.6; prompt und negative_prompt bleiben erhalten
+    //       THEN enthaelt der Input image: <sourceImageUrl> und prompt_strength: 0.6; prompt bleibt erhalten
     it('AC-3 (img2img): should set image and prompt_strength in replicate input when schema has image parameter', async () => {
       const gen = makeGeneration({
         id: "gen-schema-image",
         generationMode: "img2img",
         sourceImageUrl: SOURCE_IMAGE_URL,
         modelParams: { prompt_strength: 0.6 },
-        negativePrompt: "blurry",
       });
       (createGeneration as Mock).mockResolvedValue(gen);
       (ModelCatalogService.getSchema as Mock).mockResolvedValue({
@@ -1000,8 +961,6 @@ describe("GenerationService", () => {
       await GenerationService.generate(
         "proj-001",
         "A fox",
-        "",
-        "blurry",
         ["black-forest-labs/flux-2-pro"],
         {},
         1,
@@ -1018,7 +977,8 @@ describe("GenerationService", () => {
       expect(replicateInput.image).toBe(SOURCE_IMAGE_URL);
       expect(replicateInput.prompt_strength).toBe(0.6);
       expect(replicateInput.prompt).toBeDefined();
-      expect(replicateInput.negative_prompt).toBe("blurry");
+      // negative_prompt is no longer sent to the Replicate API
+      expect(replicateInput).not.toHaveProperty("negative_prompt");
     });
 
     // AC-4: GIVEN ein generate()-Aufruf mit generationMode: "img2img", sourceImageUrl und strength: 0.4,
@@ -1049,8 +1009,6 @@ describe("GenerationService", () => {
       await GenerationService.generate(
         "proj-001",
         "A fox",
-        "",
-        undefined,
         ["black-forest-labs/flux-2-pro"],
         {},
         1,
@@ -1097,8 +1055,6 @@ describe("GenerationService", () => {
       await GenerationService.generate(
         "proj-001",
         "A fox",
-        "",
-        undefined,
         ["black-forest-labs/flux-2-pro"],
         {},
         1,
@@ -1126,8 +1082,6 @@ describe("GenerationService", () => {
         GenerationService.generate(
           "proj-001",
           "A fox",
-          "",
-          undefined,
           ["black-forest-labs/flux-2-pro"],
           {},
           1,
@@ -1146,8 +1100,6 @@ describe("GenerationService", () => {
         GenerationService.generate(
           "proj-001",
           "A fox",
-          "",
-          undefined,
           ["black-forest-labs/flux-2-pro"],
           {},
           1,
@@ -1176,8 +1128,6 @@ describe("GenerationService", () => {
       await GenerationService.generate(
         "proj-001",
         "A fox",
-        "",
-        undefined,
         ["black-forest-labs/flux-2-pro"],
         {},
         1
@@ -1214,8 +1164,6 @@ describe("GenerationService", () => {
       const result = await GenerationService.generate(
         "proj-001",
         "A fox",
-        "",
-        undefined,
         ["black-forest-labs/flux-2-pro"],
         {},
         3,
@@ -1615,8 +1563,6 @@ describe("GenerationService", () => {
       await GenerationService.generate(
         "proj-001",
         "A fox",
-        "",
-        undefined,
         ["owner/model"],
         {},
         1,
@@ -1685,8 +1631,6 @@ describe("GenerationService", () => {
       await GenerationService.generate(
         "proj-001",
         "A fox",
-        "",
-        undefined,
         ["owner/model"],
         {},
         1,
@@ -1730,8 +1674,6 @@ describe("GenerationService", () => {
       await GenerationService.generate(
         "proj-001",
         "A fox",
-        "",
-        undefined,
         ["owner/model"],
         {},
         1,

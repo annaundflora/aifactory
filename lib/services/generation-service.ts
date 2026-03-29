@@ -275,10 +275,6 @@ async function buildReplicateInput(
     prompt: generation.prompt,
   };
 
-  if (generation.negativePrompt) {
-    input.negative_prompt = generation.negativePrompt;
-  }
-
   if (generation.generationMode === "img2img") {
     const rawSchema = await ModelCatalogService.getSchema(generation.modelId);
     const schema = (rawSchema ?? {}) as SchemaProperties;
@@ -321,8 +317,6 @@ async function buildReplicateInput(
 async function generate(
   projectId: string,
   promptMotiv: string,
-  promptStyle: string,
-  negativePrompt: string | undefined,
   modelIds: string[],
   params: Record<string, unknown>,
   count: number,
@@ -381,10 +375,9 @@ async function generate(
     }
   }
 
-  // Compose prompt from motiv + style
+  // Prompt is just the trimmed motiv (no style concatenation)
   const motivTrimmed = promptMotiv.trim();
-  const styleTrimmed = promptStyle.trim();
-  let prompt = styleTrimmed ? `${motivTrimmed}. ${styleTrimmed}` : motivTrimmed;
+  let prompt = motivTrimmed;
 
   // AC-6, AC-8: Apply composeMultiReferencePrompt when references exist
   if (effectiveReferences) {
@@ -413,11 +406,9 @@ async function generate(
       const gen = await createGeneration({
         projectId,
         prompt,
-        negativePrompt: negativePrompt?.trim() || undefined,
         modelId,
         modelParams: {},
         promptMotiv: motivTrimmed,
-        promptStyle: styleTrimmed,
         generationMode: effectiveMode,
         sourceImageUrl: sourceImageUrl ?? null,
         sourceGenerationId: sourceGenerationId ?? null,
@@ -461,11 +452,9 @@ async function generate(
     const gen = await createGeneration({
       projectId,
       prompt,
-      negativePrompt: negativePrompt?.trim() || undefined,
       modelId,
       modelParams: storedParams,
       promptMotiv: motivTrimmed,
-      promptStyle: styleTrimmed,
       generationMode: effectiveMode,
       sourceImageUrl: sourceImageUrl ?? null,
       sourceGenerationId: sourceGenerationId ?? null,
