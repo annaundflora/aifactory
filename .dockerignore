@@ -7,6 +7,7 @@
 
 # Dependencies (re-installed during build)
 node_modules
+backend/.venv
 
 # Next.js build output (rebuilt during build)
 .next
@@ -16,3 +17,12 @@ node_modules
 
 # Docker Compose files (not needed inside image)
 docker-compose*.yml
+
+# Specs, tests, images (not needed in production image)
+specs
+.images
+worktrees
+tmp.txt
+
+# Claude/IDE config
+.claude
