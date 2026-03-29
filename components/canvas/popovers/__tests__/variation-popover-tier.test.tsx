@@ -89,7 +89,6 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
     id: overrides.id ?? "gen-tier-test-1",
     projectId: overrides.projectId ?? "project-1",
     prompt: overrides.prompt ?? "A test prompt for tier testing",
-    negativePrompt: overrides.negativePrompt ?? null,
     modelId: overrides.modelId ?? "model-1",
     modelParams: overrides.modelParams ?? {},
     status: overrides.status ?? "completed",
@@ -101,7 +100,6 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
     seed: overrides.seed ?? null,
     createdAt: overrides.createdAt ?? new Date("2025-06-15T12:00:00Z"),
     promptMotiv: overrides.promptMotiv ?? "",
-    promptStyle: overrides.promptStyle ?? "",
     isFavorite: overrides.isFavorite ?? false,
     generationMode: overrides.generationMode ?? "txt2img",
     sourceImageUrl: overrides.sourceImageUrl ?? null,
@@ -335,8 +333,6 @@ describe("VariationParams interface", () => {
     // TypeScript compilation error.
     const draftParams: VariationParams = {
       prompt: "test",
-      promptStyle: "",
-      negativePrompt: "",
       count: 1,
       tier: "draft",
     };
@@ -344,8 +340,6 @@ describe("VariationParams interface", () => {
 
     const qualityParams: VariationParams = {
       prompt: "test",
-      promptStyle: "",
-      negativePrompt: "",
       count: 1,
       tier: "quality",
     };
@@ -353,8 +347,6 @@ describe("VariationParams interface", () => {
 
     const maxParams: VariationParams = {
       prompt: "test",
-      promptStyle: "",
-      negativePrompt: "",
       count: 1,
       tier: "max",
     };
@@ -365,8 +357,6 @@ describe("VariationParams interface", () => {
     for (const tier of allTiers) {
       const params: VariationParams = {
         prompt: "test",
-        promptStyle: "",
-        negativePrompt: "",
         count: 1,
         tier,
       };

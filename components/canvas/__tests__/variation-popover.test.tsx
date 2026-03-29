@@ -94,7 +94,6 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
     id: overrides.id ?? "gen-variation-1",
     projectId: overrides.projectId ?? "project-1",
     prompt: overrides.prompt ?? "A beautiful sunset over mountains",
-    negativePrompt: overrides.negativePrompt ?? null,
     modelId: overrides.modelId ?? "model-1",
     modelParams: overrides.modelParams ?? {},
     status: overrides.status ?? "completed",
@@ -106,7 +105,6 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
     seed: overrides.seed ?? null,
     createdAt: overrides.createdAt ?? new Date("2025-06-15T12:00:00Z"),
     promptMotiv: overrides.promptMotiv ?? "",
-    promptStyle: overrides.promptStyle ?? "",
     isFavorite: overrides.isFavorite ?? false,
     generationMode: overrides.generationMode ?? "txt2img",
     sourceImageUrl: overrides.sourceImageUrl ?? null,
@@ -353,7 +351,7 @@ describe("VariationPopover", () => {
    * AC-5: GIVEN das Variation-Popover ist sichtbar mit Prompt und Count
    *       WHEN der User auf den Generate-Button klickt
    *       THEN wird ein `onGenerate`-Callback aufgerufen mit
-   *            `{ prompt, promptStyle, negativePrompt, count, tier }`
+   *            `{ prompt, count, tier }`
    *            und das Popover schliesst sich (`activeToolId` wird auf `null` gesetzt)
    */
   it("AC-5: should call onGenerate with prompt and count and close popover", async () => {
@@ -377,8 +375,6 @@ describe("VariationPopover", () => {
     expect(onGenerate).toHaveBeenCalledTimes(1);
     expect(onGenerate).toHaveBeenCalledWith({
       prompt: "A beautiful sunset over mountains",
-      promptStyle: "",
-      negativePrompt: "",
       count: 1,
       tier: "draft",
       imageParams: {},
@@ -424,8 +420,6 @@ describe("VariationPopover", () => {
     expect(onGenerate).toHaveBeenCalledTimes(1);
     expect(onGenerate).toHaveBeenCalledWith({
       prompt: "A dramatic ocean scene",
-      promptStyle: "",
-      negativePrompt: "",
       count: 3,
       tier: "draft",
       imageParams: {},

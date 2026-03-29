@@ -306,8 +306,6 @@ export function CanvasDetailView({
         const result = await generateImages({
           projectId: currentGeneration.projectId,
           promptMotiv: params.prompt,
-          promptStyle: params.promptStyle,
-          negativePrompt: params.negativePrompt,
           modelIds: [selectedModel],
           params: { prompt_strength: promptStrength, ...(params.imageParams ?? {}) },
           count: params.count,
@@ -421,7 +419,6 @@ export function CanvasDetailView({
         const result = await generateImages({
           projectId: currentGeneration.projectId,
           promptMotiv: params.motiv,
-          promptStyle: params.style,
           modelIds: [selectedModel],
           params: { ...(params.imageParams ?? {}) },
           count: params.variants,
