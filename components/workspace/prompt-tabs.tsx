@@ -20,8 +20,6 @@ interface PromptTabsProps {
   onLoadHistoryEntry?: (entry: PromptHistoryEntry) => void;
   /** Current prompt field values for confirmation dialog logic */
   promptMotiv?: string;
-  promptStyle?: string;
-  negativePrompt?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -34,8 +32,6 @@ export function PromptTabs({
   children,
   onLoadHistoryEntry,
   promptMotiv = "",
-  promptStyle = "",
-  negativePrompt = "",
 }: PromptTabsProps) {
   return (
     <Tabs
@@ -78,8 +74,6 @@ export function PromptTabs({
             onTabChange("prompt");
           }}
           promptMotiv={promptMotiv}
-          promptStyle={promptStyle}
-          negativePrompt={negativePrompt}
         />
       </TabsContent>
 
@@ -90,8 +84,6 @@ export function PromptTabs({
             onTabChange("prompt");
           }}
           promptMotiv={promptMotiv}
-          promptStyle={promptStyle}
-          negativePrompt={negativePrompt}
         />
       </TabsContent>
     </Tabs>
