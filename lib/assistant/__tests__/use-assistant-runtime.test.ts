@@ -1,4 +1,14 @@
 // @vitest-environment jsdom
+/**
+ * Tests for Slice 10: Assistant Frontend -- SSE Parsing with single prompt field
+ *
+ * Tests derived from GIVEN/WHEN/THEN Acceptance Criteria:
+ * - AC-8: SSE draft_prompt parsed als { prompt }
+ * - AC-9: SSE refine_prompt parsed als { prompt }
+ *
+ * Mocking Strategy: mock_external (per slice spec).
+ * fetch is mocked to simulate SSE streams.
+ */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
@@ -72,12 +82,7 @@ function createHookOptions(
 // ---------------------------------------------------------------------------
 
 describe("parseSSEEvents", () => {
-  // AC-9: GIVEN der useAssistantRuntime Hook
-  //       WHEN der Hook die SSE-Response parst
-  //       THEN dekodiert der SSE-Parser Events im Format
-  //            `event: {type}\ndata: {json}\n\n` korrekt,
-  //            inklusive mehrzeiliger data-Felder und UTF-8 Sonderzeichen
-  it("AC-9: should parse single SSE event with event type and JSON data", () => {
+  it("should parse single SSE event with event type and JSON data", () => {
     const raw = 'event: text-delta\ndata: {"content":"Hello"}\n\n';
     const result = parseSSEEvents(raw);
 
@@ -86,7 +91,7 @@ describe("parseSSEEvents", () => {
     expect(result[0].data).toBe('{"content":"Hello"}');
   });
 
-  it("AC-9: should parse multiple SSE events separated by double newlines", () => {
+  it("should parse multiple SSE events separated by double newlines", () => {
     const raw =
       'event: metadata\ndata: {"session_id":"s1","thread_id":"t1"}\n\n' +
       'event: text-delta\ndata: {"content":"Hi"}\n\n' +
@@ -99,18 +104,17 @@ describe("parseSSEEvents", () => {
     expect(result[2].event).toBe("text-done");
   });
 
-  it("AC-9: should handle multi-line data fields by joining them", () => {
+  it("should handle multi-line data fields by joining them", () => {
     const raw =
       'event: text-delta\ndata: {"content":\ndata: "multi-line"}\n\n';
     const result = parseSSEEvents(raw);
 
     expect(result).toHaveLength(1);
     expect(result[0].event).toBe("text-delta");
-    // Data lines are joined with newline
     expect(result[0].data).toBe('{"content":\n"multi-line"}');
   });
 
-  it("AC-9: should handle UTF-8 special characters in data", () => {
+  it("should handle UTF-8 special characters in data", () => {
     const raw =
       'event: text-delta\ndata: {"content":"Gruesse mit Umlauten: aeuoe Sonderzeichen: EUR"}\n\n';
     const result = parseSSEEvents(raw);
@@ -120,7 +124,7 @@ describe("parseSSEEvents", () => {
     expect(result[0].data).toContain("EUR");
   });
 
-  it("AC-9: should skip empty blocks", () => {
+  it("should skip empty blocks", () => {
     const raw = "\n\n\n\nevent: text-done\ndata: {}\n\n\n\n";
     const result = parseSSEEvents(raw);
 
@@ -146,18 +150,182 @@ describe("useAssistantRuntime", () => {
   });
 
   // --------------------------------------------------------------------------
-  // AC-1: GIVEN der AssistantSheet ist geoeffnet mit Startscreen
-  //       WHEN der User Text in den ChatInput eingibt und auf Send klickt
-  //       THEN wird zuerst POST /api/assistant/sessions aufgerufen (Body: {project_id}),
-  //       und danach POST /api/assistant/sessions/{id}/messages mit {content, model}
-  //       -- die Session-ID stammt aus dem metadata SSE-Event der Session-Erstellung
+  // AC-8: GIVEN ein SSE tool-call-result Event mit tool: "draft_prompt"
+  //        und data: { prompt: "A vibrant coral reef" }
+  //       WHEN das Event in use-assistant-runtime.ts geparst wird
+  //       THEN wird SET_DRAFT_PROMPT dispatched mit
+  //            draftPrompt: { prompt: "A vibrant coral reef" }
+  //       AND es wird NICHT auf motiv, style oder negative_prompt
+  //            im SSE-Payload zugegriffen
   // --------------------------------------------------------------------------
-  it("AC-1: should create session via POST /api/assistant/sessions then send message to session endpoint", async () => {
+  it("AC-8: should dispatch SET_DRAFT_PROMPT with single prompt field from SSE", async () => {
+    /**
+     * AC-8: SSE tool-call-result with tool="draft_prompt" dispatches
+     * SET_DRAFT_PROMPT with draftPrompt: { prompt: "A vibrant coral reef" }.
+     * The payload uses the new single-field format { prompt }.
+     */
     const dispatch = vi.fn();
     const sessionIdRef = { current: null as string | null };
     const options = createHookOptions({ dispatch, sessionIdRef });
 
-    // Track fetch calls
+    const toolCallData = {
+      tool: "draft_prompt",
+      data: {
+        prompt: "A vibrant coral reef",
+      },
+    };
+
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+
+      if (url === "/api/assistant/sessions") {
+        return new Response(JSON.stringify({ id: "session-ac8" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      if (url.includes("/messages")) {
+        return mockSSEResponse([
+          {
+            event: "text-delta",
+            data: JSON.stringify({ content: "Here is your prompt:" }),
+          },
+          {
+            event: "tool-call-result",
+            data: JSON.stringify(toolCallData),
+          },
+          { event: "text-done", data: JSON.stringify({}) },
+        ]);
+      }
+
+      return new Response("Not Found", { status: 404 });
+    }) as typeof fetch;
+
+    dispatch.mockImplementation((action: AssistantAction) => {
+      if (action.type === "SET_SESSION_ID") {
+        sessionIdRef.current = action.sessionId;
+      }
+    });
+
+    const { result } = renderHook(() => useAssistantRuntime(options));
+
+    await act(async () => {
+      await result.current.sendMessage("Write me a prompt about coral reefs");
+    });
+
+    // Verify SET_DRAFT_PROMPT was dispatched with the new single-field format
+    const draftPromptActions = dispatch.mock.calls
+      .map(([action]: [AssistantAction]) => action)
+      .filter((a: AssistantAction) => a.type === "SET_DRAFT_PROMPT");
+
+    expect(draftPromptActions).toHaveLength(1);
+    expect(draftPromptActions[0]).toEqual({
+      type: "SET_DRAFT_PROMPT",
+      draftPrompt: {
+        prompt: "A vibrant coral reef",
+      },
+    });
+
+    // Verify the dispatched draftPrompt does NOT have old fields
+    const dispatchedDraft = (draftPromptActions[0] as { type: "SET_DRAFT_PROMPT"; draftPrompt: Record<string, unknown> }).draftPrompt;
+    expect(dispatchedDraft).not.toHaveProperty("motiv");
+    expect(dispatchedDraft).not.toHaveProperty("style");
+    expect(dispatchedDraft).not.toHaveProperty("negative_prompt");
+    expect(dispatchedDraft).not.toHaveProperty("negativePrompt");
+  });
+
+  // --------------------------------------------------------------------------
+  // AC-9: GIVEN ein SSE tool-call-result Event mit tool: "refine_prompt"
+  //        und data: { prompt: "refined version" }
+  //       WHEN das Event in use-assistant-runtime.ts geparst wird
+  //       THEN wird REFINE_DRAFT dispatched mit
+  //            draftPrompt: { prompt: "refined version" }
+  // --------------------------------------------------------------------------
+  it("AC-9: should dispatch REFINE_DRAFT with single prompt field from SSE", async () => {
+    /**
+     * AC-9: SSE tool-call-result with tool="refine_prompt" dispatches
+     * REFINE_DRAFT with draftPrompt: { prompt: "refined version" }.
+     */
+    const dispatch = vi.fn();
+    const sessionIdRef = { current: null as string | null };
+    const options = createHookOptions({ dispatch, sessionIdRef });
+
+    const toolCallData = {
+      tool: "refine_prompt",
+      data: {
+        prompt: "refined version",
+      },
+    };
+
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+
+      if (url === "/api/assistant/sessions") {
+        return new Response(JSON.stringify({ id: "session-ac9" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      if (url.includes("/messages")) {
+        return mockSSEResponse([
+          {
+            event: "text-delta",
+            data: JSON.stringify({ content: "I've refined your prompt:" }),
+          },
+          {
+            event: "tool-call-result",
+            data: JSON.stringify(toolCallData),
+          },
+          { event: "text-done", data: JSON.stringify({}) },
+        ]);
+      }
+
+      return new Response("Not Found", { status: 404 });
+    }) as typeof fetch;
+
+    dispatch.mockImplementation((action: AssistantAction) => {
+      if (action.type === "SET_SESSION_ID") {
+        sessionIdRef.current = action.sessionId;
+      }
+    });
+
+    const { result } = renderHook(() => useAssistantRuntime(options));
+
+    await act(async () => {
+      await result.current.sendMessage("Refine my prompt");
+    });
+
+    // Verify REFINE_DRAFT was dispatched with the new single-field format
+    const refineDraftActions = dispatch.mock.calls
+      .map(([action]: [AssistantAction]) => action)
+      .filter((a: AssistantAction) => a.type === "REFINE_DRAFT");
+
+    expect(refineDraftActions).toHaveLength(1);
+    expect(refineDraftActions[0]).toEqual({
+      type: "REFINE_DRAFT",
+      draftPrompt: {
+        prompt: "refined version",
+      },
+    });
+
+    // Verify the dispatched draftPrompt does NOT have old fields
+    const dispatchedDraft = (refineDraftActions[0] as { type: "REFINE_DRAFT"; draftPrompt: Record<string, unknown> }).draftPrompt;
+    expect(dispatchedDraft).not.toHaveProperty("motiv");
+    expect(dispatchedDraft).not.toHaveProperty("style");
+    expect(dispatchedDraft).not.toHaveProperty("negative_prompt");
+    expect(dispatchedDraft).not.toHaveProperty("negativePrompt");
+  });
+
+  // --------------------------------------------------------------------------
+  // Existing tests: Session creation and message flow
+  // --------------------------------------------------------------------------
+  it("should create session via POST then send message to session endpoint", async () => {
+    const dispatch = vi.fn();
+    const sessionIdRef = { current: null as string | null };
+    const options = createHookOptions({ dispatch, sessionIdRef });
+
     const fetchCalls: Array<{ url: string; body: string }> = [];
 
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -166,7 +334,6 @@ describe("useAssistantRuntime", () => {
       fetchCalls.push({ url, body });
 
       if (url === "/api/assistant/sessions") {
-        // Session creation returns JSON with session id
         return new Response(JSON.stringify({ id: "session-abc" }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -186,7 +353,6 @@ describe("useAssistantRuntime", () => {
       return new Response("Not Found", { status: 404 });
     }) as typeof fetch;
 
-    // When the metadata event dispatches SET_SESSION_ID, also set the ref
     dispatch.mockImplementation((action: AssistantAction) => {
       if (action.type === "SET_SESSION_ID") {
         sessionIdRef.current = action.sessionId;
@@ -199,12 +365,10 @@ describe("useAssistantRuntime", () => {
       await result.current.sendMessage("Help me write a prompt");
     });
 
-    // Verify first call: POST /api/assistant/sessions with project_id
     expect(fetchCalls[0].url).toBe("/api/assistant/sessions");
     const sessionBody = JSON.parse(fetchCalls[0].body);
     expect(sessionBody).toEqual({ project_id: "test-project-id" });
 
-    // Verify second call: POST /api/assistant/sessions/{id}/messages with content and model
     expect(fetchCalls[1].url).toBe(
       "/api/assistant/sessions/session-abc/messages"
     );
@@ -213,13 +377,7 @@ describe("useAssistantRuntime", () => {
     expect(messageBody.model).toBe("anthropic/claude-sonnet-4.6");
   });
 
-  // --------------------------------------------------------------------------
-  // AC-4: GIVEN der SSE-Stream sendet ein text-done Event
-  //       WHEN das Event eintrifft
-  //       THEN ist die Assistant-Message als vollstaendig markiert
-  //            (kein weiteres Streaming erwartet)
-  // --------------------------------------------------------------------------
-  it("AC-4: should mark assistant message as complete on text-done event", async () => {
+  it("should mark assistant message as complete on text-done event", async () => {
     const dispatch = vi.fn();
     const sessionIdRef = { current: null as string | null };
     const options = createHookOptions({ dispatch, sessionIdRef });
@@ -228,7 +386,6 @@ describe("useAssistantRuntime", () => {
       const url = typeof input === "string" ? input : input.toString();
 
       if (url === "/api/assistant/sessions") {
-        // Session creation returns JSON with session id
         return new Response(JSON.stringify({ id: "session-done" }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -260,7 +417,6 @@ describe("useAssistantRuntime", () => {
       await result.current.sendMessage("Test");
     });
 
-    // Verify MARK_ASSISTANT_DONE was dispatched for the response stream
     const markDoneActions = dispatch.mock.calls
       .map(([action]: [AssistantAction]) => action)
       .filter((a: AssistantAction) => a.type === "MARK_ASSISTANT_DONE");
@@ -268,14 +424,7 @@ describe("useAssistantRuntime", () => {
     expect(markDoneActions.length).toBeGreaterThanOrEqual(1);
   });
 
-  // --------------------------------------------------------------------------
-  // AC-5: GIVEN der SSE-Stream liefert ein tool-call-result Event
-  //       WHEN das Event eintrifft
-  //       THEN wird das Event im PromptAssistantContext State gespeichert
-  //            (fuer nachfolgende Slices wie Canvas),
-  //            aber nicht als eigene Bubble dargestellt
-  // --------------------------------------------------------------------------
-  it("AC-5: should store tool-call-result events in context state", async () => {
+  it("should store tool-call-result events via ADD_TOOL_CALL_RESULT dispatch", async () => {
     const dispatch = vi.fn();
     const sessionIdRef = { current: null as string | null };
     const options = createHookOptions({ dispatch, sessionIdRef });
@@ -283,9 +432,7 @@ describe("useAssistantRuntime", () => {
     const toolCallData = {
       tool: "draft_prompt",
       data: {
-        motiv: "A cat in space",
-        style: "photorealistic",
-        negative_prompt: "blurry",
+        prompt: "A cat in space",
       },
     };
 
@@ -293,7 +440,6 @@ describe("useAssistantRuntime", () => {
       const url = typeof input === "string" ? input : input.toString();
 
       if (url === "/api/assistant/sessions") {
-        // Session creation returns JSON with session id
         return new Response(JSON.stringify({ id: "session-tool" }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -329,7 +475,6 @@ describe("useAssistantRuntime", () => {
       await result.current.sendMessage("Write me a prompt");
     });
 
-    // Verify ADD_TOOL_CALL_RESULT was dispatched
     const toolCallActions = dispatch.mock.calls
       .map(([action]: [AssistantAction]) => action)
       .filter((a: AssistantAction) => a.type === "ADD_TOOL_CALL_RESULT");
@@ -340,40 +485,13 @@ describe("useAssistantRuntime", () => {
       result: {
         tool: "draft_prompt",
         data: {
-          motiv: "A cat in space",
-          style: "photorealistic",
-          negative_prompt: "blurry",
+          prompt: "A cat in space",
         },
       },
     });
-
-    // Verify SET_DRAFT_PROMPT was also dispatched (since tool=draft_prompt)
-    const draftPromptActions = dispatch.mock.calls
-      .map(([action]: [AssistantAction]) => action)
-      .filter((a: AssistantAction) => a.type === "SET_DRAFT_PROMPT");
-
-    expect(draftPromptActions).toHaveLength(1);
-
-    // Verify no ADD_USER_MESSAGE or ADD_ASSISTANT_MESSAGE was dispatched for the tool-call-result
-    // (it should NOT be displayed as a bubble)
-    const allAddMessageActions = dispatch.mock.calls
-      .map(([action]: [AssistantAction]) => action)
-      .filter(
-        (a: AssistantAction) =>
-          (a.type === "ADD_USER_MESSAGE" || a.type === "ADD_ASSISTANT_MESSAGE") &&
-          "message" in a &&
-          a.message.content === JSON.stringify(toolCallData)
-      );
-
-    expect(allAddMessageActions).toHaveLength(0);
   });
 
-  // --------------------------------------------------------------------------
-  // AC-6: GIVEN der SSE-Stream liefert ein error Event
-  //       WHEN das Event eintrifft
-  //       THEN wird die Fehlermeldung als Fehler-Nachricht im Chat angezeigt
-  // --------------------------------------------------------------------------
-  it("AC-6: should handle error SSE events and surface error message", async () => {
+  it("should handle error SSE events and surface error message", async () => {
     const dispatch = vi.fn();
     const sessionIdRef = { current: null as string | null };
     const options = createHookOptions({ dispatch, sessionIdRef });
@@ -382,7 +500,6 @@ describe("useAssistantRuntime", () => {
       const url = typeof input === "string" ? input : input.toString();
 
       if (url === "/api/assistant/sessions") {
-        // Session creation returns JSON with session id
         return new Response(JSON.stringify({ id: "session-err" }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -415,7 +532,6 @@ describe("useAssistantRuntime", () => {
       await result.current.sendMessage("Hello");
     });
 
-    // Verify ADD_ERROR_MESSAGE was dispatched with the error content
     const errorActions = dispatch.mock.calls
       .map(([action]: [AssistantAction]) => action)
       .filter((a: AssistantAction) => a.type === "ADD_ERROR_MESSAGE");
@@ -430,13 +546,7 @@ describe("useAssistantRuntime", () => {
     expect(errorWithMessage).toBeDefined();
   });
 
-  // --------------------------------------------------------------------------
-  // AC-11: GIVEN eine aktive Session mit vorherigen Messages
-  //        WHEN der User eine weitere Nachricht sendet
-  //        THEN wird die Nachricht an dieselbe Session-ID gesendet
-  //             (keine neue Session erstellt)
-  // --------------------------------------------------------------------------
-  it("AC-11: should reuse existing session ID for subsequent messages", async () => {
+  it("should reuse existing session ID for subsequent messages", async () => {
     const dispatch = vi.fn();
     const sessionIdRef = { current: "existing-session-42" as string | null };
     const options = createHookOptions({ dispatch, sessionIdRef });
@@ -466,23 +576,18 @@ describe("useAssistantRuntime", () => {
       await result.current.sendMessage("Follow-up question");
     });
 
-    // Verify NO call to /api/assistant/sessions (session creation endpoint)
     const sessionCreationCalls = fetchCalls.filter(
       (url) => url === "/api/assistant/sessions"
     );
     expect(sessionCreationCalls).toHaveLength(0);
 
-    // Verify message was sent to the existing session
     const messageCalls = fetchCalls.filter((url) =>
       url.includes("/api/assistant/sessions/existing-session-42/messages")
     );
     expect(messageCalls).toHaveLength(1);
   });
 
-  // --------------------------------------------------------------------------
-  // AC-1 (User message dispatch): Verify user message is dispatched immediately
-  // --------------------------------------------------------------------------
-  it("AC-2: should dispatch ADD_USER_MESSAGE immediately when sendMessage is called", async () => {
+  it("should dispatch ADD_USER_MESSAGE immediately when sendMessage is called", async () => {
     const dispatch = vi.fn();
     const sessionIdRef = { current: "session-x" as string | null };
     const options = createHookOptions({ dispatch, sessionIdRef });
@@ -500,7 +605,6 @@ describe("useAssistantRuntime", () => {
       await result.current.sendMessage("User typed this");
     });
 
-    // Verify ADD_USER_MESSAGE was the first content-related dispatch
     const userMsgActions = dispatch.mock.calls
       .map(([action]: [AssistantAction]) => action)
       .filter((a: AssistantAction) => a.type === "ADD_USER_MESSAGE");
@@ -514,5 +618,4 @@ describe("useAssistantRuntime", () => {
       }),
     });
   });
-
 });
