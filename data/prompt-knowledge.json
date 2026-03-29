@@ -3,10 +3,6 @@
     "flux-2-pro": {
       "displayName": "Flux 2 Pro",
       "promptStyle": "natural",
-      "negativePrompts": {
-        "supported": false,
-        "note": "Flux 2 does not support negative prompts. Use semantic negatives in the main prompt instead, e.g. 'without text' rather than a negative prompt."
-      },
       "strengths": [
         "Photorealistic rendering with fine detail",
         "Strong prompt adherence for complex scenes",
@@ -44,10 +40,6 @@
     "flux-2-max": {
       "displayName": "Flux 2 Max",
       "promptStyle": "natural",
-      "negativePrompts": {
-        "supported": false,
-        "note": "Flux 2 does not support negative prompts. Use semantic negatives in the main prompt instead, e.g. 'without text' rather than a negative prompt."
-      },
       "strengths": [
         "Photorealistic rendering with fine detail",
         "Strong prompt adherence for complex scenes",
@@ -85,10 +77,6 @@
     "flux-2-klein-4b": {
       "displayName": "Flux 2 Klein 4b",
       "promptStyle": "natural",
-      "negativePrompts": {
-        "supported": false,
-        "note": "Flux 2 does not support negative prompts. Use semantic negatives in the main prompt instead, e.g. 'without text' rather than a negative prompt."
-      },
       "strengths": [
         "Fast generation with good Flux 2 quality",
         "Natural language understanding from the Flux 2 family",
@@ -126,10 +114,6 @@
     "flux-schnell": {
       "displayName": "Flux Schnell",
       "promptStyle": "natural",
-      "negativePrompts": {
-        "supported": false,
-        "note": "Flux Schnell does not support negative prompts. Use positive rephrasing in the main prompt, e.g. 'sharp focus' instead of 'no blur'."
-      },
       "strengths": [
         "Very fast generation with good quality",
         "Natural language understanding from the Flux family",
@@ -150,10 +134,6 @@
     "nano-banana-2": {
       "displayName": "Nano Banana 2",
       "promptStyle": "natural",
-      "negativePrompts": {
-        "supported": false,
-        "note": "No separate negative prompt parameter. Embed semantic negatives in the main prompt, e.g. 'no extra fingers, avoid watermarks'."
-      },
       "strengths": [
         "Flash-speed generation at professional quality",
         "Web-search grounding for current real-world data",
@@ -191,10 +171,6 @@
     "gpt-image-1.5": {
       "displayName": "GPT Image 1.5",
       "promptStyle": "natural",
-      "negativePrompts": {
-        "supported": false,
-        "note": "GPT Image does not support negative prompts. Rephrase positively, e.g. 'empty scene' instead of 'no people'."
-      },
       "strengths": [
         "Near-perfect text rendering in images",
         "Precise prompt following with 10-20 objects",
@@ -216,10 +192,6 @@
     "seedream-5": {
       "displayName": "Seedream 5",
       "promptStyle": "natural",
-      "negativePrompts": {
-        "supported": true,
-        "note": "Supports negative prompts. Keep to 15-25 terms maximum; more terms confuse the model."
-      },
       "strengths": [
         "Native 4K output resolution",
         "Excellent text rendering for posters and UI mockups",
@@ -257,10 +229,6 @@
     "seedream-4.5": {
       "displayName": "Seedream 4.5",
       "promptStyle": "natural",
-      "negativePrompts": {
-        "supported": true,
-        "note": "Supports negative prompts. Keep to 15-25 terms maximum; more terms confuse the model."
-      },
       "strengths": [
         "Native 4K output resolution",
         "Excellent text rendering for posters and UI mockups",
@@ -298,10 +266,6 @@
     "stable-diffusion-3.5-large": {
       "displayName": "Stable Diffusion 3.5 Large",
       "promptStyle": "natural",
-      "negativePrompts": {
-        "supported": true,
-        "note": "Full negative prompt support. Use terms like 'worst quality, low quality, blurry, watermark, bad anatomy' for best results."
-      },
       "strengths": [
         "Full negative prompt support for precise exclusion",
         "Strong artist and art style recognition",
@@ -322,10 +286,6 @@
     "stable-diffusion-3.5-medium": {
       "displayName": "Stable Diffusion 3.5 Medium",
       "promptStyle": "natural",
-      "negativePrompts": {
-        "supported": true,
-        "note": "Full negative prompt support. Use terms like 'worst quality, low quality, blurry, watermark, bad anatomy' for best results."
-      },
       "strengths": [
         "Full negative prompt support for precise exclusion",
         "Strong artist and art style recognition",
@@ -346,10 +306,6 @@
     "recraft-v4": {
       "displayName": "Recraft V4",
       "promptStyle": "natural",
-      "negativePrompts": {
-        "supported": false,
-        "note": "Recraft does not use a negative prompt field. Describe what you want positively and use style presets for control."
-      },
       "strengths": [
         "True SVG vector output, unique among generators",
         "Accurate long text rendering including full paragraphs",
@@ -370,10 +326,6 @@
     "ideogram-3": {
       "displayName": "Ideogram 3",
       "promptStyle": "natural",
-      "negativePrompts": {
-        "supported": true,
-        "note": "Negative prompts available on paid plans. Use them to exclude unwanted text or visual elements."
-      },
       "strengths": [
         "Best-in-class text rendering for logos, signs, and posters",
         "Accurate multi-line typography in various styles",
@@ -394,10 +346,6 @@
     "hunyuan-image-3": {
       "displayName": "Hunyuan Image 3",
       "promptStyle": "natural",
-      "negativePrompts": {
-        "supported": true,
-        "note": "Supports negative prompts. Works similarly to Stable Diffusion negative prompt handling."
-      },
       "strengths": [
         "Handles prompts over 1000 characters with strong comprehension",
         "Bilingual text rendering in Chinese and English",

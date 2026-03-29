@@ -379,9 +379,7 @@ class AssistantService:
                 raw_draft = state_values.get("draft_prompt")
                 if raw_draft and isinstance(raw_draft, dict):
                     draft_prompt = DraftPromptDTO(
-                        motiv=raw_draft.get("motiv", ""),
-                        style=raw_draft.get("style", ""),
-                        negative_prompt=raw_draft.get("negative_prompt", ""),
+                        prompt=raw_draft.get("prompt", ""),
                     )
 
                 # Extract recommended_model from state

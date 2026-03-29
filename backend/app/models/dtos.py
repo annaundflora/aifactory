@@ -146,9 +146,7 @@ class MessageDTO(BaseModel):
 class DraftPromptDTO(BaseModel):
     """Current prompt draft from LangGraph state."""
 
-    motiv: str
-    style: str
-    negative_prompt: str
+    prompt: str
 
 
 class ModelRecDTO(BaseModel):
