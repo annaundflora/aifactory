@@ -1,0 +1,28 @@
+{
+  "spec_path": "/home/dev/aifactory/.claude/worktrees/model-slots/specs/phase-7/2026-03-29-model-slots",
+  "feature_name": "model-slots",
+  "status": "in_progress",
+  "current_state": "implementing",
+  "current_slice_id": "slice-01",
+  "retry_count": 0,
+  "failed_stage": null,
+  "waves": [
+    {"wave": 1, "slices": ["slice-01"]},
+    {"wave": 2, "slices": ["slice-02"]},
+    {"wave": 3, "slices": ["slice-03"]},
+    {"wave": 4, "slices": ["slice-04"]},
+    {"wave": 5, "slices": ["slice-05"]},
+    {"wave": 6, "slices": ["slice-06"]},
+    {"wave": 7, "slices": ["slice-07", "slice-08", "slice-09", "slice-10", "slice-11", "slice-14"]},
+    {"wave": 8, "slices": ["slice-12", "slice-13"]},
+    {"wave": 9, "slices": ["slice-15"]},
+    {"wave": 10, "slices": ["slice-16"]}
+  ],
+  "completed_slices": [],
+  "evidence_files": [],
+  "worktree_path": "/home/dev/aifactory/.claude/worktrees/model-slots",
+  "branch": "worktree-model-slots",
+  "github_available": true,
+  "repo": "annaundflora/aifactory",
+  "pr_number": 22
+}
