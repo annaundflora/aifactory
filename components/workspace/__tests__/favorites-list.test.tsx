@@ -65,8 +65,6 @@ function makeEntry(overrides: Partial<PromptHistoryEntry> = {}): PromptHistoryEn
   return {
     generationId: overrides.generationId ?? crypto.randomUUID(),
     promptMotiv: overrides.promptMotiv ?? "A test prompt",
-    promptStyle: overrides.promptStyle ?? "cinematic",
-    negativePrompt: overrides.negativePrompt ?? null,
     modelId: overrides.modelId ?? "vendor/model-test",
     modelParams: overrides.modelParams ?? {},
     isFavorite: overrides.isFavorite ?? true, // Favorites are always true
@@ -96,8 +94,6 @@ async function renderFavoritesList(props: Partial<React.ComponentProps<typeof Fa
     <FavoritesList
       onLoadEntry={onLoadEntry}
       promptMotiv={props.promptMotiv ?? ""}
-      promptStyle={props.promptStyle ?? ""}
-      negativePrompt={props.negativePrompt ?? ""}
     />
   );
   // Wait for initial load to complete (mockGetFavoritePrompts called + useTransition flushed)
@@ -189,7 +185,7 @@ describe("Favorites List", () => {
 
     // Re-render to test truncation
     const { unmount } = render(
-      <FavoritesList onLoadEntry={vi.fn()} promptMotiv="" promptStyle="" negativePrompt="" />
+      <FavoritesList onLoadEntry={vi.fn()} promptMotiv="" />
     );
     await waitFor(() => {
       expect(screen.getByText("A".repeat(80) + "...")).toBeInTheDocument();
@@ -355,8 +351,6 @@ describe("Favorites List", () => {
     const user = userEvent.setup();
     const entry = makeEntry({
       promptMotiv: "Eagle in flight",
-      promptStyle: "photorealistic",
-      negativePrompt: "blur, noise",
       isFavorite: true,
     });
     mockGetFavoritePrompts.mockResolvedValue([entry]);
@@ -366,8 +360,6 @@ describe("Favorites List", () => {
       <FavoritesList
         onLoadEntry={onLoadEntry}
         promptMotiv=""
-        promptStyle=""
-        negativePrompt=""
       />
     );
 
@@ -408,8 +400,6 @@ describe("Favorites List", () => {
       <FavoritesList
         onLoadEntry={onLoadEntry}
         promptMotiv="existing prompt text"
-        promptStyle=""
-        negativePrompt=""
       />
     );
 
@@ -450,8 +440,6 @@ describe("Favorites List", () => {
     const user = userEvent.setup();
     const entry = makeEntry({
       promptMotiv: "Apply this prompt",
-      promptStyle: "watercolor",
-      negativePrompt: "noise",
       isFavorite: true,
     });
     mockGetFavoritePrompts.mockResolvedValue([entry]);
@@ -461,8 +449,6 @@ describe("Favorites List", () => {
       <FavoritesList
         onLoadEntry={onLoadEntry}
         promptMotiv="existing text"
-        promptStyle=""
-        negativePrompt=""
       />
     );
 
@@ -515,8 +501,6 @@ describe("Favorites List", () => {
       <FavoritesList
         onLoadEntry={onLoadEntry}
         promptMotiv="keep this"
-        promptStyle="keep style"
-        negativePrompt=""
       />
     );
 
