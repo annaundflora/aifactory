@@ -58,7 +58,6 @@ export const generations = pgTable(
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     prompt: text("prompt").notNull(),
-    negativePrompt: text("negative_prompt"),
     modelId: varchar("model_id", { length: 255 }).notNull(),
     modelParams: jsonb("model_params").notNull().default({}),
     status: varchar("status", { length: 20 }).notNull().default("pending"),
@@ -69,7 +68,6 @@ export const generations = pgTable(
     height: integer("height"),
     seed: bigint("seed", { mode: "number" }),
     promptMotiv: text("prompt_motiv").notNull().default(""),
-    promptStyle: text("prompt_style").default(""),
     isFavorite: boolean("is_favorite").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
