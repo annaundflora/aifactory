@@ -1,6 +1,6 @@
 import { eq, desc, sql, and, asc, or, notInArray, lt } from "drizzle-orm";
 import { db } from "./index";
-import { projects, generations, assistantSessions, referenceImages, generationReferences, models } from "./schema";
+import { projects, generations, assistantSessions, referenceImages, generationReferences, models, modelSlots } from "./schema";
 
 // ---------------------------------------------------------------------------
 // Types (inferred from schema)
@@ -11,22 +11,7 @@ export type AssistantSession = typeof assistantSessions.$inferSelect;
 export type ReferenceImage = typeof referenceImages.$inferSelect;
 export type GenerationReference = typeof generationReferences.$inferSelect;
 export type Model = typeof models.$inferSelect;
-
-/**
- * Legacy ModelSetting type -- kept for backward compatibility with UI consumers
- * until they are migrated to the new model_slots schema (later slices).
- * The model_settings table has been replaced by model_slots; query functions
- * have been removed. Only the type remains so existing imports compile.
- */
-export type ModelSetting = {
-  id: string;
-  mode: string;
-  tier: string;
-  modelId: string;
-  modelParams: unknown;
-  createdAt: Date;
-  updatedAt: Date;
-};
+export type ModelSlot = typeof modelSlots.$inferSelect;
 
 // ---------------------------------------------------------------------------
 // Project Queries
@@ -642,4 +627,102 @@ export async function deactivateModelsNotIn(activeReplicateIds: string[]): Promi
         notInArray(models.replicateId, activeReplicateIds)
       )
     );
+}
+
+// ---------------------------------------------------------------------------
+// Model Slot Queries
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns all model slot rows from the `model_slots` table.
+ */
+export async function getAllModelSlots(): Promise<ModelSlot[]> {
+  return db.select().from(modelSlots);
+}
+
+/**
+ * Returns all model slot rows for a given mode, sorted by slot ascending.
+ */
+export async function getModelSlotsByMode(mode: string): Promise<ModelSlot[]> {
+  return db
+    .select()
+    .from(modelSlots)
+    .where(eq(modelSlots.mode, mode))
+    .orderBy(asc(modelSlots.slot));
+}
+
+/**
+ * Inserts or updates a model slot row based on the unique (mode, slot) pair.
+ * On conflict, the existing row is updated with the new values and `updated_at`
+ * is set to the current time.
+ */
+export async function upsertModelSlot(
+  mode: string,
+  slot: number,
+  modelId: string,
+  modelParams: Record<string, unknown>,
+  active: boolean
+): Promise<ModelSlot> {
+  const [row] = await db
+    .insert(modelSlots)
+    .values({
+      mode,
+      slot,
+      modelId,
+      modelParams,
+      active,
+    })
+    .onConflictDoUpdate({
+      target: [modelSlots.mode, modelSlots.slot],
+      set: {
+        modelId,
+        modelParams,
+        active,
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+  return row;
+}
+
+/**
+ * Seeds the default 15 model slot rows (5 modes x 3 slots).
+ * Uses `onConflictDoNothing` so existing rows are not overwritten (idempotent).
+ */
+export async function seedModelSlotDefaults(): Promise<void> {
+  const defaults: {
+    mode: string;
+    slot: number;
+    modelId: string | null;
+    modelParams: Record<string, unknown>;
+    active: boolean;
+  }[] = [
+    // txt2img
+    { mode: "txt2img", slot: 1, modelId: "black-forest-labs/flux-schnell", modelParams: {}, active: true },
+    { mode: "txt2img", slot: 2, modelId: "black-forest-labs/flux-2-pro", modelParams: {}, active: false },
+    { mode: "txt2img", slot: 3, modelId: "black-forest-labs/flux-2-max", modelParams: {}, active: false },
+    // img2img
+    { mode: "img2img", slot: 1, modelId: "black-forest-labs/flux-schnell", modelParams: { prompt_strength: 0.6 }, active: true },
+    { mode: "img2img", slot: 2, modelId: "black-forest-labs/flux-2-pro", modelParams: { prompt_strength: 0.6 }, active: false },
+    { mode: "img2img", slot: 3, modelId: "black-forest-labs/flux-2-max", modelParams: { prompt_strength: 0.6 }, active: false },
+    // upscale
+    { mode: "upscale", slot: 1, modelId: "philz1337x/crystal-upscaler", modelParams: { scale: 4 }, active: true },
+    { mode: "upscale", slot: 2, modelId: "nightmareai/real-esrgan", modelParams: { scale: 2 }, active: false },
+    { mode: "upscale", slot: 3, modelId: null, modelParams: {}, active: false },
+    // inpaint
+    { mode: "inpaint", slot: 1, modelId: null, modelParams: {}, active: true },
+    { mode: "inpaint", slot: 2, modelId: null, modelParams: {}, active: false },
+    { mode: "inpaint", slot: 3, modelId: null, modelParams: {}, active: false },
+    // outpaint
+    { mode: "outpaint", slot: 1, modelId: null, modelParams: {}, active: true },
+    { mode: "outpaint", slot: 2, modelId: null, modelParams: {}, active: false },
+    { mode: "outpaint", slot: 3, modelId: null, modelParams: {}, active: false },
+  ];
+
+  await db
+    .insert(modelSlots)
+    .values(defaults)
+    .onConflictDoNothing({
+      target: [modelSlots.mode, modelSlots.slot],
+    });
 }

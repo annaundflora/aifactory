@@ -2,8 +2,8 @@
   "spec_path": "/home/dev/aifactory/.claude/worktrees/model-slots/specs/phase-7/2026-03-29-model-slots",
   "feature_name": "model-slots",
   "status": "in_progress",
-  "current_state": "code_review",
-  "current_slice_id": "slice-01",
+  "current_state": "implementing",
+  "current_slice_id": "slice-02",
   "retry_count": 0,
   "failed_stage": null,
   "waves": [
@@ -18,8 +18,8 @@
     {"wave": 9, "slices": ["slice-15"]},
     {"wave": 10, "slices": ["slice-16"]}
   ],
-  "completed_slices": [],
-  "evidence_files": [],
+  "completed_slices": ["slice-01"],
+  "evidence_files": ["evidence/slice-01.json"],
   "worktree_path": "/home/dev/aifactory/.claude/worktrees/model-slots",
   "branch": "worktree-model-slots",
   "github_available": true,

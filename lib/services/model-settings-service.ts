@@ -1,7 +1,15 @@
-import {
-  getModelByReplicateId,
-  type ModelSetting,
-} from "@/lib/db/queries";
+import { getModelByReplicateId } from "@/lib/db/queries";
+
+/** @deprecated Legacy type kept for backward compat until consumers migrate to ModelSlot. */
+type ModelSetting = {
+  id: string;
+  mode: string;
+  tier: string;
+  modelId: string;
+  modelParams: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 /**
  * Legacy ModelSettingsService -- the underlying model_settings table has been

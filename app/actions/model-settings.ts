@@ -1,13 +1,23 @@
 "use server";
 
 import { ModelSettingsService } from "@/lib/services/model-settings-service";
-import type { ModelSetting } from "@/lib/db/queries";
 import {
   VALID_GENERATION_MODES,
   VALID_TIERS,
   type UpdateModelSettingInput,
 } from "@/lib/types";
 import { requireAuth } from "@/lib/auth/guard";
+
+/** @deprecated Legacy type kept for backward compat until consumers migrate to ModelSlot. */
+type ModelSetting = {
+  id: string;
+  mode: string;
+  tier: string;
+  modelId: string;
+  modelParams: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 // ---------------------------------------------------------------------------
 // Validation

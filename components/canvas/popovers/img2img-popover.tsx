@@ -24,8 +24,18 @@ import type {
   ReferenceSlotData,
 } from "@/lib/types/reference";
 import type { GalleryDragPayload } from "@/lib/constants/drag-types";
-import type { ModelSetting } from "@/lib/db/queries";
 import type { Tier } from "@/lib/types";
+
+/** @deprecated Legacy type kept for backward compat until consumers migrate to ModelSlot. */
+type ModelSetting = {
+  id: string;
+  mode: string;
+  tier: string;
+  modelId: string;
+  modelParams: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 // ---------------------------------------------------------------------------
 // Img2imgParams type (exported for slice-14 consumer)

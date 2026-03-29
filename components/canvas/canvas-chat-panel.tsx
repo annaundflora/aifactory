@@ -14,7 +14,18 @@ import { useCanvasDetail } from "@/lib/canvas-detail-context";
 import { ChatThread } from "@/components/assistant/chat-thread";
 import { ChatInput } from "@/components/assistant/chat-input";
 import { ModelSelector, DEFAULT_MODEL_SLUG } from "@/components/assistant/model-selector";
-import { type Generation, type ModelSetting } from "@/lib/db/queries";
+import { type Generation } from "@/lib/db/queries";
+
+/** @deprecated Legacy type kept for backward compat until consumers migrate to ModelSlot. */
+type ModelSetting = {
+  id: string;
+  mode: string;
+  tier: string;
+  modelId: string;
+  modelParams: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+};
 import { type ChatMessage } from "@/lib/types/chat-message";
 import type { Tier } from "@/lib/types";
 import {

@@ -9,7 +9,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { GenerationMode, Tier } from "@/lib/types";
-import type { ModelSetting } from "@/lib/db/queries";
+
+/** @deprecated Legacy type kept for backward compat until consumers migrate to ModelSlot. */
+type ModelSetting = {
+  id: string;
+  mode: string;
+  tier: string;
+  modelId: string;
+  modelParams: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+};
 import type { Model } from "@/lib/services/model-catalog-service";
 
 // ---------------------------------------------------------------------------

@@ -12,7 +12,17 @@ import {
 import { PromptTabs, type PromptTab } from "@/components/workspace/prompt-tabs";
 import { generateImages, upscaleImage } from "@/app/actions/generations";
 import { getModelSettings } from "@/app/actions/model-settings";
-import type { ModelSetting } from "@/lib/db/queries";
+
+/** @deprecated Legacy type kept for backward compat until consumers migrate to ModelSlot. */
+type ModelSetting = {
+  id: string;
+  mode: string;
+  tier: string;
+  modelId: string;
+  modelParams: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+};
 import { useWorkspaceVariation } from "@/lib/workspace-state";
 import { ModeSelector, type GenerationMode } from "@/components/workspace/mode-selector";
 import { ImageDropzone } from "@/components/workspace/image-dropzone";

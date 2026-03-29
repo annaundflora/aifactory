@@ -110,7 +110,18 @@ import {
   CanvasDetailProvider,
   useCanvasDetail,
 } from "@/lib/canvas-detail-context";
-import type { Generation, ModelSetting } from "@/lib/db/queries";
+import type { Generation } from "@/lib/db/queries";
+
+/** @deprecated Legacy type kept for backward compat until consumers migrate to ModelSlot. */
+type ModelSetting = {
+  id: string;
+  mode: string;
+  tier: string;
+  modelId: string;
+  modelParams: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 // ---------------------------------------------------------------------------
 // Helpers

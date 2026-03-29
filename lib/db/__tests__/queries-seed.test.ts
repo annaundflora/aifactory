@@ -53,7 +53,9 @@ vi.mock('../index', () => {
 })
 
 // Import queries AFTER the mock is set up
-import { seedModelSettingsDefaults } from '../queries'
+// Note: seedModelSettingsDefaults was removed in slice-02 (replaced by seedModelSlotDefaults).
+// This test file references the old function and will need to be rewritten for model_slots.
+import { seedModelSlotDefaults as seedModelSettingsDefaults } from '../queries'
 
 // ---------------------------------------------------------------------------
 // Tests

@@ -1,5 +1,15 @@
-import type { ModelSetting } from "@/lib/db/queries";
 import type { GenerationMode, Tier } from "@/lib/types";
+
+/** @deprecated Legacy type kept for backward compat until consumers migrate to ModelSlot. */
+type ModelSetting = {
+  id: string;
+  mode: string;
+  tier: string;
+  modelId: string;
+  modelParams: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 /**
  * Resolve model ID and params from cached model settings based on mode, tier,
