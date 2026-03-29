@@ -18,6 +18,8 @@ export interface CanvasImageContext {
   model_id: string;
   model_params: Record<string, unknown>;
   generation_id: string;
+  tier_models?: Record<string, string>;
+  selected_tier?: string;
 }
 
 // ---------------------------------------------------------------------------

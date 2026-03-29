@@ -62,13 +62,22 @@ function buildInitMessage(generation: Generation): ChatMessage {
   };
 }
 
-function buildImageContext(generation: Generation): CanvasImageContext {
+function buildImageContext(generation: Generation, modelSettings: ModelSetting[] = []): CanvasImageContext {
+  // Build tier_models from img2img model settings
+  const tierModels: Record<string, string> = {};
+  for (const s of modelSettings) {
+    if (s.mode === "img2img" && s.modelId) {
+      tierModels[s.tier] = s.modelId;
+    }
+  }
+
   return {
     image_url: generation.imageUrl ?? "",
     prompt: generation.prompt ?? "",
     model_id: generation.modelId ?? "",
     model_params: (generation.modelParams as Record<string, unknown>) ?? {},
     generation_id: generation.id,
+    ...(Object.keys(tierModels).length > 0 ? { tier_models: tierModels } : {}),
   };
 }
 
@@ -98,7 +107,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
   const lastGenerationIdRef = useRef(state.currentGenerationId);
 
   // Keep image context in a ref — updated on generation change
-  const imageContextRef = useRef<CanvasImageContext>(buildImageContext(generation));
+  const imageContextRef = useRef<CanvasImageContext>(buildImageContext(generation, modelSettings));
 
   // Width before collapse for restoring
   const preCollapseWidthRef = useRef(DEFAULT_WIDTH);
@@ -139,12 +148,12 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
   }, [collapsed, projectId]);
 
   // ---------------------------------------------------------------------------
-  // HIGH-2: Keep imageContextRef fresh whenever the generation prop changes
-  // (e.g. Prev/Next navigation), independently of currentGenerationId context
+  // HIGH-2: Keep imageContextRef fresh whenever generation or modelSettings change
+  // (e.g. Prev/Next navigation or async settings load)
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    imageContextRef.current = buildImageContext(generation);
-  }, [generation.id]);
+    imageContextRef.current = buildImageContext(generation, modelSettings);
+  }, [generation.id, modelSettings]);
 
   // ---------------------------------------------------------------------------
   // AC-10: Update context when currentGenerationId changes.
@@ -157,7 +166,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
       lastGenerationIdRef.current = state.currentGenerationId;
 
       // Always update image context for subsequent messages
-      imageContextRef.current = buildImageContext(generation);
+      imageContextRef.current = buildImageContext(generation, modelSettings);
 
       // Replace the first init message with updated context (Prev/Next + Sibling)
       setMessages((prev) => {
@@ -360,10 +369,12 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
       let botBubbleInserted = false;
 
       try {
+        // Inject current tier so the backend knows which model is selected
+        const contextWithTier = { ...imageContextRef.current, selected_tier: tier };
         await sendCanvasMessage(
           sessionIdRef.current,
           text,
-          imageContextRef.current,
+          contextWithTier,
           (event: CanvasSSEEvent) => {
             switch (event.type) {
               case "text-delta": {

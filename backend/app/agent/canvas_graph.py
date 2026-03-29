@@ -218,29 +218,51 @@ WICHTIG:
             prompt = prompt[:2000]
         model_id = image_context.get("model_id", "")
         model_params = image_context.get("model_params", {})
+        tier_models = image_context.get("tier_models") or {}
+        selected_tier = image_context.get("selected_tier") or ""
+
+        # Resolve the currently selected model from tier
+        selected_model_id = ""
+        if selected_tier and tier_models:
+            selected_model_id = tier_models.get(selected_tier, "")
+
+        # Build tier models section if available
+        tier_section = ""
+        if tier_models:
+            tier_lines = []
+            for tier_name in ("draft", "quality", "max"):
+                if tier_name in tier_models:
+                    marker = " (AKTUELL AUSGEWAEHLT)" if tier_name == selected_tier else ""
+                    tier_lines.append(f"- {tier_name.capitalize()}: {tier_models[tier_name]}{marker}")
+            if tier_lines:
+                tier_section = "\nVERFUEGBARE MODELLE (Tier-Auswahl des Users):\n" + "\n".join(tier_lines) + "\n"
+
+        # The effective model: selected tier model if available, else image model
+        effective_model_id = selected_model_id or model_id
 
         context_section = f"""
 AKTUELLES BILD (Editing-Kontext):
 - Du siehst das aktuelle Bild als Anhang zur User-Nachricht
 - Original-Prompt: {prompt}
-- Modell: {model_id}
+- Dieses Bild wurde generiert mit: {model_id}
+- Aktuell ausgewaehltes Modell: {effective_model_id} (Tier: {selected_tier or 'unbekannt'})
 - Modell-Parameter: {json.dumps(model_params, ensure_ascii=False)}
-
+{tier_section}
 VISUELLES FEEDBACK:
 - Beschreibe was du im Bild siehst, wenn der User danach fragt
 - Nutze deine visuelle Analyse fuer gezielte Verbesserungsvorschlaege
 - Beziehe dich auf konkrete visuelle Elemente (Farben, Komposition, Objekte, Stimmung)
 
 Beziehe dich beim Generieren auf diesen Kontext:
-- Nutze "{model_id}" als model_id (ausser der User wechselt explizit)
+- Nutze "{effective_model_id}" als model_id (ausser der User wechselt explizit)
 - Baue auf dem Original-Prompt auf und verbessere ihn gemaess der Bearbeitungsanfrage
 - Bei action="img2img" kann der User das Bild von "{image_url}" als Referenz nutzen
 """
-        # Knowledge injection: append model-specific prompting tips after context_section
+        # Knowledge injection: use effective model (selected tier model)
         knowledge_section = ""
-        if model_id:
+        if effective_model_id:
             try:
-                knowledge_result = get_prompt_knowledge(model_id, None)
+                knowledge_result = get_prompt_knowledge(effective_model_id, None)
                 formatted = format_knowledge_for_prompt(knowledge_result)
                 if formatted:
                     knowledge_section = f"\n{formatted}\n"
@@ -248,7 +270,7 @@ Beziehe dich beim Generieren auf diesen Kontext:
                 logger.warning(
                     "Failed to load prompt knowledge for model '%s' in canvas, "
                     "continuing without knowledge section",
-                    model_id,
+                    effective_model_id,
                     exc_info=True,
                 )
 

@@ -57,6 +57,14 @@ class CanvasImageContext(BaseModel):
     model_id: str = Field(..., description="Model ID of the current image")
     model_params: dict = Field(default_factory=dict, description="Model parameters")
     generation_id: str = Field(..., description="UUID of the generation record")
+    tier_models: Optional[dict] = Field(
+        default=None,
+        description="Model IDs per tier for the current workspace (e.g. {draft: 'flux-2-klein-4b', quality: 'flux-2-pro', max: 'flux-2-max'})",
+    )
+    selected_tier: Optional[str] = Field(
+        default=None,
+        description="Currently selected tier in the canvas chat (draft, quality, or max)",
+    )
 
 
 class CreateCanvasSessionRequest(BaseModel):

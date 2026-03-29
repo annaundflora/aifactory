@@ -42,19 +42,23 @@ function estimateTokens(obj: unknown): number {
 }
 
 // ---------------------------------------------------------------------------
-// Required model prefixes (from AC-1)
+// Required model slugs (exact match keys)
 // ---------------------------------------------------------------------------
 
-const REQUIRED_PREFIXES = [
-  'flux-2',
+const REQUIRED_SLUGS = [
+  'flux-2-pro',
+  'flux-2-max',
+  'flux-2-klein-4b',
   'flux-schnell',
-  'nano-banana',
-  'gpt-image',
-  'seedream',
-  'stable-diffusion',
-  'recraft',
-  'ideogram',
-  'hunyuan',
+  'nano-banana-2',
+  'gpt-image-1.5',
+  'seedream-5',
+  'seedream-4.5',
+  'stable-diffusion-3.5-large',
+  'stable-diffusion-3.5-medium',
+  'recraft-v4',
+  'ideogram-3',
+  'hunyuan-image-3',
 ] as const
 
 // ---------------------------------------------------------------------------
@@ -62,108 +66,83 @@ const REQUIRED_PREFIXES = [
 // ---------------------------------------------------------------------------
 
 describe('prompt-knowledge.json content completeness', () => {
-  /**
-   * AC-1: GIVEN die Datei `data/prompt-knowledge.json` geladen wird
-   *       WHEN die Keys in `models` gezaehlt werden
-   *       THEN existieren exakt 9 Eintraege: flux-2, flux-schnell, nano-banana,
-   *            gpt-image, seedream, stable-diffusion, recraft, ideogram, hunyuan
-   */
-  it('should contain exactly 9 model prefixes', () => {
+  it('should contain all required model slugs', () => {
     const models = data.models as Record<string, unknown>
     expect(models).toBeDefined()
 
     const keys = Object.keys(models)
-    expect(keys).toHaveLength(9)
+    expect(keys).toHaveLength(REQUIRED_SLUGS.length)
 
-    for (const prefix of REQUIRED_PREFIXES) {
-      expect(keys, `missing model prefix: ${prefix}`).toContain(prefix)
+    for (const slug of REQUIRED_SLUGS) {
+      expect(keys, `missing model slug: ${slug}`).toContain(slug)
     }
   })
 
-  /**
-   * AC-2: GIVEN ein beliebiger Modell-Eintrag in `models` (z.B. `models["recraft"]`)
-   *       WHEN seine Pflichtfelder geprueft werden
-   *       THEN enthaelt er: displayName (non-empty string), promptStyle ("natural"
-   *            oder "keywords"), negativePrompts (Objekt mit supported: boolean und
-   *            note: non-empty string), strengths (string[], 2-4 Eintraege),
-   *            tips (string[], 3-6 Eintraege), avoid (string[], 2-4 Eintraege)
-   */
   it('should have all required fields for every model entry', () => {
     const models = data.models as Record<string, Record<string, unknown>>
 
-    for (const prefix of REQUIRED_PREFIXES) {
-      const entry = models[prefix]
-      expect(entry, `model "${prefix}" should exist`).toBeDefined()
+    for (const slug of REQUIRED_SLUGS) {
+      const entry = models[slug]
+      expect(entry, `model "${slug}" should exist`).toBeDefined()
 
       // displayName: non-empty string
-      expect(typeof entry.displayName, `${prefix}.displayName type`).toBe('string')
-      expect((entry.displayName as string).length, `${prefix}.displayName non-empty`).toBeGreaterThan(0)
+      expect(typeof entry.displayName, `${slug}.displayName type`).toBe('string')
+      expect((entry.displayName as string).length, `${slug}.displayName non-empty`).toBeGreaterThan(0)
 
       // promptStyle: "natural" or "keywords"
       expect(
         ['natural', 'keywords'],
-        `${prefix}.promptStyle should be "natural" or "keywords"`
+        `${slug}.promptStyle should be "natural" or "keywords"`
       ).toContain(entry.promptStyle)
 
       // negativePrompts: object with supported (boolean) and note (non-empty string)
       const neg = entry.negativePrompts as Record<string, unknown>
-      expect(neg, `${prefix}.negativePrompts should be an object`).toBeDefined()
-      expect(typeof neg, `${prefix}.negativePrompts should be an object`).toBe('object')
-      expect(typeof neg.supported, `${prefix}.negativePrompts.supported should be boolean`).toBe('boolean')
-      expect(typeof neg.note, `${prefix}.negativePrompts.note should be string`).toBe('string')
-      expect((neg.note as string).length, `${prefix}.negativePrompts.note non-empty`).toBeGreaterThan(0)
+      expect(neg, `${slug}.negativePrompts should be an object`).toBeDefined()
+      expect(typeof neg, `${slug}.negativePrompts should be an object`).toBe('object')
+      expect(typeof neg.supported, `${slug}.negativePrompts.supported should be boolean`).toBe('boolean')
+      expect(typeof neg.note, `${slug}.negativePrompts.note should be string`).toBe('string')
+      expect((neg.note as string).length, `${slug}.negativePrompts.note non-empty`).toBeGreaterThan(0)
 
       // strengths: string[], 2-4 entries
       const strengths = entry.strengths as unknown[]
-      expect(Array.isArray(strengths), `${prefix}.strengths should be array`).toBe(true)
-      expect(strengths.length, `${prefix}.strengths count (2-4)`).toBeGreaterThanOrEqual(2)
-      expect(strengths.length, `${prefix}.strengths count (2-4)`).toBeLessThanOrEqual(4)
+      expect(Array.isArray(strengths), `${slug}.strengths should be array`).toBe(true)
+      expect(strengths.length, `${slug}.strengths count (2-4)`).toBeGreaterThanOrEqual(2)
+      expect(strengths.length, `${slug}.strengths count (2-4)`).toBeLessThanOrEqual(4)
       for (const s of strengths) {
-        expect(typeof s, `${prefix}.strengths items should be strings`).toBe('string')
+        expect(typeof s, `${slug}.strengths items should be strings`).toBe('string')
       }
 
       // tips: string[], 3-6 entries
       const tips = entry.tips as unknown[]
-      expect(Array.isArray(tips), `${prefix}.tips should be array`).toBe(true)
-      expect(tips.length, `${prefix}.tips count (3-6)`).toBeGreaterThanOrEqual(3)
-      expect(tips.length, `${prefix}.tips count (3-6)`).toBeLessThanOrEqual(6)
+      expect(Array.isArray(tips), `${slug}.tips should be array`).toBe(true)
+      expect(tips.length, `${slug}.tips count (3-6)`).toBeGreaterThanOrEqual(3)
+      expect(tips.length, `${slug}.tips count (3-6)`).toBeLessThanOrEqual(6)
       for (const t of tips) {
-        expect(typeof t, `${prefix}.tips items should be strings`).toBe('string')
+        expect(typeof t, `${slug}.tips items should be strings`).toBe('string')
       }
 
       // avoid: string[], 2-4 entries
       const avoid = entry.avoid as unknown[]
-      expect(Array.isArray(avoid), `${prefix}.avoid should be array`).toBe(true)
-      expect(avoid.length, `${prefix}.avoid count (2-4)`).toBeGreaterThanOrEqual(2)
-      expect(avoid.length, `${prefix}.avoid count (2-4)`).toBeLessThanOrEqual(4)
+      expect(Array.isArray(avoid), `${slug}.avoid should be array`).toBe(true)
+      expect(avoid.length, `${slug}.avoid count (2-4)`).toBeGreaterThanOrEqual(2)
+      expect(avoid.length, `${slug}.avoid count (2-4)`).toBeLessThanOrEqual(4)
       for (const a of avoid) {
-        expect(typeof a, `${prefix}.avoid items should be strings`).toBe('string')
+        expect(typeof a, `${slug}.avoid items should be strings`).toBe('string')
       }
     }
   })
 
-  /**
-   * AC-7: GIVEN die gesamte `data/prompt-knowledge.json` Datei
-   *       WHEN ein JSON-Parser sie laedt
-   *       THEN ist das Ergebnis valides JSON ohne Parse-Fehler
-   */
   it('should be valid JSON', () => {
     expect(() => JSON.parse(rawJson)).not.toThrow()
     expect(data).toBeDefined()
     expect(typeof data).toBe('object')
   })
 
-  /**
-   * AC-8: GIVEN der bestehende `fallback`-Eintrag aus Slice 01
-   *       WHEN er nach dem Befuellen der Modelle geprueft wird
-   *       THEN ist er unveraendert (Slice 01 Inhalt beibehalten)
-   */
-  it('should preserve the fallback section from slice-01', () => {
+  it('should preserve the fallback section', () => {
     const fallback = data.fallback as Record<string, unknown>
     expect(fallback, 'fallback should exist').toBeDefined()
     expect(typeof fallback).toBe('object')
 
-    // Verify core fallback structure
     expect(fallback.displayName).toBe('Generic')
 
     const tips = fallback.tips as string[]
@@ -174,7 +153,6 @@ describe('prompt-knowledge.json content completeness', () => {
     expect(Array.isArray(avoid)).toBe(true)
     expect(avoid.length).toBeGreaterThanOrEqual(1)
 
-    // Verify specific fallback content is preserved (slice-01 original content)
     expect(tips).toContain('Be specific and descriptive in your prompt')
     expect(avoid).toContain('Vague or overly brief prompts')
   })
@@ -185,109 +163,32 @@ describe('prompt-knowledge.json content completeness', () => {
 // ---------------------------------------------------------------------------
 
 describe('prompt-knowledge.json mode coverage', () => {
-  /**
-   * AC-3: GIVEN der Eintrag `models["flux-2"]`
-   *       WHEN das Feld `modes` geprueft wird
-   *       THEN enthaelt es `txt2img` mit `tips` (string[], 2-4 Eintraege)
-   *            UND `img2img` mit `tips` (string[], 2-4 Eintraege)
-   */
-  it('should have txt2img and img2img modes for flux-2', () => {
+  it.each([
+    'flux-2-pro',
+    'flux-2-max',
+    'flux-2-klein-4b',
+    'nano-banana-2',
+    'seedream-5',
+    'seedream-4.5',
+  ])('should have txt2img and img2img modes for %s', (slug) => {
     const models = data.models as Record<string, Record<string, unknown>>
-    const modes = models['flux-2'].modes as Record<string, Record<string, unknown>>
+    const modes = models[slug].modes as Record<string, Record<string, unknown>>
 
-    expect(modes, 'flux-2 should have modes').toBeDefined()
+    expect(modes, `${slug} should have modes`).toBeDefined()
 
-    // txt2img
     const txt2img = modes.txt2img
-    expect(txt2img, 'flux-2 should have txt2img mode').toBeDefined()
+    expect(txt2img, `${slug} should have txt2img mode`).toBeDefined()
     const txt2imgTips = txt2img.tips as unknown[]
-    expect(Array.isArray(txt2imgTips), 'flux-2 txt2img.tips should be array').toBe(true)
-    expect(txt2imgTips.length, 'flux-2 txt2img.tips count (2-4)').toBeGreaterThanOrEqual(2)
-    expect(txt2imgTips.length, 'flux-2 txt2img.tips count (2-4)').toBeLessThanOrEqual(4)
-    for (const t of txt2imgTips) {
-      expect(typeof t).toBe('string')
-    }
+    expect(Array.isArray(txt2imgTips), `${slug} txt2img.tips should be array`).toBe(true)
+    expect(txt2imgTips.length, `${slug} txt2img.tips count (2-4)`).toBeGreaterThanOrEqual(2)
+    expect(txt2imgTips.length, `${slug} txt2img.tips count (2-4)`).toBeLessThanOrEqual(4)
 
-    // img2img
     const img2img = modes.img2img
-    expect(img2img, 'flux-2 should have img2img mode').toBeDefined()
+    expect(img2img, `${slug} should have img2img mode`).toBeDefined()
     const img2imgTips = img2img.tips as unknown[]
-    expect(Array.isArray(img2imgTips), 'flux-2 img2img.tips should be array').toBe(true)
-    expect(img2imgTips.length, 'flux-2 img2img.tips count (2-4)').toBeGreaterThanOrEqual(2)
-    expect(img2imgTips.length, 'flux-2 img2img.tips count (2-4)').toBeLessThanOrEqual(4)
-    for (const t of img2imgTips) {
-      expect(typeof t).toBe('string')
-    }
-  })
-
-  /**
-   * AC-4: GIVEN der Eintrag `models["seedream"]`
-   *       WHEN das Feld `modes` geprueft wird
-   *       THEN enthaelt es `txt2img` mit `tips` (string[], 2-4 Eintraege)
-   *            UND `img2img` mit `tips` (string[], 2-4 Eintraege)
-   */
-  it('should have txt2img and img2img modes for seedream', () => {
-    const models = data.models as Record<string, Record<string, unknown>>
-    const modes = models['seedream'].modes as Record<string, Record<string, unknown>>
-
-    expect(modes, 'seedream should have modes').toBeDefined()
-
-    // txt2img
-    const txt2img = modes.txt2img
-    expect(txt2img, 'seedream should have txt2img mode').toBeDefined()
-    const txt2imgTips = txt2img.tips as unknown[]
-    expect(Array.isArray(txt2imgTips), 'seedream txt2img.tips should be array').toBe(true)
-    expect(txt2imgTips.length, 'seedream txt2img.tips count (2-4)').toBeGreaterThanOrEqual(2)
-    expect(txt2imgTips.length, 'seedream txt2img.tips count (2-4)').toBeLessThanOrEqual(4)
-    for (const t of txt2imgTips) {
-      expect(typeof t).toBe('string')
-    }
-
-    // img2img
-    const img2img = modes.img2img
-    expect(img2img, 'seedream should have img2img mode').toBeDefined()
-    const img2imgTips = img2img.tips as unknown[]
-    expect(Array.isArray(img2imgTips), 'seedream img2img.tips should be array').toBe(true)
-    expect(img2imgTips.length, 'seedream img2img.tips count (2-4)').toBeGreaterThanOrEqual(2)
-    expect(img2imgTips.length, 'seedream img2img.tips count (2-4)').toBeLessThanOrEqual(4)
-    for (const t of img2imgTips) {
-      expect(typeof t).toBe('string')
-    }
-  })
-
-  /**
-   * AC-5: GIVEN der Eintrag `models["nano-banana"]`
-   *       WHEN das Feld `modes` geprueft wird
-   *       THEN enthaelt es `txt2img` mit `tips` (string[], 2-4 Eintraege)
-   *            UND `img2img` mit `tips` (string[], 2-4 Eintraege)
-   */
-  it('should have txt2img and img2img modes for nano-banana', () => {
-    const models = data.models as Record<string, Record<string, unknown>>
-    const modes = models['nano-banana'].modes as Record<string, Record<string, unknown>>
-
-    expect(modes, 'nano-banana should have modes').toBeDefined()
-
-    // txt2img
-    const txt2img = modes.txt2img
-    expect(txt2img, 'nano-banana should have txt2img mode').toBeDefined()
-    const txt2imgTips = txt2img.tips as unknown[]
-    expect(Array.isArray(txt2imgTips), 'nano-banana txt2img.tips should be array').toBe(true)
-    expect(txt2imgTips.length, 'nano-banana txt2img.tips count (2-4)').toBeGreaterThanOrEqual(2)
-    expect(txt2imgTips.length, 'nano-banana txt2img.tips count (2-4)').toBeLessThanOrEqual(4)
-    for (const t of txt2imgTips) {
-      expect(typeof t).toBe('string')
-    }
-
-    // img2img
-    const img2img = modes.img2img
-    expect(img2img, 'nano-banana should have img2img mode').toBeDefined()
-    const img2imgTips = img2img.tips as unknown[]
-    expect(Array.isArray(img2imgTips), 'nano-banana img2img.tips should be array').toBe(true)
-    expect(img2imgTips.length, 'nano-banana img2img.tips count (2-4)').toBeGreaterThanOrEqual(2)
-    expect(img2imgTips.length, 'nano-banana img2img.tips count (2-4)').toBeLessThanOrEqual(4)
-    for (const t of img2imgTips) {
-      expect(typeof t).toBe('string')
-    }
+    expect(Array.isArray(img2imgTips), `${slug} img2img.tips should be array`).toBe(true)
+    expect(img2imgTips.length, `${slug} img2img.tips count (2-4)`).toBeGreaterThanOrEqual(2)
+    expect(img2imgTips.length, `${slug} img2img.tips count (2-4)`).toBeLessThanOrEqual(4)
   })
 })
 
@@ -296,21 +197,15 @@ describe('prompt-knowledge.json mode coverage', () => {
 // ---------------------------------------------------------------------------
 
 describe('prompt-knowledge.json token budget', () => {
-  /**
-   * AC-6: GIVEN ein beliebiger Modell-Eintrag in `models`
-   *       WHEN der Token-Count der Sektion geschaetzt wird
-   *            (alle Strings konkateniert, Whitespace-tokenisiert)
-   *       THEN liegt der Wert unter 250 Tokens
-   */
   it('should keep each model section under 250 tokens', () => {
     const models = data.models as Record<string, unknown>
 
-    for (const prefix of REQUIRED_PREFIXES) {
-      const entry = models[prefix]
+    for (const slug of REQUIRED_SLUGS) {
+      const entry = models[slug]
       const tokenCount = estimateTokens(entry)
       expect(
         tokenCount,
-        `${prefix} has ${tokenCount} tokens, must be under 250`
+        `${slug} has ${tokenCount} tokens, must be under 250`
       ).toBeLessThan(250)
     }
   })
@@ -321,38 +216,23 @@ describe('prompt-knowledge.json token budget', () => {
 // ---------------------------------------------------------------------------
 
 describe('prompt-knowledge.json factual correctness', () => {
-  /**
-   * AC-9: GIVEN die Eintraege `flux-2` und `flux-schnell`
-   *       WHEN ihre `promptStyle`-Werte verglichen werden
-   *       THEN haben beide den Wert "natural" (Flux-Familie nutzt natuerliche Sprache)
-   */
-  it('should set promptStyle to natural for flux-2 and flux-schnell', () => {
+  it('should set promptStyle to natural for flux-2-pro and flux-schnell', () => {
     const models = data.models as Record<string, Record<string, unknown>>
 
-    expect(models['flux-2'].promptStyle).toBe('natural')
+    expect(models['flux-2-pro'].promptStyle).toBe('natural')
     expect(models['flux-schnell'].promptStyle).toBe('natural')
   })
 
-  /**
-   * AC-10: GIVEN der Eintrag `models["stable-diffusion"]`
-   *        WHEN sein `negativePrompts.supported`-Wert geprueft wird
-   *        THEN ist er `true` (SD unterstuetzt Negative Prompts nativ)
-   */
-  it('should set negativePrompts.supported to true for stable-diffusion', () => {
+  it('should set negativePrompts.supported to true for stable-diffusion-3.5-large', () => {
     const models = data.models as Record<string, Record<string, unknown>>
-    const neg = models['stable-diffusion'].negativePrompts as Record<string, unknown>
+    const neg = models['stable-diffusion-3.5-large'].negativePrompts as Record<string, unknown>
 
     expect(neg.supported).toBe(true)
   })
 
-  /**
-   * AC-11: GIVEN der Eintrag `models["flux-2"]`
-   *        WHEN sein `negativePrompts.supported`-Wert geprueft wird
-   *        THEN ist er `false` (Flux hat keinen separaten Negative-Prompt-Parameter)
-   */
-  it('should set negativePrompts.supported to false for flux-2', () => {
+  it('should set negativePrompts.supported to false for flux-2-pro', () => {
     const models = data.models as Record<string, Record<string, unknown>>
-    const neg = models['flux-2'].negativePrompts as Record<string, unknown>
+    const neg = models['flux-2-pro'].negativePrompts as Record<string, unknown>
 
     expect(neg.supported).toBe(false)
   })

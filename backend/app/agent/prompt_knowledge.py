@@ -103,21 +103,17 @@ def _strip_owner_prefix(model_id: str) -> str:
     return model_id[last_slash + 1 :]
 
 
-def _find_longest_prefix_match(
+def _find_exact_match(
     name: str, models: dict
 ) -> Optional[tuple[str, dict]]:
-    """Find the longest matching prefix from the models dict.
-
-    Prefixes are sorted by length descending so the first match is the longest.
+    """Find an exact match for the model slug in the models dict.
 
     Returns:
-        Tuple of (prefix, model_knowledge) or None if no match.
+        Tuple of (slug, model_knowledge) or None if no match.
     """
-    prefixes = sorted(models.keys(), key=len, reverse=True)
-
-    for prefix in prefixes:
-        if name.startswith(prefix):
-            return (prefix, models[prefix])
+    knowledge = models.get(name)
+    if knowledge is not None:
+        return (name, knowledge)
 
     return None
 
@@ -133,9 +129,9 @@ def get_prompt_knowledge(
     """Look up prompt knowledge for a given model ID and optional generation mode.
 
     1. Strips owner prefix (e.g. "black-forest-labs/flux-2-pro" -> "flux-2-pro")
-    2. Finds the longest matching prefix in prompt-knowledge.json
+    2. Finds an exact match for the slug in prompt-knowledge.json
     3. Optionally filters mode-specific tips (txt2img / img2img)
-    4. Falls back to the generic fallback entry if no prefix matches
+    4. Falls back to the generic fallback entry if no exact match found
 
     Args:
         model_id: The full model identifier (may include owner prefix).
@@ -151,10 +147,10 @@ def get_prompt_knowledge(
     """
     data = _load_knowledge_file()
     name = _strip_owner_prefix(model_id)
-    match = _find_longest_prefix_match(name, data["models"])
+    match = _find_exact_match(name, data["models"])
 
     if match is None:
-        logger.debug("No prefix match for '%s', using fallback", model_id)
+        logger.debug("No exact match for '%s', using fallback", model_id)
         return {
             "kind": "fallback",
             "displayName": data["fallback"]["displayName"],

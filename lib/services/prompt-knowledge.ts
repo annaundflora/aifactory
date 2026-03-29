@@ -103,21 +103,16 @@ function stripOwnerPrefix(modelId: string): string {
 }
 
 /**
- * Finds the longest matching prefix from the knowledge file.
- * Prefixes are sorted by length descending so the first match is the longest.
+ * Finds an exact match for the model slug in the knowledge file.
  */
-function findLongestPrefixMatch(
+function findExactMatch(
   name: string,
   models: Record<string, ModelKnowledge>,
-): { prefix: string; knowledge: ModelKnowledge } | null {
-  const prefixes = Object.keys(models).sort((a, b) => b.length - a.length);
-
-  for (const prefix of prefixes) {
-    if (name.startsWith(prefix)) {
-      return { prefix, knowledge: models[prefix] };
-    }
+): { slug: string; knowledge: ModelKnowledge } | null {
+  const knowledge = models[name];
+  if (knowledge) {
+    return { slug: name, knowledge };
   }
-
   return null;
 }
 
@@ -129,9 +124,9 @@ function findLongestPrefixMatch(
  * Look up prompt knowledge for a given model ID and optional generation mode.
  *
  * 1. Strips owner prefix (e.g. "black-forest-labs/flux-2-pro" -> "flux-2-pro")
- * 2. Finds the longest matching prefix in prompt-knowledge.json
+ * 2. Finds an exact match for the slug in prompt-knowledge.json
  * 3. Optionally filters mode-specific tips (txt2img / img2img)
- * 4. Falls back to the generic fallback entry if no prefix matches
+ * 4. Falls back to the generic fallback entry if no exact match found
  *
  * @param modelId - The full model identifier (may include owner prefix)
  * @param mode - Optional generation mode for mode-specific tips
@@ -143,7 +138,7 @@ export function getPromptKnowledge(
 ): PromptKnowledgeLookupResult {
   const data = loadKnowledgeFile();
   const name = stripOwnerPrefix(modelId);
-  const match = findLongestPrefixMatch(name, data.models);
+  const match = findExactMatch(name, data.models);
 
   if (match === null) {
     return {

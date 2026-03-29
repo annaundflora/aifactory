@@ -1,7 +1,7 @@
 {
   "models": {
-    "flux-2": {
-      "displayName": "Flux 2 Pro/Max",
+    "flux-2-pro": {
+      "displayName": "Flux 2 Pro",
       "promptStyle": "natural",
       "negativePrompts": {
         "supported": false,
@@ -11,6 +11,88 @@
         "Photorealistic rendering with fine detail",
         "Strong prompt adherence for complex scenes",
         "Excellent text rendering in images"
+      ],
+      "tips": [
+        "Use detailed, natural-language scene descriptions rather than keyword lists",
+        "Specify lighting, camera angle, and atmosphere explicitly",
+        "Include art style references when aiming for non-photorealistic output",
+        "Describe spatial relationships between subjects clearly",
+        "Mention material textures and surface qualities for realism"
+      ],
+      "avoid": [
+        "Keyword-style tag lists separated by commas",
+        "Negative prompt syntax or embedded negatives",
+        "Overly short prompts with minimal detail"
+      ],
+      "modes": {
+        "txt2img": {
+          "tips": [
+            "Start with the main subject, then layer in environment and mood",
+            "Specify aspect ratio intent in the description if composition matters",
+            "Use cinematic or photographic framing terms for dynamic compositions"
+          ]
+        },
+        "img2img": {
+          "tips": [
+            "Describe the desired changes relative to the source image",
+            "Focus on what should change rather than re-describing the entire scene",
+            "Mention style transfer goals explicitly if changing artistic direction"
+          ]
+        }
+      }
+    },
+    "flux-2-max": {
+      "displayName": "Flux 2 Max",
+      "promptStyle": "natural",
+      "negativePrompts": {
+        "supported": false,
+        "note": "Flux 2 does not support negative prompts. Use semantic negatives in the main prompt instead, e.g. 'without text' rather than a negative prompt."
+      },
+      "strengths": [
+        "Photorealistic rendering with fine detail",
+        "Strong prompt adherence for complex scenes",
+        "Excellent text rendering in images"
+      ],
+      "tips": [
+        "Use detailed, natural-language scene descriptions rather than keyword lists",
+        "Specify lighting, camera angle, and atmosphere explicitly",
+        "Include art style references when aiming for non-photorealistic output",
+        "Describe spatial relationships between subjects clearly",
+        "Mention material textures and surface qualities for realism"
+      ],
+      "avoid": [
+        "Keyword-style tag lists separated by commas",
+        "Negative prompt syntax or embedded negatives",
+        "Overly short prompts with minimal detail"
+      ],
+      "modes": {
+        "txt2img": {
+          "tips": [
+            "Start with the main subject, then layer in environment and mood",
+            "Specify aspect ratio intent in the description if composition matters",
+            "Use cinematic or photographic framing terms for dynamic compositions"
+          ]
+        },
+        "img2img": {
+          "tips": [
+            "Describe the desired changes relative to the source image",
+            "Focus on what should change rather than re-describing the entire scene",
+            "Mention style transfer goals explicitly if changing artistic direction"
+          ]
+        }
+      }
+    },
+    "flux-2-klein-4b": {
+      "displayName": "Flux 2 Klein 4b",
+      "promptStyle": "natural",
+      "negativePrompts": {
+        "supported": false,
+        "note": "Flux 2 does not support negative prompts. Use semantic negatives in the main prompt instead, e.g. 'without text' rather than a negative prompt."
+      },
+      "strengths": [
+        "Fast generation with good Flux 2 quality",
+        "Natural language understanding from the Flux 2 family",
+        "Solid prompt adherence for straightforward scenes"
       ],
       "tips": [
         "Use detailed, natural-language scene descriptions rather than keyword lists",
@@ -65,7 +147,7 @@
         "Quality tags like '8k masterpiece' which waste token attention"
       ]
     },
-    "nano-banana": {
+    "nano-banana-2": {
       "displayName": "Nano Banana 2",
       "promptStyle": "natural",
       "negativePrompts": {
@@ -106,7 +188,7 @@
         }
       }
     },
-    "gpt-image": {
+    "gpt-image-1.5": {
       "displayName": "GPT Image 1.5",
       "promptStyle": "natural",
       "negativePrompts": {
@@ -131,8 +213,8 @@
         "Keyword-style tag lists instead of natural descriptions"
       ]
     },
-    "seedream": {
-      "displayName": "Seedream 4.5/5",
+    "seedream-5": {
+      "displayName": "Seedream 5",
       "promptStyle": "natural",
       "negativePrompts": {
         "supported": true,
@@ -172,8 +254,49 @@
         }
       }
     },
-    "stable-diffusion": {
-      "displayName": "Stable Diffusion 3.5",
+    "seedream-4.5": {
+      "displayName": "Seedream 4.5",
+      "promptStyle": "natural",
+      "negativePrompts": {
+        "supported": true,
+        "note": "Supports negative prompts. Keep to 15-25 terms maximum; more terms confuse the model."
+      },
+      "strengths": [
+        "Native 4K output resolution",
+        "Excellent text rendering for posters and UI mockups",
+        "Strong character consistency across generations",
+        "Responsive to photography terminology"
+      ],
+      "tips": [
+        "Structure prompts as: subject, action/pose, environment, style, technical details",
+        "Aim for 30-100 words; under 15 is too generic, over 150 causes conflicts",
+        "Use photography terms like lens type and lighting setup for realism",
+        "Describe spatial depth and layering explicitly for complex scenes"
+      ],
+      "avoid": [
+        "Prompts over 150 words which cause element conflicts",
+        "CFG guidance above 10 which leads to oversaturation and artifacts",
+        "Keyword-only prompts without natural sentence structure"
+      ],
+      "modes": {
+        "txt2img": {
+          "tips": [
+            "Start with the main subject and action, then layer setting and mood",
+            "Include text content in quotes if the image should contain readable text",
+            "Keep CFG guidance between 5.5 and 7.5 for best results"
+          ]
+        },
+        "img2img": {
+          "tips": [
+            "Describe modifications relative to the source image clearly",
+            "Focus on style transfer goals or specific element changes",
+            "Use depth descriptions to guide spatial modifications"
+          ]
+        }
+      }
+    },
+    "stable-diffusion-3.5-large": {
+      "displayName": "Stable Diffusion 3.5 Large",
       "promptStyle": "natural",
       "negativePrompts": {
         "supported": true,
@@ -196,7 +319,31 @@
         "Very high CFG values that cause oversaturation"
       ]
     },
-    "recraft": {
+    "stable-diffusion-3.5-medium": {
+      "displayName": "Stable Diffusion 3.5 Medium",
+      "promptStyle": "natural",
+      "negativePrompts": {
+        "supported": true,
+        "note": "Full negative prompt support. Use terms like 'worst quality, low quality, blurry, watermark, bad anatomy' for best results."
+      },
+      "strengths": [
+        "Full negative prompt support for precise exclusion",
+        "Strong artist and art style recognition",
+        "Faster generation than the Large variant"
+      ],
+      "tips": [
+        "Write natural-language descriptions; keyword weighting syntax has no effect on SD 3.5",
+        "Leverage detailed negative prompts to exclude unwanted elements",
+        "Reference specific artists or art movements for reliable style matching",
+        "Keep CFG around 4.4 with moderate guidance for balanced output"
+      ],
+      "avoid": [
+        "Keyword weighting syntax like (term:1.3) which SD 3.5 ignores completely",
+        "BREAK or [[term]] tokens which have no effect on this version",
+        "Very high CFG values that cause oversaturation"
+      ]
+    },
+    "recraft-v4": {
       "displayName": "Recraft V4",
       "promptStyle": "natural",
       "negativePrompts": {
@@ -220,7 +367,7 @@
         "Ignoring the built-in style presets which outperform manual style prompting"
       ]
     },
-    "ideogram": {
+    "ideogram-3": {
       "displayName": "Ideogram 3",
       "promptStyle": "natural",
       "negativePrompts": {
@@ -244,7 +391,7 @@
         "Ignoring the style mode selector which significantly affects output"
       ]
     },
-    "hunyuan": {
+    "hunyuan-image-3": {
       "displayName": "Hunyuan Image 3",
       "promptStyle": "natural",
       "negativePrompts": {
