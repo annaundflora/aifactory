@@ -1,64 +1,49 @@
 import {
-  getAllModelSettings,
-  getModelSettingByModeTier,
-  upsertModelSetting,
-  seedModelSettingsDefaults,
   getModelByReplicateId,
   type ModelSetting,
 } from "@/lib/db/queries";
 
+/**
+ * Legacy ModelSettingsService -- the underlying model_settings table has been
+ * replaced by model_slots (slice-01). Query functions were removed from
+ * queries.ts. This service is kept as a compile-safe stub until later slices
+ * migrate consumers to the new SlotService.
+ */
 export const ModelSettingsService = {
   /**
-   * Returns all model settings. If the table is empty, seeds the defaults first.
+   * @deprecated model_settings table removed. Returns empty array.
    */
   async getAll(): Promise<ModelSetting[]> {
-    const existing = await getAllModelSettings();
-    if (existing.length > 0) {
-      return existing;
-    }
-
-    await seedModelSettingsDefaults();
-    return getAllModelSettings();
+    return [];
   },
 
   /**
-   * Returns the model setting for a given mode+tier combination,
-   * or undefined if no match exists.
+   * @deprecated model_settings table removed. Returns undefined.
    */
   async getForModeTier(
-    mode: string,
-    tier: string
+    _mode: string,
+    _tier: string
   ): Promise<ModelSetting | undefined> {
-    return getModelSettingByModeTier(mode, tier);
+    return undefined;
   },
 
   /**
-   * Updates (upserts) a model setting for the given mode+tier.
-   * Runs a compatibility check before writing to the DB.
-   * Returns the updated ModelSetting on success, or an error object if incompatible.
+   * @deprecated model_settings table removed. Returns error.
    */
   async update(
-    mode: string,
-    tier: string,
-    modelId: string,
-    modelParams?: Record<string, unknown>
+    _mode: string,
+    _tier: string,
+    _modelId: string,
+    _modelParams?: Record<string, unknown>
   ): Promise<ModelSetting | { error: string }> {
-    const compatible = await ModelSettingsService.checkCompatibility(
-      modelId,
-      mode
-    );
-    if (!compatible) {
-      return { error: "Model does not support this mode" };
-    }
-
-    return upsertModelSetting(mode, tier, modelId, modelParams ?? {});
+    return { error: "model_settings table has been removed. Use model_slots." };
   },
 
   /**
-   * Seeds the 8 default model settings rows (idempotent via ON CONFLICT DO NOTHING).
+   * @deprecated model_settings table removed. No-op.
    */
   async seedDefaults(): Promise<void> {
-    return seedModelSettingsDefaults();
+    // no-op: model_settings table no longer exists
   },
 
   /**
@@ -68,7 +53,7 @@ export const ModelSettingsService = {
    * - Fallback: true when model not found in DB (allow selection, don't block)
    */
   async checkCompatibility(modelId: string, mode: string): Promise<boolean> {
-    // txt2img is always compatible — no DB lookup needed
+    // txt2img is always compatible -- no DB lookup needed
     if (mode === "txt2img") {
       return true;
     }
@@ -76,14 +61,14 @@ export const ModelSettingsService = {
     try {
       const model = await getModelByReplicateId(modelId);
 
-      // Fallback: model not in DB → allow selection
+      // Fallback: model not in DB -> allow selection
       if (!model) {
         return true;
       }
 
       const capabilities = model.capabilities as Record<string, boolean> | null;
 
-      // Fallback: no capabilities data → allow selection
+      // Fallback: no capabilities data -> allow selection
       if (!capabilities) {
         return true;
       }
