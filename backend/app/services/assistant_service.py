@@ -378,9 +378,18 @@ class AssistantService:
                 # Extract draft_prompt from state
                 raw_draft = state_values.get("draft_prompt")
                 if raw_draft and isinstance(raw_draft, dict):
-                    draft_prompt = DraftPromptDTO(
-                        prompt=raw_draft.get("prompt", ""),
-                    )
+                    if "prompt" in raw_draft:
+                        # New single-field format
+                        prompt_value = raw_draft["prompt"]
+                    else:
+                        # Old 3-field checkpoint format: combine motiv + style
+                        motiv = raw_draft.get("motiv", "").strip()
+                        style = raw_draft.get("style", "").strip()
+                        if motiv and style:
+                            prompt_value = f"{motiv}. {style}"
+                        else:
+                            prompt_value = motiv or style
+                    draft_prompt = DraftPromptDTO(prompt=prompt_value)
 
                 # Extract recommended_model from state
                 raw_model = state_values.get("recommended_model")
