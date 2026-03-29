@@ -28,12 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { TierToggle } from "@/components/ui/tier-toggle";
 import type { Tier } from "@/lib/types";
-import { Loader2, Sparkles, Minus, Plus, Eraser, ChevronDown } from "lucide-react";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Loader2, Sparkles, Minus, Plus, Eraser } from "lucide-react";
 import { LLMComparison } from "@/components/prompt-improve/llm-comparison";
 import { AssistantTrigger } from "@/components/assistant/assistant-trigger";
 import { SectionLabel } from "@/components/shared/section-label";
@@ -64,16 +59,12 @@ interface PromptAreaProps {
 
 interface Txt2ImgState {
   promptMotiv: string;
-  promptStyle: string;
-  negativePrompt: string;
   variantCount: number;
   imageParams: Record<string, unknown>;
 }
 
 interface Img2ImgState {
   promptMotiv: string;
-  promptStyle: string;
-  negativePrompt: string;
   variantCount: number;
   referenceSlots: ReferenceSlotData[];
   imageParams: Record<string, unknown>;
@@ -106,15 +97,11 @@ function createInitialModeStates(): ModeStates {
   return {
     txt2img: {
       promptMotiv: "",
-      promptStyle: "",
-      negativePrompt: "",
       variantCount: 1,
       imageParams: {},
     },
     img2img: {
       promptMotiv: "",
-      promptStyle: "",
-      negativePrompt: "",
       variantCount: 1,
       referenceSlots: [],
       imageParams: {},
@@ -165,11 +152,7 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
 
   // ----- Structured prompt state -----
   const [promptMotiv, setPromptMotiv] = useState("");
-  const [promptStyle, setPromptStyle] = useState("");
-  const [negativePrompt, setNegativePrompt] = useState("");
   const motivRef = useRef<HTMLTextAreaElement>(null);
-  const styleRef = useRef<HTMLTextAreaElement>(null);
-  const negativeRef = useRef<HTMLTextAreaElement>(null);
 
   // ----- Variant count -----
   const [variantCount, setVariantCount] = useState(1);
@@ -214,10 +197,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
   // ----- LLM comparison -----
   const [showImprove, setShowImprove] = useState(false);
 
-  // ----- Collapsible prompt fields -----
-  const [styleOpen, setStyleOpen] = useState(false);
-  const [negativeOpen, setNegativeOpen] = useState(false);
-
   // ----- Assistant Panel state (lifted to workspace-content) -----
   const assistantOpen = assistantOpenProp ?? false;
 
@@ -227,8 +206,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
 
   const handleClearAll = useCallback(() => {
     setPromptMotiv("");
-    setPromptStyle("");
-    setNegativePrompt("");
     setImageParams({});
     setVariantCount(1);
     setReferenceSlots([]);
@@ -252,16 +229,12 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
       if (currentMode === "txt2img") {
         updated.txt2img = {
           promptMotiv,
-          promptStyle,
-          negativePrompt,
           variantCount,
           imageParams,
         };
       } else if (currentMode === "img2img") {
         updated.img2img = {
           promptMotiv,
-          promptStyle,
-          negativePrompt,
           variantCount,
           referenceSlots,
           imageParams,
@@ -277,8 +250,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
   }, [
     currentMode,
     promptMotiv,
-    promptStyle,
-    negativePrompt,
     variantCount,
     referenceSlots,
     upscaleSourceImageUrl,
@@ -299,16 +270,12 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
       if (currentMode === "txt2img") {
         snapshot.txt2img = {
           promptMotiv,
-          promptStyle,
-          negativePrompt,
           variantCount,
           imageParams,
         };
       } else if (currentMode === "img2img") {
         snapshot.img2img = {
           promptMotiv,
-          promptStyle,
-          negativePrompt,
           variantCount,
           referenceSlots,
           imageParams,
@@ -336,8 +303,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
         } else {
           const s = snapshot.img2img;
           setPromptMotiv(s.promptMotiv);
-          setPromptStyle(s.promptStyle);
-          setNegativePrompt(s.negativePrompt);
           setVariantCount(s.variantCount);
           setReferenceSlots(s.referenceSlots);
           setImageParams(s.imageParams);
@@ -349,8 +314,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
         } else {
           const s = snapshot.txt2img;
           setPromptMotiv(s.promptMotiv);
-          setPromptStyle(s.promptStyle);
-          setNegativePrompt(s.negativePrompt);
           setVariantCount(s.variantCount);
           setImageParams(s.imageParams);
         }
@@ -369,8 +332,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
     [
       currentMode,
       promptMotiv,
-      promptStyle,
-      negativePrompt,
       variantCount,
       referenceSlots,
       upscaleSourceImageUrl,
@@ -401,8 +362,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
       // Override target mode state with incoming data
       if (targetMode === "img2img") {
         setPromptMotiv(variationData.promptMotiv);
-        setPromptStyle(variationData.promptStyle ?? "");
-        setNegativePrompt(variationData.negativePrompt ?? "");
         // If variation provides a sourceImageUrl, add it as a reference slot
         if (variationData.sourceImageUrl) {
           const occupiedPositions = referenceSlots.map((s) => s.slotPosition);
@@ -428,8 +387,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
     } else {
       // Standard variation (no mode change) — set prompt fields
       setPromptMotiv(variationData.promptMotiv);
-      setPromptStyle(variationData.promptStyle ?? "");
-      setNegativePrompt(variationData.negativePrompt ?? "");
     }
 
     clearVariation();
@@ -479,34 +436,10 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
     []
   );
 
-  const handleStyleChange = useCallback(
-    (e: ChangeEvent<HTMLTextAreaElement>) => {
-      setPromptStyle(e.target.value);
-      autoResize(e.target);
-    },
-    []
-  );
-
-  const handleNegativePromptChange = useCallback(
-    (e: ChangeEvent<HTMLTextAreaElement>) => {
-      setNegativePrompt(e.target.value);
-      autoResize(e.target);
-    },
-    []
-  );
-
   // ----- Auto-resize on programmatic value changes -----
   useEffect(() => {
     if (motivRef.current) autoResize(motivRef.current);
   }, [promptMotiv]);
-
-  useEffect(() => {
-    if (styleRef.current) autoResize(styleRef.current);
-  }, [promptStyle]);
-
-  useEffect(() => {
-    if (negativeRef.current) autoResize(negativeRef.current);
-  }, [negativePrompt]);
 
   // ---------------------------------------------------------------------------
   // Image upload handlers
@@ -710,8 +643,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
         const result = await generateImages({
           projectId,
           promptMotiv: promptMotiv.trim(),
-          promptStyle: promptStyle.trim() || undefined,
-          negativePrompt: negativePrompt.trim() || undefined,
           modelIds: [resolved.modelId],
           params: { ...resolved.modelParams, ...imageParams },
           count: variantCount,
@@ -746,8 +677,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
         const result = await generateImages({
           projectId,
           promptMotiv: promptMotiv.trim(),
-          promptStyle: promptStyle.trim() || undefined,
-          negativePrompt: negativePrompt.trim() || undefined,
           modelIds: [resolved.modelId],
           params: { ...resolved.modelParams, ...imageParams },
           count: variantCount,
@@ -782,8 +711,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
   }, [
     currentMode,
     promptMotiv,
-    promptStyle,
-    negativePrompt,
     variantCount,
     referenceSlots,
     upscaleSourceImageUrl,
@@ -846,12 +773,8 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
         onTabChange={setActiveTab}
         onLoadHistoryEntry={(entry) => {
           setPromptMotiv(entry.promptMotiv);
-          setPromptStyle(entry.promptStyle ?? "");
-          setNegativePrompt(entry.negativePrompt ?? "");
         }}
         promptMotiv={promptMotiv}
-        promptStyle={promptStyle}
-        negativePrompt={negativePrompt}
       >
         <div className="space-y-5 pt-3">
           {/* ── Group: ReferenceBar (img2img) — hidden, not unmounted, in other modes ── */}
@@ -892,7 +815,7 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
               {/* Motiv Textarea (required) */}
               <div className="space-y-2">
                 <Label htmlFor="prompt-motiv-textarea" className="text-sm font-bold font-display [letter-spacing:-0.5px]">
-                  Motiv <span aria-hidden="true" className="text-destructive">*</span>
+                  Prompt <span aria-hidden="true" className="text-destructive">*</span>
                 </Label>
                 <textarea
                   id="prompt-motiv-textarea"
@@ -901,77 +824,11 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
                   value={promptMotiv}
                   onChange={handleMotivChange}
                   onKeyDown={handleMotivKeyDown}
-                  placeholder="Describe the main subject of your image..."
+                  placeholder="Describe your image, including style and mood..."
                   rows={5}
                   className={textareaClass}
                 />
               </div>
-
-              {/* Style / Modifier — collapsible */}
-              <Collapsible open={styleOpen} onOpenChange={setStyleOpen}>
-                <CollapsibleTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
-                    data-testid="prompt-style-toggle"
-                  >
-                    <span className="flex items-center gap-2">
-                      Style / Modifier
-                      {!!promptStyle.trim() && (
-                        <span className="size-1.5 rounded-full bg-emerald-500" aria-label="has content" />
-                      )}
-                    </span>
-                    <ChevronDown
-                      className={`size-4 transition-transform ${styleOpen ? "rotate-180" : ""}`}
-                    />
-                  </button>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <textarea
-                    id="prompt-style-textarea"
-                    data-testid="prompt-style-textarea"
-                    ref={styleRef}
-                    value={promptStyle}
-                    onChange={handleStyleChange}
-                    placeholder="Add style, mood, or modifier keywords..."
-                    rows={2}
-                    className={`${textareaClass} mt-2`}
-                  />
-                </CollapsibleContent>
-              </Collapsible>
-
-              {/* Negative Prompt — collapsible */}
-              <Collapsible open={negativeOpen} onOpenChange={setNegativeOpen}>
-                <CollapsibleTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
-                    data-testid="prompt-negative-toggle"
-                  >
-                    <span className="flex items-center gap-2">
-                      Negative Prompt
-                      {!!negativePrompt.trim() && (
-                        <span className="size-1.5 rounded-full bg-emerald-500" aria-label="has content" />
-                      )}
-                    </span>
-                    <ChevronDown
-                      className={`size-4 transition-transform ${negativeOpen ? "rotate-180" : ""}`}
-                    />
-                  </button>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <textarea
-                    id="negative-prompt-textarea"
-                    data-testid="negative-prompt-textarea"
-                    ref={negativeRef}
-                    value={negativePrompt}
-                    onChange={handleNegativePromptChange}
-                    placeholder="What to avoid in the image..."
-                    rows={2}
-                    className={`${textareaClass} mt-2`}
-                  />
-                </CollapsibleContent>
-              </Collapsible>
 
               {/* Prompt Tools */}
               <div className="flex gap-2">
