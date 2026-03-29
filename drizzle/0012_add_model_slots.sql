@@ -11,8 +11,8 @@ CREATE TABLE IF NOT EXISTS "model_slots" (
 	"model_id" varchar(255),
 	"model_params" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"active" boolean DEFAULT false NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now(),
-	"updated_at" timestamp with time zone DEFAULT now(),
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "model_slots_slot_check" CHECK ("slot" IN (1, 2, 3))
 );--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "model_slots_mode_slot_idx" ON "model_slots" USING btree ("mode","slot");--> statement-breakpoint

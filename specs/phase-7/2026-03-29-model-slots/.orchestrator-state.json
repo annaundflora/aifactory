@@ -2,7 +2,7 @@
   "spec_path": "/home/dev/aifactory/.claude/worktrees/model-slots/specs/phase-7/2026-03-29-model-slots",
   "feature_name": "model-slots",
   "status": "in_progress",
-  "current_state": "implementing",
+  "current_state": "code_review",
   "current_slice_id": "slice-01",
   "retry_count": 0,
   "failed_stage": null,
