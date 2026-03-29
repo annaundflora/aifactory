@@ -10,7 +10,9 @@ REQUIREMENTS = BACKEND_DIR / "requirements.txt"
 
 def get_python():
     """Return the venv Python executable path."""
-    return VENV_DIR / "Scripts" / "python.exe"
+    if sys.platform == "win32":
+        return VENV_DIR / "Scripts" / "python.exe"
+    return VENV_DIR / "bin" / "python"
 
 def ensure_venv():
     """Create venv if it doesn't exist."""
