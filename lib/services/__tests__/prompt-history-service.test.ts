@@ -21,8 +21,6 @@ import { promptHistoryService, type PromptHistoryEntry } from '@/lib/services/pr
 function makeRow(overrides: Partial<{
   id: string
   promptMotiv: string
-  promptStyle: string | null
-  negativePrompt: string | null
   modelId: string
   modelParams: unknown
   isFavorite: boolean
@@ -31,8 +29,6 @@ function makeRow(overrides: Partial<{
   return {
     id: overrides.id ?? crypto.randomUUID(),
     promptMotiv: overrides.promptMotiv ?? 'a cat',
-    promptStyle: overrides.promptStyle ?? 'watercolor',
-    negativePrompt: overrides.negativePrompt ?? null,
     modelId: overrides.modelId ?? 'model-1',
     modelParams: overrides.modelParams ?? {},
     isFavorite: overrides.isFavorite ?? false,
@@ -64,9 +60,9 @@ describe('PromptHistoryService', () => {
       const t3 = new Date(now.getTime() - 2000)
 
       const distinctRows = [
-        makeRow({ id: 'id-1', promptMotiv: 'cat', promptStyle: 'oil', createdAt: t1 }),
-        makeRow({ id: 'id-2', promptMotiv: 'dog', promptStyle: 'photo', createdAt: t2 }),
-        makeRow({ id: 'id-3', promptMotiv: 'bird', promptStyle: 'sketch', createdAt: t3 }),
+        makeRow({ id: 'id-1', promptMotiv: 'cat', createdAt: t1 }),
+        makeRow({ id: 'id-2', promptMotiv: 'dog', createdAt: t2 }),
+        makeRow({ id: 'id-3', promptMotiv: 'bird', createdAt: t3 }),
       ]
 
       mockGetPromptHistoryQuery.mockResolvedValueOnce(distinctRows)
@@ -132,8 +128,6 @@ describe('PromptHistoryService', () => {
       const row = makeRow({
         id: 'gen-uuid-1',
         promptMotiv: 'a sunset',
-        promptStyle: 'impressionist',
-        negativePrompt: 'blurry',
         modelId: 'model-x',
         modelParams: { steps: 30 },
         isFavorite: true,
@@ -154,12 +148,9 @@ describe('PromptHistoryService', () => {
       expect(entry).toHaveProperty('promptMotiv')
       expect(typeof entry.promptMotiv).toBe('string')
 
-      expect(entry).toHaveProperty('promptStyle')
-      expect(typeof entry.promptStyle).toBe('string')
-
-      expect(entry).toHaveProperty('negativePrompt')
-      // negativePrompt is string | null
-      expect(typeof entry.negativePrompt === 'string' || entry.negativePrompt === null).toBe(true)
+      // promptStyle and negativePrompt have been removed (Phase 7 prompt simplification)
+      expect(entry).not.toHaveProperty('promptStyle')
+      expect(entry).not.toHaveProperty('negativePrompt')
 
       expect(entry).toHaveProperty('modelId')
       expect(typeof entry.modelId).toBe('string')
@@ -176,8 +167,6 @@ describe('PromptHistoryService', () => {
       // Verify correct mapping from row to entry
       expect(entry.generationId).toBe('gen-uuid-1')
       expect(entry.promptMotiv).toBe('a sunset')
-      expect(entry.promptStyle).toBe('impressionist')
-      expect(entry.negativePrompt).toBe('blurry')
       expect(entry.modelId).toBe('model-x')
       expect(entry.modelParams).toEqual({ steps: 30 })
       expect(entry.isFavorite).toBe(true)
