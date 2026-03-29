@@ -20,3 +20,6 @@
 {"ts":"2026-03-29T21:25:00Z","slice":"slice-09","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":2}
 {"ts":"2026-03-29T21:27:00Z","slice":"slice-09","gate":"lint","result":"PASSED","attempt":1,"note":"py_compile passed, TS errors only in later-slice files (assistant-context.tsx = slice-10)"}
 {"ts":"2026-03-29T21:35:00Z","slice":"slice-09","gate":"tests","result":"PASSED","retries":1}
+{"ts":"2026-03-29T21:50:00Z","slice":"slice-05","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-29T21:51:00Z","slice":"slice-05","gate":"lint","result":"PASSED","attempt":1,"note":"TS errors only in later-slice files: canvas (slice-07), assistant-context (slice-10)"}
+{"ts":"2026-03-29T22:00:00Z","slice":"slice-05","gate":"tests","result":"PASSED","retries":1}

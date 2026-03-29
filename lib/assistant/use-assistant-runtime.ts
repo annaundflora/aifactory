@@ -183,23 +183,19 @@ export function useAssistantRuntime({
 
             // Dispatch specific actions based on tool type
             if (result.tool === "draft_prompt") {
-              const rawData = result.data as { motiv: string; style: string; negative_prompt: string };
+              const rawData = result.data as { prompt: string };
               dispatch({
                 type: "SET_DRAFT_PROMPT",
                 draftPrompt: {
-                  motiv: rawData.motiv,
-                  style: rawData.style,
-                  negativePrompt: rawData.negative_prompt,
+                  prompt: rawData.prompt,
                 },
               });
             } else if (result.tool === "refine_prompt") {
-              const rawData = result.data as { motiv: string; style: string; negative_prompt: string };
+              const rawData = result.data as { prompt: string };
               dispatch({
                 type: "REFINE_DRAFT",
                 draftPrompt: {
-                  motiv: rawData.motiv,
-                  style: rawData.style,
-                  negativePrompt: rawData.negative_prompt,
+                  prompt: rawData.prompt,
                 },
               });
             }
