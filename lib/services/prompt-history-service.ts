@@ -7,8 +7,6 @@ import {
 export interface PromptHistoryEntry {
   generationId: string;
   promptMotiv: string;
-  promptStyle: string;
-  negativePrompt: string | null;
   modelId: string;
   modelParams: Record<string, unknown>;
   isFavorite: boolean;
@@ -24,8 +22,6 @@ async function getHistory(
   return rows.map((row) => ({
     generationId: row.id,
     promptMotiv: row.promptMotiv,
-    promptStyle: row.promptStyle ?? "",
-    negativePrompt: row.negativePrompt,
     modelId: row.modelId,
     modelParams: (row.modelParams as Record<string, unknown>) ?? {},
     isFavorite: row.isFavorite,
@@ -42,8 +38,6 @@ async function getFavorites(
   return rows.map((row) => ({
     generationId: row.id,
     promptMotiv: row.promptMotiv,
-    promptStyle: row.promptStyle ?? "",
-    negativePrompt: row.negativePrompt,
     modelId: row.modelId,
     modelParams: (row.modelParams as Record<string, unknown>) ?? {},
     isFavorite: row.isFavorite,

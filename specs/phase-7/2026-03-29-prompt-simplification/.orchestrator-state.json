@@ -1,0 +1,25 @@
+{
+  "spec_path": "/home/dev/aifactory/.claude/worktrees/discovery+prompt-simplification/specs/phase-7/2026-03-29-prompt-simplification",
+  "feature_name": "prompt-simplification",
+  "status": "in_progress",
+  "current_state": "implementing",
+  "current_slice_id": "slice-02",
+  "retry_count": 0,
+  "failed_stage": null,
+  "waves": [
+    {"wave": 1, "slices": ["slice-01"]},
+    {"wave": 2, "slices": ["slice-02"]},
+    {"wave": 3, "slices": ["slice-03", "slice-04", "slice-08"]},
+    {"wave": 4, "slices": ["slice-06", "slice-09"]},
+    {"wave": 5, "slices": ["slice-05", "slice-10"]},
+    {"wave": 6, "slices": ["slice-07"]},
+    {"wave": 7, "slices": ["slice-11"]}
+  ],
+  "completed_slices": ["slice-01"],
+  "evidence_files": ["evidence/slice-01.json"],
+  "worktree_path": "/home/dev/aifactory/.claude/worktrees/discovery+prompt-simplification",
+  "branch": "worktree-discovery+prompt-simplification",
+  "github_available": true,
+  "repo": "annaundflora/aifactory",
+  "pr_number": 21
+}
