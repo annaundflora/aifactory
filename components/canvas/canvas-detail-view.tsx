@@ -143,6 +143,41 @@ export function CanvasDetailView({
   );
 
   // ---------------------------------------------------------------------------
+  // Swipe navigation: detect horizontal swipe on canvas area
+  // ---------------------------------------------------------------------------
+
+  const touchStartXRef = useRef<number | null>(null);
+
+  const currentIndex = useMemo(
+    () => localGenerations.findIndex((g) => g.id === state.currentGenerationId),
+    [localGenerations, state.currentGenerationId]
+  );
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartXRef.current = e.touches[0].clientX;
+  }, []);
+
+  const handleTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      if (touchStartXRef.current === null) return;
+      const delta = e.changedTouches[0].clientX - touchStartXRef.current;
+      touchStartXRef.current = null;
+
+      const SWIPE_THRESHOLD = 50;
+      if (Math.abs(delta) < SWIPE_THRESHOLD) return;
+
+      if (delta > 0 && currentIndex > 0) {
+        // Swipe right → prev (newer)
+        handleNavigate(localGenerations[currentIndex - 1].id);
+      } else if (delta < 0 && currentIndex >= 0 && currentIndex < localGenerations.length - 1) {
+        // Swipe left → next (older)
+        handleNavigate(localGenerations[currentIndex + 1].id);
+      }
+    },
+    [currentIndex, localGenerations, handleNavigate]
+  );
+
+  // ---------------------------------------------------------------------------
   // Delete handler
   // ---------------------------------------------------------------------------
 
@@ -533,6 +568,8 @@ export function CanvasDetailView({
         <main
           className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-muted/40"
           data-testid="canvas-area"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
         >
           {/* Popovers anchored to left edge of canvas (next to toolbar) */}
           <VariationPopover

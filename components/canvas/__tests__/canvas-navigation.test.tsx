@@ -171,11 +171,11 @@ describe("CanvasNavigation", () => {
   });
 
   /**
-   * AC-11: GIVEN der User navigiert via Prev/Next zu einem neuen Bild
-   *        WHEN der Bildwechsel stattfindet
-   *        THEN werden keine Pfeiltasten-Shortcuts verwendet — nur Maus-Klick auf die Buttons navigiert
+   * AC-11: GIVEN die Detail-View zeigt ein Bild in der Mitte der Gallery
+   *        WHEN der User ArrowLeft/ArrowRight drueckt
+   *        THEN navigiert ArrowLeft zum vorherigen (neueren) und ArrowRight zum naechsten (aelteren) Bild
    */
-  it("AC-11: should not respond to arrow key presses for navigation", () => {
+  it("AC-11: should navigate via arrow key presses", () => {
     const generations = makeTwentyGenerations();
 
     // Viewing gen-10 (middle of gallery, both prev/next visible)
@@ -187,17 +187,45 @@ describe("CanvasNavigation", () => {
       />
     );
 
-    // Both buttons should be visible for this middle position
-    expect(screen.getByTestId("canvas-nav-prev")).toBeInTheDocument();
-    expect(screen.getByTestId("canvas-nav-next")).toBeInTheDocument();
+    // ArrowLeft → prev (newer image: gen-9)
+    fireEvent.keyDown(document, { key: "ArrowLeft" });
+    expect(onNavigate).toHaveBeenCalledTimes(1);
+    expect(onNavigate).toHaveBeenCalledWith("gen-9");
 
-    // Fire arrow key events on document — should NOT trigger navigation
+    onNavigate.mockClear();
+
+    // ArrowRight → next (older image: gen-11)
+    fireEvent.keyDown(document, { key: "ArrowRight" });
+    expect(onNavigate).toHaveBeenCalledTimes(1);
+    expect(onNavigate).toHaveBeenCalledWith("gen-11");
+  });
+
+  /**
+   * AC-11b: GIVEN ein Input-Feld hat Focus
+   *         WHEN der User ArrowLeft/ArrowRight drueckt
+   *         THEN wird NICHT navigiert (Pfeiltasten bewegen den Cursor im Input)
+   */
+  it("AC-11b: should not navigate via arrow keys when an input has focus", () => {
+    const generations = makeTwentyGenerations();
+
+    const { container } = render(
+      <div>
+        <input data-testid="text-input" />
+        <CanvasNavigation
+          allGenerations={generations}
+          currentGenerationId="gen-10"
+          onNavigate={onNavigate}
+        />
+      </div>
+    );
+
+    // Focus the input
+    const input = screen.getByTestId("text-input");
+    input.focus();
+
     fireEvent.keyDown(document, { key: "ArrowLeft" });
     fireEvent.keyDown(document, { key: "ArrowRight" });
-    fireEvent.keyDown(document, { key: "ArrowUp" });
-    fireEvent.keyDown(document, { key: "ArrowDown" });
 
-    // onNavigate should NOT have been called by keyboard events
     expect(onNavigate).not.toHaveBeenCalled();
   });
 

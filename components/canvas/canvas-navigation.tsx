@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { type Generation } from "@/lib/db/queries";
 
@@ -22,7 +22,7 @@ export interface CanvasNavigationProps {
  * Prev/Next navigation buttons for browsing through all gallery images.
  * allGenerations is sorted newest-first (same as gallery order).
  * Buttons are hidden at boundaries (no wrapping/cycling).
- * No keyboard shortcuts -- only mouse clicks (per business rules).
+ * Arrow keys (Left/Right) navigate when no text input has focus.
  */
 export function CanvasNavigation({
   allGenerations,
@@ -46,6 +46,30 @@ export function CanvasNavigation({
     if (!hasNext) return;
     onNavigate(allGenerations[currentIndex + 1].id);
   }, [hasNext, allGenerations, currentIndex, onNavigate]);
+
+  // Arrow key navigation: Left → prev (newer), Right → next (older)
+  // Suppressed when input/textarea/contentEditable has focus.
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+
+      const activeEl = document.activeElement;
+      if (
+        activeEl instanceof HTMLInputElement ||
+        activeEl instanceof HTMLTextAreaElement ||
+        (activeEl instanceof HTMLElement && activeEl.isContentEditable)
+      ) {
+        return;
+      }
+
+      e.preventDefault();
+      if (e.key === "ArrowLeft") goPrev();
+      else goNext();
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [goPrev, goNext]);
 
   // Hide both buttons when there's only one image or index not found
   if (allGenerations.length <= 1 || currentIndex < 0) {
