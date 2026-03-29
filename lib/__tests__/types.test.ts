@@ -1,39 +1,103 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
-import type { Tier, GenerationMode, UpdateModelSettingInput } from "@/lib/types";
-import { VALID_TIERS, VALID_GENERATION_MODES } from "@/lib/types";
+import { readFileSync } from "fs";
+import { resolve } from "path";
 
-describe("Type definitions", () => {
+/**
+ * Tests for slice-03-types-resolve-model: lib/types.ts
+ *
+ * Verifies that the Tier-based types have been replaced by Slot-based types,
+ * while GenerationMode remains unchanged.
+ *
+ * Mocking Strategy: no_mocks (Pure Types, no I/O)
+ */
+
+// ---------------------------------------------------------------------------
+// Import the CURRENT exports (post-refactor)
+// ---------------------------------------------------------------------------
+import type { SlotNumber, GenerationMode } from "@/lib/types";
+import { VALID_SLOTS, VALID_GENERATION_MODES } from "@/lib/types";
+
+// We also import the module as a namespace to check what exists at runtime
+import * as typesModule from "@/lib/types";
+
+describe("lib/types.ts — Slice 03 Acceptance Tests", () => {
   // ---------------------------------------------------------------------------
-  // Tier type (unchanged from prior slices)
+  // AC-1: GIVEN lib/types.ts wird importiert
+  //       WHEN die Exports geprueft werden
+  //       THEN existiert ein Type SlotNumber = 1 | 2 | 3
+  //       AND existiert eine Konstante VALID_SLOTS mit Wert [1, 2, 3] as const
+  //       AND der Type Tier existiert NICHT mehr
+  //       AND die Konstante VALID_TIERS existiert NICHT mehr
+  //       AND der UpdateModelSettingInput DTO existiert NICHT mehr
   // ---------------------------------------------------------------------------
 
-  it("should accept draft, quality, max as valid Tier values", () => {
-    expect(VALID_TIERS).toEqual(["draft", "quality", "max"]);
-    expect(VALID_TIERS).toHaveLength(3);
+  it("AC-1: should export SlotNumber type and VALID_SLOTS constant [1, 2, 3]", () => {
+    // SlotNumber type-level check: must be exactly 1 | 2 | 3
+    expectTypeOf<SlotNumber>().toEqualTypeOf<1 | 2 | 3>();
 
-    const draft: Tier = "draft";
-    const quality: Tier = "quality";
-    const max: Tier = "max";
-    expect(draft).toBe("draft");
-    expect(quality).toBe("quality");
-    expect(max).toBe("max");
+    // Runtime: VALID_SLOTS is [1, 2, 3]
+    expect(VALID_SLOTS).toEqual([1, 2, 3]);
+    expect(VALID_SLOTS).toHaveLength(3);
+    expect(VALID_SLOTS[0]).toBe(1);
+    expect(VALID_SLOTS[1]).toBe(2);
+    expect(VALID_SLOTS[2]).toBe(3);
 
-    expectTypeOf<Tier>().toEqualTypeOf<"draft" | "quality" | "max">();
+    // Verify VALID_SLOTS is an array with exactly these values
+    expect(Array.isArray(VALID_SLOTS)).toBe(true);
+  });
+
+  it("AC-1: should NOT export Tier type or VALID_TIERS constant", () => {
+    // Runtime check: VALID_TIERS must not exist as an export
+    const moduleExports = typesModule as Record<string, unknown>;
+    expect(moduleExports).not.toHaveProperty("VALID_TIERS");
+
+    // Source-level check: Tier type must not be defined
+    const source = readFileSync(
+      resolve(__dirname, "../types.ts"),
+      "utf-8",
+    );
+    expect(source).not.toMatch(/export\s+type\s+Tier\b/);
+    expect(source).not.toMatch(/export\s+(?:const|let|var)\s+VALID_TIERS\b/);
+  });
+
+  it("AC-1: should NOT export UpdateModelSettingInput", () => {
+    // Runtime check
+    const moduleExports = typesModule as Record<string, unknown>;
+    expect(moduleExports).not.toHaveProperty("UpdateModelSettingInput");
+
+    // Source-level check: UpdateModelSettingInput type/interface must not be defined
+    const source = readFileSync(
+      resolve(__dirname, "../types.ts"),
+      "utf-8",
+    );
+    expect(source).not.toMatch(
+      /export\s+(?:type|interface)\s+UpdateModelSettingInput\b/,
+    );
   });
 
   // ---------------------------------------------------------------------------
-  // AC-1: GIVEN lib/types.ts
-  //       WHEN der Type GenerationMode geprueft wird
-  //       THEN akzeptiert er exakt die 5 Werte
-  //            "txt2img" | "img2img" | "upscale" | "inpaint" | "outpaint"
+  // AC-2: GIVEN lib/types.ts enthaelt weiterhin
+  //       WHEN GenerationMode und VALID_GENERATION_MODES geprueft werden
+  //       THEN sind beide unveraendert vorhanden
   // ---------------------------------------------------------------------------
-  it("AC-1: should accept all 5 generation modes including inpaint and outpaint", () => {
+
+  it("AC-2: should still export GenerationMode and VALID_GENERATION_MODES unchanged", () => {
     // Type-level: GenerationMode is exactly the 5-member union
     expectTypeOf<GenerationMode>().toEqualTypeOf<
       "txt2img" | "img2img" | "upscale" | "inpaint" | "outpaint"
     >();
 
-    // Runtime: all 5 values are assignable
+    // Runtime: VALID_GENERATION_MODES has all 5 entries in order
+    expect(VALID_GENERATION_MODES).toEqual([
+      "txt2img",
+      "img2img",
+      "upscale",
+      "inpaint",
+      "outpaint",
+    ]);
+    expect(VALID_GENERATION_MODES).toHaveLength(5);
+
+    // Verify each value
     const txt2img: GenerationMode = "txt2img";
     const img2img: GenerationMode = "img2img";
     const upscale: GenerationMode = "upscale";
@@ -45,54 +109,5 @@ describe("Type definitions", () => {
     expect(upscale).toBe("upscale");
     expect(inpaint).toBe("inpaint");
     expect(outpaint).toBe("outpaint");
-  });
-
-  // ---------------------------------------------------------------------------
-  // AC-2: GIVEN lib/types.ts
-  //       WHEN das Array VALID_GENERATION_MODES geprueft wird
-  //       THEN enthaelt es exakt
-  //            ["txt2img", "img2img", "upscale", "inpaint", "outpaint"]
-  //            (5 Eintraege, Reihenfolge beibehalten)
-  // ---------------------------------------------------------------------------
-  it("AC-2: should export VALID_GENERATION_MODES with exactly 5 entries in order", () => {
-    expect(VALID_GENERATION_MODES).toEqual([
-      "txt2img",
-      "img2img",
-      "upscale",
-      "inpaint",
-      "outpaint",
-    ]);
-    expect(VALID_GENERATION_MODES).toHaveLength(5);
-
-    // Verify each element by index for strict ordering
-    expect(VALID_GENERATION_MODES[0]).toBe("txt2img");
-    expect(VALID_GENERATION_MODES[1]).toBe("img2img");
-    expect(VALID_GENERATION_MODES[2]).toBe("upscale");
-    expect(VALID_GENERATION_MODES[3]).toBe("inpaint");
-    expect(VALID_GENERATION_MODES[4]).toBe("outpaint");
-  });
-
-  // ---------------------------------------------------------------------------
-  // UpdateModelSettingInput DTO (unchanged from prior slices)
-  // ---------------------------------------------------------------------------
-  it("should have mode, tier, and modelId fields with correct types", () => {
-    expectTypeOf<UpdateModelSettingInput>().toHaveProperty("mode");
-    expectTypeOf<UpdateModelSettingInput>().toHaveProperty("tier");
-    expectTypeOf<UpdateModelSettingInput>().toHaveProperty("modelId");
-
-    expectTypeOf<UpdateModelSettingInput["mode"]>().toEqualTypeOf<GenerationMode>();
-    expectTypeOf<UpdateModelSettingInput["tier"]>().toEqualTypeOf<Tier>();
-    expectTypeOf<UpdateModelSettingInput["modelId"]>().toEqualTypeOf<string>();
-
-    const input: UpdateModelSettingInput = {
-      mode: "inpaint",
-      tier: "quality",
-      modelId: "owner/model-name",
-    };
-    expect(input).toEqual({
-      mode: "inpaint",
-      tier: "quality",
-      modelId: "owner/model-name",
-    });
   });
 });
