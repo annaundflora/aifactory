@@ -28,6 +28,8 @@ export interface ModelSlotsProps {
   models: Model[];
   variant?: "stacked" | "compact";
   disabled?: boolean;
+  /** Hide per-slot ParameterPanels even in stacked variant (default: true) */
+  showParameters?: boolean;
   onSlotsChanged?: () => void;
   className?: string;
 }
@@ -74,6 +76,7 @@ interface SlotRowProps {
   isLastActive: boolean;
   disabled: boolean;
   variant: "stacked" | "compact";
+  showParameters: boolean;
   onSlotUpdate: (slot: ModelSlot) => void;
   onError: (slot: ModelSlot) => void;
 }
@@ -87,6 +90,7 @@ function SlotRow({
   isLastActive,
   disabled,
   variant,
+  showParameters,
   onSlotUpdate,
   onError,
 }: SlotRowProps) {
@@ -102,8 +106,8 @@ function SlotRow({
   const checkboxDisabled =
     disabled || !hasModel || (isActive && isLastActive) || isPending;
 
-  // Schema for parameter panel (only in stacked variant for active slots with a model)
-  const showParams = variant === "stacked" && isActive && hasModel;
+  // Schema for parameter panel (only when showParameters is true, in stacked variant, for active slots with a model)
+  const showParams = showParameters && variant === "stacked" && isActive && hasModel;
   const schemaResult = useModelSchema(
     showParams ? (slot.modelId ?? undefined) : undefined,
   );
@@ -191,7 +195,7 @@ function SlotRow({
   if (variant === "compact") {
     return (
       <div
-        className="flex items-center gap-1.5"
+        className="flex items-center gap-1.5 min-w-0"
         data-testid={`slot-row-${slotNumber}`}
       >
         <CheckboxPrimitive.Root
@@ -219,15 +223,15 @@ function SlotRow({
         >
           <SelectTrigger
             size="sm"
-            className="h-7 min-w-0 max-w-[140px] text-xs"
+            className="h-7 min-w-0 max-w-[140px] text-xs *:data-[slot=select-value]:block *:data-[slot=select-value]:truncate *:data-[slot=select-value]:max-w-[100px]"
             data-testid={`slot-select-${slotNumber}`}
           >
-            <SelectValue placeholder="select model" />
+            <SelectValue placeholder="--" />
           </SelectTrigger>
           <SelectContent>
             {compatibleModels.map((model) => (
               <SelectItem key={model.replicateId} value={model.replicateId}>
-                {abbreviateModelName(model.replicateId)}
+                {model.name}
               </SelectItem>
             ))}
           </SelectContent>
@@ -313,6 +317,7 @@ export function ModelSlots({
   models,
   variant = "stacked",
   disabled = false,
+  showParameters = true,
   onSlotsChanged,
   className,
 }: ModelSlotsProps) {
@@ -405,6 +410,7 @@ export function ModelSlots({
           isLastActive={slot.active && activeCount <= 1}
           disabled={disabled}
           variant={variant}
+          showParameters={showParameters}
           onSlotUpdate={handleSlotUpdate}
           onError={handleSlotError}
         />
