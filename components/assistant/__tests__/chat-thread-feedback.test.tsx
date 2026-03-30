@@ -41,48 +41,36 @@ describe("ChatThread - Improve Prompt Chip", () => {
   it("AC-8: should include current workspace fields when improve-prompt chip is clicked with non-empty fields", () => {
     const variationData = {
       promptMotiv: "A cat on a windowsill",
-      promptStyle: "watercolor",
-      negativePrompt: "blurry",
     };
 
     const result = getWorkspaceFieldsForChip(variationData);
 
-    // Should return a formatted context string
+    // Should return a formatted context string with promptMotiv only (promptStyle/negativePrompt removed)
     expect(result).not.toBeNull();
     expect(result).toContain("[Aktueller Prompt:");
-    expect(result).toContain("motiv=A cat on a windowsill");
-    expect(result).toContain("style=watercolor");
-    expect(result).toContain("negative=blurry");
+    expect(result).toContain("promptMotiv=A cat on a windowsill");
   });
 
   it("AC-8: should include only non-empty fields in the context string", () => {
     const variationData = {
       promptMotiv: "A sunset",
-      promptStyle: "",
-      negativePrompt: "",
     };
 
     const result = getWorkspaceFieldsForChip(variationData);
 
     expect(result).not.toBeNull();
-    expect(result).toContain("motiv=A sunset");
-    // Empty fields should not appear
-    expect(result).not.toContain("style=");
-    expect(result).not.toContain("negative=");
+    expect(result).toContain("promptMotiv=A sunset");
   });
 
-  it("AC-8: should handle variationData with only style set", () => {
+  it("AC-8: should return null when promptMotiv is empty", () => {
     const variationData = {
       promptMotiv: "",
-      promptStyle: "photorealistic",
-      negativePrompt: "",
     };
 
     const result = getWorkspaceFieldsForChip(variationData);
 
-    expect(result).not.toBeNull();
-    expect(result).toContain("style=photorealistic");
-    expect(result).not.toContain("motiv=");
+    // With simplified schema, empty promptMotiv means no workspace context
+    expect(result).toBeNull();
   });
 
   // ---------------------------------------------------------------------------
@@ -92,11 +80,9 @@ describe("ChatThread - Improve Prompt Chip", () => {
   //       THEN wird der Chip-Text trotzdem als Nachricht gesendet -- der Agent
   //            erkennt die leeren Felder und leitet in die Verstehen-Phase ueber
   // ---------------------------------------------------------------------------
-  it("AC-9: should send chip text without workspace fields when all prompt fields are empty", () => {
+  it("AC-9: should send chip text without workspace fields when promptMotiv is empty", () => {
     const variationData = {
       promptMotiv: "",
-      promptStyle: "",
-      negativePrompt: "",
     };
 
     const result = getWorkspaceFieldsForChip(variationData);

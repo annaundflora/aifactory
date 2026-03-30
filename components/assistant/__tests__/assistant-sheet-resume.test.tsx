@@ -316,8 +316,6 @@ describe("AssistantSheet - Session Resume", () => {
   it("AC-3: should allow re-apply after agent refines prompt via feedback", async () => {
     mockVariationData = {
       promptMotiv: "old motiv",
-      promptStyle: "old style",
-      negativePrompt: "old negative",
       modelId: "flux-2-pro",
       modelParams: {},
     };
@@ -333,9 +331,7 @@ describe("AssistantSheet - Session Resume", () => {
       latestCtx!.dispatch({
         type: "REFINE_DRAFT",
         draftPrompt: {
-          motiv: "Refined sunset motif",
-          style: "impressionist refined",
-          negativePrompt: "blurry, dark",
+          prompt: "Refined sunset motif",
         },
       });
     });
@@ -345,11 +341,10 @@ describe("AssistantSheet - Session Resume", () => {
     expect(latestCtx!.isApplied).toBe(true);
 
     // setVariation should have been called with the refined values (via auto-apply)
+    // DraftPrompt.prompt maps to promptMotiv in the workspace
     expect(mockSetVariation).toHaveBeenCalledWith(
       expect.objectContaining({
         promptMotiv: "Refined sunset motif",
-        promptStyle: "impressionist refined",
-        negativePrompt: "blurry, dark",
       })
     );
 

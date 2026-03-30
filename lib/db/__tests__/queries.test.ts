@@ -90,7 +90,6 @@ const FAKE_GENERATION = {
   id: "11111111-2222-3333-4444-555555555555",
   projectId: FAKE_PROJECT.id,
   prompt: "A fox",
-  negativePrompt: null,
   modelId: "black-forest-labs/flux-2-pro",
   modelParams: {},
   status: "pending",
@@ -276,9 +275,10 @@ describe("Generation Queries", () => {
   });
 
   /**
-   * AC-8 (edge): createGeneration with optional negativePrompt omitted defaults to null
+   * AC-8 (edge): createGeneration without optional fields defaults promptMotiv to empty string
+   * (negativePrompt column was removed by prompt-simplification)
    */
-  it("AC-8 (edge): should default negativePrompt to null when omitted", async () => {
+  it("AC-8 (edge): should default promptMotiv to empty string when omitted", async () => {
     mockChain = createChainableMock([FAKE_GENERATION]);
 
     await createGeneration({
@@ -289,9 +289,12 @@ describe("Generation Queries", () => {
 
     expect(mockChain.values).toHaveBeenCalledWith(
       expect.objectContaining({
-        negativePrompt: null,
+        promptMotiv: "",
       })
     );
+    // negativePrompt should NOT be in the values call (column removed)
+    const calledValues = mockChain.values.mock.calls[0][0];
+    expect(calledValues).not.toHaveProperty("negativePrompt");
   });
 
   /**

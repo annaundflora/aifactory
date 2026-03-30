@@ -64,13 +64,13 @@ describe('PromptService.improve -- Integration mit realem Knowledge-Lookup', () 
     expect(mockChat).toHaveBeenCalledOnce()
     const systemPrompt = getSystemPromptFromLastCall()
 
-    // Must contain at least one tip from models["flux-2"].tips
-    const flux2Tips = knowledgeData.models['flux-2'].tips
+    // Must contain at least one tip from models["flux-2-pro"].tips
+    const flux2Tips = knowledgeData.models['flux-2-pro'].tips
     const hasModelTip = flux2Tips.some((tip) => systemPrompt.includes(tip))
     expect(hasModelTip).toBe(true)
 
-    // Must contain at least one tip from models["flux-2"].modes.img2img.tips
-    const flux2Img2imgTips = knowledgeData.models['flux-2'].modes!.img2img!.tips
+    // Must contain at least one tip from models["flux-2-pro"].modes.img2img.tips
+    const flux2Img2imgTips = knowledgeData.models['flux-2-pro'].modes!.img2img!.tips
     const hasModeTip = flux2Img2imgTips.some((tip) => systemPrompt.includes(tip))
     expect(hasModeTip).toBe(true)
   })
@@ -78,7 +78,7 @@ describe('PromptService.improve -- Integration mit realem Knowledge-Lookup', () 
   // --------------------------------------------------------------------------
   // AC-2: Flux-Modell + txt2img -> Modell-Tipps UND txt2img-Tipps, KEINE img2img-Tipps
   // --------------------------------------------------------------------------
-  it('should include flux-2 model tips AND txt2img mode tips but NOT img2img tips for flux-2-pro with txt2img', async () => {
+  it('should include flux-2-pro model tips AND txt2img mode tips but NOT img2img tips for flux-2-pro with txt2img', async () => {
     await PromptService.improve(
       'a cat on a rooftop',
       'black-forest-labs/flux-2-pro',
@@ -88,20 +88,20 @@ describe('PromptService.improve -- Integration mit realem Knowledge-Lookup', () 
     expect(mockChat).toHaveBeenCalledOnce()
     const systemPrompt = getSystemPromptFromLastCall()
 
-    // Must contain at least one tip from models["flux-2"].tips
-    const flux2Tips = knowledgeData.models['flux-2'].tips
+    // Must contain at least one tip from models["flux-2-pro"].tips
+    const flux2Tips = knowledgeData.models['flux-2-pro'].tips
     const hasModelTip = flux2Tips.some((tip) => systemPrompt.includes(tip))
     expect(hasModelTip).toBe(true)
 
-    // Must contain at least one tip from models["flux-2"].modes.txt2img.tips
-    const flux2Txt2imgTips = knowledgeData.models['flux-2'].modes!.txt2img!.tips
+    // Must contain at least one tip from models["flux-2-pro"].modes.txt2img.tips
+    const flux2Txt2imgTips = knowledgeData.models['flux-2-pro'].modes!.txt2img!.tips
     const hasTxt2imgTip = flux2Txt2imgTips.some((tip) =>
       systemPrompt.includes(tip),
     )
     expect(hasTxt2imgTip).toBe(true)
 
-    // Must NOT contain any tip from models["flux-2"].modes.img2img.tips
-    const flux2Img2imgTips = knowledgeData.models['flux-2'].modes!.img2img!.tips
+    // Must NOT contain any tip from models["flux-2-pro"].modes.img2img.tips
+    const flux2Img2imgTips = knowledgeData.models['flux-2-pro'].modes!.img2img!.tips
     for (const tip of flux2Img2imgTips) {
       expect(systemPrompt).not.toContain(tip)
     }
@@ -179,14 +179,14 @@ describe('PromptService.improve -- Integration mit realem Knowledge-Lookup', () 
     expect(mockChat).toHaveBeenCalledOnce()
     const systemPrompt = getSystemPromptFromLastCall()
 
-    // Must contain at least one tip from models["seedream"].tips
-    const seedreamTips = knowledgeData.models['seedream'].tips
+    // Must contain at least one tip from models["seedream-5"].tips
+    const seedreamTips = knowledgeData.models['seedream-5'].tips
     const hasModelTip = seedreamTips.some((tip) => systemPrompt.includes(tip))
     expect(hasModelTip).toBe(true)
 
-    // Must contain at least one tip from models["seedream"].modes.img2img.tips
+    // Must contain at least one tip from models["seedream-5"].modes.img2img.tips
     const seedreamImg2imgTips =
-      knowledgeData.models['seedream'].modes!.img2img!.tips
+      knowledgeData.models['seedream-5'].modes!.img2img!.tips
     const hasModeTip = seedreamImg2imgTips.some((tip) =>
       systemPrompt.includes(tip),
     )
@@ -204,12 +204,12 @@ describe('PromptService.improve -- Integration mit realem Knowledge-Lookup', () 
     const systemPrompt = getSystemPromptFromLastCall()
 
     // Must contain Flux model tips
-    const flux2Tips = knowledgeData.models['flux-2'].tips
+    const flux2Tips = knowledgeData.models['flux-2-pro'].tips
     const hasModelTip = flux2Tips.some((tip) => systemPrompt.includes(tip))
     expect(hasModelTip).toBe(true)
 
     // Must contain txt2img mode tips (default behavior from Slice 04)
-    const flux2Txt2imgTips = knowledgeData.models['flux-2'].modes!.txt2img!.tips
+    const flux2Txt2imgTips = knowledgeData.models['flux-2-pro'].modes!.txt2img!.tips
     const hasTxt2imgTip = flux2Txt2imgTips.some((tip) =>
       systemPrompt.includes(tip),
     )
