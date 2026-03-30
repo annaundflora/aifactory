@@ -323,11 +323,11 @@ describe("SettingsDialog Capability-Filter", () => {
 
   /**
    * AC-8: GIVEN das Settings-Dialog ist geoeffnet und zeigt 2 Models in TEXT TO IMAGE
-   *       WHEN ein `window` Event `"model-settings-changed"` dispatched wird
+   *       WHEN ein `window` Event `"model-slots-changed"` dispatched wird
    *       THEN werden die Model-Daten automatisch neu geladen (erneute `getModels`-Calls)
    *            und die Dropdowns aktualisieren sich
    */
-  it("AC-8: should reload models when model-settings-changed event is dispatched", async () => {
+  it("AC-8: should reload models when model-slots-changed event is dispatched", async () => {
     renderDialog();
 
     // Wait for initial load (5 getModels calls)
@@ -340,7 +340,7 @@ describe("SettingsDialog Capability-Filter", () => {
 
     // Dispatch the event
     await act(async () => {
-      window.dispatchEvent(new Event("model-settings-changed"));
+      window.dispatchEvent(new Event("model-slots-changed"));
     });
 
     // getModels should be called again (5 times, once per mode)

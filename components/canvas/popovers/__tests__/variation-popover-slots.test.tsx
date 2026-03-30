@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * Slice-09: Variation Popover -- TierToggle durch ModelSlots ersetzen
+ * Slice-09: Variation Popover -- ModelSlots integration
  *
  * Tests AC-1 through AC-10 from the slice-09-variation-popover spec.
  * Mocking Strategy: mock_external (per spec -- Server Actions, useModelSchema, ModelSlots internals).
@@ -10,12 +10,6 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
-
-// ---------------------------------------------------------------------------
-// Local type re-declaration (Tier was removed from @/lib/types in prior slices)
-// ---------------------------------------------------------------------------
-
-type Tier = "draft" | "quality" | "max";
 
 // ---------------------------------------------------------------------------
 // Polyfills for jsdom (Radix Popover / Select use these internally)
@@ -166,16 +160,6 @@ import type { Generation } from "@/lib/db/queries";
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** @deprecated Legacy type kept for backward compat until consumers migrate to ModelSlot. */
-type ModelSetting = {
-  id: string;
-  mode: string;
-  tier: string;
-  modelId: string;
-  modelParams: unknown;
-  createdAt: Date;
-  updatedAt: Date;
-};
 
 function makeGeneration(overrides: Partial<Generation> = {}): Generation {
   return {
@@ -248,28 +232,6 @@ function createModel(overrides: {
   };
 }
 
-function makeModelSettings(): ModelSetting[] {
-  return [
-    {
-      id: "ms-draft",
-      mode: "img2img",
-      tier: "draft",
-      modelId: "black-forest-labs/flux-schnell",
-      modelParams: {},
-      createdAt: new Date("2025-06-15T12:00:00Z"),
-      updatedAt: new Date("2025-06-15T12:00:00Z"),
-    },
-    {
-      id: "ms-quality",
-      mode: "img2img",
-      tier: "quality",
-      modelId: "black-forest-labs/flux-pro",
-      modelParams: {},
-      createdAt: new Date("2025-06-15T12:00:00Z"),
-      updatedAt: new Date("2025-06-15T12:00:00Z"),
-    },
-  ];
-}
 
 // Standard fixtures
 const standardSlots = [
@@ -322,7 +284,6 @@ function renderPopoverOpen(options?: {
   onGenerate?: (params: VariationParams) => void;
   modelSlots?: VariationPopoverProps["modelSlots"];
   models?: VariationPopoverProps["models"];
-  modelSettings?: ModelSetting[];
   isGenerating?: boolean;
 }) {
   const generation = options?.generation ?? makeGeneration();
@@ -335,9 +296,8 @@ function renderPopoverOpen(options?: {
       <VariationPopover
         generation={generation}
         onGenerate={onGenerate}
-        modelSlots={options?.modelSlots}
-        models={options?.models}
-        modelSettings={options?.modelSettings}
+        modelSlots={options?.modelSlots ?? standardSlots}
+        models={options?.models ?? standardModels}
       />
     </CanvasDetailProvider>,
   );
@@ -359,17 +319,16 @@ describe("VariationPopover ModelSlots Acceptance", () => {
   });
 
   // -------------------------------------------------------------------------
-  // AC-1: ModelSlots statt TierToggle gerendert
+  // AC-1: ModelSlots gerendert
   // -------------------------------------------------------------------------
 
   /**
    * AC-1: GIVEN der Variation Popover wird geoeffnet (activeToolId === "variation")
    *       WHEN die Komponente rendert
-   *       THEN ist kein TierToggle sichtbar
-   *       AND stattdessen wird eine ModelSlots-Komponente mit variant="stacked"
+   *       THEN wird eine ModelSlots-Komponente mit variant="stacked"
    *       und mode="txt2img" gerendert
    */
-  it('AC-1: should render ModelSlots with variant="stacked" instead of TierToggle', async () => {
+  it('AC-1: should render ModelSlots with variant="stacked"', async () => {
     renderPopoverOpen({
       modelSlots: standardSlots,
       models: standardModels,
@@ -379,9 +338,8 @@ describe("VariationPopover ModelSlots Acceptance", () => {
     const popover = await screen.findByTestId("variation-popover");
     expect(popover).toBeInTheDocument();
 
-    // TierToggle should NOT be rendered in the new path
+    // Legacy tier section should not exist
     expect(screen.queryByTestId("variation-tier-section")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("tier-toggle")).not.toBeInTheDocument();
 
     // ModelSlots section should be rendered
     const modelSlotsSection = screen.getByTestId("variation-model-slots-section");
@@ -477,12 +435,11 @@ describe("VariationPopover ModelSlots Acceptance", () => {
   /**
    * AC-4: GIVEN das VariationParams Interface
    *       WHEN es importiert wird
-   *       THEN enthaelt es modelIds: string[] als neues Pflichtfeld
-   *       AND tier?: Tier bleibt als optionales Feld mit @deprecated JSDoc erhalten
+   *       THEN enthaelt es modelIds: string[] als Pflichtfeld
    *       AND alle anderen Felder (prompt, promptStyle, negativePrompt, strength, count, imageParams)
    *       bleiben unveraendert
    */
-  it("AC-4: should include modelIds in VariationParams and keep tier as optional deprecated field", () => {
+  it("AC-4: should include modelIds in VariationParams as required field", () => {
     // Type-level check: VariationParams must accept modelIds as required field
     const paramsWithModelIds: VariationParams = {
       prompt: "test prompt",
@@ -496,20 +453,6 @@ describe("VariationPopover ModelSlots Acceptance", () => {
     expect(paramsWithModelIds.promptStyle).toBe("test style");
     expect(paramsWithModelIds.negativePrompt).toBe("negative");
     expect(paramsWithModelIds.count).toBe(2);
-
-    // tier is optional (can be omitted)
-    expect(paramsWithModelIds.tier).toBeUndefined();
-
-    // tier can still be set for backward compat
-    const paramsWithTier: VariationParams = {
-      prompt: "test",
-      promptStyle: "",
-      negativePrompt: "",
-      count: 1,
-      modelIds: [],
-      tier: "draft" as Tier,
-    };
-    expect(paramsWithTier.tier).toBe("draft");
 
     // strength remains optional
     const paramsWithStrength: VariationParams = {
@@ -632,51 +575,34 @@ describe("VariationPopover ModelSlots Acceptance", () => {
   });
 
   // -------------------------------------------------------------------------
-  // AC-7: Props akzeptieren modelSlots und models neben optionalem deprecated modelSettings
+  // AC-7: Props require modelSlots and models
   // -------------------------------------------------------------------------
 
   /**
    * AC-7: GIVEN die VariationPopoverProps
    *       WHEN die Props definiert werden
-   *       THEN akzeptiert die Komponente modelSlots? (vom Typ ModelSlot[], optional)
-   *       und models? (vom Typ Model[], optional) als neue optionale Props
-   *       AND modelSettings? bleibt als optionales Feld mit @deprecated JSDoc erhalten
+   *       THEN akzeptiert die Komponente modelSlots (vom Typ ModelSlot[])
+   *       und models (vom Typ Model[]) als Pflicht-Props
    */
-  it("AC-7: should accept modelSlots and models props alongside optional deprecated modelSettings", async () => {
-    // New path: modelSlots + models provided
-    const { unmount: unmount1 } = renderPopoverOpen({
+  it("AC-7: should accept modelSlots and models as required props", async () => {
+    renderPopoverOpen({
       modelSlots: standardSlots,
       models: standardModels,
     });
     await screen.findByTestId("variation-popover");
 
-    // ModelSlots should be rendered (new path)
+    // ModelSlots should be rendered
     expect(screen.getByTestId("model-slots")).toBeInTheDocument();
-    unmount1();
 
-    // With all three props provided (modelSlots + models + modelSettings)
-    const { unmount: unmount2 } = renderPopoverOpen({
-      modelSlots: standardSlots,
-      models: standardModels,
-      modelSettings: makeModelSettings(),
-    });
-    await screen.findByTestId("variation-popover");
-
-    // Still renders ModelSlots when modelSlots + models are provided
-    expect(screen.getByTestId("model-slots")).toBeInTheDocument();
-    unmount2();
-
-    // Type-level check: VariationPopoverProps accepts all expected props
+    // Type-level check: VariationPopoverProps requires modelSlots and models
     const propsCheck: VariationPopoverProps = {
       generation: makeGeneration(),
       onGenerate: vi.fn(),
       modelSlots: standardSlots,
       models: standardModels,
-      modelSettings: makeModelSettings(),
     };
     expect(propsCheck.modelSlots).toBeDefined();
     expect(propsCheck.models).toBeDefined();
-    expect(propsCheck.modelSettings).toBeDefined();
   });
 
   // -------------------------------------------------------------------------
@@ -775,49 +701,8 @@ describe("VariationPopover ModelSlots Acceptance", () => {
   // AC-10: Legacy-Fallback wenn modelSlots/models nicht uebergeben werden
   // -------------------------------------------------------------------------
 
-  /**
-   * AC-10: GIVEN der Variation Popover wird geoeffnet OHNE modelSlots und models Props
-   *        (Legacy-Consumer)
-   *        WHEN die Komponente rendert
-   *        THEN faellt die Komponente auf den Legacy-Pfad zurueck: TierToggle wird
-   *        weiterhin gerendert und modelSettings wird fuer die Model-Resolution genutzt
-   *        AND onGenerate wird mit tier statt modelIds aufgerufen
-   *        (Rueckwaertskompatibilitaet bis slice-12)
-   */
-  it("AC-10: should fall back to TierToggle and modelSettings when modelSlots and models props are not provided", async () => {
-    const user = userEvent.setup();
-    const onGenerate = vi.fn();
-
-    renderPopoverOpen({
-      onGenerate,
-      modelSettings: makeModelSettings(),
-      // NO modelSlots and NO models -- legacy path
-    });
-
-    // Wait for popover
-    await screen.findByTestId("variation-popover");
-
-    // TierToggle should be visible (legacy path)
-    const tierSection = screen.getByTestId("variation-tier-section");
-    expect(tierSection).toBeInTheDocument();
-
-    // ModelSlots should NOT be rendered
-    expect(screen.queryByTestId("variation-model-slots-section")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("model-slots")).not.toBeInTheDocument();
-
-    // Click Generate in legacy path
-    const generateBtn = screen.getByTestId("variation-generate-button");
-    await user.click(generateBtn);
-
-    expect(onGenerate).toHaveBeenCalledTimes(1);
-    const params = onGenerate.mock.calls[0][0] as VariationParams;
-
-    // Legacy path: tier should be set (default "draft")
-    expect(params.tier).toBe("draft");
-
-    // Legacy path: modelIds should be empty
-    expect(params.modelIds).toEqual([]);
-  });
+  // AC-10: Legacy fallback path removed in slice-15 cleanup.
+  // modelSlots and models are now required props.
 });
 
 // ---------------------------------------------------------------------------
@@ -839,63 +724,23 @@ describe("VariationPopover Unit -- Type Contracts", () => {
     expect(Array.isArray(params.modelIds)).toBe(true);
   });
 
-  it("VariationParams tier is optional", () => {
-    const withoutTier: VariationParams = {
-      prompt: "",
-      promptStyle: "",
-      negativePrompt: "",
-      count: 1,
-      modelIds: [],
-    };
-    expect(withoutTier.tier).toBeUndefined();
-
-    const withTier: VariationParams = {
-      prompt: "",
-      promptStyle: "",
-      negativePrompt: "",
-      count: 1,
-      modelIds: [],
-      tier: "quality" as Tier,
-    };
-    expect(withTier.tier).toBe("quality");
-  });
-
-  it("VariationPopoverProps accepts modelSlots and models as optional props", () => {
-    // Without new props (legacy)
-    const legacyProps: VariationPopoverProps = {
-      generation: makeGeneration(),
-      onGenerate: vi.fn(),
-    };
-    expect(legacyProps.modelSlots).toBeUndefined();
-    expect(legacyProps.models).toBeUndefined();
-
-    // With new props
-    const newProps: VariationPopoverProps = {
+  it("VariationPopoverProps requires modelSlots and models", () => {
+    const props: VariationPopoverProps = {
       generation: makeGeneration(),
       onGenerate: vi.fn(),
       modelSlots: standardSlots,
       models: standardModels,
     };
-    expect(newProps.modelSlots).toBeDefined();
-    expect(newProps.models).toBeDefined();
-  });
-
-  it("VariationPopoverProps accepts deprecated modelSettings as optional prop", () => {
-    const props: VariationPopoverProps = {
-      generation: makeGeneration(),
-      onGenerate: vi.fn(),
-      modelSettings: makeModelSettings(),
-    };
-    expect(props.modelSettings).toBeDefined();
-    expect(props.modelSettings).toHaveLength(2);
+    expect(props.modelSlots).toBeDefined();
+    expect(props.models).toBeDefined();
   });
 });
 
 // ---------------------------------------------------------------------------
-// Integration Tests: VariationPopover new path vs legacy path routing
+// Integration Tests: VariationPopover ModelSlots integration
 // ---------------------------------------------------------------------------
 
-describe("VariationPopover Integration -- Path Routing", () => {
+describe("VariationPopover Integration -- ModelSlots", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     capturedModelSlotsProps = null;
@@ -904,7 +749,7 @@ describe("VariationPopover Integration -- Path Routing", () => {
     mockUseModelSchemaReturn.error = null;
   });
 
-  it("should route to new path when both modelSlots AND models are provided", async () => {
+  it("should render ModelSlots section when modelSlots and models are provided", async () => {
     renderPopoverOpen({
       modelSlots: standardSlots,
       models: standardModels,
@@ -912,37 +757,8 @@ describe("VariationPopover Integration -- Path Routing", () => {
 
     await screen.findByTestId("variation-popover");
 
-    // New path rendered
+    // ModelSlots section rendered
     expect(screen.getByTestId("variation-model-slots-section")).toBeInTheDocument();
-    expect(screen.queryByTestId("variation-tier-section")).not.toBeInTheDocument();
-  });
-
-  it("should route to legacy path when modelSlots is provided but models is NOT", async () => {
-    renderPopoverOpen({
-      modelSlots: standardSlots,
-      // models not provided
-      modelSettings: makeModelSettings(),
-    });
-
-    await screen.findByTestId("variation-popover");
-
-    // Legacy path rendered (both modelSlots AND models are required for new path)
-    expect(screen.getByTestId("variation-tier-section")).toBeInTheDocument();
-    expect(screen.queryByTestId("variation-model-slots-section")).not.toBeInTheDocument();
-  });
-
-  it("should route to legacy path when models is provided but modelSlots is NOT", async () => {
-    renderPopoverOpen({
-      models: standardModels,
-      // modelSlots not provided
-      modelSettings: makeModelSettings(),
-    });
-
-    await screen.findByTestId("variation-popover");
-
-    // Legacy path rendered
-    expect(screen.getByTestId("variation-tier-section")).toBeInTheDocument();
-    expect(screen.queryByTestId("variation-model-slots-section")).not.toBeInTheDocument();
   });
 
   it("should pass modelSlots data directly from props to ModelSlots component (no local cache)", async () => {

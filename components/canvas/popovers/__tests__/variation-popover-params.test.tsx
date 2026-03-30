@@ -241,7 +241,7 @@ describe("VariationPopover – ParameterPanel Mount", () => {
    * AC-1: GIVEN das Variation-Popover ist offen mit Tier "draft" und modelSettings
    *       enthaelt ein Setting fuer img2img/draft mit modelId "black-forest-labs/flux-schnell"
    *       WHEN useModelSchema ein Schema mit aspect_ratio (enum) zurueckgibt
-   *       THEN erscheint ein ParameterPanel zwischen dem TierToggle/MaxQualityToggle-Bereich
+   *       THEN erscheint ein ParameterPanel zwischen dem Model-Auswahl-Bereich
    *       und dem Generate-Button, das aspect_ratio als Primary-Control zeigt
    */
   it("AC-1: should render ParameterPanel with primary controls between tier section and generate button", async () => {
@@ -353,7 +353,7 @@ describe("VariationPopover – ParameterPanel Mount", () => {
   /**
    * AC-5: GIVEN useModelSchema gibt { isLoading: true } zurueck in einem der Popovers
    *       WHEN das Popover gerendert wird
-   *       THEN zeigt der Bereich zwischen TierToggle und Generate-Button
+   *       THEN zeigt der Bereich zwischen Model-Auswahl und Generate-Button
    *       Skeleton-Platzhalter (aus ParameterPanel)
    */
   it("AC-5: should render skeleton placeholders while schema is loading", async () => {

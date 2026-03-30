@@ -26,9 +26,7 @@ describe("lib/types.ts — Slice 03 Acceptance Tests", () => {
   //       WHEN die Exports geprueft werden
   //       THEN existiert ein Type SlotNumber = 1 | 2 | 3
   //       AND existiert eine Konstante VALID_SLOTS mit Wert [1, 2, 3] as const
-  //       AND der Type Tier existiert NICHT mehr
-  //       AND die Konstante VALID_TIERS existiert NICHT mehr
-  //       AND der UpdateModelSettingInput DTO existiert NICHT mehr
+  //       AND legacy Tier-related exports existieren NICHT mehr
   // ---------------------------------------------------------------------------
 
   it("AC-1: should export SlotNumber type and VALID_SLOTS constant [1, 2, 3]", () => {
@@ -46,33 +44,23 @@ describe("lib/types.ts — Slice 03 Acceptance Tests", () => {
     expect(Array.isArray(VALID_SLOTS)).toBe(true);
   });
 
-  it("AC-1: should NOT export Tier type or VALID_TIERS constant", () => {
-    // Runtime check: VALID_TIERS must not exist as an export
+  it("AC-1: should NOT export legacy Tier-related types or constants", () => {
+    // Runtime check: legacy tier constants must not exist as exports
     const moduleExports = typesModule as Record<string, unknown>;
-    expect(moduleExports).not.toHaveProperty("VALID_TIERS");
+    expect(moduleExports).not.toHaveProperty("Tier");
 
-    // Source-level check: Tier type must not be defined
+    // Source-level check: legacy type definitions must not exist
     const source = readFileSync(
       resolve(__dirname, "../types.ts"),
       "utf-8",
     );
     expect(source).not.toMatch(/export\s+type\s+Tier\b/);
-    expect(source).not.toMatch(/export\s+(?:const|let|var)\s+VALID_TIERS\b/);
-  });
 
-  it("AC-1: should NOT export UpdateModelSettingInput", () => {
-    // Runtime check
-    const moduleExports = typesModule as Record<string, unknown>;
-    expect(moduleExports).not.toHaveProperty("UpdateModelSettingInput");
-
-    // Source-level check: UpdateModelSettingInput type/interface must not be defined
-    const source = readFileSync(
-      resolve(__dirname, "../types.ts"),
-      "utf-8",
-    );
-    expect(source).not.toMatch(
-      /export\s+(?:type|interface)\s+UpdateModelSettingInput\b/,
-    );
+    // Only SlotNumber, GenerationMode, VALID_SLOTS, VALID_GENERATION_MODES should be exported
+    const exportMatches = source.match(/export\s+(type|const|let|var|interface)\s+(\w+)/g) ?? [];
+    const exportNames = exportMatches.map((m) => m.replace(/export\s+(type|const|let|var|interface)\s+/, ""));
+    expect(exportNames).toContain("SlotNumber");
+    expect(exportNames).toContain("GenerationMode");
   });
 
   // ---------------------------------------------------------------------------

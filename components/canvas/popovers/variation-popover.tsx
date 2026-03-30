@@ -12,47 +12,9 @@ import {
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { TierToggle } from "@/components/ui/tier-toggle";
-import { ParameterPanel, type SchemaProperties } from "@/components/workspace/parameter-panel";
-import { useModelSchema } from "@/lib/hooks/use-model-schema";
 import { ModelSlots } from "@/components/ui/model-slots";
 import { resolveActiveSlots } from "@/lib/utils/resolve-model";
 import type { Generation, ModelSlot, Model } from "@/lib/db/queries";
-import type { Tier } from "@/lib/types";
-
-/** @deprecated Legacy type kept for backward compat until consumers migrate to ModelSlot. */
-type ModelSetting = {
-  id: string;
-  mode: string;
-  tier: string;
-  modelId: string;
-  modelParams: unknown;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-// ---------------------------------------------------------------------------
-// Legacy helper (inline replacement for removed resolveModel export)
-// ---------------------------------------------------------------------------
-
-/**
- * @deprecated Legacy model resolution from ModelSetting[]. Used only when
- * modelSlots/models props are not provided (backward compat until slice-12).
- */
-function resolveModelLegacy(
-  settings: ModelSetting[],
-  mode: string,
-  tier: string,
-): { modelId: string; modelParams: Record<string, unknown> } | undefined {
-  const setting = settings.find(
-    (s) => s.mode === mode && s.tier === tier,
-  );
-  if (!setting) return undefined;
-  return {
-    modelId: setting.modelId,
-    modelParams: (setting.modelParams ?? {}) as Record<string, unknown>,
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Types (exported for slice-12)
@@ -68,8 +30,6 @@ export interface VariationParams {
   count: number;
   /** Active model IDs from selected slots. */
   modelIds: string[];
-  /** @deprecated Kept for backward compat until slice-12. Use `modelIds` instead. */
-  tier?: Tier;
   imageParams?: Record<string, unknown>;
 }
 
@@ -86,12 +46,10 @@ const COUNT_OPTIONS = [1, 2, 3, 4] as const;
 export interface VariationPopoverProps {
   generation: Generation;
   onGenerate: (params: VariationParams) => void;
-  /** New prop: model slot configurations. When provided (together with `models`), ModelSlots UI is rendered instead of TierToggle. */
-  modelSlots?: ModelSlot[];
-  /** New prop: available models for dropdown. Required together with `modelSlots` for new path. */
-  models?: Model[];
-  /** @deprecated Kept for backward compat until slice-12. Used only when `modelSlots`/`models` are not provided. */
-  modelSettings?: ModelSetting[];
+  /** Model slot configurations for the ModelSlots UI. */
+  modelSlots: ModelSlot[];
+  /** Available models for dropdown population. */
+  models: Model[];
 }
 
 // ---------------------------------------------------------------------------
@@ -103,39 +61,16 @@ export function VariationPopover({
   onGenerate,
   modelSlots,
   models,
-  modelSettings = [],
 }: VariationPopoverProps) {
   const { state, dispatch } = useCanvasDetail();
 
   const isOpen = state.activeToolId === "variation";
-
-  // Determine which path to use: new (ModelSlots) or legacy (TierToggle)
-  const useNewPath = modelSlots !== undefined && models !== undefined;
 
   // Local form state
   const [prompt, setPrompt] = useState(generation.prompt ?? "");
   const [promptStyle, setPromptStyle] = useState(generation.promptStyle ?? "");
   const [negativePrompt, setNegativePrompt] = useState(generation.negativePrompt ?? "");
   const [count, setCount] = useState<number>(1);
-
-  // Legacy path state
-  const [tier, setTier] = useState<Tier>("draft");
-  const [imageParams, setImageParams] = useState<Record<string, unknown>>({});
-
-  // Legacy path: resolve modelId from settings for schema fetching
-  const resolved = !useNewPath
-    ? resolveModelLegacy(modelSettings, "img2img", tier)
-    : undefined;
-  const { schema, isLoading, error } = useModelSchema(
-    !useNewPath ? resolved?.modelId : undefined,
-  );
-
-  // Legacy path: reset imageParams when tier/model changes
-  useEffect(() => {
-    if (!useNewPath) {
-      setImageParams({});
-    }
-  }, [resolved?.modelId, useNewPath]);
 
   // Reset form state when generation changes or popover reopens
   useEffect(() => {
@@ -144,8 +79,6 @@ export function VariationPopover({
       setPromptStyle(generation.promptStyle ?? "");
       setNegativePrompt(generation.negativePrompt ?? "");
       setCount(1);
-      setTier("draft");
-      setImageParams({});
     }
   }, [isOpen, generation.id]);
 
@@ -162,44 +95,26 @@ export function VariationPopover({
 
   // Handle generate action
   const handleGenerate = useCallback(() => {
-    if (useNewPath && modelSlots) {
-      // New path: collect active slot modelIds via resolveActiveSlots
-      const activeSlots = resolveActiveSlots(modelSlots, "txt2img");
-      const modelIds = activeSlots.map((s) => s.modelId);
+    const activeSlots = resolveActiveSlots(modelSlots, "txt2img");
+    const modelIds = activeSlots.map((s) => s.modelId);
 
-      onGenerate({
-        prompt,
-        promptStyle,
-        negativePrompt,
-        count,
-        modelIds,
-        // tier is intentionally NOT set (undefined) in new path
-      });
-    } else {
-      // Legacy path: use tier
-      onGenerate({
-        prompt,
-        promptStyle,
-        negativePrompt,
-        count,
-        modelIds: [], // empty in legacy path — consumer uses tier instead
-        tier,
-        imageParams,
-      });
-    }
+    onGenerate({
+      prompt,
+      promptStyle,
+      negativePrompt,
+      count,
+      modelIds,
+    });
 
     // Close the popover by setting activeToolId to null via toggle
     dispatch({ type: "SET_ACTIVE_TOOL", toolId: "variation" });
   }, [
-    useNewPath,
     modelSlots,
     onGenerate,
     prompt,
     promptStyle,
     negativePrompt,
     count,
-    tier,
-    imageParams,
     dispatch,
   ]);
 
@@ -316,40 +231,16 @@ export function VariationPopover({
             </div>
           </div>
 
-          {/* Model Selection: New path (ModelSlots) or Legacy path (TierToggle) */}
-          {useNewPath && modelSlots && models ? (
-            <div className="space-y-2" data-testid="variation-model-slots-section">
-              <ModelSlots
-                mode="txt2img"
-                slots={modelSlots}
-                models={models}
-                variant="stacked"
-                disabled={state.isGenerating}
-              />
-            </div>
-          ) : (
-            <>
-              {/* Legacy: Tier Toggle */}
-              <div className="space-y-2" data-testid="variation-tier-section">
-                <TierToggle
-                  tier={tier}
-                  onTierChange={setTier}
-                  disabled={state.isGenerating}
-                />
-              </div>
-
-              {/* Legacy: Parameter Controls (schema-based) */}
-              {!error && (
-                <ParameterPanel
-                  schema={schema as SchemaProperties | null}
-                  isLoading={isLoading}
-                  values={imageParams}
-                  onChange={setImageParams}
-                  primaryFields={["aspect_ratio", "megapixels", "resolution"]}
-                />
-              )}
-            </>
-          )}
+          {/* Model Selection */}
+          <div className="space-y-2" data-testid="variation-model-slots-section">
+            <ModelSlots
+              mode="txt2img"
+              slots={modelSlots}
+              models={models}
+              variant="stacked"
+              disabled={state.isGenerating}
+            />
+          </div>
 
           {/* Generate Button */}
           <Button

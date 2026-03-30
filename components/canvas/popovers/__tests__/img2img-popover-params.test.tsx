@@ -402,7 +402,7 @@ describe("Img2imgPopover – ParameterPanel Mount", () => {
   /**
    * AC-5: GIVEN useModelSchema gibt { isLoading: true } zurueck in einem der Popovers
    *       WHEN das Popover gerendert wird
-   *       THEN zeigt der Bereich zwischen TierToggle und Generate-Button
+   *       THEN zeigt der Bereich zwischen Model-Auswahl und Generate-Button
    *       Skeleton-Platzhalter (aus ParameterPanel)
    */
   it("AC-5: should render skeleton placeholders while schema is loading", async () => {

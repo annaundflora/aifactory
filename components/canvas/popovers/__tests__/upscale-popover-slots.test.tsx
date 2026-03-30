@@ -24,7 +24,7 @@ beforeAll(() => {
 // Mocking Strategy: mock_external (per spec)
 // Mock lucide-react icons, ModelSlots component (external dependency from
 // slice-06), and resolveActiveSlots (tested in its own unit tests).
-// TierToggle is a real component for legacy path assertions.
+// ModelSlots and resolveActiveSlots are mocked for isolation.
 // ---------------------------------------------------------------------------
 
 vi.mock("lucide-react", () => ({
@@ -246,7 +246,7 @@ type OnUpscaleFn = (params: {
 
 /**
  * Render helper that wraps UpscalePopover in CanvasDetailProvider.
- * Supports both slot-based path (with modelSlots + models) and legacy path.
+ * Renders UpscalePopover with ModelSlots path.
  */
 function renderUpscalePopover(
   overrides: Partial<{
@@ -271,8 +271,8 @@ function renderUpscalePopover(
         <UpscalePopover
           onUpscale={onUpscale}
           isUpscaleDisabled={isUpscaleDisabled}
-          modelSlots={overrides.modelSlots}
-          models={overrides.models}
+          modelSlots={overrides.modelSlots ?? [slot1Active, slot2Inactive]}
+          models={overrides.models ?? allModels}
         />
       </Activator>
     </CanvasDetailProvider>
@@ -296,19 +296,18 @@ describe("UpscalePopover - ModelSlots Integration (Slice 11)", () => {
   });
 
   // -------------------------------------------------------------------------
-  // AC-1: ModelSlots statt TierToggle gerendert (ohne ParameterPanel)
+  // AC-1: ModelSlots gerendert (ohne ParameterPanel)
   // -------------------------------------------------------------------------
 
   /**
    * AC-1: GIVEN der Upscale Popover wird geoeffnet (activeToolId === "upscale")
    *       und modelSlots + models Props sind uebergeben
    *       WHEN die Komponente rendert
-   *       THEN ist kein TierToggle sichtbar
-   *       AND stattdessen wird eine ModelSlots-Komponente mit variant="stacked"
+   *       THEN wird eine ModelSlots-Komponente mit variant="stacked"
    *           und mode="upscale" gerendert
    *       AND es werden KEINE Per-Slot ParameterPanels angezeigt
    */
-  it('AC-1: should render ModelSlots with variant="stacked" and mode="upscale" without ParameterPanels instead of TierToggle', async () => {
+  it('AC-1: should render ModelSlots with variant="stacked" and mode="upscale" without ParameterPanels', async () => {
     renderUpscalePopover({
       initialActiveToolId: "upscale",
       modelSlots: [slot1Active, slot2Inactive],
@@ -325,9 +324,6 @@ describe("UpscalePopover - ModelSlots Integration (Slice 11)", () => {
 
     // Verify ModelSlots props: mode="upscale"
     expect(modelSlotsEl).toHaveAttribute("data-mode", "upscale");
-
-    // TierToggle should NOT be present
-    expect(within(popover).queryByTestId("tier-toggle")).not.toBeInTheDocument();
 
     // The model-slots section testid should be present (not the tier section)
     expect(
@@ -449,7 +445,7 @@ describe("UpscalePopover - ModelSlots Integration (Slice 11)", () => {
   /**
    * AC-4: GIVEN die UpscalePopoverProps
    *       WHEN die Props definiert werden
-   *       THEN akzeptiert die Komponente modelSlots? (Typ ModelSlot[], optional)
+   *       THEN akzeptiert die Komponente modelSlots (Typ ModelSlot[])
    *            und models? (Typ Model[], optional) als neue Props
    *       AND onUpscale akzeptiert { scale: 2 | 4, modelIds: string[], tier?: Tier }
    *            -- tier ist @deprecated
@@ -501,65 +497,8 @@ describe("UpscalePopover - ModelSlots Integration (Slice 11)", () => {
   });
 
   // -------------------------------------------------------------------------
-  // AC-5: Legacy-Fallback wenn modelSlots/models nicht uebergeben werden
-  // -------------------------------------------------------------------------
-
-  /**
-   * AC-5: GIVEN der Upscale Popover wird geoeffnet OHNE modelSlots und models
-   *       Props (Legacy-Consumer)
-   *       WHEN die Komponente rendert
-   *       THEN faellt die Komponente auf den Legacy-Pfad zurueck: TierToggle
-   *            wird mit hiddenValues={["max"]} gerendert
-   *       AND onUpscale wird mit { scale, tier } statt modelIds aufgerufen
-   */
-  it('AC-5: should fall back to TierToggle with hiddenValues=["max"] when modelSlots and models props are not provided', async () => {
-    const user = userEvent.setup();
-    const onUpscale = vi.fn();
-
-    renderUpscalePopover({
-      initialActiveToolId: "upscale",
-      onUpscale,
-      // No modelSlots or models provided -- legacy path
-    });
-
-    // Wait for popover
-    const popover = await screen.findByTestId("upscale-popover");
-    expect(popover).toBeInTheDocument();
-
-    // TierToggle should be present (legacy path)
-    const tierSection = within(popover).getByTestId("upscale-tier-section");
-    expect(tierSection).toBeInTheDocument();
-
-    // TierToggle should be rendered
-    const tierToggle = within(popover).getByTestId("tier-toggle");
-    expect(tierToggle).toBeInTheDocument();
-
-    // ModelSlots should NOT be present
-    expect(
-      within(popover).queryByTestId("model-slots")
-    ).not.toBeInTheDocument();
-    expect(
-      within(popover).queryByTestId("upscale-model-slots-section")
-    ).not.toBeInTheDocument();
-
-    // "Max" segment should be hidden (hiddenValues={["max"]})
-    expect(within(popover).queryByText("Max")).not.toBeInTheDocument();
-
-    // "Draft" should be visible and active by default
-    const draftButton = within(popover).getByText("Draft");
-    expect(draftButton).toHaveAttribute("aria-pressed", "true");
-
-    // Click 2x Upscale -- legacy path should pass tier, NOT modelIds
-    const btn2x = screen.getByTestId("upscale-2x-button");
-    await user.click(btn2x);
-
-    expect(onUpscale).toHaveBeenCalledTimes(1);
-    expect(onUpscale).toHaveBeenCalledWith({ scale: 2, tier: "draft" });
-
-    // Verify NO modelIds in the callback params
-    const callArgs = onUpscale.mock.calls[0][0];
-    expect(callArgs).not.toHaveProperty("modelIds");
-  });
+  // AC-5: Legacy fallback path removed in slice-15 cleanup.
+  // modelSlots and models are now required props.
 
   // -------------------------------------------------------------------------
   // AC-6: Disabled-State waehrend Generierung

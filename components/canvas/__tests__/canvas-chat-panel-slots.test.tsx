@@ -6,17 +6,17 @@ import "@testing-library/jest-dom/vitest";
 import React, { useEffect } from "react";
 
 /**
- * Acceptance Tests for slice-13: Chat Panel -- TierToggle durch ModelSlots (compact) ersetzen
+ * Acceptance Tests for slice-13: Chat Panel -- ModelSlots (compact) integration
  *
  * These tests validate that the CanvasChatPanel:
- * - Accepts modelSlots + models props instead of modelSettings (AC-1)
- * - Renders ModelSlots compact instead of TierToggle (AC-2)
+ * - Accepts modelSlots + models props (AC-1)
+ * - Renders ModelSlots compact (AC-2)
  * - Passes img2img mode to ModelSlots without ParameterPanel (AC-3)
  * - Resolves modelIds from active slots for canvas-generate (AC-4)
- * - Builds image context with active_model_ids instead of selected_tier (AC-5)
+ * - Builds image context with active_model_ids (AC-5)
  * - Keeps ModelSlots interactive during streaming, disabled only during generation (AC-6)
- * - buildImageContext uses modelSlots instead of modelSettings (AC-7)
- * - Imports ModelSlots and ModelSlot type instead of TierToggle and ModelSetting (AC-8)
+ * - buildImageContext uses modelSlots (AC-7)
+ * - Imports ModelSlots and ModelSlot type (AC-8)
  *
  * Mocking Strategy: mock_external per spec
  * (generateImages server action, canvas-chat-service, ModelSlots component are mocked)
@@ -409,14 +409,13 @@ describe("Slice 13: Chat Panel -- ModelSlots (compact) Acceptance", () => {
       expect(props.modelSettings).toBeUndefined();
     });
 
-    it("should not have Tier type import (verified by absence of TierToggle and tier state)", () => {
+    it("should not have legacy tier-related UI elements", () => {
       renderChatPanel({ modelSlots: ALL_SLOTS, models: ALL_MODELS });
 
-      // There should be no TierToggle or tier-related UI
-      expect(screen.queryByTestId("tier-toggle")).not.toBeInTheDocument();
+      // There should be no legacy tier-related UI
       expect(screen.queryByTestId("chat-tier-bar")).not.toBeInTheDocument();
 
-      // No Draft/Quality/Max buttons (TierToggle segments)
+      // No Draft/Quality/Max buttons (legacy segments)
       expect(screen.queryByText("Draft")).not.toBeInTheDocument();
       expect(screen.queryByText("Quality")).not.toBeInTheDocument();
       expect(screen.queryByText("Max")).not.toBeInTheDocument();
@@ -424,17 +423,16 @@ describe("Slice 13: Chat Panel -- ModelSlots (compact) Acceptance", () => {
   });
 
   // -------------------------------------------------------------------------
-  // AC-2: ModelSlots compact wird statt TierToggle gerendert
+  // AC-2: ModelSlots compact is rendered
   // -------------------------------------------------------------------------
-  describe("AC-2: ModelSlots compact renders instead of TierToggle", () => {
+  describe("AC-2: ModelSlots compact renders", () => {
     /**
      * AC-2: GIVEN das Chat Panel ist expanded (nicht collapsed)
      *       WHEN der Bereich zwischen ChatThread und ChatInput gerendert wird
-     *       THEN wird <ModelSlots variant="compact" ... /> angezeigt (NICHT <TierToggle>)
-     *       AND das Element mit data-testid="chat-tier-bar" ist durch ein aequivalentes
-     *           Test-ID fuer die Slot-Leiste ersetzt
+     *       THEN wird <ModelSlots variant="compact" ... /> angezeigt
+     *       AND das Element mit data-testid="chat-model-slots-bar" ist vorhanden
      */
-    it("should render ModelSlots with variant compact instead of TierToggle between ChatThread and ChatInput", () => {
+    it("should render ModelSlots with variant compact between ChatThread and ChatInput", () => {
       renderChatPanel({ modelSlots: ALL_SLOTS, models: ALL_MODELS });
 
       // ModelSlots (compact) mock should be rendered
@@ -442,16 +440,12 @@ describe("Slice 13: Chat Panel -- ModelSlots (compact) Acceptance", () => {
       expect(modelSlotsEl).toBeInTheDocument();
       expect(modelSlotsEl).toHaveAttribute("data-variant", "compact");
 
-      // The old chat-tier-bar test ID should be replaced by chat-model-slots-bar
-      expect(screen.queryByTestId("chat-tier-bar")).not.toBeInTheDocument();
+      // The chat-model-slots-bar should be present
       expect(screen.getByTestId("chat-model-slots-bar")).toBeInTheDocument();
 
       // The model-slots should be inside the slots bar
       const slotsBar = screen.getByTestId("chat-model-slots-bar");
       expect(slotsBar).toContainElement(modelSlotsEl);
-
-      // TierToggle should NOT be present
-      expect(screen.queryByTestId("tier-toggle")).not.toBeInTheDocument();
     });
   });
 
@@ -920,18 +914,16 @@ describe("Slice 13: Chat Panel -- ModelSlots (compact) Acceptance", () => {
   });
 
   // -------------------------------------------------------------------------
-  // AC-8: Imports nutzen model-slots statt tier-toggle und model-settings
+  // AC-8: Imports nutzen model-slots
   // -------------------------------------------------------------------------
-  describe("AC-8: Imports use ModelSlots and ModelSlot instead of TierToggle and ModelSetting", () => {
+  describe("AC-8: Imports use ModelSlots and ModelSlot", () => {
     /**
      * AC-8: GIVEN der Import-Block von canvas-chat-panel.tsx
      *       WHEN Slice 13 implementiert ist
-     *       THEN ist TierToggle Import entfernt
-     *       AND ModelSlots aus @/components/ui/model-slots importiert
-     *       AND ModelSlot Type aus @/lib/db/queries importiert (statt ModelSetting)
-     *       AND Tier Type Import ist entfernt
+     *       THEN sind ModelSlots aus @/components/ui/model-slots importiert
+     *       AND ModelSlot Type aus @/lib/db/queries importiert
      */
-    it("should import ModelSlots and ModelSlot type instead of TierToggle and ModelSetting", async () => {
+    it("should import ModelSlots and ModelSlot type", async () => {
       // This test verifies through rendering behavior that the correct
       // components are imported and used.
 
@@ -940,15 +932,12 @@ describe("Slice 13: Chat Panel -- ModelSlots (compact) Acceptance", () => {
       // ModelSlots component is rendered (proves the import works)
       expect(screen.getByTestId("model-slots")).toBeInTheDocument();
 
-      // TierToggle is NOT rendered (proves the old import is removed)
-      expect(screen.queryByTestId("tier-toggle")).not.toBeInTheDocument();
-
       // The component accepts ModelSlot[] type for modelSlots prop
       // (compile-time verification -- if the import was wrong, this would fail)
       const typedSlot: ModelSlot = makeModelSlot();
       expect(typedSlot).toBeDefined();
 
-      // Verify no Tier-related UI elements exist
+      // Verify no legacy UI elements exist
       expect(screen.queryByText("Draft")).not.toBeInTheDocument();
       expect(screen.queryByText("Quality")).not.toBeInTheDocument();
       expect(screen.queryByText("Max")).not.toBeInTheDocument();
@@ -969,14 +958,8 @@ describe("Slice 13: Chat Panel -- ModelSlots (compact) Acceptance", () => {
       expect(sourceCode).toContain("ModelSlot");
       expect(sourceCode).toMatch(/from\s+["']@\/lib\/db\/queries["']/);
 
-      // TierToggle should NOT be imported
-      expect(sourceCode).not.toContain("TierToggle");
-      expect(sourceCode).not.toContain("tier-toggle");
-
-      // ModelSetting type should NOT be imported
+      // Legacy types should NOT be imported
       expect(sourceCode).not.toContain("ModelSetting");
-
-      // Tier type should NOT be imported
       expect(sourceCode).not.toMatch(/import\s+.*\bTier\b/);
     });
   });

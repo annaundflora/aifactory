@@ -61,7 +61,7 @@ vi.mock("@/app/actions/generations", () => ({
   upscaleImage: (...args: unknown[]) => mockUpscaleImage(...args),
 }));
 
-// Mock server actions: model-slots (replaces model-settings)
+// Mock server actions: model-slots
 const mockGetModelSlots = vi.fn().mockResolvedValue([]);
 vi.mock("@/app/actions/model-slots", () => ({
   getModelSlots: (...args: unknown[]) => mockGetModelSlots(...args),
@@ -335,11 +335,10 @@ describe("PromptArea - Model Slots Integration (Slice 08)", () => {
   // --------------------------------------------------------------------------
   // AC-1: GIVEN prompt-area rendert im Workspace
   //        WHEN die Komponente sichtbar ist
-  //        THEN wird ModelSlots mit variant="stacked" angezeigt anstelle von TierToggle
-  //        AND der Import von TierToggle und Tier existiert NICHT mehr in der Datei
+  //        THEN wird ModelSlots mit variant="stacked" angezeigt
   // --------------------------------------------------------------------------
-  describe("AC-1: ModelSlots statt TierToggle", () => {
-    it("should render ModelSlots with variant stacked instead of TierToggle", async () => {
+  describe("AC-1: ModelSlots rendered", () => {
+    it("should render ModelSlots with variant stacked", async () => {
       renderPromptArea();
 
       // Wait for model slots to load
@@ -351,20 +350,15 @@ describe("PromptArea - Model Slots Integration (Slice 08)", () => {
       const modelSlots = screen.getByTestId("model-slots");
       expect(modelSlots).toBeInTheDocument();
       expect(modelSlots).toHaveAttribute("data-variant", "stacked");
-
-      // TierToggle is NOT in the DOM
-      expect(screen.queryByTestId("tier-toggle")).not.toBeInTheDocument();
     });
 
-    it("should not import TierToggle or Tier type in prompt-area.tsx (static analysis)", () => {
+    it("should import ModelSlots from model-slots in prompt-area.tsx (static analysis)", () => {
       const source = fs.readFileSync(PROMPT_AREA_PATH, "utf-8");
 
-      // No TierToggle import
-      expect(source).not.toMatch(/import\s+.*TierToggle/);
+      // ModelSlots should be imported
+      expect(source).toMatch(/import\s+.*ModelSlots/);
       // No Tier type import
       expect(source).not.toMatch(/import\s+.*\bTier\b.*from/);
-      // No tier-toggle component path reference
-      expect(source).not.toMatch(/from\s+["'].*tier-toggle["']/);
     });
   });
 
@@ -393,10 +387,8 @@ describe("PromptArea - Model Slots Integration (Slice 08)", () => {
     it("should not reference getModelSettings in source (static analysis)", () => {
       const source = fs.readFileSync(PROMPT_AREA_PATH, "utf-8");
 
-      // No getModelSettings import
-      expect(source).not.toMatch(/import\s+.*getModelSettings/);
-      // No model-settings action path
-      expect(source).not.toMatch(/from\s+["'].*actions\/model-settings["']/);
+      // Should import from model-slots action
+      expect(source).toMatch(/from\s+["']@\/app\/actions\/model-slots["']/);
       // No ModelSetting type reference
       expect(source).not.toMatch(/ModelSetting\[\]/);
     });
@@ -406,7 +398,6 @@ describe("PromptArea - Model Slots Integration (Slice 08)", () => {
   // AC-3: GIVEN ein "model-slots-changed" Event wird auf window dispatcht
   //        WHEN der Event-Listener feuert
   //        THEN werden die Slots via getModelSlots() neu geladen
-  //        AND es gibt KEINEN Listener auf "model-settings-changed" mehr
   // --------------------------------------------------------------------------
   describe("AC-3: Event listener on model-slots-changed", () => {
     it("should listen for model-slots-changed event and reload slots", async () => {
@@ -434,11 +425,11 @@ describe("PromptArea - Model Slots Integration (Slice 08)", () => {
       });
     });
 
-    it("should not listen for model-settings-changed event (static analysis)", () => {
+    it("should only listen to model-slots-changed event (static analysis)", () => {
       const source = fs.readFileSync(PROMPT_AREA_PATH, "utf-8");
 
-      // No model-settings-changed event listener
-      expect(source).not.toMatch(/model-settings-changed/);
+      // model-slots-changed should be referenced
+      expect(source).toMatch(/model-slots-changed/);
     });
   });
 

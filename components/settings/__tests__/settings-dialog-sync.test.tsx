@@ -335,7 +335,7 @@ describe("SettingsDialog Sync-Button", () => {
    *       THEN wird der Loading-Toast dismissed und ein Success-Toast
    *            `toast.success("120 Models synced")` angezeigt (auto-dismiss nach 3s),
    *            der Button wechselt zurueck in den Zustand `idle`, und
-   *            `window.dispatchEvent(new Event("model-settings-changed"))` wird ausgeloest
+   *            `window.dispatchEvent(new Event("model-slots-changed"))` wird ausgeloest
    */
   it("AC-4: should show success toast and reset to idle on complete with zero failures", async () => {
     const user = userEvent.setup();
@@ -366,9 +366,9 @@ describe("SettingsDialog Sync-Button", () => {
       expect(syncButton).toHaveAttribute("data-sync-state", "idle");
     });
 
-    // window.dispatchEvent was called with "model-settings-changed"
+    // window.dispatchEvent was called with "model-slots-changed"
     expect(dispatchEventSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "model-settings-changed" })
+      expect.objectContaining({ type: "model-slots-changed" })
     );
   });
 
@@ -384,7 +384,7 @@ describe("SettingsDialog Sync-Button", () => {
    *            Text "95 synced, 25 failed" (user-dismissible, KEIN auto-dismiss),
    *            der Button wechselt in den Zustand `sync_partial` mit Warning-Badge
    *            und Tooltip "Last sync: 25 models failed. Click to retry.", und
-   *            `window.dispatchEvent(new Event("model-settings-changed"))` wird ausgeloest
+   *            `window.dispatchEvent(new Event("model-slots-changed"))` wird ausgeloest
    */
   it("AC-5: should show warning toast and switch to sync_partial on complete with failures", async () => {
     const user = userEvent.setup();
@@ -424,9 +424,9 @@ describe("SettingsDialog Sync-Button", () => {
     // by checking that the button is wrapped in a TooltipTrigger (data-slot attribute).
     expect(updatedSyncButton).toHaveAttribute("data-slot", "tooltip-trigger");
 
-    // window.dispatchEvent was called with "model-settings-changed"
+    // window.dispatchEvent was called with "model-slots-changed"
     expect(dispatchEventSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "model-settings-changed" })
+      expect.objectContaining({ type: "model-slots-changed" })
     );
   });
 

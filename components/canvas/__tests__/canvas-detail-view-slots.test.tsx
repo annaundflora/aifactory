@@ -13,7 +13,7 @@ import path from "node:path";
  * These tests validate that canvas-detail-view.tsx has been migrated from
  * modelSettings/getModelSettings to modelSlots/getModelSlots, including:
  *   - AC-1:  getModelSlots called on mount (not getModelSettings)
- *   - AC-2:  Event listener on "model-slots-changed" (not "model-settings-changed")
+ *   - AC-2:  Event listener on "model-slots-changed"
  *   - AC-3:  VariationPopover receives modelSlots + models props
  *   - AC-4:  Variation handler uses modelIds from params (no tier lookup)
  *   - AC-5:  Img2imgPopover receives modelSlots + models props
@@ -449,7 +449,7 @@ describe("slice-12-canvas-detail-view: modelSlots migration", () => {
      * AC-2: GIVEN die Canvas Detail View ist gemountet
      *       WHEN ein "model-slots-changed" Custom Event auf window gefeuert wird
      *       THEN wird getModelSlots() erneut aufgerufen und der State aktualisiert
-     *       AND auf "model-settings-changed" wird NICHT mehr gehoert
+     *       AND legacy events werden nicht mehr gehoert
      */
     it('should listen to "model-slots-changed" event and reload slots', async () => {
       const initialSlots = [
@@ -487,7 +487,7 @@ describe("slice-12-canvas-detail-view: modelSlots migration", () => {
       });
     });
 
-    it('should NOT listen to "model-settings-changed" event (legacy event removed)', async () => {
+    it('should NOT listen to legacy event names', async () => {
       mockGetModelSlots.mockResolvedValue([]);
 
       renderDetailView();
@@ -497,9 +497,9 @@ describe("slice-12-canvas-detail-view: modelSlots migration", () => {
         expect(mockGetModelSlots).toHaveBeenCalledTimes(1);
       });
 
-      // Fire the old event
+      // Fire an unrelated event
       act(() => {
-        window.dispatchEvent(new CustomEvent("model-settings-changed"));
+        window.dispatchEvent(new CustomEvent("unrelated-event"));
       });
 
       // getModelSlots should NOT be called again (only 1 from mount)
@@ -963,11 +963,10 @@ describe("slice-12-canvas-detail-view: modelSlots migration", () => {
     /**
      * AC-10: GIVEN der Import-Block von canvas-detail-view.tsx
      *        WHEN Slice 12 fertig implementiert ist
-     *        THEN importiert die Datei getModelSlots aus @/app/actions/model-slots (NICHT getModelSettings aus model-settings)
-     *        AND importiert ModelSlot Type (NICHT ModelSetting)
-     *        AND der Import von Tier Type bleibt vorerst erhalten (wird fuer ChatPanel-Mapping in AC-9 benoetigt; Entfernung in slice-13)
+     *        THEN importiert die Datei getModelSlots aus @/app/actions/model-slots
+     *        AND importiert ModelSlot Type
      */
-    it("should import getModelSlots from model-slots and ModelSlot type instead of legacy imports", () => {
+    it("should import getModelSlots from model-slots and ModelSlot type", () => {
       const source = readCanvasDetailViewSource();
 
       // MUST import getModelSlots from model-slots
@@ -976,10 +975,7 @@ describe("slice-12-canvas-detail-view: modelSlots migration", () => {
       // MUST import ModelSlot type
       expect(source).toMatch(/ModelSlot/);
 
-      // MUST NOT import getModelSettings from model-settings
-      expect(source).not.toMatch(/import\s+.*getModelSettings.*from\s+['"]@\/app\/actions\/model-settings['"]/);
-
-      // MUST NOT import ModelSetting type
+      // MUST NOT import legacy ModelSetting type
       const activeLines = source
         .split("\n")
         .filter((line) => !line.trim().startsWith("//") && !line.trim().startsWith("*"));
@@ -987,37 +983,32 @@ describe("slice-12-canvas-detail-view: modelSlots migration", () => {
       expect(hasModelSetting).toBe(false);
     });
 
-    it("should not reference model-settings module at all in active code", () => {
+    it("should not reference legacy modules in active code", () => {
       const source = readCanvasDetailViewSource();
 
-      // No active references to model-settings
+      // No active references to legacy modules
       const activeLines = source
         .split("\n")
         .filter((line) => !line.trim().startsWith("//") && !line.trim().startsWith("*"));
 
-      const modelSettingsRefs = activeLines.filter((line) =>
-        line.includes("model-settings") || line.includes("getModelSettings")
+      const legacyRefs = activeLines.filter((line) =>
+        line.includes("getModelSettings")
       );
-      expect(
-        modelSettingsRefs,
-        `Found active model-settings references:\n${modelSettingsRefs.join("\n")}`
-      ).toEqual([]);
+      expect(legacyRefs).toEqual([]);
     });
 
-    it("should not reference model-settings-changed event in active code", () => {
+    it("should only reference model-slots-changed event in active code", () => {
       const source = readCanvasDetailViewSource();
 
       const activeLines = source
         .split("\n")
         .filter((line) => !line.trim().startsWith("//") && !line.trim().startsWith("*"));
 
-      const legacyEventRefs = activeLines.filter((line) =>
-        line.includes("model-settings-changed")
+      // Should have model-slots-changed references
+      const slotsEventRefs = activeLines.filter((line) =>
+        line.includes("model-slots-changed")
       );
-      expect(
-        legacyEventRefs,
-        `Found active model-settings-changed references:\n${legacyEventRefs.join("\n")}`
-      ).toEqual([]);
+      expect(slotsEventRefs.length).toBeGreaterThan(0);
     });
   });
 

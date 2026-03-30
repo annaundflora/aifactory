@@ -1029,7 +1029,7 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
           <div className="space-y-3">
             <hr className="border-border my-8" />
 
-            {/* Model Slots — replaces TierToggle and standalone ParameterPanel */}
+            {/* Model Slots */}
             <ModelSlots
               mode={currentMode}
               slots={modelSlots}

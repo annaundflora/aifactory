@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * Slice 10: Img2img Popover -- TierToggle durch ModelSlots ersetzen
+ * Slice 10: Img2img Popover -- ModelSlots integration
  *
  * Tests AC-1 through AC-10 from slice-10-img2img-popover spec.
  * Mocking Strategy: mock_external (Server Actions, useModelSchema, getModelSlots via Vitest mocks)
@@ -257,40 +257,6 @@ const standardModels = [
   createModel({ replicateId: "black-forest-labs/flux-pro", name: "Flux Pro" }),
 ];
 
-/** @deprecated Legacy type kept for backward compat */
-type ModelSetting = {
-  id: string;
-  mode: string;
-  tier: string;
-  modelId: string;
-  modelParams: unknown;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-function makeModelSettings(): ModelSetting[] {
-  return [
-    {
-      id: "ms-draft",
-      mode: "img2img",
-      tier: "draft",
-      modelId: "black-forest-labs/flux-schnell",
-      modelParams: {},
-      createdAt: new Date("2025-06-15T12:00:00Z"),
-      updatedAt: new Date("2025-06-15T12:00:00Z"),
-    },
-    {
-      id: "ms-quality",
-      mode: "img2img",
-      tier: "quality",
-      modelId: "black-forest-labs/flux-pro",
-      modelParams: {},
-      createdAt: new Date("2025-06-15T12:00:00Z"),
-      updatedAt: new Date("2025-06-15T12:00:00Z"),
-    },
-  ];
-}
-
 /**
  * Renders Img2imgPopover inside CanvasDetailProvider with controllable state.
  */
@@ -301,7 +267,6 @@ function renderImg2imgPopover(
     initialActiveToolId: string | null;
     modelSlots: typeof standardModelSlots;
     models: typeof standardModels;
-    modelSettings: ModelSetting[];
     isGenerating: boolean;
   }> = {},
 ) {
@@ -312,9 +277,8 @@ function renderImg2imgPopover(
 
   const popoverProps: Img2imgPopoverProps = {
     onGenerate,
-    ...(overrides.modelSlots !== undefined ? { modelSlots: overrides.modelSlots } : {}),
-    ...(overrides.models !== undefined ? { models: overrides.models } : {}),
-    ...(overrides.modelSettings !== undefined ? { modelSettings: overrides.modelSettings } : {}),
+    modelSlots: overrides.modelSlots ?? standardModelSlots,
+    models: overrides.models ?? standardModels,
   };
 
   function SetupDispatcher({ children }: { children: ReactNode }) {
@@ -367,18 +331,17 @@ beforeEach(() => {
 
 describe("Img2imgPopover ModelSlots Acceptance (Slice 10)", () => {
   // -------------------------------------------------------------------------
-  // AC-1: ModelSlots statt TierToggle gerendert
+  // AC-1: ModelSlots gerendert
   // -------------------------------------------------------------------------
 
   /**
    * AC-1: GIVEN der Img2img Popover wird geoeffnet (activeToolId === "img2img")
    *       und `modelSlots` + `models` Props sind uebergeben
    *       WHEN die Komponente rendert
-   *       THEN ist kein `TierToggle` sichtbar
-   *       AND stattdessen wird eine `ModelSlots`-Komponente mit
+   *       THEN wird eine `ModelSlots`-Komponente mit
    *       `variant="stacked"` und `mode="img2img"` gerendert
    */
-  it('AC-1: should render ModelSlots with variant="stacked" and mode="img2img" instead of TierToggle', async () => {
+  it('AC-1: should render ModelSlots with variant="stacked" and mode="img2img"', async () => {
     renderImg2imgPopover({
       initialActiveToolId: "img2img",
       modelSlots: standardModelSlots,
@@ -388,10 +351,6 @@ describe("Img2imgPopover ModelSlots Acceptance (Slice 10)", () => {
     // Wait for the popover to be visible
     const popover = await screen.findByTestId("img2img-popover");
     expect(popover).toBeInTheDocument();
-
-    // TierToggle should NOT be visible
-    expect(screen.queryByTestId("tier-toggle")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("tier-section")).not.toBeInTheDocument();
 
     // ModelSlots should be rendered
     const modelSlotsEl = screen.getByTestId("model-slots");
@@ -507,11 +466,10 @@ describe("Img2imgPopover ModelSlots Acceptance (Slice 10)", () => {
   /**
    * AC-4: GIVEN das `Img2imgParams` Interface
    *       WHEN es importiert wird
-   *       THEN enthaelt es `modelIds: string[]` als neues Pflichtfeld
-   *       AND `tier?: Tier` bleibt als optionales Feld mit `@deprecated` JSDoc erhalten
+   *       THEN enthaelt es `modelIds: string[]` als Pflichtfeld
    *       AND alle anderen Felder (references, motiv, style, variants, imageParams) bleiben unveraendert
    */
-  it("AC-4: should include modelIds in Img2imgParams and keep tier as optional deprecated field", () => {
+  it("AC-4: should include modelIds in Img2imgParams as required field", () => {
     // Type-level check: modelIds is required
     const paramsWithModelIds: Img2imgParams = {
       references: [],
@@ -526,20 +484,6 @@ describe("Img2imgPopover ModelSlots Acceptance (Slice 10)", () => {
     expect(paramsWithModelIds.style).toBe("test style");
     expect(paramsWithModelIds.variants).toBe(2);
 
-    // tier is optional (can be omitted)
-    expect(paramsWithModelIds.tier).toBeUndefined();
-
-    // tier can also be set (backward compat)
-    const paramsWithTier: Img2imgParams = {
-      references: [],
-      motiv: "test",
-      style: "",
-      variants: 1,
-      modelIds: [],
-      tier: "draft",
-    };
-    expect(paramsWithTier.tier).toBe("draft");
-
     // imageParams is optional
     const paramsWithImageParams: Img2imgParams = {
       references: [],
@@ -550,19 +494,6 @@ describe("Img2imgPopover ModelSlots Acceptance (Slice 10)", () => {
       imageParams: { aspect_ratio: "16:9" },
     };
     expect(paramsWithImageParams.imageParams).toEqual({ aspect_ratio: "16:9" });
-
-    // Verify all Tier values are still assignable
-    for (const tier of ["draft", "quality", "max"] as const) {
-      const p: Img2imgParams = {
-        references: [],
-        motiv: "",
-        style: "",
-        variants: 1,
-        modelIds: [],
-        tier,
-      };
-      expect(p.tier).toBe(tier);
-    }
   });
 
   // -------------------------------------------------------------------------
@@ -660,49 +591,27 @@ describe("Img2imgPopover ModelSlots Acceptance (Slice 10)", () => {
   });
 
   // -------------------------------------------------------------------------
-  // AC-7: Props akzeptieren modelSlots und models neben optionalem deprecated modelSettings
+  // AC-7: Props require modelSlots and models
   // -------------------------------------------------------------------------
 
   /**
    * AC-7: GIVEN die `Img2imgPopoverProps`
    *       WHEN die Props definiert werden
-   *       THEN akzeptiert die Komponente `modelSlots?` (vom Typ `ModelSlot[]`, optional)
-   *       und `models?` (vom Typ `Model[]`, optional) als neue optionale Props
-   *       AND `modelSettings?` bleibt als optionales Feld mit `@deprecated` JSDoc erhalten
+   *       THEN akzeptiert die Komponente `modelSlots` (vom Typ `ModelSlot[]`)
+   *       und `models` (vom Typ `Model[]`) als Pflicht-Props
    */
-  it("AC-7: should accept modelSlots and models props alongside optional deprecated modelSettings", async () => {
-    // Render with all three props to verify they compile and are accepted
+  it("AC-7: should accept modelSlots and models as required props", async () => {
     renderImg2imgPopover({
       initialActiveToolId: "img2img",
       modelSlots: standardModelSlots,
       models: standardModels,
-      modelSettings: makeModelSettings(),
     });
 
     const popover = await screen.findByTestId("img2img-popover");
     expect(popover).toBeInTheDocument();
 
-    // When both modelSlots AND models are provided, new path is used (ModelSlots rendered)
+    // ModelSlots should be rendered
     expect(screen.getByTestId("model-slots")).toBeInTheDocument();
-    expect(screen.queryByTestId("tier-toggle")).not.toBeInTheDocument();
-  });
-
-  /**
-   * AC-7 (supplementary): Render without modelSlots/models but with modelSettings
-   * to verify the deprecated prop is still accepted
-   */
-  it("AC-7: should accept modelSettings prop alone (deprecated, legacy path)", async () => {
-    renderImg2imgPopover({
-      initialActiveToolId: "img2img",
-      modelSettings: makeModelSettings(),
-    });
-
-    const popover = await screen.findByTestId("img2img-popover");
-    expect(popover).toBeInTheDocument();
-
-    // Legacy path: TierToggle should be visible
-    expect(screen.getByTestId("tier-section")).toBeInTheDocument();
-    expect(screen.queryByTestId("model-slots")).not.toBeInTheDocument();
   });
 
   // -------------------------------------------------------------------------
@@ -735,55 +644,8 @@ describe("Img2imgPopover ModelSlots Acceptance (Slice 10)", () => {
     expect(capturedModelSlotsProps.disabled).toBe(true);
   });
 
-  // -------------------------------------------------------------------------
-  // AC-9: Legacy-Fallback wenn modelSlots/models nicht uebergeben werden
-  // -------------------------------------------------------------------------
-
-  /**
-   * AC-9: GIVEN der Img2img Popover wird geoeffnet OHNE `modelSlots` und `models` Props
-   *       (Legacy-Consumer)
-   *       WHEN die Komponente rendert
-   *       THEN faellt die Komponente auf den Legacy-Pfad zurueck: TierToggle wird
-   *       gerendert und das separate ParameterPanel wird angezeigt
-   *       AND `onGenerate` wird mit `tier` statt `modelIds` aufgerufen
-   */
-  it("AC-9: should fall back to TierToggle and separate ParameterPanel when modelSlots and models props are not provided", async () => {
-    const user = userEvent.setup();
-    const onGenerate = vi.fn();
-
-    renderImg2imgPopover({
-      initialActiveToolId: "img2img",
-      onGenerate,
-      // No modelSlots, no models -> legacy path
-    });
-
-    const popover = await screen.findByTestId("img2img-popover");
-    expect(popover).toBeInTheDocument();
-
-    // TierToggle should be visible (legacy path)
-    const tierSection = screen.getByTestId("tier-section");
-    expect(tierSection).toBeInTheDocument();
-
-    // ModelSlots should NOT be rendered
-    expect(screen.queryByTestId("model-slots")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("model-slots-section")).not.toBeInTheDocument();
-
-    // Click Generate
-    const generateBtn = screen.getByTestId("generate-button");
-    await user.click(generateBtn);
-
-    expect(onGenerate).toHaveBeenCalledTimes(1);
-    const params = onGenerate.mock.calls[0][0] as Img2imgParams;
-
-    // Legacy path: tier should be set (default "draft")
-    expect(params.tier).toBe("draft");
-
-    // modelIds should be empty array in legacy path
-    expect(params.modelIds).toEqual([]);
-
-    // resolveActiveSlots should NOT have been called (legacy path)
-    expect(mockResolveActiveSlots).not.toHaveBeenCalled();
-  });
+  // AC-9: Legacy fallback path removed in slice-15 cleanup.
+  // modelSlots and models are now required props.
 
   // -------------------------------------------------------------------------
   // AC-10: Unveraenderte Sections (References, Prompt, Generate)
@@ -794,7 +656,7 @@ describe("Img2imgPopover ModelSlots Acceptance (Slice 10)", () => {
    *        WHEN die Komponente rendert
    *        THEN bleiben References-Section (ReferenceBar), Prompt-Section
    *        (Motiv + Style Textareas) und Generate-Button unveraendert
-   *        AND nur die Tier/Parameter-Section wird durch ModelSlots ersetzt
+   *        AND die Model-Section zeigt ModelSlots
    */
   it("AC-10: should keep references section, prompt section, and generate button unchanged", async () => {
     renderImg2imgPopover({
@@ -964,37 +826,7 @@ describe("Img2imgPopover Integration (Slice 10)", () => {
     expect(capturedModelSlotsProps.disabled).toBe(false);
   });
 
-  it("should correctly transition from TierToggle (legacy) to ModelSlots when props change", async () => {
-    // Start without modelSlots/models (legacy path)
-    const { rerender } = render(
-      <CanvasDetailProvider initialGenerationId="gen-1">
-        <HelperDispatcher toolId="img2img">
-          <Img2imgPopover onGenerate={vi.fn()} />
-        </HelperDispatcher>
-      </CanvasDetailProvider>,
-    );
-
-    await screen.findByTestId("img2img-popover");
-    expect(screen.getByTestId("tier-section")).toBeInTheDocument();
-    expect(screen.queryByTestId("model-slots")).not.toBeInTheDocument();
-
-    // Re-render with modelSlots and models (new path)
-    rerender(
-      <CanvasDetailProvider initialGenerationId="gen-1">
-        <HelperDispatcher toolId="img2img">
-          <Img2imgPopover
-            onGenerate={vi.fn()}
-            modelSlots={standardModelSlots}
-            models={standardModels}
-          />
-        </HelperDispatcher>
-      </CanvasDetailProvider>,
-    );
-
-    // Now new path should be active
-    expect(screen.queryByTestId("tier-section")).not.toBeInTheDocument();
-    expect(screen.getByTestId("model-slots")).toBeInTheDocument();
-  });
+  // Legacy transition test removed in slice-15 cleanup.
 
   it("should render sections in correct order: references -> prompt -> variants -> model-slots -> generate", async () => {
     renderImg2imgPopover({
@@ -1017,25 +849,7 @@ describe("Img2imgPopover Integration (Slice 10)", () => {
     expect(allSections[4]).toBe(screen.getByTestId("generate-button"));
   });
 
-  it("should render sections in correct order for legacy path: references -> prompt -> variants -> tier -> generate", async () => {
-    renderImg2imgPopover({
-      initialActiveToolId: "img2img",
-      // No modelSlots/models -> legacy path
-    });
-
-    const popover = await screen.findByTestId("img2img-popover");
-
-    const allSections = popover.querySelectorAll(
-      '[data-testid="references-section"], [data-testid="prompt-section"], [data-testid="variants-section"], [data-testid="tier-section"], [data-testid="generate-button"]',
-    );
-
-    expect(allSections.length).toBe(5);
-    expect(allSections[0]).toBe(screen.getByTestId("references-section"));
-    expect(allSections[1]).toBe(screen.getByTestId("prompt-section"));
-    expect(allSections[2]).toBe(screen.getByTestId("variants-section"));
-    expect(allSections[3]).toBe(screen.getByTestId("tier-section"));
-    expect(allSections[4]).toBe(screen.getByTestId("generate-button"));
-  });
+  // Legacy path section order test removed in slice-15 cleanup.
 
   it("should pass motiv and style text to onGenerate in new path", async () => {
     const user = userEvent.setup();

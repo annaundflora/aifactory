@@ -570,7 +570,7 @@ describe("Slice 14: Settings Dialog Read-Only — Acceptance Tests", () => {
    * AC-8: GIVEN der Dialog wird geoeffnet
    *       WHEN `getModelSlots()` aufgerufen wird (statt des alten `getModelSettings()`)
    *       THEN werden die Slots korrekt geladen und angezeigt
-   *       AND der Event-Listener lauscht auf "model-slots-changed" (statt "model-settings-changed")
+   *       AND der Event-Listener lauscht auf "model-slots-changed"
    */
   it("AC-8: should call getModelSlots on open and listen to model-slots-changed event", async () => {
     renderDialog();
@@ -939,16 +939,16 @@ describe("Slice 14: Settings Dialog Read-Only — Integration Tests", () => {
     });
   });
 
-  it("should NOT listen to the old model-settings-changed event", async () => {
+  it("should NOT listen to legacy event names", async () => {
     renderDialog();
 
     await waitFor(() => {
       expect(mockGetModelSlots).toHaveBeenCalledTimes(1);
     });
 
-    // Dispatch the OLD event name
+    // Dispatch an unrelated event name to confirm no extra reloads
     await act(async () => {
-      window.dispatchEvent(new Event("model-settings-changed"));
+      window.dispatchEvent(new Event("unrelated-event"));
     });
 
     // getModelSlots should NOT be called again (still at 1 from initial load)

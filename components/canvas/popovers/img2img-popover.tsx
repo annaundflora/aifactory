@@ -14,10 +14,7 @@ import { ReferenceBar } from "@/components/workspace/reference-bar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { TierToggle } from "@/components/ui/tier-toggle";
 import { ModelSlots } from "@/components/ui/model-slots";
-import { ParameterPanel, type SchemaProperties } from "@/components/workspace/parameter-panel";
-import { useModelSchema } from "@/lib/hooks/use-model-schema";
 import { resolveActiveSlots } from "@/lib/utils/resolve-model";
 import type {
   ReferenceRole,
@@ -26,42 +23,6 @@ import type {
 } from "@/lib/types/reference";
 import type { GalleryDragPayload } from "@/lib/constants/drag-types";
 import type { ModelSlot, Model } from "@/lib/db/queries";
-
-// ---------------------------------------------------------------------------
-// Legacy Tier type (kept locally since removed from lib/types in slice-03)
-// ---------------------------------------------------------------------------
-
-/** @deprecated Tier type is deprecated. Use ModelSlot-based workflow instead. */
-type Tier = "draft" | "quality" | "max";
-
-/** @deprecated Legacy type kept for backward compat until consumers migrate to ModelSlot. */
-type ModelSetting = {
-  id: string;
-  mode: string;
-  tier: string;
-  modelId: string;
-  modelParams: unknown;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-// ---------------------------------------------------------------------------
-// Legacy resolveModel (inline, since removed from resolve-model.ts in slice-03)
-// ---------------------------------------------------------------------------
-
-/** @deprecated Use resolveActiveSlots instead. Kept for legacy path only. */
-function resolveModel(
-  settings: ModelSetting[],
-  mode: string,
-  tier: string,
-): { modelId: string; modelParams: Record<string, unknown> } | null {
-  const setting = settings.find((s) => s.mode === mode && s.tier === tier);
-  if (!setting) return null;
-  return {
-    modelId: setting.modelId,
-    modelParams: (setting.modelParams ?? {}) as Record<string, unknown>,
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Img2imgParams type (exported for slice-12 consumer)
@@ -78,10 +39,8 @@ export interface Img2imgParams {
   motiv: string;
   style: string;
   variants: number;
-  /** Active model IDs from model slots (new path). */
+  /** Active model IDs from model slots. */
   modelIds: string[];
-  /** @deprecated Use modelIds instead. Kept for legacy consumers until slice-12 migration. */
-  tier?: Tier;
   imageParams?: Record<string, unknown>;
 }
 
@@ -99,12 +58,10 @@ const VARIANTS_MAX = 4;
 
 export interface Img2imgPopoverProps {
   onGenerate?: (params: Img2imgParams) => void;
-  /** Model slots for the new ModelSlots-based workflow. Optional for backward compat. */
-  modelSlots?: ModelSlot[];
-  /** Available models for dropdown population. Optional for backward compat. */
-  models?: Model[];
-  /** @deprecated Use modelSlots + models instead. Kept for legacy consumers until slice-12. */
-  modelSettings?: ModelSetting[];
+  /** Model slot configurations for the ModelSlots UI. */
+  modelSlots: ModelSlot[];
+  /** Available models for dropdown population. */
+  models: Model[];
 }
 
 // ---------------------------------------------------------------------------
@@ -115,35 +72,14 @@ export function Img2imgPopover({
   onGenerate,
   modelSlots,
   models,
-  modelSettings = [],
 }: Img2imgPopoverProps) {
   const { state, dispatch } = useCanvasDetail();
-
-  // Determine whether to use the new ModelSlots path or the legacy TierToggle path
-  const useNewPath = modelSlots !== undefined && models !== undefined;
 
   // Local state for references, prompt fields, and variants
   const [slots, setSlots] = useState<ReferenceSlotData[]>([]);
   const [motiv, setMotiv] = useState("");
   const [style, setStyle] = useState("");
   const [variants, setVariants] = useState(1);
-
-  // Legacy-only state
-  const [tier, setTier] = useState<Tier>("draft");
-  const [imageParams, setImageParams] = useState<Record<string, unknown>>({});
-
-  // Legacy path: resolve modelId from settings for schema fetching
-  const resolved = !useNewPath ? resolveModel(modelSettings, "img2img", tier) : null;
-  const { schema, isLoading, error } = useModelSchema(
-    !useNewPath ? resolved?.modelId : undefined,
-  );
-
-  // Reset imageParams when tier/model changes (legacy path only)
-  useEffect(() => {
-    if (!useNewPath) {
-      setImageParams({});
-    }
-  }, [resolved?.modelId, useNewPath]);
 
   // Track all blob URLs we create so we can revoke them on unmount
   const blobUrlsRef = useRef<Set<string>>(new Set());
@@ -353,34 +289,18 @@ export function Img2imgPopover({
       strength: s.strength,
     }));
 
-    if (useNewPath && modelSlots) {
-      // New path: collect active slot modelIds via resolveActiveSlots
-      const activeSlots = resolveActiveSlots(modelSlots, "img2img");
-      const modelIds = activeSlots.map((s) => s.modelId);
+    const activeSlots = resolveActiveSlots(modelSlots, "img2img");
+    const modelIds = activeSlots.map((s) => s.modelId);
 
-      const params: Img2imgParams = {
-        references,
-        motiv,
-        style,
-        variants,
-        modelIds,
-        imageParams: undefined,
-      };
-      onGenerate?.(params);
-    } else {
-      // Legacy path: use tier
-      const params: Img2imgParams = {
-        references,
-        motiv,
-        style,
-        variants,
-        modelIds: [],
-        tier,
-        imageParams,
-      };
-      onGenerate?.(params);
-    }
-  }, [slots, motiv, style, variants, tier, imageParams, onGenerate, useNewPath, modelSlots]);
+    const params: Img2imgParams = {
+      references,
+      motiv,
+      style,
+      variants,
+      modelIds,
+    };
+    onGenerate?.(params);
+  }, [slots, motiv, style, variants, onGenerate, modelSlots]);
 
   // -------------------------------------------------------------------------
   // Render
@@ -507,45 +427,16 @@ export function Img2imgPopover({
             </div>
           </section>
 
-          {/* ---- Model Selection: New Path (ModelSlots) or Legacy Path (TierToggle) ---- */}
-          {useNewPath && modelSlots && models ? (
-            /* New path: ModelSlots replaces TierToggle and separate ParameterPanel */
-            <section data-testid="model-slots-section">
-              <ModelSlots
-                mode="img2img"
-                slots={modelSlots}
-                models={models}
-                variant="stacked"
-                disabled={state.isGenerating}
-              />
-            </section>
-          ) : (
-            /* Legacy path: TierToggle + separate ParameterPanel */
-            <>
-              <section data-testid="tier-section">
-                <div className="space-y-2">
-                  <TierToggle
-                    tier={tier}
-                    onTierChange={setTier}
-                    disabled={state.isGenerating}
-                  />
-                </div>
-              </section>
-
-              {/* ---- Parameter Controls (schema-based, legacy path only) ---- */}
-              {!error && (
-                <section data-testid="parameter-section">
-                  <ParameterPanel
-                    schema={schema as SchemaProperties | null}
-                    isLoading={isLoading}
-                    values={imageParams}
-                    onChange={setImageParams}
-                    primaryFields={["aspect_ratio", "megapixels", "resolution"]}
-                  />
-                </section>
-              )}
-            </>
-          )}
+          {/* ---- Model Selection ---- */}
+          <section data-testid="model-slots-section">
+            <ModelSlots
+              mode="img2img"
+              slots={modelSlots}
+              models={models}
+              variant="stacked"
+              disabled={state.isGenerating}
+            />
+          </section>
 
           {/* ---- Generate Button ---- */}
           <Button

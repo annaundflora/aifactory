@@ -388,10 +388,10 @@ describe("SettingsDialog Auto-Sync", () => {
   /**
    * AC-5: GIVEN ein Auto-Sync schliesst erfolgreich ab (failed === 0)
    *       WHEN die Complete-Events verarbeitet werden
-   *       THEN werden die Dropdowns automatisch befuellt (via window.dispatchEvent("model-settings-changed"),
-   *            bereits aus Slice 09), und der Success-Toast "X Models synced" erscheint mit auto-dismiss nach 3s
+   *       THEN werden die Dropdowns automatisch befuellt (via window.dispatchEvent("model-slots-changed")),
+   *            und der Success-Toast "X Models synced" erscheint mit auto-dismiss nach 3s
    */
-  it("AC-5: should dispatch model-settings-changed event after successful auto-sync", async () => {
+  it("AC-5: should dispatch model-slots-changed event after successful auto-sync", async () => {
     const events = [
       { type: "progress", completed: 50, total: 100 },
       { type: "complete", synced: 100, failed: 0, new: 80, updated: 20 },
@@ -410,9 +410,9 @@ describe("SettingsDialog Auto-Sync", () => {
     // Loading toast was dismissed
     expect(mockToast.dismiss).toHaveBeenCalledWith("toast-id-1");
 
-    // window.dispatchEvent was called with "model-settings-changed"
+    // window.dispatchEvent was called with "model-slots-changed"
     expect(dispatchEventSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "model-settings-changed" })
+      expect.objectContaining({ type: "model-slots-changed" })
     );
 
     // Sync button should be back to idle
@@ -456,9 +456,9 @@ describe("SettingsDialog Auto-Sync", () => {
     const syncButton = screen.getByTestId("sync-button");
     expect(syncButton).toHaveAttribute("data-sync-state", "sync_partial");
 
-    // window.dispatchEvent was called with "model-settings-changed"
+    // window.dispatchEvent was called with "model-slots-changed"
     expect(dispatchEventSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "model-settings-changed" })
+      expect.objectContaining({ type: "model-slots-changed" })
     );
   });
 
