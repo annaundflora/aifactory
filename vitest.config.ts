@@ -12,6 +12,7 @@ export default defineConfig({
       '**/node_modules/**',
       '**/dist/**',
       'worktrees/**',
+      'e2e/**',
     ],
     server: {
       deps: {

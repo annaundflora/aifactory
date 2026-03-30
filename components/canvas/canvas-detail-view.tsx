@@ -16,13 +16,13 @@ import { UpscalePopover } from "@/components/canvas/popovers/upscale-popover";
 import { CanvasChatPanel } from "@/components/canvas/canvas-chat-panel";
 import { generateImages, upscaleImage, fetchGenerations } from "@/app/actions/generations";
 import { deleteGeneration } from "@/app/actions/generations";
-import { getModelSettings } from "@/app/actions/model-settings";
+import { getModelSlots } from "@/app/actions/model-slots";
+import { getModels } from "@/app/actions/models";
 import { uploadReferenceImage, addGalleryAsReference } from "@/app/actions/references";
 import { Button } from "@/components/ui/button";
-import { type Generation, type ModelSetting } from "@/lib/db/queries";
+import { type Generation, type ModelSlot, type Model } from "@/lib/db/queries";
 import type { VariationParams } from "@/components/canvas/popovers/variation-popover";
 import type { Img2imgParams } from "@/components/canvas/popovers/img2img-popover";
-import type { Tier } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -78,28 +78,44 @@ export function CanvasDetailView({
   }, [allGenerations]);
 
   // ---------------------------------------------------------------------------
-  // Model Settings: fetch once on mount, cache in local state
+  // Model Slots: fetch once on mount, cache in local state (AC-1, AC-2)
   // ---------------------------------------------------------------------------
-  const [modelSettings, setModelSettings] = useState<ModelSetting[]>([]);
+  const [modelSlots, setModelSlots] = useState<ModelSlot[]>([]);
 
-  const loadModelSettings = useCallback(() => {
-    getModelSettings()
+  const loadModelSlots = useCallback(() => {
+    getModelSlots()
       .then((result) => {
         if ("error" in result) return;
-        setModelSettings(result);
+        setModelSlots(result);
       })
       .catch((err) => {
-        console.error("Failed to fetch model settings:", err);
+        console.error("Failed to fetch model slots:", err);
       });
   }, []);
 
   useEffect(() => {
-    loadModelSettings();
-    window.addEventListener("model-settings-changed", loadModelSettings);
+    loadModelSlots();
+    window.addEventListener("model-slots-changed", loadModelSlots);
     return () => {
-      window.removeEventListener("model-settings-changed", loadModelSettings);
+      window.removeEventListener("model-slots-changed", loadModelSlots);
     };
-  }, [loadModelSettings]);
+  }, [loadModelSlots]);
+
+  // ---------------------------------------------------------------------------
+  // Models: fetch once on mount for popover dropdowns (AC-11)
+  // ---------------------------------------------------------------------------
+  const [models, setModels] = useState<Model[]>([]);
+
+  useEffect(() => {
+    getModels({})
+      .then((result) => {
+        if ("error" in result) return;
+        setModels(result);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch models:", err);
+      });
+  }, []);
 
   // Track pending generation IDs for polling via ref to avoid effect churn.
   // A counter state triggers re-renders when pending list changes.
@@ -292,11 +308,10 @@ export function CanvasDetailView({
     async (params: VariationParams) => {
       if (state.isGenerating) return;
 
-      // Resolve img2img model for the selected tier
-      const setting = modelSettings.find(
-        (s) => s.mode === "img2img" && s.tier === params.tier
-      );
-      const selectedModel = setting?.modelId ?? currentGeneration.modelId;
+      // AC-4: Use modelIds from params directly (no tier-based lookup)
+      const modelIds = params.modelIds.length > 0
+        ? params.modelIds
+        : [currentGeneration.modelId];
       const promptStrength =
         VARIATION_STRENGTH_MAP[params.strength ?? "balanced"] ?? 0.6;
 
@@ -308,7 +323,7 @@ export function CanvasDetailView({
           promptMotiv: params.prompt,
           promptStyle: params.promptStyle,
           negativePrompt: params.negativePrompt,
-          modelIds: [selectedModel],
+          modelIds,
           params: { prompt_strength: promptStrength, ...(params.imageParams ?? {}) },
           count: params.count,
           generationMode: "img2img",
@@ -340,7 +355,7 @@ export function CanvasDetailView({
         toast.error("Generation fehlgeschlagen.");
       }
     },
-    [state.isGenerating, modelSettings, currentGeneration, dispatch, setPendingGenerationIds, onGenerationsCreated]
+    [state.isGenerating, currentGeneration, dispatch, setPendingGenerationIds, onGenerationsCreated]
   );
 
   // ---------------------------------------------------------------------------
@@ -351,11 +366,10 @@ export function CanvasDetailView({
     async (params: Img2imgParams) => {
       if (state.isGenerating) return;
 
-      // Resolve model from settings using the tier from params
-      const setting = modelSettings.find(
-        (s) => s.mode === "img2img" && s.tier === params.tier
-      );
-      const selectedModel = setting?.modelId ?? currentGeneration.modelId;
+      // AC-6: Use modelIds from params directly (no tier-based lookup)
+      const modelIds = params.modelIds.length > 0
+        ? params.modelIds
+        : [currentGeneration.modelId];
 
       dispatch({ type: "SET_GENERATING", isGenerating: true });
 
@@ -422,7 +436,7 @@ export function CanvasDetailView({
           projectId: currentGeneration.projectId,
           promptMotiv: params.motiv,
           promptStyle: params.style,
-          modelIds: [selectedModel],
+          modelIds,
           params: { ...(params.imageParams ?? {}) },
           count: params.variants,
           generationMode: "img2img",
@@ -454,7 +468,7 @@ export function CanvasDetailView({
         toast.error("Generation fehlgeschlagen.");
       }
     },
-    [state.isGenerating, modelSettings, currentGeneration, dispatch, setPendingGenerationIds, onGenerationsCreated]
+    [state.isGenerating, currentGeneration, dispatch, setPendingGenerationIds, onGenerationsCreated]
   );
 
   // ---------------------------------------------------------------------------
@@ -462,19 +476,19 @@ export function CanvasDetailView({
   // ---------------------------------------------------------------------------
 
   const handleUpscale = useCallback(
-    async (params: { scale: 2 | 4; tier: Tier }) => {
+    async (params: { scale: 2 | 4; modelIds?: string[]; tier?: string }) => {
       if (state.isGenerating) return;
       if (!currentGeneration.imageUrl) {
         toast.error("Kein Bild zum Hochskalieren vorhanden.");
         return;
       }
 
-      // Resolve model from settings using the tier from params
-      const setting = modelSettings.find(
-        (s) => s.mode === "upscale" && s.tier === params.tier
+      // AC-8: Use first modelId from params; resolve modelParams from modelSlots
+      const resolvedModelId = params.modelIds?.[0] ?? currentGeneration.modelId;
+      const matchingSlot = modelSlots.find(
+        (s) => s.mode === "upscale" && s.modelId === resolvedModelId
       );
-      const resolvedModelId = setting?.modelId ?? currentGeneration.modelId;
-      const resolvedModelParams = setting?.modelParams ?? {};
+      const resolvedModelParams = (matchingSlot?.modelParams ?? {}) as Record<string, unknown>;
 
       dispatch({ type: "SET_GENERATING", isGenerating: true });
 
@@ -485,7 +499,7 @@ export function CanvasDetailView({
           scale: params.scale,
           sourceGenerationId: currentGeneration.id,
           modelId: resolvedModelId,
-          modelParams: resolvedModelParams as Record<string, unknown>,
+          modelParams: resolvedModelParams,
         });
 
         if ("error" in result) {
@@ -508,7 +522,7 @@ export function CanvasDetailView({
         toast.error("Upscale fehlgeschlagen.");
       }
     },
-    [state.isGenerating, modelSettings, currentGeneration, dispatch, setPendingGenerationIds, onGenerationsCreated]
+    [state.isGenerating, modelSlots, currentGeneration, dispatch, setPendingGenerationIds, onGenerationsCreated]
   );
 
   // ---------------------------------------------------------------------------
@@ -575,15 +589,19 @@ export function CanvasDetailView({
           <VariationPopover
             generation={currentGeneration}
             onGenerate={handleVariationGenerate}
-            modelSettings={modelSettings}
+            modelSlots={modelSlots}
+            models={models}
           />
           <Img2imgPopover
             onGenerate={handleImg2imgGenerate}
-            modelSettings={modelSettings}
+            modelSlots={modelSlots}
+            models={models}
           />
           <UpscalePopover
             onUpscale={handleUpscale}
             isUpscaleDisabled={isUpscaleDisabled}
+            modelSlots={modelSlots}
+            models={models}
           />
           {/* Details overlay (push-down layout) */}
           <DetailsOverlay generation={currentGeneration} />
@@ -622,7 +640,8 @@ export function CanvasDetailView({
                   projectId={currentGeneration.projectId}
                   onPendingGenerations={setPendingGenerationIds}
                   onGenerationsCreated={onGenerationsCreated}
-                  modelSettings={modelSettings}
+                  modelSlots={modelSlots}
+                  models={models}
                 />
               )}
             </div>

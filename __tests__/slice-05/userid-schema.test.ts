@@ -13,7 +13,6 @@ import {
   assistantImages,
   referenceImages,
   generationReferences,
-  modelSettings,
 } from '@/lib/db/schema'
 
 /**
@@ -126,7 +125,6 @@ describe('slice-05-db-userid-migration: userId Schema', () => {
       { name: 'assistant_images', table: assistantImages, expectedCols: ['id', 'session_id', 'image_url'] },
       { name: 'reference_images', table: referenceImages, expectedCols: ['id', 'project_id', 'image_url', 'source_type'] },
       { name: 'generation_references', table: generationReferences, expectedCols: ['id', 'generation_id', 'reference_image_id', 'role'] },
-      { name: 'model_settings', table: modelSettings, expectedCols: ['id', 'mode', 'tier', 'model_id', 'model_params'] },
       { name: 'users', table: users, expectedCols: ['id', 'name', 'email', 'emailVerified', 'image'] },
       { name: 'accounts', table: accounts, expectedCols: ['userId', 'type', 'provider', 'providerAccountId'] },
       { name: 'sessions', table: sessions, expectedCols: ['sessionToken', 'userId', 'expires'] },

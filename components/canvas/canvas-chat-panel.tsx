@@ -9,14 +9,14 @@ import {
 import { MessageSquare, PanelRightClose, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { TierToggle } from "@/components/ui/tier-toggle";
+import { ModelSlots } from "@/components/ui/model-slots";
 import { useCanvasDetail } from "@/lib/canvas-detail-context";
 import { ChatThread } from "@/components/assistant/chat-thread";
 import { ChatInput } from "@/components/assistant/chat-input";
 import { ModelSelector, DEFAULT_MODEL_SLUG } from "@/components/assistant/model-selector";
-import { type Generation, type ModelSetting } from "@/lib/db/queries";
+import { type Generation, type ModelSlot, type Model } from "@/lib/db/queries";
+import { resolveActiveSlots } from "@/lib/utils/resolve-model";
 import { type ChatMessage } from "@/lib/types/chat-message";
-import type { Tier } from "@/lib/types";
 import {
   createSession,
   sendMessage as sendCanvasMessage,
@@ -46,8 +46,10 @@ export interface CanvasChatPanelProps {
   onPendingGenerations?: (pendingIds: string[]) => void;
   /** Called with newly created generations so the gallery state stays in sync. */
   onGenerationsCreated?: (newGens: Generation[]) => void;
-  /** Model settings for tier-based model resolution. Falls back to generation.modelId if empty. */
-  modelSettings?: ModelSetting[];
+  /** Model slots for slot-based model resolution. */
+  modelSlots: ModelSlot[];
+  /** Available models for the ModelSlots dropdown. */
+  models: Model[];
 }
 
 // ---------------------------------------------------------------------------
@@ -62,14 +64,16 @@ function buildInitMessage(generation: Generation): ChatMessage {
   };
 }
 
-function buildImageContext(generation: Generation, modelSettings: ModelSetting[] = []): CanvasImageContext {
-  // Build tier_models from img2img model settings
-  const tierModels: Record<string, string> = {};
-  for (const s of modelSettings) {
-    if (s.mode === "img2img" && s.modelId) {
-      tierModels[s.tier] = s.modelId;
-    }
-  }
+/** Extended image context that includes active model IDs from slots. */
+type SlotImageContext = CanvasImageContext & {
+  active_model_ids?: string[];
+};
+
+function buildImageContext(generation: Generation, modelSlots: ModelSlot[]): SlotImageContext {
+  // Build active_model_ids from active img2img model slots
+  const activeModelIds = modelSlots
+    .filter((s) => s.mode === "img2img" && s.active && s.modelId != null)
+    .map((s) => s.modelId as string);
 
   return {
     image_url: generation.imageUrl ?? "",
@@ -77,7 +81,7 @@ function buildImageContext(generation: Generation, modelSettings: ModelSetting[]
     model_id: generation.modelId ?? "",
     model_params: (generation.modelParams as Record<string, unknown>) ?? {},
     generation_id: generation.id,
-    ...(Object.keys(tierModels).length > 0 ? { tier_models: tierModels } : {}),
+    ...(activeModelIds.length > 0 ? { active_model_ids: activeModelIds } : {}),
   };
 }
 
@@ -85,7 +89,7 @@ function buildImageContext(generation: Generation, modelSettings: ModelSetting[]
 // CanvasChatPanel
 // ---------------------------------------------------------------------------
 
-export function CanvasChatPanel({ generation, projectId, onPendingGenerations, onGenerationsCreated, modelSettings = [] }: CanvasChatPanelProps) {
+export function CanvasChatPanel({ generation, projectId, onPendingGenerations, onGenerationsCreated, modelSlots, models }: CanvasChatPanelProps) {
   const { state, dispatch } = useCanvasDetail();
 
   // Local UI state
@@ -97,9 +101,6 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
   ]);
   const [isStreaming, setIsStreaming] = useState(false);
 
-  // Tier state for chat panel model resolution (independent from popovers)
-  const [tier, setTier] = useState<Tier>("draft");
-
   // Session state — local to the chat panel (not in Context per spec constraint)
   const sessionIdRef = useRef<string | null>(null);
 
@@ -107,7 +108,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
   const lastGenerationIdRef = useRef(state.currentGenerationId);
 
   // Keep image context in a ref — updated on generation change
-  const imageContextRef = useRef<CanvasImageContext>(buildImageContext(generation, modelSettings));
+  const imageContextRef = useRef<SlotImageContext>(buildImageContext(generation, modelSlots));
 
   // Width before collapse for restoring
   const preCollapseWidthRef = useRef(DEFAULT_WIDTH);
@@ -148,12 +149,12 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
   }, [collapsed, projectId]);
 
   // ---------------------------------------------------------------------------
-  // HIGH-2: Keep imageContextRef fresh whenever generation or modelSettings change
-  // (e.g. Prev/Next navigation or async settings load)
+  // HIGH-2: Keep imageContextRef fresh whenever generation or modelSlots change
+  // (e.g. Prev/Next navigation or async slots load)
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    imageContextRef.current = buildImageContext(generation, modelSettings);
-  }, [generation.id, modelSettings]);
+    imageContextRef.current = buildImageContext(generation, modelSlots);
+  }, [generation.id, modelSlots]);
 
   // ---------------------------------------------------------------------------
   // AC-10: Update context when currentGenerationId changes.
@@ -166,7 +167,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
       lastGenerationIdRef.current = state.currentGenerationId;
 
       // Always update image context for subsequent messages
-      imageContextRef.current = buildImageContext(generation, modelSettings);
+      imageContextRef.current = buildImageContext(generation, modelSlots);
 
       // Replace the first init message with updated context (Prev/Next + Sibling)
       setMessages((prev) => {
@@ -274,29 +275,32 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
 
   // ---------------------------------------------------------------------------
   // AC-6: Handle canvas-generate event -> call generateImages()
-  // Model resolution: ignore event.model_id, resolve from settings + tier.
-  // Fallback: generation.modelId if settings are empty (AC-10).
+  // Model resolution: resolve from active img2img slots.
+  // Fallback: generation.modelId if no active slots (AC-10).
   // ---------------------------------------------------------------------------
   const handleCanvasGenerate = useCallback(
     async (event: SSECanvasGenerateEvent) => {
       dispatch({ type: "SET_GENERATING", isGenerating: true });
 
-      // Resolve model from settings (img2img mode for chat panel)
-      const setting = modelSettings.find(
-        (s) => s.mode === "img2img" && s.tier === tier
-      );
-      // Use setting model + params, or fall back to generation.modelId (AC-10)
-      const resolvedModelId = setting?.modelId ?? generation.modelId;
-      const resolvedParams = setting?.modelParams
-        ? { ...(setting.modelParams as Record<string, unknown>), ...(event.params ?? {}) }
+      // Resolve models from active img2img slots
+      const activeSlots = resolveActiveSlots(modelSlots, "img2img");
+
+      // Use active slot modelIds, or fall back to generation.modelId (AC-10)
+      const modelIds = activeSlots.length > 0
+        ? activeSlots.map((s) => s.modelId)
+        : [generation.modelId];
+
+      // Use the first active slot's modelParams as base params, merged with event params
+      const baseParams = activeSlots.length > 0
+        ? { ...activeSlots[0].modelParams, ...(event.params ?? {}) }
         : (event.params ?? {});
 
       try {
         const result = await generateImages({
           projectId,
           promptMotiv: event.prompt,
-          modelIds: [resolvedModelId],
-          params: resolvedParams,
+          modelIds,
+          params: baseParams,
           count: 1,
           generationMode: event.action === "img2img" ? "img2img" : "txt2img",
           sourceImageUrl:
@@ -334,7 +338,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
         dispatch({ type: "SET_GENERATING", isGenerating: false });
       }
     },
-    [dispatch, projectId, onPendingGenerations, onGenerationsCreated, tier, modelSettings, generation.modelId]
+    [dispatch, projectId, onPendingGenerations, onGenerationsCreated, modelSlots, generation.modelId]
   );
 
   // ---------------------------------------------------------------------------
@@ -369,12 +373,16 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
       let botBubbleInserted = false;
 
       try {
-        // Inject current tier so the backend knows which model is selected
-        const contextWithTier = { ...imageContextRef.current, selected_tier: tier };
+        // Inject active model IDs so the backend knows which models are selected
+        const activeModelIds = resolveActiveSlots(modelSlots, "img2img").map((s) => s.modelId);
+        const contextWithModels = {
+          ...imageContextRef.current,
+          ...(activeModelIds.length > 0 ? { active_model_ids: activeModelIds } : {}),
+        };
         await sendCanvasMessage(
           sessionIdRef.current,
           text,
-          contextWithTier,
+          contextWithModels,
           (event: CanvasSSEEvent) => {
             switch (event.type) {
               case "text-delta": {
@@ -475,7 +483,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
         abortControllerRef.current = null;
       }
     },
-    [projectId, dispatch, handleCanvasGenerate, chatModelSlug]
+    [projectId, dispatch, handleCanvasGenerate, chatModelSlug, modelSlots]
   );
 
   // ---------------------------------------------------------------------------
@@ -629,14 +637,16 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
         onChipClick={handleChipClick}
       />
 
-      {/* Tier toggle bar between ChatThread and ChatInput */}
+      {/* Model slots bar between ChatThread and ChatInput */}
       <div
         className="flex shrink-0 items-center gap-2 border-t border-border/60 px-3 py-1.5"
-        data-testid="chat-tier-bar"
+        data-testid="chat-model-slots-bar"
       >
-        <TierToggle
-          tier={tier}
-          onTierChange={setTier}
+        <ModelSlots
+          variant="compact"
+          mode="img2img"
+          slots={modelSlots}
+          models={models}
           disabled={state.isGenerating}
         />
       </div>

@@ -1,25 +1,27 @@
-import type { ModelSetting } from "@/lib/db/queries";
-import type { GenerationMode, Tier } from "@/lib/types";
+import type { ModelSlot } from "@/lib/db/queries";
+import type { GenerationMode } from "@/lib/types";
 
 /**
- * Resolve model ID and params from cached model settings based on mode, tier,
- * and maxQuality flag.
+ * Resolve active model slots for a given generation mode.
  *
- * effectiveTier = maxQuality ? "max" : tier
+ * Filters the provided slots by mode and active status, then returns
+ * an array of { modelId, modelParams } for each matching slot.
  *
- * Returns { modelId, modelParams } or undefined if no matching setting found.
+ * - Slots with `modelId === null` are skipped (even if active).
+ * - Null/undefined `modelParams` are normalized to `{}`.
+ * - Result order follows the input array order (no sorting applied).
  */
-export function resolveModel(
-  settings: ModelSetting[],
+export function resolveActiveSlots(
+  slots: ModelSlot[],
   mode: GenerationMode,
-  tier: Tier,
-): { modelId: string; modelParams: Record<string, unknown> } | undefined {
-  const setting = settings.find(
-    (s) => s.mode === mode && s.tier === tier
-  );
-  if (!setting) return undefined;
-  return {
-    modelId: setting.modelId,
-    modelParams: (setting.modelParams ?? {}) as Record<string, unknown>,
-  };
+): { modelId: string; modelParams: Record<string, unknown> }[] {
+  return slots
+    .filter(
+      (s): s is ModelSlot & { modelId: string } =>
+        s.mode === mode && s.active === true && s.modelId != null,
+    )
+    .map((s) => ({
+      modelId: s.modelId,
+      modelParams: (s.modelParams ?? {}) as Record<string, unknown>,
+    }));
 }

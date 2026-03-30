@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import { ZoomIn } from "lucide-react";
 import { useCanvasDetail } from "@/lib/canvas-detail-context";
 import {
@@ -17,16 +17,24 @@ import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { TierToggle } from "@/components/ui/tier-toggle";
-import type { Tier } from "@/lib/types";
+import { ModelSlots } from "@/components/ui/model-slots";
+import { resolveActiveSlots } from "@/lib/utils/resolve-model";
+import type { ModelSlot, Model } from "@/lib/db/queries";
 
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
 
 export interface UpscalePopoverProps {
-  onUpscale: (params: { scale: 2 | 4; tier: Tier }) => void;
+  onUpscale: (params: {
+    scale: 2 | 4;
+    modelIds?: string[];
+  }) => void;
   isUpscaleDisabled: boolean;
+  /** Model slot configurations for the ModelSlots UI. */
+  modelSlots: ModelSlot[];
+  /** Available models for dropdown population. */
+  models: Model[];
 }
 
 // ---------------------------------------------------------------------------
@@ -36,19 +44,11 @@ export interface UpscalePopoverProps {
 export function UpscalePopover({
   onUpscale,
   isUpscaleDisabled,
+  modelSlots,
+  models,
 }: UpscalePopoverProps) {
   const { state, dispatch } = useCanvasDetail();
   const isOpen = state.activeToolId === "upscale";
-
-  // Local tier state -- defaults to "draft", resets when popover reopens
-  const [tier, setTier] = useState<Tier>("draft");
-
-  // Reset tier to draft whenever the popover opens
-  useEffect(() => {
-    if (isOpen) {
-      setTier("draft");
-    }
-  }, [isOpen]);
 
   // -------------------------------------------------------------------------
   // Handlers
@@ -66,11 +66,13 @@ export function UpscalePopover({
 
   const handleUpscale = useCallback(
     (scale: 2 | 4) => {
-      onUpscale({ scale, tier });
+      const activeSlots = resolveActiveSlots(modelSlots, "upscale");
+      const modelIds = activeSlots.map((s) => s.modelId);
+      onUpscale({ scale, modelIds });
       // Close the popover after action
       dispatch({ type: "SET_ACTIVE_TOOL", toolId: "upscale" });
     },
-    [onUpscale, tier, dispatch]
+    [onUpscale, dispatch, modelSlots]
   );
 
   // -------------------------------------------------------------------------
@@ -123,7 +125,7 @@ export function UpscalePopover({
       <PopoverContent
         side="right"
         sideOffset={12}
-        className="w-48"
+        className="w-72 max-h-[80vh] overflow-y-auto"
         data-testid="upscale-popover"
       >
         <PopoverHeader>
@@ -133,13 +135,14 @@ export function UpscalePopover({
           </PopoverTitle>
         </PopoverHeader>
 
-        {/* Tier Toggle -- above scale buttons, no MaxQualityToggle for upscale */}
-        <div className="mt-3" data-testid="upscale-tier-section">
-          <TierToggle
-            tier={tier}
-            onTierChange={setTier}
+        {/* Model selection */}
+        <div className="mt-3" data-testid="upscale-model-slots-section">
+          <ModelSlots
+            mode="upscale"
+            slots={modelSlots}
+            models={models}
+            variant="stacked"
             disabled={state.isGenerating}
-            hiddenValues={["max"]}
           />
         </div>
 
@@ -149,6 +152,7 @@ export function UpscalePopover({
             size="sm"
             className="w-full justify-center"
             onClick={() => handleUpscale(2)}
+            disabled={state.isGenerating}
             data-testid="upscale-2x-button"
           >
             2x Upscale
@@ -159,6 +163,7 @@ export function UpscalePopover({
             size="sm"
             className="w-full justify-center"
             onClick={() => handleUpscale(4)}
+            disabled={state.isGenerating}
             data-testid="upscale-4x-button"
           >
             4x Upscale

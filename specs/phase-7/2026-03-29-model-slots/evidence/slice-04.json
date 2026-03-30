@@ -1,0 +1,17 @@
+{
+  "feature": "model-slots",
+  "slice": "slice-04",
+  "timestamp": "2026-03-29T00:09:00Z",
+  "status": "completed",
+  "implementation": {"status": "completed", "files_changed": ["lib/services/model-slot-service.ts"]},
+  "review": {"verdict": "APPROVED", "findings": [], "iterations": 1},
+  "deterministic_gate": {"detected_stack": "TypeScript", "lint_passed": true, "lint_iterations": 1},
+  "tests": {
+    "test_files": ["lib/services/__tests__/model-slot-service.test.ts"],
+    "test_count": {"unit": 5, "integration": 0, "acceptance": 11},
+    "ac_coverage": {"total": 11, "covered": 11, "missing": []}
+  },
+  "validation": {"overall_status": "passed", "unit": "16 passed", "regression": "42 passed", "smoke": "307 OK"},
+  "retries": 0,
+  "review_iterations": 1
+}

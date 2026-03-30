@@ -11,7 +11,6 @@ import {
   assistantImages,
   referenceImages,
   generationReferences,
-  modelSettings,
 } from '@/lib/db/schema'
 
 /**
@@ -337,10 +336,9 @@ describe('slice-04-db-auth-tables: Auth Schema', () => {
       { name: 'assistant_images', table: assistantImages },
       { name: 'reference_images', table: referenceImages },
       { name: 'generation_references', table: generationReferences },
-      { name: 'model_settings', table: modelSettings },
     ]
 
-    it('should still export all 7 pre-existing tables (6 original + model_settings)', () => {
+    it('should still export all 6 pre-existing tables', () => {
       for (const { name, table } of existingTables) {
         expect(table, `Table "${name}" should still be exported`).toBeDefined()
         expect(
@@ -374,15 +372,5 @@ describe('slice-04-db-auth-tables: Auth Schema', () => {
       expect(colNames).toContain('image_url')
     })
 
-    it('should preserve model_settings table with original columns', () => {
-      const config = getTableConfig(modelSettings)
-      const colNames = config.columns.map((c) => c.name)
-
-      expect(colNames).toContain('id')
-      expect(colNames).toContain('mode')
-      expect(colNames).toContain('tier')
-      expect(colNames).toContain('model_id')
-      expect(colNames).toContain('model_params')
-    })
   })
 })

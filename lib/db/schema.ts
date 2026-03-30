@@ -11,6 +11,7 @@ import {
   boolean,
   index,
   uniqueIndex,
+  check,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
@@ -204,18 +205,19 @@ export const generationReferences = pgTable(
 );
 
 // -----------------------------------------------
-// model_settings
+// model_slots
 // -----------------------------------------------
-export const modelSettings = pgTable(
-  "model_settings",
+export const modelSlots = pgTable(
+  "model_slots",
   {
     id: uuid("id")
       .primaryKey()
       .default(sql`gen_random_uuid()`),
     mode: varchar("mode", { length: 20 }).notNull(),
-    tier: varchar("tier", { length: 20 }).notNull(),
-    modelId: varchar("model_id", { length: 255 }).notNull(),
+    slot: integer("slot").notNull(),
+    modelId: varchar("model_id", { length: 255 }),
     modelParams: jsonb("model_params").notNull().default({}),
+    active: boolean("active").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -224,7 +226,8 @@ export const modelSettings = pgTable(
       .defaultNow(),
   },
   (table) => [
-    uniqueIndex("model_settings_mode_tier_idx").on(table.mode, table.tier),
+    uniqueIndex("model_slots_mode_slot_idx").on(table.mode, table.slot),
+    check("model_slots_slot_check", sql`${table.slot} IN (1, 2, 3)`),
   ]
 );
 

@@ -11,8 +11,8 @@ import {
 } from "react";
 import { PromptTabs, type PromptTab } from "@/components/workspace/prompt-tabs";
 import { generateImages, upscaleImage } from "@/app/actions/generations";
-import { getModelSettings } from "@/app/actions/model-settings";
-import type { ModelSetting } from "@/lib/db/queries";
+import { getModelSlots } from "@/app/actions/model-slots";
+import { getModels } from "@/app/actions/models";
 import { useWorkspaceVariation } from "@/lib/workspace-state";
 import { ModeSelector, type GenerationMode } from "@/components/workspace/mode-selector";
 import { ImageDropzone } from "@/components/workspace/image-dropzone";
@@ -26,8 +26,8 @@ import type {
 } from "@/lib/types/reference";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { TierToggle } from "@/components/ui/tier-toggle";
-import type { Tier } from "@/lib/types";
+import { ModelSlots } from "@/components/ui/model-slots";
+import type { ModelSlot, Model } from "@/lib/db/queries";
 import { Loader2, Sparkles, Minus, Plus, Eraser, ChevronDown } from "lucide-react";
 import {
   Collapsible,
@@ -38,10 +38,8 @@ import { LLMComparison } from "@/components/prompt-improve/llm-comparison";
 import { AssistantTrigger } from "@/components/assistant/assistant-trigger";
 import { SectionLabel } from "@/components/shared/section-label";
 import { modelIdToDisplayName } from "@/lib/utils/model-display-name";
-import { resolveModel } from "@/lib/utils/resolve-model";
+import { resolveActiveSlots } from "@/lib/utils/resolve-model";
 import { usePromptAssistant } from "@/lib/assistant/assistant-context";
-import { useModelSchema } from "@/lib/hooks/use-model-schema";
-import { ParameterPanel, type SchemaProperties } from "@/components/workspace/parameter-panel";
 import { toast } from "sonner";
 
 // Re-export Generation type for callback
@@ -67,7 +65,6 @@ interface Txt2ImgState {
   promptStyle: string;
   negativePrompt: string;
   variantCount: number;
-  imageParams: Record<string, unknown>;
 }
 
 interface Img2ImgState {
@@ -76,7 +73,6 @@ interface Img2ImgState {
   negativePrompt: string;
   variantCount: number;
   referenceSlots: ReferenceSlotData[];
-  imageParams: Record<string, unknown>;
 }
 
 interface UpscaleState {
@@ -109,7 +105,6 @@ function createInitialModeStates(): ModeStates {
       promptStyle: "",
       negativePrompt: "",
       variantCount: 1,
-      imageParams: {},
     },
     img2img: {
       promptMotiv: "",
@@ -117,7 +112,6 @@ function createInitialModeStates(): ModeStates {
       negativePrompt: "",
       variantCount: 1,
       referenceSlots: [],
-      imageParams: {},
     },
     upscale: {
       sourceImageUrl: null,
@@ -139,29 +133,39 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
     createInitialModeStates()
   );
 
-  // ----- Tier state (Draft/Quality) -----
-  const [tier, setTier] = useState<Tier>("draft");
+  // ----- Model slots (replaces tier + model settings) -----
+  const [modelSlots, setModelSlots] = useState<ModelSlot[]>([]);
 
-  // ----- Model settings (cached from DB) -----
-  const [modelSettings, setModelSettings] = useState<ModelSetting[]>([]);
+  // ----- Models list for ModelSlots component -----
+  const [models, setModels] = useState<Model[]>([]);
 
-  // Fetch model settings on mount and when settings change
-  const loadModelSettings = useCallback(() => {
-    getModelSettings().then((result) => {
+  // Fetch model slots on mount and when slots change
+  const loadModelSlots = useCallback(() => {
+    getModelSlots().then((result) => {
       if ("error" in result) return;
-      setModelSettings(result);
+      setModelSlots(result);
     }).catch((err) => {
-      console.error("Failed to load model settings:", err);
+      console.error("Failed to load model slots:", err);
+    });
+  }, []);
+
+  // Fetch models list on mount
+  useEffect(() => {
+    getModels({}).then((result) => {
+      if ("error" in result) return;
+      setModels(result);
+    }).catch((err) => {
+      console.error("Failed to load models:", err);
     });
   }, []);
 
   useEffect(() => {
-    loadModelSettings();
-    window.addEventListener("model-settings-changed", loadModelSettings);
+    loadModelSlots();
+    window.addEventListener("model-slots-changed", loadModelSlots);
     return () => {
-      window.removeEventListener("model-settings-changed", loadModelSettings);
+      window.removeEventListener("model-slots-changed", loadModelSlots);
     };
-  }, [loadModelSettings]);
+  }, [loadModelSlots]);
 
   // ----- Structured prompt state -----
   const [promptMotiv, setPromptMotiv] = useState("");
@@ -181,28 +185,12 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
   const [upscaleSourceImageUrl, setUpscaleSourceImageUrl] = useState<string | null>(null);
   const [upscaleScale, setUpscaleScale] = useState<2 | 4>(DEFAULT_SCALE);
 
-  // ----- imageParams state (user-selected model parameters like aspect_ratio) -----
-  const [imageParams, setImageParams] = useState<Record<string, unknown>>({});
-
-  // ----- Model schema for parameter controls -----
-  const resolvedModel = currentMode !== "upscale"
-    ? resolveModel(modelSettings, currentMode, tier)
-    : undefined;
-  const resolvedModelId = resolvedModel?.modelId;
-  const { schema: modelSchema, isLoading: isSchemaLoading } = useModelSchema(resolvedModelId);
-
-  // Reset imageParams when resolved model changes (e.g., tier change)
-  const prevModelIdRef = useRef<string | undefined>(resolvedModelId);
-  useEffect(() => {
-    if (prevModelIdRef.current !== resolvedModelId) {
-      setImageParams({});
-      prevModelIdRef.current = resolvedModelId;
-    }
-  }, [resolvedModelId]);
-
   // ----- Sync current model + mode to Assistant context refs -----
   const { imageModelIdRef, generationModeRef } = usePromptAssistant();
-  imageModelIdRef.current = resolvedModelId ?? null;
+  const firstActiveSlot = modelSlots.find(
+    (s) => s.mode === currentMode && s.active && s.modelId != null,
+  );
+  imageModelIdRef.current = firstActiveSlot?.modelId ?? null;
   generationModeRef.current = currentMode;
 
   // ----- Generation state -----
@@ -229,7 +217,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
     setPromptMotiv("");
     setPromptStyle("");
     setNegativePrompt("");
-    setImageParams({});
     setVariantCount(1);
     setReferenceSlots([]);
     setUpscaleSourceImageUrl(null);
@@ -255,7 +242,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
           promptStyle,
           negativePrompt,
           variantCount,
-          imageParams,
         };
       } else if (currentMode === "img2img") {
         updated.img2img = {
@@ -264,7 +250,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
           negativePrompt,
           variantCount,
           referenceSlots,
-          imageParams,
         };
       } else if (currentMode === "upscale") {
         updated.upscale = {
@@ -283,7 +268,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
     referenceSlots,
     upscaleSourceImageUrl,
     upscaleScale,
-    imageParams,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -302,7 +286,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
           promptStyle,
           negativePrompt,
           variantCount,
-          imageParams,
         };
       } else if (currentMode === "img2img") {
         snapshot.img2img = {
@@ -311,7 +294,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
           negativePrompt,
           variantCount,
           referenceSlots,
-          imageParams,
         };
       } else if (currentMode === "upscale") {
         snapshot.upscale = {
@@ -332,7 +314,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
       } else if (targetMode === "img2img") {
         if (fromHasPrompt) {
           setReferenceSlots(snapshot.img2img.referenceSlots);
-          setImageParams(snapshot.img2img.imageParams);
         } else {
           const s = snapshot.img2img;
           setPromptMotiv(s.promptMotiv);
@@ -340,19 +321,14 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
           setNegativePrompt(s.negativePrompt);
           setVariantCount(s.variantCount);
           setReferenceSlots(s.referenceSlots);
-          setImageParams(s.imageParams);
         }
       } else if (targetMode === "txt2img") {
-        if (fromHasPrompt) {
-          // Prompts carry over; restore only txt2img-specific imageParams
-          setImageParams(snapshot.txt2img.imageParams);
-        } else {
+        if (!fromHasPrompt) {
           const s = snapshot.txt2img;
           setPromptMotiv(s.promptMotiv);
           setPromptStyle(s.promptStyle);
           setNegativePrompt(s.negativePrompt);
           setVariantCount(s.variantCount);
-          setImageParams(s.imageParams);
         }
       }
 
@@ -376,7 +352,6 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
       upscaleSourceImageUrl,
       upscaleScale,
       modeStates,
-      imageParams,
     ]
   );
 
@@ -696,15 +671,19 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
   // ---------------------------------------------------------------------------
 
   const handleGenerate = useCallback(() => {
-    // AC-10: Prevent generation when model settings are not loaded
-    if (modelSettings.length === 0) return;
+    // Prevent generation when model slots are not loaded
+    if (modelSlots.length === 0) return;
 
     if (currentMode === "txt2img") {
       if (!promptMotiv.trim()) return;
 
-      // Resolve model from settings based on tier + maxQuality
-      const resolved = resolveModel(modelSettings, "txt2img", tier);
-      if (!resolved) return;
+      // Resolve active slots for txt2img mode
+      const activeSlots = resolveActiveSlots(modelSlots, "txt2img");
+      if (activeSlots.length === 0) return;
+
+      const modelIds = activeSlots.map((s) => s.modelId);
+      // Merge params from all active slots (first slot's params as base)
+      const params = activeSlots[0].modelParams;
 
       startGeneration(async () => {
         const result = await generateImages({
@@ -712,8 +691,8 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
           promptMotiv: promptMotiv.trim(),
           promptStyle: promptStyle.trim() || undefined,
           negativePrompt: negativePrompt.trim() || undefined,
-          modelIds: [resolved.modelId],
-          params: { ...resolved.modelParams, ...imageParams },
+          modelIds,
+          params,
           count: variantCount,
           generationMode: "txt2img",
         });
@@ -724,9 +703,12 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
     } else if (currentMode === "img2img") {
       if (!promptMotiv.trim()) return;
 
-      // Resolve model from settings based on tier + maxQuality
-      const resolved = resolveModel(modelSettings, "img2img", tier);
-      if (!resolved) return;
+      // Resolve active slots for img2img mode
+      const activeSlots = resolveActiveSlots(modelSlots, "img2img");
+      if (activeSlots.length === 0) return;
+
+      const modelIds = activeSlots.map((s) => s.modelId);
+      const params = activeSlots[0].modelParams;
 
       // Pass referenceSlots data to generateImages
       const filledSlots = referenceSlots.filter((s) => s.imageUrl);
@@ -748,8 +730,8 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
           promptMotiv: promptMotiv.trim(),
           promptStyle: promptStyle.trim() || undefined,
           negativePrompt: negativePrompt.trim() || undefined,
-          modelIds: [resolved.modelId],
-          params: { ...resolved.modelParams, ...imageParams },
+          modelIds,
+          params,
           count: variantCount,
           generationMode: "img2img",
           sourceImageUrl,
@@ -762,9 +744,11 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
     } else if (currentMode === "upscale") {
       if (!upscaleSourceImageUrl) return;
 
-      // Resolve upscale model from settings (upscale has no max tier)
-      const resolved = resolveModel(modelSettings, "upscale", tier);
-      if (!resolved) return;
+      // Resolve active slots for upscale mode (use first active)
+      const activeSlots = resolveActiveSlots(modelSlots, "upscale");
+      if (activeSlots.length === 0) return;
+
+      const resolved = activeSlots[0];
 
       startGeneration(async () => {
         const result = await upscaleImage({
@@ -790,9 +774,7 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
     upscaleScale,
     projectId,
     onGenerationsCreated,
-    modelSettings,
-    tier,
-    imageParams,
+    modelSlots,
   ]);
 
   // ----- Keyboard shortcut (Cmd/Ctrl+Enter) on Motiv field -----
@@ -812,8 +794,8 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
 
   const isButtonDisabled = (() => {
     if (isGenerating) return true;
-    // AC-10: Disable when model settings not loaded
-    if (modelSettings.length === 0) return true;
+    // Disable when model slots not loaded
+    if (modelSlots.length === 0) return true;
     if (currentMode === "txt2img") return !promptMotiv.trim();
     if (currentMode === "img2img") return !promptMotiv.trim();
     if (currentMode === "upscale") return !upscaleSourceImageUrl;
@@ -1003,8 +985,8 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
 
               {/* LLM Prompt Improvement */}
               {showImprove && (() => {
-                const resolved = resolveModel(modelSettings, currentMode, tier);
-                const mid = resolved?.modelId ?? "";
+                const activeSlots = resolveActiveSlots(modelSlots, currentMode);
+                const mid = activeSlots.length > 0 ? activeSlots[0].modelId : "";
                 return (
                 <LLMComparison
                   prompt={promptMotiv}
@@ -1043,27 +1025,19 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
             </div>
           )}
 
-          {/* ── Action Bar: Tier Toggle + Variants + Generate ── */}
+          {/* ── Action Bar: Model Slots + Variants + Generate ── */}
           <div className="space-y-3">
             <hr className="border-border my-8" />
 
-            {/* Tier Toggle — always visible */}
-            <TierToggle
-              tier={tier}
-              onTierChange={setTier}
+            {/* Model Slots */}
+            <ModelSlots
+              mode={currentMode}
+              slots={modelSlots}
+              models={models}
+              variant="stacked"
               disabled={isGenerating}
-              hiddenValues={currentMode === "upscale" ? ["max"] : []}
+              onSlotsChanged={loadModelSlots}
             />
-
-            {/* Parameter Controls (aspect ratio, megapixels, etc.) — hidden in upscale mode */}
-            {currentMode !== "upscale" && (
-              <ParameterPanel
-                schema={modelSchema as SchemaProperties | null}
-                isLoading={isSchemaLoading}
-                values={imageParams}
-                onChange={setImageParams}
-              />
-            )}
 
             {/* Variant Count Stepper — hidden in upscale mode */}
             {showVariants && (
