@@ -39,7 +39,8 @@ import {
   CanvasDetailProvider,
   useCanvasDetail,
 } from "@/lib/canvas-detail-context";
-import type { Tier } from "@/lib/types";
+/** @deprecated Local Tier type for legacy test compatibility */
+type Tier = "draft" | "quality" | "max";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -75,7 +76,7 @@ function ToolActivator({
  */
 function renderUpscalePopover(
   overrides: Partial<{
-    onUpscale: (params: { scale: 2 | 4; tier: Tier }) => void;
+    onUpscale: (params: { scale: 2 | 4; modelIds?: string[]; tier?: Tier }) => void;
     isUpscaleDisabled: boolean;
     initialActiveToolId: string | null;
   }> = {}

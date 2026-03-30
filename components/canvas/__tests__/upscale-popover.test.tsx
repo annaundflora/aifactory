@@ -64,7 +64,7 @@ function ToolActivator({
  */
 function renderUpscalePopover(
   overrides: Partial<{
-    onUpscale: (params: { scale: 2 | 4; tier: import("@/lib/types").Tier }) => void;
+    onUpscale: (params: { scale: 2 | 4; modelIds?: string[]; tier?: "draft" | "quality" | "max" }) => void;
     isUpscaleDisabled: boolean;
     initialActiveToolId: string | null;
   }> = {}
