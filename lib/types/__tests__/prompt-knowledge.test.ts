@@ -35,24 +35,24 @@ describe('prompt-knowledge.json schema validation', () => {
 
   // AC-2: GIVEN die JSON-Datei geladen ist
   //        WHEN der Top-Level-Key models gelesen wird
-  //        THEN enthaelt er mindestens einen Eintrag mit dem Key flux-2
-  it('AC-2: should contain flux-2 entry in models', () => {
+  //        THEN enthaelt er mindestens einen Eintrag mit dem Key flux-2-pro
+  it('AC-2: should contain flux-2-pro entry in models', () => {
     const data = JSON.parse(rawJson)
     expect(data).toHaveProperty('models')
     expect(typeof data.models).toBe('object')
-    expect(data.models).toHaveProperty('flux-2')
+    expect(data.models).toHaveProperty('flux-2-pro')
   })
 
-  // AC-3: GIVEN der Eintrag models["flux-2"] existiert
+  // AC-3: GIVEN der Eintrag models["flux-2-pro"] existiert
   //        WHEN seine Felder geprueft werden
   //        THEN enthaelt er alle Pflichtfelder gemaess Schema:
   //        displayName (string), promptStyle ("natural" | "keywords"),
   //        negativePrompts (Objekt mit supported: boolean und note: string),
   //        strengths (string[], 2-4 Eintraege), tips (string[], 3-6 Eintraege),
   //        avoid (string[], 2-4 Eintraege)
-  it('AC-3: should have all required fields in flux-2 entry', () => {
+  it('AC-3: should have all required fields in flux-2-pro entry', () => {
     const data = JSON.parse(rawJson)
-    const flux2 = data.models['flux-2']
+    const flux2 = data.models['flux-2-pro']
 
     // displayName is a string
     expect(flux2).toHaveProperty('displayName')
@@ -91,13 +91,13 @@ describe('prompt-knowledge.json schema validation', () => {
     flux2.avoid.forEach((s: unknown) => expect(typeof s).toBe('string'))
   })
 
-  // AC-4: GIVEN der Eintrag models["flux-2"] existiert
+  // AC-4: GIVEN der Eintrag models["flux-2-pro"] existiert
   //        WHEN das optionale Feld modes geprueft wird
   //        THEN enthaelt es die Keys txt2img und img2img,
   //        jeweils mit tips (string[], 2-4 Eintraege)
-  it('AC-4: should have txt2img and img2img modes in flux-2 entry', () => {
+  it('AC-4: should have txt2img and img2img modes in flux-2-pro entry', () => {
     const data = JSON.parse(rawJson)
-    const flux2 = data.models['flux-2']
+    const flux2 = data.models['flux-2-pro']
 
     expect(flux2).toHaveProperty('modes')
     expect(typeof flux2.modes).toBe('object')
