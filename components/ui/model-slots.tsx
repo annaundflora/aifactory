@@ -28,8 +28,6 @@ export interface ModelSlotsProps {
   models: Model[];
   variant?: "stacked" | "compact";
   disabled?: boolean;
-  /** Hide per-slot ParameterPanels even in stacked variant (default: true) */
-  showParameters?: boolean;
   onSlotsChanged?: () => void;
   className?: string;
 }
@@ -76,7 +74,6 @@ interface SlotRowProps {
   isLastActive: boolean;
   disabled: boolean;
   variant: "stacked" | "compact";
-  showParameters: boolean;
   onSlotUpdate: (slot: ModelSlot) => void;
   onError: (slot: ModelSlot) => void;
 }
@@ -90,7 +87,6 @@ function SlotRow({
   isLastActive,
   disabled,
   variant,
-  showParameters,
   onSlotUpdate,
   onError,
 }: SlotRowProps) {
@@ -106,8 +102,7 @@ function SlotRow({
   const checkboxDisabled =
     disabled || !hasModel || (isActive && isLastActive) || isPending;
 
-  // Schema for parameter panel (only when showParameters is true, in stacked variant, for active slots with a model)
-  const showParams = showParameters && variant === "stacked" && isActive && hasModel;
+  const showParams = variant === "stacked" && isActive && hasModel;
   const schemaResult = useModelSchema(
     showParams ? (slot.modelId ?? undefined) : undefined,
   );
@@ -317,7 +312,6 @@ export function ModelSlots({
   models,
   variant = "stacked",
   disabled = false,
-  showParameters = true,
   onSlotsChanged,
   className,
 }: ModelSlotsProps) {
@@ -410,7 +404,6 @@ export function ModelSlots({
           isLastActive={slot.active && activeCount <= 1}
           disabled={disabled}
           variant={variant}
-          showParameters={showParameters}
           onSlotUpdate={handleSlotUpdate}
           onError={handleSlotError}
         />

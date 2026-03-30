@@ -4,3 +4,15 @@
 {"ts":"2026-03-29T00:04:00Z","slice":"slice-02","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
 {"ts":"2026-03-29T00:04:30Z","slice":"slice-02","gate":"lint","result":"PASSED","attempt":1}
 {"ts":"2026-03-29T00:05:00Z","slice":"slice-02","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-29T00:06:00Z","slice":"slice-03","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-29T00:06:30Z","slice":"slice-03","gate":"lint","result":"PASSED_WITH_KNOWN_BREAKAGE","attempt":1,"note":"14 TS errors in consumer files - expected per spec known_breakage"}
+{"ts":"2026-03-29T00:07:00Z","slice":"slice-03","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-29T00:08:00Z","slice":"slice-04","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-29T00:08:10Z","slice":"slice-04","gate":"lint","result":"PASSED_WITH_KNOWN_BREAKAGE","attempt":1}
+{"ts":"2026-03-29T00:09:00Z","slice":"slice-04","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-29T00:10:00Z","slice":"slice-05","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-29T00:10:10Z","slice":"slice-05","gate":"lint","result":"PASSED_WITH_KNOWN_BREAKAGE","attempt":1}
+{"ts":"2026-03-29T00:11:00Z","slice":"slice-05","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-29T00:12:00Z","slice":"slice-06","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-29T00:12:10Z","slice":"slice-06","gate":"lint","result":"PASSED_WITH_KNOWN_BREAKAGE","attempt":1}
+{"ts":"2026-03-29T00:13:00Z","slice":"slice-06","gate":"tests","result":"PASSED","retries":0}

@@ -1,0 +1,17 @@
+{
+  "feature": "model-slots",
+  "slice": "slice-03",
+  "timestamp": "2026-03-29T00:07:00Z",
+  "status": "completed",
+  "implementation": {"status": "completed", "files_changed": ["lib/types.ts", "lib/utils/resolve-model.ts"]},
+  "review": {"verdict": "APPROVED", "findings": [], "iterations": 1},
+  "deterministic_gate": {"detected_stack": "TypeScript", "lint_passed": true, "lint_iterations": 1, "note": "14 TS errors - known_breakage per spec"},
+  "tests": {
+    "test_files": ["lib/__tests__/types.test.ts", "lib/utils/resolve-model.test.ts"],
+    "test_count": {"unit": 6, "integration": 0, "acceptance": 11},
+    "ac_coverage": {"total": 8, "covered": 8, "missing": []}
+  },
+  "validation": {"overall_status": "passed", "unit": "17 passed", "regression": "25 passed", "smoke": "307 OK"},
+  "retries": 0,
+  "review_iterations": 1
+}

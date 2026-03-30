@@ -172,8 +172,7 @@ export function UpscalePopover({
               mode="upscale"
               slots={modelSlots!}
               models={models!}
-              variant="stacked"
-              showParameters={false}
+              variant="compact"
               disabled={state.isGenerating}
             />
           ) : (
