@@ -1,25 +1,7 @@
 "use client";
 
-import { useCallback } from "react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import type { GenerationMode, Tier } from "@/lib/types";
-
-/** @deprecated Legacy type kept for backward compat until consumers migrate to ModelSlot. */
-type ModelSetting = {
-  id: string;
-  mode: string;
-  tier: string;
-  modelId: string;
-  modelParams: unknown;
-  createdAt: Date;
-  updatedAt: Date;
-};
+import type { GenerationMode } from "@/lib/types";
+import type { ModelSlot } from "@/lib/db/queries";
 import type { Model } from "@/lib/services/model-catalog-service";
 
 // ---------------------------------------------------------------------------
@@ -30,9 +12,8 @@ type EmptyState = "empty:syncing" | "empty:never-synced" | "empty:failed" | "emp
 
 interface ModelModeSectionProps {
   mode: GenerationMode;
-  settings: ModelSetting[];
+  slots: ModelSlot[];
   models: Model[];
-  onModelChange: (mode: GenerationMode, tier: Tier, modelId: string) => void;
   syncState?: "idle" | "syncing" | "sync_partial";
   hasEverSynced?: boolean;
   syncFailed?: boolean;
@@ -51,19 +32,13 @@ const MODE_LABELS: Record<GenerationMode, string> = {
   outpaint: "OUTPAINT",
 };
 
-const TIERS_BY_MODE: Record<GenerationMode, Tier[]> = {
-  txt2img: ["draft", "quality", "max"],
-  img2img: ["draft", "quality", "max"],
-  upscale: ["draft", "quality"],
-  inpaint: ["quality"],
-  outpaint: ["quality"],
+const SLOT_LABELS: Record<number, string> = {
+  1: "Slot 1",
+  2: "Slot 2",
+  3: "Slot 3",
 };
 
-const TIER_LABELS: Record<Tier, string> = {
-  draft: "Draft",
-  quality: "Quality",
-  max: "Max",
-};
+const SLOTS = [1, 2, 3] as const;
 
 const EMPTY_STATE_MESSAGES: Record<Exclude<EmptyState, null>, string> = {
   "empty:syncing": "Loading models... please wait.",
@@ -78,32 +53,32 @@ const EMPTY_STATE_MESSAGES: Record<Exclude<EmptyState, null>, string> = {
 
 export function ModelModeSection({
   mode,
-  settings,
+  slots,
   models,
-  onModelChange,
   syncState = "idle",
   hasEverSynced = false,
   syncFailed = false,
   otherModesHaveModels = false,
 }: ModelModeSectionProps) {
-  const tiers = TIERS_BY_MODE[mode];
-
-  const getSettingForTier = useCallback(
-    (tier: Tier): ModelSetting | undefined => {
-      return settings.find((s) => s.mode === mode && s.tier === tier);
-    },
-    [settings, mode]
-  );
-
-  const handleValueChange = useCallback(
-    (tier: Tier, modelId: string) => {
-      onModelChange(mode, tier, modelId);
-    },
-    [mode, onModelChange]
+  const modeSlots = SLOTS.map((slotNumber) =>
+    slots.find((s) => s.mode === mode && s.slot === slotNumber) ?? null
   );
 
   // Determine the empty state for this section
-  const emptyState: EmptyState = models.length === 0 ? determineEmptyState(syncState, hasEverSynced, syncFailed, otherModesHaveModels) : null;
+  const emptyState: EmptyState =
+    models.length === 0
+      ? determineEmptyState(syncState, hasEverSynced, syncFailed, otherModesHaveModels)
+      : null;
+
+  /**
+   * Resolve a human-readable display name for the model assigned to a slot.
+   * Falls back to the raw modelId when the model is not in the catalog.
+   */
+  const getModelDisplayName = (modelId: string | null): string | null => {
+    if (!modelId) return null;
+    const model = models.find((m) => m.replicateId === modelId);
+    return model ? model.name : modelId;
+  };
 
   return (
     <div className="space-y-3">
@@ -111,56 +86,48 @@ export function ModelModeSection({
         {MODE_LABELS[mode]}
       </h3>
       <div className="rounded-lg border bg-card p-4 space-y-3">
-        {tiers.map((tier) => {
-          const setting = getSettingForTier(tier);
-          const currentModelId = setting?.modelId ?? "";
+        {emptyState ? (
+          <p className="text-sm text-muted-foreground" data-testid={`empty-state-${mode}`}>
+            {EMPTY_STATE_MESSAGES[emptyState]}
+          </p>
+        ) : (
+          modeSlots.map((slot, index) => {
+            const slotNumber = SLOTS[index];
+            const modelId = slot?.modelId ?? null;
+            const isActive = slot?.active ?? false;
+            const displayName = getModelDisplayName(modelId);
 
-          return (
-            <div
-              key={tier}
-              className="flex items-center gap-3"
-            >
-              <span className="text-sm font-medium w-16 shrink-0">
-                {TIER_LABELS[tier]}
-              </span>
-              {emptyState ? (
-                <p className="text-sm text-muted-foreground" data-testid={`empty-state-${mode}`}>
-                  {EMPTY_STATE_MESSAGES[emptyState]}
-                </p>
-              ) : (
-                <Select
-                  value={currentModelId}
-                  onValueChange={(value) => handleValueChange(tier, value)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a model">
-                      {currentModelId || "Select a model"}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[...models].sort((a, b) => a.name.localeCompare(b.name)).map((model) => {
-                      const modelId = model.replicateId;
-
-                      return (
-                        <SelectItem
-                          key={modelId}
-                          value={modelId}
-                        >
-                          <span className="flex flex-col">
-                            <span className="font-medium">{model.name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {model.owner}
-                            </span>
-                          </span>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-          );
-        })}
+            return (
+              <div
+                key={slotNumber}
+                className="flex items-center gap-3"
+                data-testid={`slot-row-${mode}-${slotNumber}`}
+              >
+                <span className="text-sm font-medium w-16 shrink-0">
+                  {SLOT_LABELS[slotNumber]}
+                </span>
+                <span className="text-sm flex-1 truncate">
+                  {displayName ? (
+                    displayName
+                  ) : (
+                    <span className="text-muted-foreground">not assigned</span>
+                  )}
+                </span>
+                <span className="flex items-center gap-1.5 shrink-0">
+                  <span
+                    className={`inline-block size-2 rounded-full ${
+                      isActive ? "bg-green-500" : "bg-gray-400"
+                    }`}
+                    data-testid={`status-dot-${mode}-${slotNumber}`}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    {isActive ? "on" : "off"}
+                  </span>
+                </span>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

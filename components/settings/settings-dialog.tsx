@@ -16,25 +16,12 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ModelModeSection } from "@/components/settings/model-mode-section";
-import {
-  getModelSettings,
-  updateModelSetting,
-} from "@/app/actions/model-settings";
+import { getModelSlots } from "@/app/actions/model-slots";
 import { getModels } from "@/app/actions/models";
 import { toast } from "sonner";
 import { Loader2, RefreshCw, AlertTriangle } from "lucide-react";
-import type { GenerationMode, Tier } from "@/lib/types";
-
-/** @deprecated Legacy type kept for backward compat until consumers migrate to ModelSlot. */
-type ModelSetting = {
-  id: string;
-  mode: string;
-  tier: string;
-  modelId: string;
-  modelParams: unknown;
-  createdAt: Date;
-  updatedAt: Date;
-};
+import type { GenerationMode } from "@/lib/types";
+import type { ModelSlot } from "@/lib/db/queries";
 import type { Model } from "@/lib/services/model-catalog-service";
 
 // ---------------------------------------------------------------------------
@@ -61,7 +48,7 @@ const SYNC_TIMEOUT_MS = 60_000;
 // ---------------------------------------------------------------------------
 
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
-  const [settings, setSettings] = useState<ModelSetting[]>([]);
+  const [slots, setSlots] = useState<ModelSlot[]>([]);
   const [modelsByMode, setModelsByMode] = useState<Record<GenerationMode, Model[]>>({
     txt2img: [],
     img2img: [],
@@ -87,10 +74,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   // Data loading
   // -------------------------------------------------------------------------
 
-  const loadSettings = useCallback(async () => {
-    const result = await getModelSettings();
+  const loadSlots = useCallback(async () => {
+    const result = await getModelSlots();
     if ("error" in result) return;
-    setSettings(result);
+    setSlots(result);
   }, []);
 
   /**
@@ -227,9 +214,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 setFailedCount(event.failed);
               }
 
-              // Reload models and notify other components
-              await loadModels();
-              window.dispatchEvent(new Event("model-settings-changed"));
+              // Reload models + slots and notify other components
+              await Promise.all([loadModels(), loadSlots()]);
+              window.dispatchEvent(new Event("model-slots-changed"));
             } else if (event.type === "error") {
               toast.dismiss(toastId);
               toast.error(`Sync failed: ${event.message}`, {
@@ -259,7 +246,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     } finally {
       clearTimeout(timeoutId);
     }
-  }, [syncState, loadModels]);
+  }, [syncState, loadModels, loadSlots]);
 
   // Keep a ref to the latest handleSync so the mount effect can call it
   // without adding handleSync to its dependency array (avoids re-running the
@@ -275,7 +262,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   useEffect(() => {
     if (open) {
-      loadSettings();
+      loadSlots();
       loadModels().then((catalogEmpty) => {
         // Auto-sync: when the catalog is completely empty and no auto-sync
         // has been triggered yet, start a sync automatically (AC-1).
@@ -286,56 +273,24 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         }
       });
     }
-  }, [open, loadSettings, loadModels]);
+  }, [open, loadSlots, loadModels]);
 
   // -------------------------------------------------------------------------
-  // Event-based refresh: listen to "model-settings-changed"
+  // Event-based refresh: listen to "model-slots-changed"
   // -------------------------------------------------------------------------
 
   useEffect(() => {
-    const handleModelSettingsChanged = () => {
+    const handleModelSlotsChanged = () => {
       loadModels();
+      loadSlots();
     };
 
-    window.addEventListener("model-settings-changed", handleModelSettingsChanged);
+    window.addEventListener("model-slots-changed", handleModelSlotsChanged);
 
     return () => {
-      window.removeEventListener("model-settings-changed", handleModelSettingsChanged);
+      window.removeEventListener("model-slots-changed", handleModelSlotsChanged);
     };
-  }, [loadModels]);
-
-  // -------------------------------------------------------------------------
-  // Model change handler (auto-save)
-  // -------------------------------------------------------------------------
-
-  const handleModelChange = useCallback(
-    async (mode: GenerationMode, tier: Tier, modelId: string) => {
-      const result = await updateModelSetting({ mode, tier, modelId });
-
-      if ("error" in result) {
-        // Error from server action -- could show a toast, but for now we
-        // simply reload to keep UI in sync
-        await loadSettings();
-        return;
-      }
-
-      // Optimistic update: replace the matching setting in state
-      setSettings((prev) => {
-        const updated = prev.map((s) =>
-          s.mode === mode && s.tier === tier ? result : s
-        );
-        // If the setting didn't exist before, add it
-        if (!prev.some((s) => s.mode === mode && s.tier === tier)) {
-          updated.push(result);
-        }
-        return updated;
-      });
-
-      // Notify other components (e.g. PromptArea) that settings changed
-      window.dispatchEvent(new Event("model-settings-changed"));
-    },
-    [loadSettings]
-  );
+  }, [loadModels, loadSlots]);
 
   // -------------------------------------------------------------------------
   // Sync button rendering
@@ -405,7 +360,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <div>
               <DialogTitle>Model Settings</DialogTitle>
               <DialogDescription>
-                Assign models to each generation mode and quality tier.
+                View current model slot assignments per generation mode.
               </DialogDescription>
             </div>
             {renderSyncButton()}
@@ -416,9 +371,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <ModelModeSection
               key={mode}
               mode={mode}
-              settings={settings}
+              slots={slots}
               models={modelsByMode[mode]}
-              onModelChange={handleModelChange}
               syncState={syncState}
               hasEverSynced={hasEverSynced}
               syncFailed={syncFailed}
@@ -427,6 +381,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               }
             />
           ))}
+          <p className="text-sm text-muted-foreground text-center">
+            Change models in the workspace.
+          </p>
         </div>
       </DialogContent>
     </Dialog>
