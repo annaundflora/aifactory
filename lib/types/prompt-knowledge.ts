@@ -8,16 +8,6 @@
 // ---------------------------------------------------------------------------
 
 /**
- * Information about negative prompt support for a model.
- */
-export interface NegativePromptInfo {
-  /** Whether the model supports a dedicated negative prompt input. */
-  supported: boolean;
-  /** Guidance note on how to handle negatives for this model. */
-  note: string;
-}
-
-/**
  * Mode-specific knowledge (e.g. txt2img, img2img).
  * Contains tips tailored to a particular generation mode.
  */
@@ -35,8 +25,6 @@ export interface ModelKnowledge {
   displayName: string;
   /** Preferred prompt style: natural language or keyword-based. */
   promptStyle: "natural" | "keywords";
-  /** Information about negative prompt support. */
-  negativePrompts: NegativePromptInfo;
   /** Key strengths of this model (2-4 items). */
   strengths: string[];
   /** General prompting tips for this model (3-6 items). */
