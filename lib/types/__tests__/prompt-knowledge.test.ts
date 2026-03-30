@@ -7,7 +7,6 @@ import type {
   ModelKnowledge,
   ModeKnowledge,
   FallbackKnowledge,
-  NegativePromptInfo,
 } from '@/lib/types/prompt-knowledge'
 
 // ---------------------------------------------------------------------------
@@ -47,7 +46,6 @@ describe('prompt-knowledge.json schema validation', () => {
   //        WHEN seine Felder geprueft werden
   //        THEN enthaelt er alle Pflichtfelder gemaess Schema:
   //        displayName (string), promptStyle ("natural" | "keywords"),
-  //        negativePrompts (Objekt mit supported: boolean und note: string),
   //        strengths (string[], 2-4 Eintraege), tips (string[], 3-6 Eintraege),
   //        avoid (string[], 2-4 Eintraege)
   it('AC-3: should have all required fields in flux-2 entry', () => {
@@ -61,13 +59,6 @@ describe('prompt-knowledge.json schema validation', () => {
     // promptStyle is "natural" or "keywords"
     expect(flux2).toHaveProperty('promptStyle')
     expect(['natural', 'keywords']).toContain(flux2.promptStyle)
-
-    // negativePrompts is an object with supported (boolean) and note (string)
-    expect(flux2).toHaveProperty('negativePrompts')
-    expect(typeof flux2.negativePrompts).toBe('object')
-    expect(flux2.negativePrompts).not.toBeNull()
-    expect(typeof flux2.negativePrompts.supported).toBe('boolean')
-    expect(typeof flux2.negativePrompts.note).toBe('string')
 
     // strengths is string[] with 2-4 entries
     expect(flux2).toHaveProperty('strengths')
@@ -154,7 +145,7 @@ describe('prompt-knowledge TypeScript types', () => {
   // AC-7: GIVEN die TypeScript-Interfaces exportiert sind
   //        WHEN die Exports geprueft werden
   //        THEN existieren mindestens: PromptKnowledgeFile, ModelKnowledge,
-  //        ModeKnowledge, FallbackKnowledge, NegativePromptInfo
+  //        ModeKnowledge, FallbackKnowledge
   //
   // Strategy: Import the module at runtime (not just type-level) and verify
   // that the module is resolvable. The type-level imports above already prove
@@ -178,7 +169,6 @@ describe('prompt-knowledge TypeScript types', () => {
     const obj: ModelKnowledge = {
       displayName: 'Test',
       promptStyle: 'natural',
-      negativePrompts: { supported: false, note: 'n/a' },
       strengths: ['a', 'b'],
       tips: ['a', 'b', 'c'],
       avoid: ['a', 'b'],
@@ -205,16 +195,6 @@ describe('prompt-knowledge TypeScript types', () => {
     expect(obj.displayName).toBe('Generic')
   })
 
-  it('AC-7: should export NegativePromptInfo interface', () => {
-    const obj: NegativePromptInfo = {
-      supported: true,
-      note: 'test note',
-    }
-    expect(obj).toBeDefined()
-    expect(obj.supported).toBe(true)
-    expect(obj.note).toBe('test note')
-  })
-
   // AC-8: GIVEN das Interface PromptKnowledgeFile existiert
   //        WHEN seine Struktur geprueft wird
   //        THEN hat es ein Feld models (Record mit string-Key und
@@ -223,7 +203,6 @@ describe('prompt-knowledge TypeScript types', () => {
     const modelEntry: ModelKnowledge = {
       displayName: 'Test Model',
       promptStyle: 'keywords',
-      negativePrompts: { supported: true, note: 'supports negatives' },
       strengths: ['fast', 'accurate'],
       tips: ['use keywords', 'be specific', 'add style'],
       avoid: ['long sentences', 'ambiguity'],
@@ -261,7 +240,6 @@ describe('prompt-knowledge TypeScript types', () => {
     const withoutModes: ModelKnowledge = {
       displayName: 'No Modes Model',
       promptStyle: 'natural',
-      negativePrompts: { supported: false, note: 'no negatives' },
       strengths: ['a', 'b'],
       tips: ['a', 'b', 'c'],
       avoid: ['a', 'b'],
@@ -273,7 +251,6 @@ describe('prompt-knowledge TypeScript types', () => {
     const withModes: ModelKnowledge = {
       displayName: 'Modes Model',
       promptStyle: 'keywords',
-      negativePrompts: { supported: true, note: 'supports negatives' },
       strengths: ['a', 'b', 'c'],
       tips: ['a', 'b', 'c', 'd'],
       avoid: ['a', 'b'],
@@ -291,7 +268,6 @@ describe('prompt-knowledge TypeScript types', () => {
     const requiredFields = [
       'displayName',
       'promptStyle',
-      'negativePrompts',
       'strengths',
       'tips',
       'avoid',

@@ -23,3 +23,10 @@
 {"ts":"2026-03-29T21:50:00Z","slice":"slice-05","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
 {"ts":"2026-03-29T21:51:00Z","slice":"slice-05","gate":"lint","result":"PASSED","attempt":1,"note":"TS errors only in later-slice files: canvas (slice-07), assistant-context (slice-10)"}
 {"ts":"2026-03-29T22:00:00Z","slice":"slice-05","gate":"tests","result":"PASSED","retries":1}
+{"ts":"2026-03-29T22:10:00Z","slice":"slice-10","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-29T22:11:00Z","slice":"slice-10","gate":"lint","result":"PASSED","attempt":1,"note":"TS errors only in canvas files (slice-07 scope)"}
+{"ts":"2026-03-29T22:25:00Z","slice":"slice-10","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-29T22:40:00Z","slice":"slice-07","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-29T22:41:00Z","slice":"slice-07","gate":"lint","result":"PASSED","attempt":1,"note":"0 TS errors - all slices now clean"}
+{"ts":"2026-03-29T22:55:00Z","slice":"slice-07","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-29T23:10:00Z","slice":"slice-11","gate":"code_review","verdict":"REJECTED","findings_count":3,"findings":["Missing deliverable: __tests__/e2e/prompt-simplification-smoke.test.ts","Missing deliverable: backend/tests/e2e/test_prompt_simplification_smoke.py","lib/types/__tests__/prompt-knowledge.test.ts has 3 failures from removed NegativePromptInfo"],"attempt":1}
