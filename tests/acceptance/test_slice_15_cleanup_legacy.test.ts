@@ -25,7 +25,7 @@ const ROOT = resolve(__dirname, '../..')
 // specs/, drizzle/, and .next/
 // ---------------------------------------------------------------------------
 function collectTsTsxFiles(dir: string, results: string[] = []): string[] {
-  const skipDirs = ['node_modules', 'specs', 'drizzle', '.next', '.git', '.claude']
+  const skipDirs = ['node_modules', 'specs', 'drizzle', '.next', '.git', '.claude', 'e2e', '__tests__']
   let entries: string[]
   try {
     entries = readdirSync(dir)

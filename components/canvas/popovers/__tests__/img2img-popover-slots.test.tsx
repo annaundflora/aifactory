@@ -709,30 +709,6 @@ describe("Img2imgPopover Unit (Slice 10)", () => {
     expect(screen.queryByTestId("tier-section")).not.toBeInTheDocument();
   });
 
-  it("should determine legacy path when modelSlots is missing", async () => {
-    renderImg2imgPopover({
-      initialActiveToolId: "img2img",
-      models: standardModels,
-      // modelSlots not provided
-    });
-
-    await screen.findByTestId("img2img-popover");
-    expect(screen.queryByTestId("model-slots")).not.toBeInTheDocument();
-    expect(screen.getByTestId("tier-section")).toBeInTheDocument();
-  });
-
-  it("should determine legacy path when models is missing", async () => {
-    renderImg2imgPopover({
-      initialActiveToolId: "img2img",
-      modelSlots: standardModelSlots,
-      // models not provided
-    });
-
-    await screen.findByTestId("img2img-popover");
-    expect(screen.queryByTestId("model-slots")).not.toBeInTheDocument();
-    expect(screen.getByTestId("tier-section")).toBeInTheDocument();
-  });
-
   it("should pass modelSlots and models to ModelSlots component", async () => {
     renderImg2imgPopover({
       initialActiveToolId: "img2img",

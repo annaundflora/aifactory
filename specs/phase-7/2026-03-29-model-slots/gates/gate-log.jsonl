@@ -35,3 +35,9 @@
 {"ts":"2026-03-29T00:18:00Z","slice":"slice-12","gate":"tests","result":"PASSED","retries":0}
 {"ts":"2026-03-29T00:18:01Z","slice":"slice-13","gate":"tests","result":"PASSED","retries":0}
 {"ts":"2026-03-29T00:19:00Z","slice":"slice-15","gate":"code_review","verdict":"REJECTED","findings_count":3,"attempt":1}
+{"ts":"2026-03-29T00:20:00Z","slice":"slice-15","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":2}
+{"ts":"2026-03-29T00:20:01Z","slice":"slice-15","gate":"lint","result":"PASSED","attempt":1,"note":"tsc --noEmit: 0 errors"}
+{"ts":"2026-03-29T00:21:00Z","slice":"slice-15","gate":"tests","result":"PASSED","retries":1}
+{"ts":"2026-03-29T00:22:00Z","slice":"slice-16","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-29T00:22:01Z","slice":"slice-16","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-03-29T00:22:02Z","slice":"slice-16","gate":"tests","result":"SKIPPED","note":"E2E tests require running dev server + DB - will run in Phase 6 final validation"}
