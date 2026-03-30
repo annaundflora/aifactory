@@ -125,7 +125,7 @@ export function UpscalePopover({
       <PopoverContent
         side="right"
         sideOffset={12}
-        className="w-48"
+        className="w-72 max-h-[80vh] overflow-y-auto"
         data-testid="upscale-popover"
       >
         <PopoverHeader>
@@ -141,7 +141,7 @@ export function UpscalePopover({
             mode="upscale"
             slots={modelSlots}
             models={models}
-            variant="compact"
+            variant="stacked"
             disabled={state.isGenerating}
           />
         </div>

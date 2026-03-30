@@ -85,6 +85,13 @@
       "when": 1774195200000,
       "tag": "0011_add_models_table",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1774281600000,
+      "tag": "0012_add_model_slots",
+      "breakpoints": true
     }
   ]
 }

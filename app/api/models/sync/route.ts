@@ -11,7 +11,7 @@
  * Runtime: nodejs (postgres-js needs TCP sockets, no Edge).
  */
 
-import { auth } from "@/auth";
+import { requireAuth } from "@/lib/auth/guard";
 import { ModelSyncService } from "@/lib/services/model-sync-service";
 
 // Force Node.js runtime — postgres-js uses TCP sockets which are not
@@ -29,10 +29,10 @@ let isSyncing = false;
 // ---------------------------------------------------------------------------
 
 export async function POST() {
-  // Auth check
-  const session = await auth();
-  if (!session) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  // Auth check (respects AUTH_DISABLED for dev mode)
+  const authResult = await requireAuth();
+  if ("error" in authResult) {
+    return Response.json({ error: authResult.error }, { status: 401 });
   }
 
   // Create the ReadableStream

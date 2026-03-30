@@ -329,11 +329,11 @@ export function ModelSlots({
     setOptimisticSlots(slots);
   }
 
-  // Ensure we always show exactly 3 slots, sorted by slot number
+  // Filter by current mode, then ensure exactly 3 slots sorted by slot number
   const sortedSlots = useMemo(() => {
     const slotMap = new Map<number, ModelSlot>();
     for (const s of optimisticSlots) {
-      slotMap.set(s.slot, s);
+      if (s.mode === mode) slotMap.set(s.slot, s);
     }
     return [1, 2, 3].map(
       (n) =>
@@ -352,7 +352,10 @@ export function ModelSlots({
 
   // Filter models by mode compatibility
   const compatibleModels = useMemo(
-    () => getCompatibleModels(models, mode),
+    () =>
+      getCompatibleModels(models, mode).sort((a, b) =>
+        a.name.localeCompare(b.name),
+      ),
     [models, mode],
   );
 
