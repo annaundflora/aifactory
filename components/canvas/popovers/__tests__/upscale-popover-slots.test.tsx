@@ -100,9 +100,6 @@ import {
   useCanvasDetail,
 } from "@/lib/canvas-detail-context";
 
-/** @deprecated Local Tier type for legacy test compatibility */
-type Tier = "draft" | "quality" | "max";
-
 // ---------------------------------------------------------------------------
 // Test Fixtures
 // ---------------------------------------------------------------------------
@@ -241,7 +238,6 @@ function GeneratingActivator({
 type OnUpscaleFn = (params: {
   scale: 2 | 4;
   modelIds?: string[];
-  tier?: Tier;
 }) => void;
 
 /**
@@ -446,11 +442,10 @@ describe("UpscalePopover - ModelSlots Integration (Slice 11)", () => {
    * AC-4: GIVEN die UpscalePopoverProps
    *       WHEN die Props definiert werden
    *       THEN akzeptiert die Komponente modelSlots (Typ ModelSlot[])
-   *            und models? (Typ Model[], optional) als neue Props
-   *       AND onUpscale akzeptiert { scale: 2 | 4, modelIds: string[], tier?: Tier }
-   *            -- tier ist @deprecated
+   *            und models (Typ Model[]) als required Props
+   *       AND onUpscale akzeptiert { scale: 2 | 4, modelIds?: string[] }
    */
-  it("AC-4: should accept modelSlots and models props with onUpscale receiving modelIds and optional deprecated tier", () => {
+  it("AC-4: should accept modelSlots and models as required props with onUpscale receiving modelIds", () => {
     // Type-level check: Verify the component accepts modelSlots and models props.
     // This test will fail to compile if the props are not accepted.
 
@@ -461,30 +456,15 @@ describe("UpscalePopover - ModelSlots Integration (Slice 11)", () => {
     expect(paramsWithModelIds.scale).toBe(2);
     expect(paramsWithModelIds.modelIds).toEqual(["model-a", "model-b"]);
 
-    // Verify onUpscale still accepts deprecated tier (backward compat)
-    const paramsWithTier: Parameters<
+    // Verify onUpscale accepts scale-only (modelIds is optional)
+    const paramsScaleOnly: Parameters<
       React.ComponentProps<typeof UpscalePopover>["onUpscale"]
-    >[0] = { scale: 4, tier: "quality" };
-    expect(paramsWithTier.tier).toBe("quality");
+    >[0] = { scale: 4 };
+    expect(paramsScaleOnly.scale).toBe(4);
 
-    // Verify both can be provided simultaneously
-    const paramsWithBoth: Parameters<
-      React.ComponentProps<typeof UpscalePopover>["onUpscale"]
-    >[0] = { scale: 2, modelIds: ["model-a"], tier: "draft" };
-    expect(paramsWithBoth.modelIds).toEqual(["model-a"]);
-    expect(paramsWithBoth.tier).toBe("draft");
-
-    // Verify modelSlots and models are optional (rendering without them should work)
+    // Verify modelSlots and models are accepted as required props
     const { unmount } = render(
       <CanvasDetailProvider initialGenerationId="gen-type-test">
-        <UpscalePopover onUpscale={vi.fn()} isUpscaleDisabled={false} />
-      </CanvasDetailProvider>
-    );
-    unmount();
-
-    // Verify modelSlots and models are accepted when provided
-    const { unmount: unmount2 } = render(
-      <CanvasDetailProvider initialGenerationId="gen-type-test-2">
         <UpscalePopover
           onUpscale={vi.fn()}
           isUpscaleDisabled={false}
@@ -493,7 +473,7 @@ describe("UpscalePopover - ModelSlots Integration (Slice 11)", () => {
         />
       </CanvasDetailProvider>
     );
-    unmount2();
+    unmount();
   });
 
   // -------------------------------------------------------------------------
@@ -638,76 +618,9 @@ describe("UpscalePopover - ModelSlots Integration (Slice 11)", () => {
     });
   });
 
-  it("AC-7b: should reset legacy tier state to draft when popover reopens", async () => {
-    const user = userEvent.setup();
-    const onUpscale = vi.fn();
-
-    /**
-     * Wrapper for legacy path (no modelSlots) to verify tier reset behavior.
-     * Uses a separate close button that dispatches a different tool to force
-     * activeToolId to null (toggle "upscale" -> null), then open button
-     * re-dispatches "upscale".
-     */
-    function LegacyReopenHarness() {
-      const { dispatch } = useCanvasDetail();
-
-      return (
-        <>
-          <button
-            data-testid="open-popover"
-            onClick={() =>
-              dispatch({ type: "SET_ACTIVE_TOOL", toolId: "upscale" })
-            }
-          >
-            Open
-          </button>
-          <button
-            data-testid="close-popover"
-            onClick={() =>
-              dispatch({ type: "SET_ACTIVE_TOOL", toolId: "upscale" })
-            }
-          >
-            Close
-          </button>
-          <UpscalePopover
-            onUpscale={onUpscale}
-            isUpscaleDisabled={false}
-          />
-        </>
-      );
-    }
-
-    render(
-      <CanvasDetailProvider initialGenerationId="gen-legacy-reopen">
-        <LegacyReopenHarness />
-      </CanvasDetailProvider>
-    );
-
-    // Step 1: Open popover
-    await user.click(screen.getByTestId("open-popover"));
-    await screen.findByTestId("upscale-popover");
-
-    // Step 2: Switch to Quality
-    const qualityButton = screen.getByText("Quality");
-    await user.click(qualityButton);
-    expect(qualityButton).toHaveAttribute("aria-pressed", "true");
-
-    // Step 3: Close popover (toggle off -- dispatching "upscale" again sets activeToolId to null)
-    await user.click(screen.getByTestId("close-popover"));
-
-    // Step 4: Reopen popover (toggle on -- dispatching "upscale" sets activeToolId to "upscale")
-    await user.click(screen.getByTestId("open-popover"));
-    const popoverReopened = await screen.findByTestId("upscale-popover");
-    expect(popoverReopened).toBeInTheDocument();
-
-    // Step 5: Verify tier is reset to "Draft"
-    const draftButton = screen.getByText("Draft");
-    expect(draftButton).toHaveAttribute("aria-pressed", "true");
-    expect(draftButton).toHaveAttribute("data-active", "true");
-
-    const qualityAfterReopen = screen.getByText("Quality");
-    expect(qualityAfterReopen).toHaveAttribute("aria-pressed", "false");
-  });
+  // AC-7b: Legacy tier reset test removed -- tier/legacy path no longer exists.
+  // The UpscalePopover now requires modelSlots and models as mandatory props
+  // and no longer renders a tier selector.
 
   // -------------------------------------------------------------------------
   // AC-8: isUpscaleDisabled zeigt Tooltip-State
