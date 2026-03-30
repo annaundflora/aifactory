@@ -120,7 +120,7 @@ import {
   useCanvasDetail,
 } from "@/lib/canvas-detail-context";
 import type { Generation } from "@/lib/db/queries";
-import type { Tier } from "@/lib/types";
+// Tier type removed from @/lib/types in slice-03; no longer imported
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -399,6 +399,7 @@ describe("Img2imgParams interface", () => {
       motiv: "test",
       style: "",
       variants: 1,
+      modelIds: [],
       tier: "draft",
     };
     expect(draftParams.tier).toBe("draft");
@@ -408,6 +409,7 @@ describe("Img2imgParams interface", () => {
       motiv: "test",
       style: "",
       variants: 1,
+      modelIds: [],
       tier: "quality",
     };
     expect(qualityParams.tier).toBe("quality");
@@ -417,18 +419,20 @@ describe("Img2imgParams interface", () => {
       motiv: "test",
       style: "",
       variants: 1,
+      modelIds: [],
       tier: "max",
     };
     expect(maxParams.tier).toBe("max");
 
     // Verify that all Tier values are assignable
-    const allTiers: Tier[] = ["draft", "quality", "max"];
+    const allTiers: ("draft" | "quality" | "max")[] = ["draft", "quality", "max"];
     for (const tier of allTiers) {
       const params: Img2imgParams = {
         references: [],
         motiv: "test",
         style: "",
         variants: 1,
+        modelIds: [],
         tier,
       };
       expect(allTiers).toContain(params.tier);
