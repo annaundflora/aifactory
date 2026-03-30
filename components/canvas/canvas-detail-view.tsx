@@ -24,26 +24,6 @@ import { type Generation, type ModelSlot, type Model } from "@/lib/db/queries";
 import type { VariationParams } from "@/components/canvas/popovers/variation-popover";
 import type { Img2imgParams } from "@/components/canvas/popovers/img2img-popover";
 
-/**
- * @deprecated Local Tier type kept solely for ChatPanel backward-compat
- * mapping (AC-9). Will be removed when slice-13 migrates CanvasChatPanel.
- */
-type Tier = "draft" | "quality" | "max";
-
-/**
- * @deprecated Legacy ModelSetting shape for ChatPanel backward-compat (AC-9).
- * Constructed by mapping ModelSlot[] -> ModelSetting[].
- */
-type ModelSetting = {
-  id: string;
-  mode: string;
-  tier: string;
-  modelId: string;
-  modelParams: unknown;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -136,21 +116,6 @@ export function CanvasDetailView({
         console.error("Failed to fetch models:", err);
       });
   }, []);
-
-  // ---------------------------------------------------------------------------
-  // Backward-compat: map modelSlots to modelSettings for CanvasChatPanel (AC-9)
-  // ---------------------------------------------------------------------------
-  const modelSettings = useMemo<ModelSetting[]>(() => {
-    return modelSlots.map((slot) => ({
-      id: slot.id,
-      mode: slot.mode,
-      tier: "pro" as Tier,
-      modelId: slot.modelId ?? "",
-      modelParams: slot.modelParams,
-      createdAt: slot.createdAt,
-      updatedAt: slot.updatedAt,
-    }));
-  }, [modelSlots]);
 
   // Track pending generation IDs for polling via ref to avoid effect churn.
   // A counter state triggers re-renders when pending list changes.
@@ -511,7 +476,7 @@ export function CanvasDetailView({
   // ---------------------------------------------------------------------------
 
   const handleUpscale = useCallback(
-    async (params: { scale: 2 | 4; modelIds?: string[]; tier?: Tier }) => {
+    async (params: { scale: 2 | 4; modelIds?: string[]; tier?: string }) => {
       if (state.isGenerating) return;
       if (!currentGeneration.imageUrl) {
         toast.error("Kein Bild zum Hochskalieren vorhanden.");
@@ -675,7 +640,8 @@ export function CanvasDetailView({
                   projectId={currentGeneration.projectId}
                   onPendingGenerations={setPendingGenerationIds}
                   onGenerationsCreated={onGenerationsCreated}
-                  modelSettings={modelSettings}
+                  modelSlots={modelSlots}
+                  models={models}
                 />
               )}
             </div>

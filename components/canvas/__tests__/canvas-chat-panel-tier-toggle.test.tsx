@@ -109,18 +109,7 @@ import {
   useCanvasDetail,
   type CanvasDetailAction,
 } from "@/lib/canvas-detail-context";
-import { type Generation } from "@/lib/db/queries";
-
-/** @deprecated Legacy type kept for backward compat until consumers migrate to ModelSlot. */
-type ModelSetting = {
-  id: string;
-  mode: string;
-  tier: string;
-  modelId: string;
-  modelParams: unknown;
-  createdAt: Date;
-  updatedAt: Date;
-};
+import { type Generation, type ModelSlot, type Model } from "@/lib/db/queries";
 import type { CanvasSSEEvent } from "@/lib/canvas-chat-service";
 
 // ---------------------------------------------------------------------------
@@ -153,13 +142,14 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
   };
 }
 
-function makeModelSetting(overrides: Partial<ModelSetting> = {}): ModelSetting {
+function makeModelSlot(overrides: Partial<ModelSlot> = {}): ModelSlot {
   return {
     id: overrides.id ?? "ms-default",
     mode: overrides.mode ?? "img2img",
-    tier: overrides.tier ?? "draft",
+    slot: overrides.slot ?? 1,
     modelId: overrides.modelId ?? "black-forest-labs/flux-schnell",
     modelParams: overrides.modelParams ?? {},
+    active: overrides.active ?? true,
     createdAt: overrides.createdAt ?? new Date(),
     updatedAt: overrides.updatedAt ?? new Date(),
   };
@@ -203,14 +193,15 @@ function ContextDispatcher({
 }
 
 /**
- * Renders CanvasChatPanel wrapped in CanvasDetailProvider with modelSettings support.
+ * Renders CanvasChatPanel wrapped in CanvasDetailProvider with modelSlots support.
  */
 function renderChatPanel(
   options: {
     generation?: Generation;
     projectId?: string;
     initialGenerationId?: string;
-    modelSettings?: ModelSetting[];
+    modelSlots?: ModelSlot[];
+    models?: Model[];
     onPendingGenerations?: (pendingIds: string[]) => void;
     onGenerationsCreated?: (newGens: Generation[]) => void;
   } = {}
@@ -226,7 +217,8 @@ function renderChatPanel(
       <CanvasChatPanel
         generation={generation}
         projectId={projectId}
-        modelSettings={options.modelSettings}
+        modelSlots={options.modelSlots ?? []}
+        models={options.models ?? []}
         onPendingGenerations={options.onPendingGenerations}
         onGenerationsCreated={options.onGenerationsCreated}
       />
@@ -242,7 +234,8 @@ function renderChatPanelWithDispatcher(
     generation?: Generation;
     projectId?: string;
     initialGenerationId?: string;
-    modelSettings?: ModelSetting[];
+    modelSlots?: ModelSlot[];
+    models?: Model[];
     initialAction?: CanvasDetailAction;
   } = {}
 ) {
@@ -261,7 +254,8 @@ function renderChatPanelWithDispatcher(
       <CanvasChatPanel
         generation={generation}
         projectId={projectId}
-        modelSettings={options.modelSettings}
+        modelSlots={options.modelSlots ?? []}
+        models={options.models ?? []}
       />
     </CanvasDetailProvider>
   );
@@ -382,27 +376,30 @@ describe("CanvasChatPanel handleCanvasGenerate model resolution", () => {
     mockGenerateImages.mockResolvedValue([]);
   });
 
-  const MODEL_SETTINGS: ModelSetting[] = [
-    makeModelSetting({
-      id: "ms-draft",
+  const MODEL_SLOTS: ModelSlot[] = [
+    makeModelSlot({
+      id: "ms-slot1",
       mode: "img2img",
-      tier: "draft",
+      slot: 1,
       modelId: "black-forest-labs/flux-schnell",
       modelParams: {},
+      active: true,
     }),
-    makeModelSetting({
-      id: "ms-quality",
+    makeModelSlot({
+      id: "ms-slot2",
       mode: "img2img",
-      tier: "quality",
+      slot: 2,
       modelId: "black-forest-labs/flux-2-pro",
       modelParams: { prompt_strength: 0.6 },
+      active: false,
     }),
-    makeModelSetting({
-      id: "ms-max",
+    makeModelSlot({
+      id: "ms-slot3",
       mode: "img2img",
-      tier: "max",
+      slot: 3,
       modelId: "black-forest-labs/flux-2-max",
       modelParams: { prompt_strength: 0.8 },
+      active: false,
     }),
   ];
 
@@ -438,7 +435,7 @@ describe("CanvasChatPanel handleCanvasGenerate model resolution", () => {
     renderChatPanel({
       generation,
       projectId: "project-ac5",
-      modelSettings: MODEL_SETTINGS,
+      modelSlots: MODEL_SLOTS,
     });
 
     await waitFor(() => expect(mockCreateSession).toHaveBeenCalledTimes(1));
@@ -498,7 +495,7 @@ describe("CanvasChatPanel handleCanvasGenerate model resolution", () => {
     renderChatPanel({
       generation,
       projectId: "project-ac6",
-      modelSettings: MODEL_SETTINGS,
+      modelSlots: MODEL_SLOTS,
     });
 
     await waitFor(() => expect(mockCreateSession).toHaveBeenCalledTimes(1));
@@ -558,7 +555,7 @@ describe("CanvasChatPanel handleCanvasGenerate model resolution", () => {
     renderChatPanel({
       generation,
       projectId: "project-ac7",
-      modelSettings: MODEL_SETTINGS,
+      modelSlots: MODEL_SLOTS,
     });
 
     await waitFor(() => expect(mockCreateSession).toHaveBeenCalledTimes(1));
@@ -613,7 +610,7 @@ describe("CanvasChatPanel handleCanvasGenerate model resolution", () => {
     renderChatPanel({
       generation,
       projectId: "project-ac10",
-      modelSettings: [],
+      modelSlots: [],
     });
 
     await waitFor(() => expect(mockCreateSession).toHaveBeenCalledTimes(1));
@@ -779,7 +776,8 @@ describe("CanvasChatPanel TierToggle interaction states", () => {
           <CanvasChatPanel
             generation={generation}
             projectId={generation.projectId}
-            modelSettings={[]}
+            modelSlots={[]}
+            models={[]}
           />
           {!didSetGenerating && (
             <button
