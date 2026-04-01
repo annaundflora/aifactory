@@ -92,6 +92,7 @@ const mockToggleSlotActive = vi.fn();
 vi.mock("@/app/actions/model-slots", () => ({
   updateModelSlot: (...args: unknown[]) => mockUpdateModelSlot(...args),
   toggleSlotActive: (...args: unknown[]) => mockToggleSlotActive(...args),
+  clearModelSlot: vi.fn(),
 }));
 
 // Track ModelSlots props for assertion

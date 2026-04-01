@@ -676,6 +676,32 @@ export async function upsertModelSlot(
 }
 
 /**
+ * Clears a model slot by setting modelId to null, modelParams to {},
+ * and active to false. Used for removing a model from a slot.
+ */
+export async function clearModelSlot(
+  mode: string,
+  slot: number
+): Promise<ModelSlot> {
+  const [row] = await db
+    .update(modelSlots)
+    .set({
+      modelId: null,
+      modelParams: {},
+      active: false,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(modelSlots.mode, mode),
+        eq(modelSlots.slot, slot)
+      )
+    )
+    .returning();
+  return row;
+}
+
+/**
  * Seeds the default 15 model slot rows (5 modes x 3 slots).
  * Uses `onConflictDoNothing` so existing rows are not overwritten (idempotent).
  */

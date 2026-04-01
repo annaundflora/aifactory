@@ -23,6 +23,11 @@ export type ToggleSlotActiveInput = {
   active: boolean;
 };
 
+export type ClearModelSlotInput = {
+  mode: GenerationMode;
+  slot: SlotNumber;
+};
+
 // ---------------------------------------------------------------------------
 // Validation
 // ---------------------------------------------------------------------------
@@ -128,4 +133,25 @@ export async function toggleSlotActive(
   if (slotError) return slotError;
 
   return ModelSlotService.toggleActive(input.mode, input.slot, input.active);
+}
+
+/**
+ * Clears a model slot (removes model assignment, sets inactive).
+ * Validates mode and slot before delegating to ModelSlotService.clear().
+ */
+export async function clearModelSlot(
+  input: ClearModelSlotInput
+): Promise<ModelSlot | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
+  const modeError = validateMode(input.mode);
+  if (modeError) return modeError;
+
+  const slotError = validateSlot(input.slot);
+  if (slotError) return slotError;
+
+  return ModelSlotService.clear(input.mode, input.slot);
 }

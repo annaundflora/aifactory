@@ -2,6 +2,7 @@ import {
   getAllModelSlots,
   getModelSlotsByMode,
   upsertModelSlot,
+  clearModelSlot,
   seedModelSlotDefaults,
   getModelByReplicateId,
 } from "@/lib/db/queries";
@@ -173,6 +174,37 @@ export const ModelSlotService = {
       active
     );
     return updated;
+  },
+
+  /**
+   * Clears a model slot (removes the model assignment).
+   * Sets modelId=null, modelParams={}, active=false.
+   *
+   * Business rule: Cannot clear the last slot that has a model
+   * for a given mode (at least one model must remain).
+   */
+  async clear(
+    mode: string,
+    slot: SlotNumber
+  ): Promise<ModelSlot | { error: string }> {
+    const modeSlots = await getModelSlotsByMode(mode);
+    const currentSlot = modeSlots.find((s) => s.slot === slot);
+
+    if (!currentSlot) {
+      return { error: "Slot not found" };
+    }
+
+    if (currentSlot.modelId === null) {
+      return { error: "Slot is already empty" };
+    }
+
+    // Check if this is the last slot with a model
+    const slotsWithModels = modeSlots.filter((s) => s.modelId !== null);
+    if (slotsWithModels.length <= 1) {
+      return { error: "Cannot remove last model" };
+    }
+
+    return clearModelSlot(mode, slot);
   },
 
   /**

@@ -74,6 +74,7 @@ vi.mock("@/lib/utils/resolve-model", async () => {
 vi.mock("@/app/actions/model-slots", () => ({
   updateModelSlot: vi.fn(),
   toggleSlotActive: vi.fn(),
+  clearModelSlot: vi.fn(),
 }));
 
 // --- Mock useModelSchema (used by ModelSlots stub) ---

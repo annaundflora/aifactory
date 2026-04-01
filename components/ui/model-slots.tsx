@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useTransition } from "react";
-import { Checkbox as CheckboxPrimitive } from "radix-ui";
-import { Check, Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -12,7 +11,10 @@ import {
 } from "@/components/ui/select";
 import { ParameterPanel } from "@/components/workspace/parameter-panel";
 import { useModelSchema } from "@/lib/hooks/use-model-schema";
-import { updateModelSlot, toggleSlotActive } from "@/app/actions/model-slots";
+import {
+  updateModelSlot,
+  clearModelSlot as clearModelSlotAction,
+} from "@/app/actions/model-slots";
 import { cn } from "@/lib/utils";
 import type { GenerationMode, SlotNumber } from "@/lib/types";
 import type { ModelSlot } from "@/lib/db/queries";
@@ -52,17 +54,8 @@ function getCompatibleModels(models: Model[], mode: GenerationMode): Model[] {
   });
 }
 
-/**
- * Abbreviates a model name for compact layout display.
- * "black-forest-labs/flux-schnell" -> "flux-schnell"
- */
-function abbreviateModelName(replicateId: string): string {
-  const parts = replicateId.split("/");
-  return parts.length > 1 ? parts[1] : replicateId;
-}
-
 // ---------------------------------------------------------------------------
-// Slot Row Sub-Component (stacked variant)
+// Slot Row Sub-Component
 // ---------------------------------------------------------------------------
 
 interface SlotRowProps {
@@ -70,11 +63,11 @@ interface SlotRowProps {
   slotNumber: SlotNumber;
   mode: GenerationMode;
   compatibleModels: Model[];
-  allModels: Model[];
-  isLastActive: boolean;
+  removable: boolean;
   disabled: boolean;
   variant: "stacked" | "compact";
   onSlotUpdate: (slot: ModelSlot) => void;
+  onSlotRemoved: () => void;
   onError: (slot: ModelSlot) => void;
 }
 
@@ -83,57 +76,19 @@ function SlotRow({
   slotNumber,
   mode,
   compatibleModels,
-  allModels,
-  isLastActive,
+  removable,
   disabled,
   variant,
   onSlotUpdate,
+  onSlotRemoved,
   onError,
 }: SlotRowProps) {
   const [isPending, startTransition] = useTransition();
   const hasModel = slot.modelId !== null;
-  const isActive = slot.active;
 
-  // Checkbox is disabled when:
-  // - component-level disabled
-  // - slot has no model (can't activate empty slot)
-  // - it's the last active slot (min-1-active rule)
-  // - a transition is pending
-  const checkboxDisabled =
-    disabled || !hasModel || (isActive && isLastActive) || isPending;
-
-  const showParams = variant === "stacked" && isActive && hasModel;
+  const showParams = variant === "stacked" && hasModel;
   const schemaResult = useModelSchema(
     showParams ? (slot.modelId ?? undefined) : undefined,
-  );
-
-  const handleCheckedChange = useCallback(
-    (checked: CheckboxPrimitive.CheckedState) => {
-      // Prevent deactivating last active slot (guard)
-      if (isActive && isLastActive) return;
-
-      const newActive = checked === true;
-      // Optimistic update
-      onSlotUpdate({ ...slot, active: newActive });
-
-      startTransition(async () => {
-        const result = await toggleSlotActive({
-          mode,
-          slot: slotNumber,
-          active: newActive,
-        });
-
-        if (result && "error" in result) {
-          // Rollback on error
-          onError(slot);
-        } else {
-          // Confirm with server state
-          onSlotUpdate(result);
-          window.dispatchEvent(new CustomEvent("model-slots-changed"));
-        }
-      });
-    },
-    [slot, slotNumber, mode, isActive, isLastActive, onSlotUpdate, onError],
   );
 
   const handleModelChange = useCallback(
@@ -150,10 +105,8 @@ function SlotRow({
         });
 
         if (result && "error" in result) {
-          // Rollback on error
           onError(slot);
         } else {
-          // Confirm with server state
           onSlotUpdate(result);
           window.dispatchEvent(new CustomEvent("model-slots-changed"));
         }
@@ -165,7 +118,6 @@ function SlotRow({
   const handleParamsChange = useCallback(
     (newParams: Record<string, unknown>) => {
       if (!slot.modelId) return;
-      // Optimistic update params
       onSlotUpdate({ ...slot, modelParams: newParams });
 
       startTransition(async () => {
@@ -187,30 +139,32 @@ function SlotRow({
     [slot, slotNumber, mode, onSlotUpdate, onError],
   );
 
+  const handleRemove = useCallback(() => {
+    // Optimistic update: clear model
+    onSlotUpdate({ ...slot, modelId: null, modelParams: {}, active: false });
+
+    startTransition(async () => {
+      const result = await clearModelSlotAction({
+        mode,
+        slot: slotNumber,
+      });
+
+      if (result && "error" in result) {
+        onError(slot);
+      } else {
+        onSlotUpdate(result);
+        onSlotRemoved();
+        window.dispatchEvent(new CustomEvent("model-slots-changed"));
+      }
+    });
+  }, [slot, slotNumber, mode, onSlotUpdate, onSlotRemoved, onError]);
+
   if (variant === "compact") {
     return (
       <div
         className="flex items-center gap-1.5 min-w-0"
         data-testid={`slot-row-${slotNumber}`}
       >
-        <CheckboxPrimitive.Root
-          checked={isActive}
-          onCheckedChange={handleCheckedChange}
-          disabled={checkboxDisabled}
-          className={cn(
-            "size-4 shrink-0 rounded border border-input bg-background transition-colors",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-            "data-[state=checked]:bg-primary data-[state=checked]:border-primary data-[state=checked]:text-primary-foreground",
-            "disabled:cursor-not-allowed disabled:opacity-50",
-          )}
-          data-testid={`slot-checkbox-${slotNumber}`}
-          aria-label={`Slot ${slotNumber} active`}
-        >
-          <CheckboxPrimitive.Indicator className="flex items-center justify-center">
-            <Check className="size-3" />
-          </CheckboxPrimitive.Indicator>
-        </CheckboxPrimitive.Root>
-
         <Select
           value={slot.modelId ?? undefined}
           onValueChange={handleModelChange}
@@ -231,6 +185,19 @@ function SlotRow({
             ))}
           </SelectContent>
         </Select>
+
+        {removable && (
+          <button
+            type="button"
+            onClick={handleRemove}
+            disabled={disabled || isPending}
+            className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+            data-testid={`slot-remove-${slotNumber}`}
+            aria-label={`Remove slot ${slotNumber}`}
+          >
+            <X className="size-3.5" />
+          </button>
+        )}
       </div>
     );
   }
@@ -239,24 +206,6 @@ function SlotRow({
   return (
     <div data-testid={`slot-row-${slotNumber}`}>
       <div className="flex items-center gap-2">
-        <CheckboxPrimitive.Root
-          checked={isActive}
-          onCheckedChange={handleCheckedChange}
-          disabled={checkboxDisabled}
-          className={cn(
-            "size-5 shrink-0 rounded border border-input bg-background transition-colors",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-            "data-[state=checked]:bg-primary data-[state=checked]:border-primary data-[state=checked]:text-primary-foreground",
-            "disabled:cursor-not-allowed disabled:opacity-50",
-          )}
-          data-testid={`slot-checkbox-${slotNumber}`}
-          aria-label={`Slot ${slotNumber} active`}
-        >
-          <CheckboxPrimitive.Indicator className="flex items-center justify-center">
-            <Check className="size-3.5" />
-          </CheckboxPrimitive.Indicator>
-        </CheckboxPrimitive.Root>
-
         <Select
           value={slot.modelId ?? undefined}
           onValueChange={handleModelChange}
@@ -276,11 +225,24 @@ function SlotRow({
             ))}
           </SelectContent>
         </Select>
+
+        {removable && (
+          <button
+            type="button"
+            onClick={handleRemove}
+            disabled={disabled || isPending}
+            className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+            data-testid={`slot-remove-${slotNumber}`}
+            aria-label={`Remove slot ${slotNumber}`}
+          >
+            <X className="size-4" />
+          </button>
+        )}
       </div>
 
-      {/* Per-slot ParameterPanel: only for active slots with a model in stacked variant */}
+      {/* Per-slot ParameterPanel: only for slots with a model in stacked variant */}
       {showParams && (
-        <div className="mt-2 ml-7" data-testid={`slot-params-${slotNumber}`}>
+        <div className="mt-2" data-testid={`slot-params-${slotNumber}`}>
           <ParameterPanel
             schema={schemaResult.schema as Record<string, import("@/components/workspace/parameter-panel").SchemaProperty> | null}
             isLoading={schemaResult.isLoading}
@@ -416,9 +378,9 @@ export function ModelSlots({
     [models, mode],
   );
 
-  // Count active slots to enforce min-1-active rule
-  const activeCount = useMemo(
-    () => sortedSlots.filter((s) => s.active).length,
+  // Count slots with models to enforce "can't remove last model" rule
+  const slotsWithModels = useMemo(
+    () => sortedSlots.filter((s) => s.modelId !== null).length,
     [sortedSlots],
   );
 
@@ -434,13 +396,16 @@ export function ModelSlots({
 
   const handleSlotError = useCallback(
     (originalSlot: ModelSlot) => {
-      // Rollback to the original slot state
       setOptimisticSlots((prev) =>
         prev.map((s) => (s.slot === originalSlot.slot ? originalSlot : s)),
       );
     },
     [],
   );
+
+  const handleSlotRemoved = useCallback(() => {
+    setVisibleCount((c) => Math.max(1, c - 1));
+  }, []);
 
   const isCompact = variant === "compact";
 
@@ -453,18 +418,18 @@ export function ModelSlots({
       data-testid="model-slots"
       data-variant={variant}
     >
-      {sortedSlots.slice(0, visibleCount).map((slot) => (
+      {sortedSlots.slice(0, visibleCount).map((slot, index) => (
         <SlotRow
           key={slot.slot}
           slot={slot}
           slotNumber={slot.slot as SlotNumber}
           mode={mode}
           compatibleModels={compatibleModels}
-          allModels={models}
-          isLastActive={slot.active && activeCount <= 1}
+          removable={index > 0 && slotsWithModels > 1}
           disabled={disabled}
           variant={variant}
           onSlotUpdate={handleSlotUpdate}
+          onSlotRemoved={handleSlotRemoved}
           onError={handleSlotError}
         />
       ))}
