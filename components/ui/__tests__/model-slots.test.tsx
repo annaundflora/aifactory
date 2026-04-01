@@ -220,34 +220,25 @@ describe("ModelSlots Acceptance", () => {
    * AC-1: GIVEN die ModelSlots-Komponente wird mit mode="txt2img" und 3 Slots
    * (Slot 1 active mit Model, Slot 2 active mit Model, Slot 3 inactive ohne Model) gerendert
    * WHEN die Komponente sichtbar ist
-   * THEN werden exakt 3 Slot-Zeilen gerendert, jede mit einer Checkbox und einem Select-Dropdown
-   * AND die Checkboxen von Slot 1 und 2 sind checked, Slot 3 ist unchecked
+   * THEN werden nur die Slots mit zugewiesenen Models angezeigt (progressive disclosure)
+   * AND ein "+ Add model" Button wird angezeigt wenn weniger als 3 Slots sichtbar sind
    */
-  it("AC-1: should render 3 slot rows with checkboxes matching active state", () => {
+  it("AC-1: should render slots with models visible and show add button for hidden slots", () => {
     render(<ModelSlots {...defaultProps()} />);
 
-    // Exactly 3 slot rows
-    const slotRow1 = screen.getByTestId("slot-row-1");
-    const slotRow2 = screen.getByTestId("slot-row-2");
-    const slotRow3 = screen.getByTestId("slot-row-3");
-    expect(slotRow1).toBeInTheDocument();
-    expect(slotRow2).toBeInTheDocument();
-    expect(slotRow3).toBeInTheDocument();
+    // Slots 1 and 2 (have models) should be visible
+    expect(screen.getByTestId("slot-row-1")).toBeInTheDocument();
+    expect(screen.getByTestId("slot-row-2")).toBeInTheDocument();
 
-    // Each row has a checkbox and a select trigger
-    for (const num of [1, 2, 3]) {
-      expect(screen.getByTestId(`slot-checkbox-${num}`)).toBeInTheDocument();
-      expect(screen.getByTestId(`slot-select-${num}`)).toBeInTheDocument();
-    }
+    // Slot 3 (no model) should be hidden initially
+    expect(screen.queryByTestId("slot-row-3")).not.toBeInTheDocument();
 
-    // Slot 1 and 2 checkboxes are checked
-    const cb1 = screen.getByTestId("slot-checkbox-1");
-    const cb2 = screen.getByTestId("slot-checkbox-2");
-    const cb3 = screen.getByTestId("slot-checkbox-3");
+    // Add button should be visible
+    expect(screen.getByTestId("add-slot-button")).toBeInTheDocument();
 
-    expect(cb1).toHaveAttribute("data-state", "checked");
-    expect(cb2).toHaveAttribute("data-state", "checked");
-    expect(cb3).toHaveAttribute("data-state", "unchecked");
+    // Checkboxes for visible slots
+    expect(screen.getByTestId("slot-checkbox-1")).toHaveAttribute("data-state", "checked");
+    expect(screen.getByTestId("slot-checkbox-2")).toHaveAttribute("data-state", "checked");
   });
 
   /**
@@ -319,12 +310,16 @@ describe("ModelSlots Acceptance", () => {
 
   /**
    * AC-4: GIVEN Slot 3 hat kein Model zugewiesen (model_id ist null)
-   * WHEN die Komponente rendert
+   * WHEN der User den "+ Add model" Button klickt um Slot 3 aufzudecken
    * THEN ist die Checkbox von Slot 3 disabled (nicht klickbar)
    * AND das Dropdown zeigt den Placeholder-Text (z.B. "select model")
    */
-  it("AC-4: should disable checkbox for empty slot and show placeholder in dropdown", () => {
+  it("AC-4: should disable checkbox for empty slot and show placeholder in dropdown", async () => {
+    const user = userEvent.setup();
     render(<ModelSlots {...defaultProps()} />);
+
+    // Slot 3 is hidden initially — reveal it via add button
+    await user.click(screen.getByTestId("add-slot-button"));
 
     // Checkbox for slot 3 is disabled
     const cb3 = screen.getByTestId("slot-checkbox-3");
@@ -350,6 +345,9 @@ describe("ModelSlots Acceptance", () => {
     );
 
     render(<ModelSlots {...defaultProps()} />);
+
+    // Reveal slot 3 via add button
+    await user.click(screen.getByTestId("add-slot-button"));
 
     // Slot 3 starts unchecked with no model
     expect(screen.getByTestId("slot-checkbox-3")).toHaveAttribute("data-state", "unchecked");
@@ -464,15 +462,17 @@ describe("ModelSlots Acceptance", () => {
     expect(container).toHaveAttribute("data-variant", "compact");
     expect(container.className).toMatch(/flex/);
 
-    // All 3 slot rows should be rendered
+    // Slots with models (1 and 2) should be rendered, slot 3 hidden (progressive disclosure)
     expect(screen.getByTestId("slot-row-1")).toBeInTheDocument();
     expect(screen.getByTestId("slot-row-2")).toBeInTheDocument();
-    expect(screen.getByTestId("slot-row-3")).toBeInTheDocument();
+    expect(screen.queryByTestId("slot-row-3")).not.toBeInTheDocument();
+
+    // Add button should be visible in compact variant
+    expect(screen.getByTestId("add-slot-button")).toBeInTheDocument();
 
     // NO ParameterPanels should be rendered, even though slots 1 and 2 are active
     expect(screen.queryByTestId("slot-params-1")).not.toBeInTheDocument();
     expect(screen.queryByTestId("slot-params-2")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("slot-params-3")).not.toBeInTheDocument();
 
     // useModelSchema should have been called with undefined for all slots in compact mode
     // (because showParams = false when variant is compact)
@@ -497,6 +497,9 @@ describe("ModelSlots Acceptance", () => {
     );
 
     render(<ModelSlots {...defaultProps()} />);
+
+    // Reveal slot 3 via add button
+    await user.click(screen.getByTestId("add-slot-button"));
 
     // Click the FastGen option within slot 3
     const slotRow3 = screen.getByTestId("slot-row-3");
@@ -553,20 +556,20 @@ describe("ModelSlots Acceptance", () => {
    * WHEN die Komponente rendert
    * THEN sind alle Checkboxen und Dropdowns disabled
    */
-  it("AC-12: should disable all checkboxes and dropdowns when disabled prop is true", () => {
+  it("AC-12: should disable all visible checkboxes and dropdowns when disabled prop is true", () => {
     render(<ModelSlots {...defaultProps({ disabled: true })} />);
 
-    // All 3 checkboxes must be disabled
-    for (const num of [1, 2, 3]) {
-      const checkbox = screen.getByTestId(`slot-checkbox-${num}`);
-      expect(checkbox).toBeDisabled();
+    // Visible slots (1 and 2) must have disabled checkboxes and select triggers
+    for (const num of [1, 2]) {
+      expect(screen.getByTestId(`slot-checkbox-${num}`)).toBeDisabled();
+      expect(screen.getByTestId(`slot-select-${num}`)).toBeDisabled();
     }
 
-    // All 3 select triggers must be disabled
-    for (const num of [1, 2, 3]) {
-      const selectTrigger = screen.getByTestId(`slot-select-${num}`);
-      expect(selectTrigger).toBeDisabled();
-    }
+    // Slot 3 is hidden (progressive disclosure)
+    expect(screen.queryByTestId("slot-row-3")).not.toBeInTheDocument();
+
+    // Add button must NOT be shown when disabled
+    expect(screen.queryByTestId("add-slot-button")).not.toBeInTheDocument();
   });
 });
 
@@ -637,17 +640,20 @@ describe("ModelSlots Unit - getCompatibleModels", () => {
 // ---------------------------------------------------------------------------
 
 describe("ModelSlots Integration", () => {
-  it("should render exactly 3 slots even if fewer are provided", () => {
+  it("should show only slot 1 with add button when only one slot has a model", () => {
     const oneSlot = [
       createSlot({ slot: 1, active: true, modelId: "black-forest-labs/flux-schnell" }),
     ];
 
     render(<ModelSlots {...defaultProps({ slots: oneSlot })} />);
 
-    // Should still show all 3 slot rows
+    // Only slot 1 should be visible (progressive disclosure)
     expect(screen.getByTestId("slot-row-1")).toBeInTheDocument();
-    expect(screen.getByTestId("slot-row-2")).toBeInTheDocument();
-    expect(screen.getByTestId("slot-row-3")).toBeInTheDocument();
+    expect(screen.queryByTestId("slot-row-2")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("slot-row-3")).not.toBeInTheDocument();
+
+    // Add button should be shown
+    expect(screen.getByTestId("add-slot-button")).toBeInTheDocument();
   });
 
   it("should rollback optimistic update when server action fails on toggle", async () => {
@@ -674,6 +680,9 @@ describe("ModelSlots Integration", () => {
     mockUpdateModelSlot.mockResolvedValueOnce({ error: "Server error" });
 
     render(<ModelSlots {...defaultProps()} />);
+
+    // Reveal slot 3 via add button
+    await user.click(screen.getByTestId("add-slot-button"));
 
     // Click the Flux Schnell option within slot 3
     const slotRow3 = screen.getByTestId("slot-row-3");
@@ -716,5 +725,85 @@ describe("ModelSlots Integration", () => {
     // Stacked uses space-y-3 (not flex)
     expect(container.className).toMatch(/space-y/);
     expect(container.className).not.toMatch(/flex/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Progressive Disclosure Tests
+// ---------------------------------------------------------------------------
+
+describe("ModelSlots Progressive Disclosure", () => {
+  it("should show all 3 slots without add button when all slots have models", () => {
+    const allAssigned = [
+      createSlot({ slot: 1, active: true, modelId: "black-forest-labs/flux-schnell" }),
+      createSlot({ slot: 2, active: true, modelId: "stability-ai/sdxl" }),
+      createSlot({ slot: 3, active: false, modelId: "acme/fast-gen" }),
+    ];
+
+    render(<ModelSlots {...defaultProps({ slots: allAssigned })} />);
+
+    expect(screen.getByTestId("slot-row-1")).toBeInTheDocument();
+    expect(screen.getByTestId("slot-row-2")).toBeInTheDocument();
+    expect(screen.getByTestId("slot-row-3")).toBeInTheDocument();
+    expect(screen.queryByTestId("add-slot-button")).not.toBeInTheDocument();
+  });
+
+  it("should show only slot 1 when no slots have models", () => {
+    const noModels = [
+      createSlot({ slot: 1, active: true, modelId: null }),
+      createSlot({ slot: 2, active: false, modelId: null }),
+      createSlot({ slot: 3, active: false, modelId: null }),
+    ];
+
+    render(<ModelSlots {...defaultProps({ slots: noModels })} />);
+
+    expect(screen.getByTestId("slot-row-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("slot-row-2")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("slot-row-3")).not.toBeInTheDocument();
+    expect(screen.getByTestId("add-slot-button")).toBeInTheDocument();
+  });
+
+  it("should reveal next slot when add button is clicked", async () => {
+    const user = userEvent.setup();
+
+    render(<ModelSlots {...defaultProps()} />);
+
+    // Initially: 2 slots visible (slots 1+2 have models)
+    expect(screen.queryByTestId("slot-row-3")).not.toBeInTheDocument();
+
+    // Click add button
+    await user.click(screen.getByTestId("add-slot-button"));
+
+    // Now slot 3 should be visible
+    expect(screen.getByTestId("slot-row-3")).toBeInTheDocument();
+
+    // Add button should disappear (all 3 slots now visible)
+    expect(screen.queryByTestId("add-slot-button")).not.toBeInTheDocument();
+  });
+
+  it("should reveal slots one at a time with multiple add button clicks", async () => {
+    const user = userEvent.setup();
+    const noModels = [
+      createSlot({ slot: 1, active: true, modelId: null }),
+      createSlot({ slot: 2, active: false, modelId: null }),
+      createSlot({ slot: 3, active: false, modelId: null }),
+    ];
+
+    render(<ModelSlots {...defaultProps({ slots: noModels })} />);
+
+    // Initially: only slot 1
+    expect(screen.getByTestId("slot-row-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("slot-row-2")).not.toBeInTheDocument();
+
+    // First click: reveal slot 2
+    await user.click(screen.getByTestId("add-slot-button"));
+    expect(screen.getByTestId("slot-row-2")).toBeInTheDocument();
+    expect(screen.queryByTestId("slot-row-3")).not.toBeInTheDocument();
+    expect(screen.getByTestId("add-slot-button")).toBeInTheDocument();
+
+    // Second click: reveal slot 3
+    await user.click(screen.getByTestId("add-slot-button"));
+    expect(screen.getByTestId("slot-row-3")).toBeInTheDocument();
+    expect(screen.queryByTestId("add-slot-button")).not.toBeInTheDocument();
   });
 });

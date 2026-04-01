@@ -277,7 +277,7 @@ describe("ModelSlots Compact Acceptance", () => {
    * THEN werden alle 3 Slots horizontal in einer einzigen Zeile dargestellt (Flex-Row)
    * AND die Gesamthoehe der Komponente ist eine einzelne Zeile (kein vertikales Stacking)
    */
-  it("AC-1: should render all 3 slots in a single horizontal row when variant is compact", () => {
+  it("AC-1: should render slots with models in a horizontal row with add button in compact variant", () => {
     render(<ModelSlots {...defaultProps()} />);
 
     // Container must have data-variant="compact"
@@ -288,21 +288,20 @@ describe("ModelSlots Compact Acceptance", () => {
     expect(container.className).toMatch(/flex/);
     expect(container.className).not.toMatch(/space-y/);
 
-    // All 3 slot rows must be present
+    // Slots with models (1 and 2) should be present, slot 3 hidden (progressive disclosure)
     expect(screen.getByTestId("slot-row-1")).toBeInTheDocument();
     expect(screen.getByTestId("slot-row-2")).toBeInTheDocument();
-    expect(screen.getByTestId("slot-row-3")).toBeInTheDocument();
+    expect(screen.queryByTestId("slot-row-3")).not.toBeInTheDocument();
 
-    // Each slot row must also use flex for inline checkbox+dropdown
-    for (const num of [1, 2, 3]) {
+    // Add button should be visible
+    expect(screen.getByTestId("add-slot-button")).toBeInTheDocument();
+
+    // Visible slot rows must use flex for inline checkbox+dropdown
+    for (const num of [1, 2]) {
       const row = screen.getByTestId(`slot-row-${num}`);
       expect(row.className).toMatch(/flex/);
       expect(row.className).toMatch(/items-center/);
     }
-
-    // All 3 slot rows are direct children of the container (single row)
-    const children = Array.from(container.children);
-    expect(children).toHaveLength(3);
   });
 
   /**
@@ -371,8 +370,12 @@ describe("ModelSlots Compact Acceptance", () => {
    * THEN zeigt der Dropdown-Trigger einen kurzen Placeholder (z.B. "--" oder aehnlich kompakt)
    * AND die Checkbox ist disabled (identisch zum Stacked-Verhalten)
    */
-  it("AC-4: should show compact placeholder for empty slot with disabled checkbox", () => {
+  it("AC-4: should show compact placeholder for empty slot with disabled checkbox", async () => {
+    const user = userEvent.setup();
     render(<ModelSlots {...defaultProps()} />);
+
+    // Reveal slot 3 via add button
+    await user.click(screen.getByTestId("add-slot-button"));
 
     // Checkbox for slot 3 must be disabled (no model assigned)
     const cb3 = screen.getByTestId("slot-checkbox-3");
@@ -471,6 +474,9 @@ describe("ModelSlots Compact Acceptance", () => {
 
     render(<ModelSlots {...defaultProps()} />);
 
+    // Reveal slot 3 via add button
+    await user.click(screen.getByTestId("add-slot-button"));
+
     // Slot 3 starts unchecked with no model
     expect(screen.getByTestId("slot-checkbox-3")).toHaveAttribute(
       "data-state",
@@ -519,20 +525,18 @@ describe("ModelSlots Compact Acceptance", () => {
    * THEN sind alle Checkboxen und Dropdowns disabled
    * AND die visuelle Darstellung bleibt horizontal einzeilig
    */
-  it("AC-8: should disable all checkboxes and dropdowns when disabled prop is true in compact variant", () => {
+  it("AC-8: should disable all visible checkboxes and dropdowns when disabled prop is true in compact variant", () => {
     render(<ModelSlots {...defaultProps({ disabled: true })} />);
 
-    // All 3 checkboxes must be disabled
-    for (const num of [1, 2, 3]) {
-      const checkbox = screen.getByTestId(`slot-checkbox-${num}`);
-      expect(checkbox).toBeDisabled();
+    // Visible slots (1 and 2) must have disabled checkboxes and select triggers
+    for (const num of [1, 2]) {
+      expect(screen.getByTestId(`slot-checkbox-${num}`)).toBeDisabled();
+      expect(screen.getByTestId(`slot-select-${num}`)).toBeDisabled();
     }
 
-    // All 3 select triggers must be disabled
-    for (const num of [1, 2, 3]) {
-      const selectTrigger = screen.getByTestId(`slot-select-${num}`);
-      expect(selectTrigger).toBeDisabled();
-    }
+    // Slot 3 is hidden (progressive disclosure) and add button hidden when disabled
+    expect(screen.queryByTestId("slot-row-3")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("add-slot-button")).not.toBeInTheDocument();
 
     // Layout must still be horizontal (flex row, not stacked)
     const container = screen.getByTestId("model-slots");
@@ -567,8 +571,8 @@ describe("ModelSlots Compact Unit", () => {
   it("should apply min-w-0 on slot rows in compact variant for truncation to work", () => {
     render(<ModelSlots {...defaultProps()} />);
 
-    // Each compact slot row must have min-w-0 to allow flex children to shrink
-    for (const num of [1, 2, 3]) {
+    // Visible compact slot rows must have min-w-0 to allow flex children to shrink
+    for (const num of [1, 2]) {
       const row = screen.getByTestId(`slot-row-${num}`);
       expect(row.className).toMatch(/min-w-0/);
     }
@@ -582,8 +586,13 @@ describe("ModelSlots Compact Unit", () => {
     expect(container.className).toMatch(/gap-3/);
   });
 
-  it("compact placeholder differs from stacked placeholder", () => {
+  it("compact placeholder differs from stacked placeholder", async () => {
+    const user = userEvent.setup();
+
     const { unmount } = render(<ModelSlots {...defaultProps()} />);
+
+    // Reveal slot 3 via add button
+    await user.click(screen.getByTestId("add-slot-button"));
 
     // Compact placeholder is "--"
     const compactTrigger = screen.getByTestId("slot-select-3");
@@ -595,6 +604,9 @@ describe("ModelSlots Compact Unit", () => {
     render(
       <ModelSlots {...defaultProps({ variant: "stacked" })} />,
     );
+    // Reveal slot 3 via add button in stacked variant
+    await user.click(screen.getByTestId("add-slot-button"));
+
     const stackedTrigger = screen.getByTestId("slot-select-3");
     expect(
       within(stackedTrigger).getByText("select model"),
@@ -633,6 +645,9 @@ describe("ModelSlots Compact Integration", () => {
     mockUpdateModelSlot.mockResolvedValueOnce({ error: "Server error" });
 
     render(<ModelSlots {...defaultProps()} />);
+
+    // Reveal slot 3 via add button
+    await user.click(screen.getByTestId("add-slot-button"));
 
     // Click the FastGen option within slot 3
     const slotRow3 = screen.getByTestId("slot-row-3");

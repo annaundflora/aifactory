@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useTransition } from "react";
 import { Checkbox as CheckboxPrimitive } from "radix-ui";
-import { Check } from "lucide-react";
+import { Check, Plus } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -294,6 +294,43 @@ function SlotRow({
 }
 
 // ---------------------------------------------------------------------------
+// Add Slot Button Sub-Component
+// ---------------------------------------------------------------------------
+
+interface AddSlotButtonProps {
+  variant: "stacked" | "compact";
+  onClick: () => void;
+}
+
+function AddSlotButton({ variant, onClick }: AddSlotButtonProps) {
+  if (variant === "compact") {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex h-7 shrink-0 items-center gap-1 rounded-md border border-dashed border-muted-foreground/40 px-2 text-xs text-muted-foreground transition-colors hover:border-muted-foreground hover:text-foreground"
+        data-testid="add-slot-button"
+      >
+        <Plus className="size-3" />
+        Model
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-muted-foreground/40 py-2 text-sm text-muted-foreground transition-colors hover:border-muted-foreground hover:text-foreground"
+      data-testid="add-slot-button"
+    >
+      <Plus className="size-4" />
+      Add model
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // ModelSlots Component
 // ---------------------------------------------------------------------------
 
@@ -350,6 +387,26 @@ export function ModelSlots({
     ) as ModelSlot[];
   }, [optimisticSlots, mode]);
 
+  // Progressive disclosure: compute initial visible count based on assigned models
+  const initialVisibleCount = useMemo(() => {
+    const assignedCount = sortedSlots.filter((s) => s.modelId !== null).length;
+    return Math.max(1, assignedCount);
+  }, [sortedSlots]);
+
+  const [visibleCount, setVisibleCount] = useState(initialVisibleCount);
+
+  // Reset visible count when mode changes or slots change externally
+  const [prevMode, setPrevMode] = useState(mode);
+  if (mode !== prevMode) {
+    setPrevMode(mode);
+    setVisibleCount(initialVisibleCount);
+  }
+
+  // Also sync when initialVisibleCount increases (e.g. external slot assignment)
+  if (initialVisibleCount > visibleCount) {
+    setVisibleCount(initialVisibleCount);
+  }
+
   // Filter models by mode compatibility
   const compatibleModels = useMemo(
     () =>
@@ -396,7 +453,7 @@ export function ModelSlots({
       data-testid="model-slots"
       data-variant={variant}
     >
-      {sortedSlots.map((slot) => (
+      {sortedSlots.slice(0, visibleCount).map((slot) => (
         <SlotRow
           key={slot.slot}
           slot={slot}
@@ -411,6 +468,12 @@ export function ModelSlots({
           onError={handleSlotError}
         />
       ))}
+      {visibleCount < 3 && !disabled && (
+        <AddSlotButton
+          variant={variant}
+          onClick={() => setVisibleCount((c) => Math.min(c + 1, 3))}
+        />
+      )}
     </div>
   );
 }
