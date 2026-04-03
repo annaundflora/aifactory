@@ -402,7 +402,7 @@ export function ModelSlots({
   return (
     <div
       className={cn(
-        isCompact ? "flex items-center gap-3" : "space-y-3",
+        isCompact ? "grid grid-cols-2 gap-2" : "space-y-3",
         className,
       )}
       data-testid="model-slots"
