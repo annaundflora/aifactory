@@ -349,24 +349,14 @@ export function ModelSlots({
     ) as ModelSlot[];
   }, [optimisticSlots, mode]);
 
-  // Progressive disclosure: compute initial visible count based on assigned models
-  const initialVisibleCount = useMemo(() => {
-    const assignedCount = sortedSlots.filter((s) => s.modelId !== null).length;
-    return Math.max(1, assignedCount);
-  }, [sortedSlots]);
+  // Progressive disclosure: always start with 1 visible slot
+  const [visibleCount, setVisibleCount] = useState(1);
 
-  const [visibleCount, setVisibleCount] = useState(initialVisibleCount);
-
-  // Reset visible count when mode changes or slots change externally
+  // Reset visible count when mode changes
   const [prevMode, setPrevMode] = useState(mode);
   if (mode !== prevMode) {
     setPrevMode(mode);
-    setVisibleCount(initialVisibleCount);
-  }
-
-  // Also sync when initialVisibleCount increases (e.g. external slot assignment)
-  if (initialVisibleCount > visibleCount) {
-    setVisibleCount(initialVisibleCount);
+    setVisibleCount(1);
   }
 
   // Filter models by mode compatibility

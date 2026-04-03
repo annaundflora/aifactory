@@ -203,14 +203,12 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("ModelSlots Acceptance", () => {
-  it("AC-1: should render slots with models visible and show add button for hidden slots", () => {
+  it("AC-1: should render only slot 1 initially with add button", () => {
     render(<ModelSlots {...defaultProps()} />);
 
-    // Slots 1 and 2 (have models) should be visible
+    // Only slot 1 should be visible initially
     expect(screen.getByTestId("slot-row-1")).toBeInTheDocument();
-    expect(screen.getByTestId("slot-row-2")).toBeInTheDocument();
-
-    // Slot 3 (no model) should be hidden initially
+    expect(screen.queryByTestId("slot-row-2")).not.toBeInTheDocument();
     expect(screen.queryByTestId("slot-row-3")).not.toBeInTheDocument();
 
     // Add button should be visible
@@ -218,44 +216,48 @@ describe("ModelSlots Acceptance", () => {
 
     // No checkboxes should exist
     expect(screen.queryByTestId("slot-checkbox-1")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("slot-checkbox-2")).not.toBeInTheDocument();
   });
 
   it("AC-4: should show placeholder in dropdown for empty revealed slot", async () => {
     const user = userEvent.setup();
-    render(<ModelSlots {...defaultProps()} />);
+    const slotsWithEmpty = [
+      createSlot({ slot: 1, active: true, modelId: "black-forest-labs/flux-schnell" }),
+      createSlot({ slot: 2, active: false, modelId: null }),
+      createSlot({ slot: 3, active: false, modelId: null }),
+    ];
 
-    // Reveal slot 3 via add button
+    render(<ModelSlots {...defaultProps({ slots: slotsWithEmpty })} />);
+
+    // Reveal slot 2 via add button
     await user.click(screen.getByTestId("add-slot-button"));
 
-    // Select trigger for slot 3 should show placeholder text
-    const selectTrigger3 = screen.getByTestId("slot-select-3");
-    expect(within(selectTrigger3).getByText("select model")).toBeInTheDocument();
+    // Select trigger for slot 2 should show placeholder text
+    const selectTrigger2 = screen.getByTestId("slot-select-2");
+    expect(within(selectTrigger2).getByText("select model")).toBeInTheDocument();
   });
 
   it("AC-5: should call updateModelSlot on model selection and auto-activate", async () => {
     const user = userEvent.setup();
 
-    const selectedModelId = "black-forest-labs/flux-schnell";
+    const selectedModelId = "acme/fast-gen";
     mockUpdateModelSlot.mockResolvedValueOnce(
-      createSlot({ slot: 3, active: true, modelId: selectedModelId }),
+      createSlot({ slot: 2, active: true, modelId: selectedModelId }),
     );
 
     render(<ModelSlots {...defaultProps()} />);
 
-    // Reveal slot 3 via add button
+    // Reveal slot 2 via add button
     await user.click(screen.getByTestId("add-slot-button"));
 
-    // Click the "Flux Schnell" option within slot 3
-    const slotRow3 = screen.getByTestId("slot-row-3");
-    const fluxOption = within(slotRow3).getByRole("option", { name: "Flux Schnell" });
-    await user.click(fluxOption);
+    // Click the "FastGen" option within slot 2
+    const slotRow2 = screen.getByTestId("slot-row-2");
+    const option = within(slotRow2).getByRole("option", { name: "FastGen" });
+    await user.click(option);
 
-    // updateModelSlot must have been called
     expect(mockUpdateModelSlot).toHaveBeenCalledWith(
       expect.objectContaining({
         mode: "txt2img",
-        slot: 3,
+        slot: 2,
         modelId: selectedModelId,
       }),
     );
@@ -276,22 +278,20 @@ describe("ModelSlots Acceptance", () => {
     expect(options).toHaveLength(3);
   });
 
-  it("AC-7: should render ParameterPanel below slots with models in stacked variant", () => {
+  it("AC-7: should render ParameterPanel below slot 1 with model in stacked variant", () => {
     render(<ModelSlots {...defaultProps({ variant: "stacked" })} />);
 
-    // ParameterPanel should be rendered for slots with models (1 and 2)
+    // Only slot 1 visible initially — ParameterPanel should be rendered for it
     const paramsSlot1 = screen.getByTestId("slot-params-1");
     expect(paramsSlot1).toBeInTheDocument();
-    expect(screen.getByTestId("slot-params-2")).toBeInTheDocument();
 
     const paramPanel = within(paramsSlot1).getByTestId("parameter-panel");
     expect(paramPanel).toHaveTextContent("schema-loaded");
 
     expect(mockUseModelSchema).toHaveBeenCalledWith("black-forest-labs/flux-schnell");
-    expect(mockUseModelSchema).toHaveBeenCalledWith("stability-ai/sdxl");
   });
 
-  it("AC-9: should render slots horizontally without ParameterPanels in compact variant", () => {
+  it("AC-9: should render only slot 1 horizontally without ParameterPanels in compact variant", () => {
     render(<ModelSlots {...defaultProps({ variant: "compact" })} />);
 
     const container = screen.getByTestId("model-slots");
@@ -299,12 +299,10 @@ describe("ModelSlots Acceptance", () => {
     expect(container.className).toMatch(/flex/);
 
     expect(screen.getByTestId("slot-row-1")).toBeInTheDocument();
-    expect(screen.getByTestId("slot-row-2")).toBeInTheDocument();
-    expect(screen.queryByTestId("slot-row-3")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("slot-row-2")).not.toBeInTheDocument();
     expect(screen.getByTestId("add-slot-button")).toBeInTheDocument();
 
     expect(screen.queryByTestId("slot-params-1")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("slot-params-2")).not.toBeInTheDocument();
   });
 
   it("AC-10: should dispatch model-slots-changed CustomEvent after successful updateModelSlot", async () => {
@@ -313,14 +311,14 @@ describe("ModelSlots Acceptance", () => {
     window.addEventListener("model-slots-changed", eventSpy);
 
     mockUpdateModelSlot.mockResolvedValueOnce(
-      createSlot({ slot: 3, active: true, modelId: "acme/fast-gen" }),
+      createSlot({ slot: 2, active: true, modelId: "acme/fast-gen" }),
     );
 
     render(<ModelSlots {...defaultProps()} />);
 
     await user.click(screen.getByTestId("add-slot-button"));
-    const slotRow3 = screen.getByTestId("slot-row-3");
-    await user.click(within(slotRow3).getByRole("option", { name: "FastGen" }));
+    const slotRow2 = screen.getByTestId("slot-row-2");
+    await user.click(within(slotRow2).getByRole("option", { name: "FastGen" }));
 
     await waitFor(() => {
       expect(eventSpy).toHaveBeenCalledTimes(1);
@@ -336,11 +334,8 @@ describe("ModelSlots Acceptance", () => {
   it("AC-12: should disable all visible dropdowns when disabled prop is true", () => {
     render(<ModelSlots {...defaultProps({ disabled: true })} />);
 
-    for (const num of [1, 2]) {
-      expect(screen.getByTestId(`slot-select-${num}`)).toBeDisabled();
-    }
-
-    expect(screen.queryByTestId("slot-row-3")).not.toBeInTheDocument();
+    expect(screen.getByTestId("slot-select-1")).toBeDisabled();
+    expect(screen.queryByTestId("slot-row-2")).not.toBeInTheDocument();
     expect(screen.queryByTestId("add-slot-button")).not.toBeInTheDocument();
   });
 });
@@ -356,28 +351,14 @@ describe("ModelSlots Remove Button", () => {
     expect(screen.queryByTestId("slot-remove-1")).not.toBeInTheDocument();
   });
 
-  it("should show remove button on slot 2 when it has a model and there are multiple models", () => {
+  it("should show remove button on slot 2 after revealing it", async () => {
+    const user = userEvent.setup();
     render(<ModelSlots {...defaultProps()} />);
 
+    await user.click(screen.getByTestId("add-slot-button"));
+
+    // Slot 2 has a model (from standardSlots), so remove is available
     expect(screen.getByTestId("slot-remove-2")).toBeInTheDocument();
-  });
-
-  it("should not show remove button on slot 2 when it is the only slot with a model besides slot 1", () => {
-    // Only slot 1 has a model — slot 2 is visible but empty (user clicked add)
-    const slotsOnlyOneModel = [
-      createSlot({ slot: 1, active: true, modelId: "black-forest-labs/flux-schnell" }),
-      createSlot({ slot: 2, active: false, modelId: null }),
-      createSlot({ slot: 3, active: false, modelId: null }),
-    ];
-
-    // We need 2 visible to test slot 2 — render with 2 slots visible
-    // Since only 1 has a model, initial visible = 1, so we render and click add
-    const { rerender } = render(<ModelSlots {...defaultProps({ slots: slotsOnlyOneModel })} />);
-
-    // Slot 2 not visible initially — but let's test with 2 models visible
-    // Actually: removable = index > 0 && slotsWithModels > 1
-    // With only 1 model, slotsWithModels = 1, so even slot 2 with a model wouldn't be removable
-    // This is correct: can't remove last model
   });
 
   it("should call clearModelSlot and hide slot when remove button is clicked", async () => {
@@ -389,19 +370,19 @@ describe("ModelSlots Remove Button", () => {
 
     render(<ModelSlots {...defaultProps()} />);
 
-    // Slot 2 is visible with remove button
+    // Reveal slot 2
+    await user.click(screen.getByTestId("add-slot-button"));
     expect(screen.getByTestId("slot-row-2")).toBeInTheDocument();
 
     // Click remove
     await user.click(screen.getByTestId("slot-remove-2"));
 
-    // clearModelSlot should have been called
     expect(mockClearModelSlot).toHaveBeenCalledWith({
       mode: "txt2img",
       slot: 2,
     });
 
-    // After server response, slot 2 should be hidden (visibleCount decremented)
+    // After server response, slot 2 should be hidden
     await waitFor(() => {
       expect(screen.queryByTestId("slot-row-2")).not.toBeInTheDocument();
     });
@@ -421,6 +402,7 @@ describe("ModelSlots Remove Button", () => {
 
     render(<ModelSlots {...defaultProps()} />);
 
+    await user.click(screen.getByTestId("add-slot-button"));
     await user.click(screen.getByTestId("slot-remove-2"));
 
     await waitFor(() => {
@@ -432,28 +414,17 @@ describe("ModelSlots Remove Button", () => {
 
   it("should rollback when clearModelSlot fails", async () => {
     const user = userEvent.setup();
-
     mockClearModelSlot.mockResolvedValueOnce({ error: "Server error" });
 
     render(<ModelSlots {...defaultProps()} />);
 
+    await user.click(screen.getByTestId("add-slot-button"));
     await user.click(screen.getByTestId("slot-remove-2"));
 
-    // After error, slot 2 should still be visible with its model
+    // After error, slot 2 should still be visible
     await waitFor(() => {
       expect(screen.getByTestId("slot-row-2")).toBeInTheDocument();
     });
-  });
-
-  it("should disable remove button when disabled prop is true", () => {
-    render(<ModelSlots {...defaultProps({ disabled: true })} />);
-
-    // Remove buttons should not exist when disabled (add button hidden too)
-    // Actually the remove button exists but is disabled
-    const removeBtn = screen.queryByTestId("slot-remove-2");
-    if (removeBtn) {
-      expect(removeBtn).toBeDisabled();
-    }
   });
 });
 
@@ -531,17 +502,23 @@ describe("ModelSlots Integration", () => {
     const user = userEvent.setup();
     mockUpdateModelSlot.mockResolvedValueOnce({ error: "Server error" });
 
-    render(<ModelSlots {...defaultProps()} />);
+    const slotsWithEmpty = [
+      createSlot({ slot: 1, active: true, modelId: "black-forest-labs/flux-schnell" }),
+      createSlot({ slot: 2, active: false, modelId: null }),
+      createSlot({ slot: 3, active: false, modelId: null }),
+    ];
+
+    render(<ModelSlots {...defaultProps({ slots: slotsWithEmpty })} />);
 
     await user.click(screen.getByTestId("add-slot-button"));
 
-    const slotRow3 = screen.getByTestId("slot-row-3");
-    const option = within(slotRow3).getByRole("option", { name: "Flux Schnell" });
+    const slotRow2 = screen.getByTestId("slot-row-2");
+    const option = within(slotRow2).getByRole("option", { name: "FastGen" });
     await user.click(option);
 
-    // After error, slot 3 should still show placeholder (no model)
+    // After error, slot 2 should still show placeholder (rollback)
     await waitFor(() => {
-      const trigger = screen.getByTestId("slot-select-3");
+      const trigger = screen.getByTestId("slot-select-2");
       expect(within(trigger).getByText("select model")).toBeInTheDocument();
     });
   });
@@ -561,7 +538,7 @@ describe("ModelSlots Integration", () => {
 // ---------------------------------------------------------------------------
 
 describe("ModelSlots Progressive Disclosure", () => {
-  it("should show all 3 slots without add button when all slots have models", () => {
+  it("should always show only slot 1 initially regardless of assigned models", () => {
     const allAssigned = [
       createSlot({ slot: 1, active: true, modelId: "black-forest-labs/flux-schnell" }),
       createSlot({ slot: 2, active: true, modelId: "stability-ai/sdxl" }),
@@ -570,10 +547,11 @@ describe("ModelSlots Progressive Disclosure", () => {
 
     render(<ModelSlots {...defaultProps({ slots: allAssigned })} />);
 
+    // Only slot 1 visible, even though all 3 have models
     expect(screen.getByTestId("slot-row-1")).toBeInTheDocument();
-    expect(screen.getByTestId("slot-row-2")).toBeInTheDocument();
-    expect(screen.getByTestId("slot-row-3")).toBeInTheDocument();
-    expect(screen.queryByTestId("add-slot-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("slot-row-2")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("slot-row-3")).not.toBeInTheDocument();
+    expect(screen.getByTestId("add-slot-button")).toBeInTheDocument();
   });
 
   it("should show only slot 1 when no slots have models", () => {
@@ -595,12 +573,12 @@ describe("ModelSlots Progressive Disclosure", () => {
 
     render(<ModelSlots {...defaultProps()} />);
 
-    expect(screen.queryByTestId("slot-row-3")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("slot-row-2")).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId("add-slot-button"));
 
-    expect(screen.getByTestId("slot-row-3")).toBeInTheDocument();
-    expect(screen.queryByTestId("add-slot-button")).not.toBeInTheDocument();
+    expect(screen.getByTestId("slot-row-2")).toBeInTheDocument();
+    expect(screen.getByTestId("add-slot-button")).toBeInTheDocument(); // still shows, slot 3 not yet visible
   });
 
   it("should reveal slots one at a time with multiple add button clicks", async () => {

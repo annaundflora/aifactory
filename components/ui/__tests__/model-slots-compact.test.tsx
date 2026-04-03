@@ -232,7 +232,7 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("ModelSlots Compact Acceptance", () => {
-  it("AC-1: should render slots with models in a horizontal row with add button", () => {
+  it("AC-1: should render only slot 1 in a horizontal row with add button", () => {
     render(<ModelSlots {...defaultProps()} />);
 
     const container = screen.getByTestId("model-slots");
@@ -241,11 +241,9 @@ describe("ModelSlots Compact Acceptance", () => {
     expect(container.className).not.toMatch(/space-y/);
 
     expect(screen.getByTestId("slot-row-1")).toBeInTheDocument();
-    expect(screen.getByTestId("slot-row-2")).toBeInTheDocument();
-    expect(screen.queryByTestId("slot-row-3")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("slot-row-2")).not.toBeInTheDocument();
     expect(screen.getByTestId("add-slot-button")).toBeInTheDocument();
 
-    // No checkboxes
     expect(screen.queryByTestId("slot-checkbox-1")).not.toBeInTheDocument();
   });
 
@@ -279,19 +277,26 @@ describe("ModelSlots Compact Acceptance", () => {
 
   it("AC-4: should show compact placeholder for empty revealed slot", async () => {
     const user = userEvent.setup();
-    render(<ModelSlots {...defaultProps()} />);
+    const slotsWithEmpty = [
+      createSlot({ slot: 1, active: true, modelId: "black-forest-labs/flux-schnell" }),
+      createSlot({ slot: 2, active: false, modelId: null }),
+      createSlot({ slot: 3, active: false, modelId: null }),
+    ];
+
+    render(<ModelSlots {...defaultProps({ slots: slotsWithEmpty })} />);
 
     await user.click(screen.getByTestId("add-slot-button"));
 
-    const selectTrigger3 = screen.getByTestId("slot-select-3");
-    expect(within(selectTrigger3).getByText("--")).toBeInTheDocument();
+    const selectTrigger2 = screen.getByTestId("slot-select-2");
+    expect(within(selectTrigger2).getByText("--")).toBeInTheDocument();
   });
 
   it("AC-6: should show full model names and only mode-compatible models in dropdown", () => {
     render(<ModelSlots {...defaultProps()} />);
 
-    const slotRow2 = screen.getByTestId("slot-row-2");
-    const options = within(slotRow2).getAllByRole("option");
+    // Test on slot 1 (always visible)
+    const slotRow1 = screen.getByTestId("slot-row-1");
+    const options = within(slotRow1).getAllByRole("option");
     const optionTexts = options.map((o) => o.textContent);
 
     expect(optionTexts).toContain("Flux Schnell");
@@ -307,18 +312,18 @@ describe("ModelSlots Compact Acceptance", () => {
     window.addEventListener("model-slots-changed", eventSpy);
 
     mockUpdateModelSlot.mockResolvedValueOnce(
-      createSlot({ slot: 3, active: true, modelId: "black-forest-labs/flux-schnell" }),
+      createSlot({ slot: 2, active: true, modelId: "acme/fast-gen" }),
     );
 
     render(<ModelSlots {...defaultProps()} />);
 
     await user.click(screen.getByTestId("add-slot-button"));
 
-    const slotRow3 = screen.getByTestId("slot-row-3");
-    await user.click(within(slotRow3).getByRole("option", { name: "Flux Schnell" }));
+    const slotRow2 = screen.getByTestId("slot-row-2");
+    await user.click(within(slotRow2).getByRole("option", { name: "FastGen" }));
 
     expect(mockUpdateModelSlot).toHaveBeenCalledWith(
-      expect.objectContaining({ mode: "txt2img", slot: 3 }),
+      expect.objectContaining({ mode: "txt2img", slot: 2 }),
     );
 
     await waitFor(() => {
@@ -328,14 +333,11 @@ describe("ModelSlots Compact Acceptance", () => {
     window.removeEventListener("model-slots-changed", eventSpy);
   });
 
-  it("AC-8: should disable all visible dropdowns and hide add button when disabled", () => {
+  it("AC-8: should disable slot 1 dropdown and hide add button when disabled", () => {
     render(<ModelSlots {...defaultProps({ disabled: true })} />);
 
-    for (const num of [1, 2]) {
-      expect(screen.getByTestId(`slot-select-${num}`)).toBeDisabled();
-    }
-
-    expect(screen.queryByTestId("slot-row-3")).not.toBeInTheDocument();
+    expect(screen.getByTestId("slot-select-1")).toBeDisabled();
+    expect(screen.queryByTestId("slot-row-2")).not.toBeInTheDocument();
     expect(screen.queryByTestId("add-slot-button")).not.toBeInTheDocument();
 
     const container = screen.getByTestId("model-slots");
@@ -352,10 +354,8 @@ describe("ModelSlots Compact Unit", () => {
   it("should apply min-w-0 on slot rows in compact variant", () => {
     render(<ModelSlots {...defaultProps()} />);
 
-    for (const num of [1, 2]) {
-      const row = screen.getByTestId(`slot-row-${num}`);
-      expect(row.className).toMatch(/min-w-0/);
-    }
+    const row = screen.getByTestId("slot-row-1");
+    expect(row.className).toMatch(/min-w-0/);
   });
 
   it("should use compact gap between slots", () => {
@@ -367,20 +367,25 @@ describe("ModelSlots Compact Unit", () => {
 
   it("compact placeholder differs from stacked placeholder", async () => {
     const user = userEvent.setup();
+    const slotsWithEmpty = [
+      createSlot({ slot: 1, active: true, modelId: "black-forest-labs/flux-schnell" }),
+      createSlot({ slot: 2, active: false, modelId: null }),
+      createSlot({ slot: 3, active: false, modelId: null }),
+    ];
 
-    const { unmount } = render(<ModelSlots {...defaultProps()} />);
+    const { unmount } = render(<ModelSlots {...defaultProps({ slots: slotsWithEmpty })} />);
 
     await user.click(screen.getByTestId("add-slot-button"));
 
-    const compactTrigger = screen.getByTestId("slot-select-3");
+    const compactTrigger = screen.getByTestId("slot-select-2");
     expect(within(compactTrigger).getByText("--")).toBeInTheDocument();
 
     unmount();
 
-    render(<ModelSlots {...defaultProps({ variant: "stacked" })} />);
+    render(<ModelSlots {...defaultProps({ variant: "stacked", slots: slotsWithEmpty })} />);
     await user.click(screen.getByTestId("add-slot-button"));
 
-    const stackedTrigger = screen.getByTestId("slot-select-3");
+    const stackedTrigger = screen.getByTestId("slot-select-2");
     expect(within(stackedTrigger).getByText("select model")).toBeInTheDocument();
   });
 });
@@ -390,8 +395,11 @@ describe("ModelSlots Compact Unit", () => {
 // ---------------------------------------------------------------------------
 
 describe("ModelSlots Compact Remove", () => {
-  it("should show remove button on slot 2 in compact variant", () => {
+  it("should show remove button on slot 2 after revealing it", async () => {
+    const user = userEvent.setup();
     render(<ModelSlots {...defaultProps()} />);
+
+    await user.click(screen.getByTestId("add-slot-button"));
 
     expect(screen.getByTestId("slot-remove-2")).toBeInTheDocument();
     expect(screen.queryByTestId("slot-remove-1")).not.toBeInTheDocument();
@@ -406,6 +414,7 @@ describe("ModelSlots Compact Remove", () => {
 
     render(<ModelSlots {...defaultProps()} />);
 
+    await user.click(screen.getByTestId("add-slot-button"));
     await user.click(screen.getByTestId("slot-remove-2"));
 
     expect(mockClearModelSlot).toHaveBeenCalledWith({
@@ -424,6 +433,7 @@ describe("ModelSlots Compact Remove", () => {
 
     render(<ModelSlots {...defaultProps()} />);
 
+    await user.click(screen.getByTestId("add-slot-button"));
     await user.click(screen.getByTestId("slot-remove-2"));
 
     await waitFor(() => {
