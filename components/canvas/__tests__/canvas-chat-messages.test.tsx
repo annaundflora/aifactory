@@ -126,6 +126,8 @@ function renderChatPanel(
       <CanvasChatPanel
         generation={generation}
         projectId={projectId}
+        modelSlots={[]}
+        models={[]}
       />
     </CanvasDetailProvider>
   );

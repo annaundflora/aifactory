@@ -86,10 +86,17 @@ vi.mock('@/app/actions/generations', () => ({
   uploadSourceImage: vi.fn().mockResolvedValue({ url: 'https://r2.example.com/uploaded.png' }),
 }))
 
-// Mock server actions: model-settings
-const mockGetModelSettings = vi.fn().mockResolvedValue([])
-vi.mock('@/app/actions/model-settings', () => ({
-  getModelSettings: (...args: unknown[]) => mockGetModelSettings(...args),
+// Mock server actions: model-slots (replaces model-settings after slots refactoring)
+const mockGetModelSlots = vi.fn().mockResolvedValue([])
+vi.mock('@/app/actions/model-slots', () => ({
+  getModelSlots: (...args: unknown[]) => mockGetModelSlots(...args),
+}))
+
+// Mock server actions: models
+const mockGetModels = vi.fn().mockResolvedValue([])
+vi.mock('@/app/actions/models', () => ({
+  getModels: (...args: unknown[]) => mockGetModels(...args),
+  getModelSchema: vi.fn().mockResolvedValue({ properties: {} }),
 }))
 
 // Mock server actions: references
@@ -246,6 +253,12 @@ vi.mock('@/lib/hooks/use-model-schema', () => ({
   useModelSchema: () => ({ schema: null, isLoading: false }),
 }))
 
+// Mock ModelSlots component (external, not under test)
+vi.mock('@/components/ui/model-slots', () => ({
+  ModelSlots: (props: Record<string, unknown>) =>
+    createElement('div', { 'data-testid': 'model-slots', 'data-variant': props.variant, 'data-mode': props.mode }),
+}))
+
 // Mock ParameterPanel
 vi.mock('@/components/workspace/parameter-panel', () => ({
   ParameterPanel: () => null,
@@ -258,19 +271,26 @@ vi.mock('@/components/workspace/parameter-panel', () => ({
 import { PromptArea } from '@/components/workspace/prompt-area'
 
 // ---------------------------------------------------------------------------
-// Fixtures: Model Settings
+// Fixtures: Model Slots (replaces Model Settings after slots refactoring)
 // ---------------------------------------------------------------------------
 
-function makeFullModelSettings() {
+function makeModelSlots() {
   return [
-    { id: 'ms-1', mode: 'txt2img', tier: 'draft', modelId: 'black-forest-labs/flux-schnell', modelParams: {}, createdAt: new Date(), updatedAt: new Date() },
-    { id: 'ms-2', mode: 'txt2img', tier: 'quality', modelId: 'black-forest-labs/flux-2-pro', modelParams: {}, createdAt: new Date(), updatedAt: new Date() },
-    { id: 'ms-3', mode: 'txt2img', tier: 'max', modelId: 'black-forest-labs/flux-2-max', modelParams: {}, createdAt: new Date(), updatedAt: new Date() },
-    { id: 'ms-4', mode: 'img2img', tier: 'draft', modelId: 'black-forest-labs/flux-schnell', modelParams: { prompt_strength: 0.6 }, createdAt: new Date(), updatedAt: new Date() },
-    { id: 'ms-5', mode: 'img2img', tier: 'quality', modelId: 'black-forest-labs/flux-2-pro', modelParams: {}, createdAt: new Date(), updatedAt: new Date() },
-    { id: 'ms-6', mode: 'img2img', tier: 'max', modelId: 'black-forest-labs/flux-2-max', modelParams: {}, createdAt: new Date(), updatedAt: new Date() },
-    { id: 'ms-7', mode: 'upscale', tier: 'draft', modelId: 'nightmareai/real-esrgan', modelParams: { scale: 2 }, createdAt: new Date(), updatedAt: new Date() },
-    { id: 'ms-8', mode: 'upscale', tier: 'quality', modelId: 'philz1337x/crystal-upscaler', modelParams: { scale: 4 }, createdAt: new Date(), updatedAt: new Date() },
+    { id: 'slot-1', mode: 'txt2img', slot: 1, modelId: 'black-forest-labs/flux-schnell', modelParams: {}, active: true, createdAt: new Date(), updatedAt: new Date() },
+    { id: 'slot-2', mode: 'txt2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro', modelParams: {}, active: false, createdAt: new Date(), updatedAt: new Date() },
+    { id: 'slot-3', mode: 'txt2img', slot: 3, modelId: null, modelParams: {}, active: false, createdAt: new Date(), updatedAt: new Date() },
+    { id: 'slot-4', mode: 'img2img', slot: 1, modelId: 'black-forest-labs/flux-schnell', modelParams: { prompt_strength: 0.6 }, active: true, createdAt: new Date(), updatedAt: new Date() },
+    { id: 'slot-5', mode: 'img2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro', modelParams: {}, active: false, createdAt: new Date(), updatedAt: new Date() },
+    { id: 'slot-6', mode: 'img2img', slot: 3, modelId: null, modelParams: {}, active: false, createdAt: new Date(), updatedAt: new Date() },
+    { id: 'slot-7', mode: 'upscale', slot: 1, modelId: 'nightmareai/real-esrgan', modelParams: { scale: 2 }, active: true, createdAt: new Date(), updatedAt: new Date() },
+    { id: 'slot-8', mode: 'upscale', slot: 2, modelId: 'philz1337x/crystal-upscaler', modelParams: { scale: 4 }, active: false, createdAt: new Date(), updatedAt: new Date() },
+  ]
+}
+
+function makeModels() {
+  return [
+    { id: 'model-1', replicateId: 'black-forest-labs/flux-schnell', owner: 'black-forest-labs', name: 'flux-schnell', description: null, coverImageUrl: null, runCount: 100, collections: null, capabilities: { txt2img: true, img2img: true }, inputSchema: null, versionHash: null, isActive: true, lastSyncedAt: null, createdAt: new Date(), updatedAt: new Date() },
+    { id: 'model-2', replicateId: 'black-forest-labs/flux-2-pro', owner: 'black-forest-labs', name: 'flux-2-pro', description: null, coverImageUrl: null, runCount: 100, collections: null, capabilities: { txt2img: true, img2img: true }, inputSchema: null, versionHash: null, isActive: true, lastSyncedAt: null, createdAt: new Date(), updatedAt: new Date() },
   ]
 }
 
@@ -299,7 +319,8 @@ async function switchToMode(
 describe('PromptArea - prompt simplification', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockGetModelSettings.mockResolvedValue(makeFullModelSettings())
+    mockGetModelSlots.mockResolvedValue(makeModelSlots())
+    mockGetModels.mockResolvedValue(makeModels())
   })
 
   // -------------------------------------------------------------------------
@@ -316,7 +337,7 @@ describe('PromptArea - prompt simplification', () => {
     renderPromptArea()
 
     await waitFor(() => {
-      expect(mockGetModelSettings).toHaveBeenCalled()
+      expect(mockGetModelSlots).toHaveBeenCalled()
     })
 
     // Exactly 1 prompt textarea exists
@@ -342,7 +363,7 @@ describe('PromptArea - prompt simplification', () => {
     renderPromptArea()
 
     await waitFor(() => {
-      expect(mockGetModelSettings).toHaveBeenCalled()
+      expect(mockGetModelSlots).toHaveBeenCalled()
     })
 
     expect(screen.queryByTestId('prompt-style-toggle')).not.toBeInTheDocument()
@@ -361,7 +382,7 @@ describe('PromptArea - prompt simplification', () => {
     renderPromptArea()
 
     await waitFor(() => {
-      expect(mockGetModelSettings).toHaveBeenCalled()
+      expect(mockGetModelSlots).toHaveBeenCalled()
     })
 
     // The label for the prompt textarea should say "Prompt"
@@ -392,7 +413,7 @@ describe('PromptArea - prompt simplification', () => {
     renderPromptArea()
 
     await waitFor(() => {
-      expect(mockGetModelSettings).toHaveBeenCalled()
+      expect(mockGetModelSlots).toHaveBeenCalled()
     })
 
     const textarea = screen.getByTestId('prompt-motiv-textarea')
@@ -424,7 +445,7 @@ describe('PromptArea - prompt simplification', () => {
     // Verify expected properties exist
     expect(txt2ImgBody).toMatch(/promptMotiv/)
     expect(txt2ImgBody).toMatch(/variantCount/)
-    expect(txt2ImgBody).toMatch(/imageParams/)
+    // imageParams moved to per-slot ModelSlots system
 
     // Extract Img2ImgState interface
     const img2ImgMatch = source.match(
@@ -438,7 +459,7 @@ describe('PromptArea - prompt simplification', () => {
     expect(img2ImgBody).toMatch(/promptMotiv/)
     expect(img2ImgBody).toMatch(/variantCount/)
     expect(img2ImgBody).toMatch(/referenceSlots/)
-    expect(img2ImgBody).toMatch(/imageParams/)
+    // imageParams moved to per-slot ModelSlots system
   })
 
   // -------------------------------------------------------------------------
@@ -513,7 +534,7 @@ describe('PromptArea - prompt simplification', () => {
     renderPromptArea()
 
     await waitFor(() => {
-      expect(mockGetModelSettings).toHaveBeenCalled()
+      expect(mockGetModelSlots).toHaveBeenCalled()
     })
 
     // Type the prompt
@@ -550,7 +571,7 @@ describe('PromptArea - prompt simplification', () => {
     renderPromptArea()
 
     await waitFor(() => {
-      expect(mockGetModelSettings).toHaveBeenCalled()
+      expect(mockGetModelSlots).toHaveBeenCalled()
     })
 
     // Switch to img2img
@@ -592,7 +613,7 @@ describe('PromptArea - prompt simplification', () => {
     renderPromptArea()
 
     await waitFor(() => {
-      expect(mockGetModelSettings).toHaveBeenCalled()
+      expect(mockGetModelSlots).toHaveBeenCalled()
     })
 
     // Type a prompt in txt2img mode

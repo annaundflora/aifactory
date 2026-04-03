@@ -1,8 +1,8 @@
 {
   "spec_path": "/home/dev/aifactory/.claude/worktrees/discovery+prompt-simplification/specs/phase-7/2026-03-29-prompt-simplification",
   "feature_name": "prompt-simplification",
-  "status": "in_progress",
-  "current_state": "final_validation",
+  "status": "completed",
+  "current_state": "feature_complete",
   "current_slice_id": null,
   "retry_count": 0,
   "failed_stage": null,

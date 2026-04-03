@@ -69,12 +69,52 @@ vi.mock("lucide-react", () => ({
   CheckIcon: (props: Record<string, unknown>) => (
     <span data-testid="icon-check" {...props} />
   ),
+  Check: (props: Record<string, unknown>) => (
+    <span data-testid="icon-check" {...props} />
+  ),
   ChevronDownIcon: (props: Record<string, unknown>) => (
     <span data-testid="icon-chevron-down" {...props} />
   ),
   ChevronUpIcon: (props: Record<string, unknown>) => (
     <span data-testid="icon-chevron-up" {...props} />
   ),
+}));
+
+// Mock useModelSchema
+vi.mock("@/lib/hooks/use-model-schema", () => ({
+  useModelSchema: () => ({ schema: null, isLoading: false, error: null }),
+}));
+
+// Mock server actions: model-slots
+vi.mock("@/app/actions/model-slots", () => ({
+  updateModelSlot: vi.fn(),
+  toggleSlotActive: vi.fn(),
+}));
+
+// Mock ModelSlots UI component
+vi.mock("@/components/ui/model-slots", () => ({
+  ModelSlots: (props: Record<string, unknown>) => (
+    <div
+      data-testid="model-slots"
+      data-variant={props.variant}
+      data-mode={props.mode}
+    />
+  ),
+}));
+
+// Mock resolveActiveSlots
+vi.mock("@/lib/utils/resolve-model", () => ({
+  resolveActiveSlots: (
+    slots: Array<{ mode: string; active: boolean; modelId: string | null }>,
+    mode: string,
+  ) => {
+    return slots
+      .filter((s) => s.mode === mode && s.active && s.modelId != null)
+      .map((s) => ({
+        modelId: s.modelId!,
+        modelParams: {},
+      }));
+  },
 }));
 
 // ---------------------------------------------------------------------------
@@ -84,6 +124,7 @@ vi.mock("lucide-react", () => ({
 import {
   VariationPopover,
   type VariationParams,
+  type VariationPopoverProps,
 } from "@/components/canvas/popovers/variation-popover";
 import {
   CanvasDetailProvider,
@@ -119,6 +160,21 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Fixtures: Model Slots and Models
+// ---------------------------------------------------------------------------
+
+const standardSlots = [
+  { id: "slot-1", mode: "txt2img", slot: 1, modelId: "black-forest-labs/flux-schnell", modelParams: {}, active: true, createdAt: new Date(), updatedAt: new Date() },
+  { id: "slot-2", mode: "txt2img", slot: 2, modelId: "black-forest-labs/flux-pro", modelParams: {}, active: false, createdAt: new Date(), updatedAt: new Date() },
+  { id: "slot-3", mode: "txt2img", slot: 3, modelId: null, modelParams: {}, active: false, createdAt: new Date(), updatedAt: new Date() },
+];
+
+const standardModels = [
+  { id: "model-1", replicateId: "black-forest-labs/flux-schnell", owner: "black-forest-labs", name: "Flux Schnell", description: null, coverImageUrl: null, runCount: 100, collections: null, capabilities: { txt2img: true }, inputSchema: null, versionHash: null, isActive: true, lastSyncedAt: null, createdAt: new Date(), updatedAt: new Date() },
+  { id: "model-2", replicateId: "black-forest-labs/flux-pro", owner: "black-forest-labs", name: "Flux Pro", description: null, coverImageUrl: null, runCount: 100, collections: null, capabilities: { txt2img: true }, inputSchema: null, versionHash: null, isActive: true, lastSyncedAt: null, createdAt: new Date(), updatedAt: new Date() },
+];
+
 /**
  * Helper component that dispatches SET_ACTIVE_TOOL with toolId "variation"
  * on mount, making the popover visible.
@@ -138,6 +194,8 @@ function ActivateVariationTool() {
 function renderPopoverOpen(options?: {
   generation?: Generation;
   onGenerate?: (params: VariationParams) => void;
+  modelSlots?: VariationPopoverProps["modelSlots"];
+  models?: VariationPopoverProps["models"];
 }) {
   const generation = options?.generation ?? makeGeneration();
   const onGenerate = options?.onGenerate ?? vi.fn();
@@ -145,7 +203,12 @@ function renderPopoverOpen(options?: {
   const result = render(
     <CanvasDetailProvider initialGenerationId={generation.id}>
       <ActivateVariationTool />
-      <VariationPopover generation={generation} onGenerate={onGenerate} />
+      <VariationPopover
+        generation={generation}
+        onGenerate={onGenerate}
+        modelSlots={options?.modelSlots ?? standardSlots}
+        models={options?.models ?? standardModels}
+      />
     </CanvasDetailProvider>
   );
 
@@ -179,7 +242,7 @@ describe("VariationPopover - prompt simplification", () => {
       prompt: "test prompt",
       strength: "balanced",
       count: 2,
-      tier: "draft",
+      modelIds: ["black-forest-labs/flux-schnell"],
       imageParams: { aspect_ratio: "16:9" },
     };
 
@@ -187,17 +250,19 @@ describe("VariationPopover - prompt simplification", () => {
     expect(params).toHaveProperty("prompt");
     expect(params).toHaveProperty("strength");
     expect(params).toHaveProperty("count");
-    expect(params).toHaveProperty("tier");
+    expect(params).toHaveProperty("modelIds");
     expect(params).toHaveProperty("imageParams");
 
     // Verify removed fields are NOT present
     expect(params).not.toHaveProperty("promptStyle");
     expect(params).not.toHaveProperty("negativePrompt");
+    expect(params).not.toHaveProperty("tier");
 
     // Verify exact key set (only allowed keys)
     const keys = Object.keys(params);
     expect(keys).not.toContain("promptStyle");
     expect(keys).not.toContain("negativePrompt");
+    expect(keys).not.toContain("tier");
   });
 
   // -------------------------------------------------------------------------
@@ -230,9 +295,9 @@ describe("VariationPopover - prompt simplification", () => {
     expect(screen.queryByTestId("variation-style")).not.toBeInTheDocument();
     expect(screen.queryByTestId("variation-negative-prompt")).not.toBeInTheDocument();
 
-    // The count selector and tier toggle should be present (part of the reset state)
+    // The count selector and model slots section should be present (part of the reset state)
     expect(screen.getByTestId("variation-count-selector")).toBeInTheDocument();
-    expect(screen.getByTestId("variation-tier-section")).toBeInTheDocument();
+    expect(screen.getByTestId("variation-model-slots-section")).toBeInTheDocument();
   });
 
   // -------------------------------------------------------------------------
@@ -308,20 +373,20 @@ describe("VariationPopover - prompt simplification", () => {
     // Must have the expected fields
     expect(calledParams).toHaveProperty("prompt", "A beautiful sunset");
     expect(calledParams).toHaveProperty("count", 1);
-    expect(calledParams).toHaveProperty("tier", "draft");
-    expect(calledParams).toHaveProperty("imageParams");
+    expect(calledParams).toHaveProperty("modelIds");
 
     // Must NOT have removed fields
     expect(calledParams).not.toHaveProperty("promptStyle");
     expect(calledParams).not.toHaveProperty("negativePrompt");
+    expect(calledParams).not.toHaveProperty("tier");
 
     // Double-check: verify exact keys in the object
     const paramKeys = Object.keys(calledParams);
     expect(paramKeys).not.toContain("promptStyle");
     expect(paramKeys).not.toContain("negativePrompt");
+    expect(paramKeys).not.toContain("tier");
     expect(paramKeys).toContain("prompt");
     expect(paramKeys).toContain("count");
-    expect(paramKeys).toContain("tier");
-    expect(paramKeys).toContain("imageParams");
+    expect(paramKeys).toContain("modelIds");
   });
 });

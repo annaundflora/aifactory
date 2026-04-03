@@ -14,21 +14,18 @@ import { ReferenceBar } from "@/components/workspace/reference-bar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { TierToggle } from "@/components/ui/tier-toggle";
-import { ParameterPanel, type SchemaProperties } from "@/components/workspace/parameter-panel";
-import { useModelSchema } from "@/lib/hooks/use-model-schema";
-import { resolveModel } from "@/lib/utils/resolve-model";
+import { ModelSlots } from "@/components/ui/model-slots";
+import { resolveActiveSlots } from "@/lib/utils/resolve-model";
 import type {
   ReferenceRole,
   ReferenceStrength,
   ReferenceSlotData,
 } from "@/lib/types/reference";
 import type { GalleryDragPayload } from "@/lib/constants/drag-types";
-import type { ModelSetting } from "@/lib/db/queries";
-import type { Tier } from "@/lib/types";
+import type { ModelSlot, Model } from "@/lib/db/queries";
 
 // ---------------------------------------------------------------------------
-// Img2imgParams type (exported for slice-14 consumer)
+// Img2imgParams type (exported for slice-12 consumer)
 // ---------------------------------------------------------------------------
 
 export interface ReferenceInput {
@@ -42,7 +39,8 @@ export interface Img2imgParams {
   motiv: string;
   style: string;
   variants: number;
-  tier: Tier;
+  /** Active model IDs from model slots. */
+  modelIds: string[];
   imageParams?: Record<string, unknown>;
 }
 
@@ -60,7 +58,10 @@ const VARIANTS_MAX = 4;
 
 export interface Img2imgPopoverProps {
   onGenerate?: (params: Img2imgParams) => void;
-  modelSettings?: ModelSetting[];
+  /** Model slot configurations for the ModelSlots UI. */
+  modelSlots: ModelSlot[];
+  /** Available models for dropdown population. */
+  models: Model[];
 }
 
 // ---------------------------------------------------------------------------
@@ -69,7 +70,8 @@ export interface Img2imgPopoverProps {
 
 export function Img2imgPopover({
   onGenerate,
-  modelSettings = [],
+  modelSlots,
+  models,
 }: Img2imgPopoverProps) {
   const { state, dispatch } = useCanvasDetail();
 
@@ -78,17 +80,6 @@ export function Img2imgPopover({
   const [motiv, setMotiv] = useState("");
   const [style, setStyle] = useState("");
   const [variants, setVariants] = useState(1);
-  const [tier, setTier] = useState<Tier>("draft");
-  const [imageParams, setImageParams] = useState<Record<string, unknown>>({});
-
-  // Resolve modelId from settings for schema fetching
-  const resolved = resolveModel(modelSettings, "img2img", tier);
-  const { schema, isLoading, error } = useModelSchema(resolved?.modelId);
-
-  // Reset imageParams when tier/model changes
-  useEffect(() => {
-    setImageParams({});
-  }, [resolved?.modelId]);
 
   // Track all blob URLs we create so we can revoke them on unmount
   const blobUrlsRef = useRef<Set<string>>(new Set());
@@ -292,20 +283,24 @@ export function Img2imgPopover({
   // -------------------------------------------------------------------------
 
   const handleGenerate = useCallback(() => {
+    const references = slots.map((s) => ({
+      imageUrl: s.imageUrl,
+      role: s.role,
+      strength: s.strength,
+    }));
+
+    const activeSlots = resolveActiveSlots(modelSlots, "img2img");
+    const modelIds = activeSlots.map((s) => s.modelId);
+
     const params: Img2imgParams = {
-      references: slots.map((s) => ({
-        imageUrl: s.imageUrl,
-        role: s.role,
-        strength: s.strength,
-      })),
+      references,
       motiv,
       style,
       variants,
-      tier,
-      imageParams,
+      modelIds,
     };
     onGenerate?.(params);
-  }, [slots, motiv, style, variants, tier, imageParams, onGenerate]);
+  }, [slots, motiv, style, variants, onGenerate, modelSlots]);
 
   // -------------------------------------------------------------------------
   // Render
@@ -432,29 +427,16 @@ export function Img2imgPopover({
             </div>
           </section>
 
-          {/* ---- Tier Toggle ---- */}
-          <section data-testid="tier-section">
-            <div className="space-y-2">
-              <TierToggle
-                tier={tier}
-                onTierChange={setTier}
-                disabled={state.isGenerating}
-              />
-            </div>
+          {/* ---- Model Selection ---- */}
+          <section data-testid="model-slots-section">
+            <ModelSlots
+              mode="img2img"
+              slots={modelSlots}
+              models={models}
+              variant="stacked"
+              disabled={state.isGenerating}
+            />
           </section>
-
-          {/* ---- Parameter Controls (schema-based) ---- */}
-          {!error && (
-            <section data-testid="parameter-section">
-              <ParameterPanel
-                schema={schema as SchemaProperties | null}
-                isLoading={isLoading}
-                values={imageParams}
-                onChange={setImageParams}
-                primaryFields={["aspect_ratio", "megapixels", "resolution"]}
-              />
-            </section>
-          )}
 
           {/* ---- Generate Button ---- */}
           <Button

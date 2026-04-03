@@ -12,7 +12,7 @@ import { resolve } from 'path'
  */
 
 const DRIZZLE_DIR = resolve(__dirname, '..')
-const MIGRATION_FILE = resolve(DRIZZLE_DIR, '0012_drop_prompt_style_negative.sql')
+const MIGRATION_FILE = resolve(DRIZZLE_DIR, '0013_drop_prompt_style_negative.sql')
 const JOURNAL_FILE = resolve(DRIZZLE_DIR, 'meta', '_journal.json')
 
 describe('migration 0012 - drop prompt_style and negative_prompt', () => {
@@ -83,12 +83,12 @@ describe('migration 0012 - drop prompt_style and negative_prompt', () => {
   // -----------------------------------------------------------
   // AC-3: Journal-Eintrag ist korrekt
   // -----------------------------------------------------------
-  it('should have journal entry with idx 12 and tag 0012_drop_prompt_style_negative', () => {
+  it('should have journal entry with idx 13 and tag 0013_drop_prompt_style_negative', () => {
     /**
      * AC-3: GIVEN die generierte Migration aus AC-2
      *       WHEN die Datei `drizzle/meta/_journal.json` geprueft wird
      *       THEN enthaelt das `entries`-Array einen Eintrag mit
-     *       `"idx": 12` und `"tag": "0012_drop_prompt_style_negative"`
+     *       `"idx": 13` und `"tag": "0013_drop_prompt_style_negative"`
      */
     expect(existsSync(JOURNAL_FILE)).toBe(true)
 
@@ -97,21 +97,21 @@ describe('migration 0012 - drop prompt_style and negative_prompt', () => {
     expect(journal.entries).toBeDefined()
     expect(Array.isArray(journal.entries)).toBe(true)
 
-    const entry12 = journal.entries.find((e: any) => e.idx === 12)
-    expect(entry12).toBeDefined()
-    expect(entry12.tag).toBe('0012_drop_prompt_style_negative')
-    expect(entry12.version).toBe('7')
-    expect(entry12.breakpoints).toBe(true)
+    const entry13 = journal.entries.find((e: any) => e.idx === 13)
+    expect(entry13).toBeDefined()
+    expect(entry13.tag).toBe('0013_drop_prompt_style_negative')
+    expect(entry13.version).toBe('7')
+    expect(entry13.breakpoints).toBe(true)
   })
 
   // -----------------------------------------------------------
   // AC-3: Vorherige Journal-Eintraege intakt
   // -----------------------------------------------------------
-  it('should preserve all 12 previous journal entries (idx 0-11)', () => {
+  it('should preserve all 13 previous journal entries (idx 0-12)', () => {
     /**
      * AC-3: GIVEN die generierte Migration aus AC-2
      *       WHEN die Datei `drizzle/meta/_journal.json` geprueft wird
-     *       THEN hat das Journal weiterhin alle 12 vorherigen Eintraege (idx 0-11)
+     *       THEN hat das Journal weiterhin alle 13 vorherigen Eintraege (idx 0-12)
      */
     expect(existsSync(JOURNAL_FILE)).toBe(true)
 
@@ -120,11 +120,11 @@ describe('migration 0012 - drop prompt_style and negative_prompt', () => {
     expect(journal.version).toBe('7')
     expect(journal.dialect).toBe('postgresql')
 
-    // Must have at least 13 entries (idx 0 through 12)
-    expect(journal.entries.length).toBeGreaterThanOrEqual(13)
+    // Must have at least 14 entries (idx 0 through 13)
+    expect(journal.entries.length).toBeGreaterThanOrEqual(14)
 
-    // All previous entries (idx 0-11) must exist
-    for (let i = 0; i <= 11; i++) {
+    // All previous entries (idx 0-12) must exist
+    for (let i = 0; i <= 12; i++) {
       const entry = journal.entries.find((e: any) => e.idx === i)
       expect(entry, `Journal entry for idx ${i} should exist`).toBeDefined()
       expect(entry.version).toBe('7')

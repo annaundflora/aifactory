@@ -65,7 +65,7 @@ const {
   mockDeleteGeneration,
   mockGetModels,
   mockCheckImg2ImgSupport,
-  mockGetModelSettings,
+  mockGetModelSlots,
   mockToastFn,
   mockToastError,
   mockToastSuccess,
@@ -81,7 +81,7 @@ const {
   mockDeleteGeneration: vi.fn(),
   mockGetModels: vi.fn(),
   mockCheckImg2ImgSupport: vi.fn(),
-  mockGetModelSettings: vi.fn(),
+  mockGetModelSlots: vi.fn(),
   mockToastFn: vi.fn(),
   mockToastError: vi.fn(),
   mockToastSuccess: vi.fn(),
@@ -111,9 +111,9 @@ vi.mock("@/app/actions/generations", () => ({
   getSiblingGenerations: vi.fn().mockResolvedValue([]),
 }));
 
-// Mock model settings server action
-vi.mock("@/app/actions/model-settings", () => ({
-  getModelSettings: (...args: unknown[]) => mockGetModelSettings(...args),
+// Mock model-slots server action (replaces model-settings after slots refactoring)
+vi.mock("@/app/actions/model-slots", () => ({
+  getModelSlots: (...args: unknown[]) => mockGetModelSlots(...args),
 }));
 
 // Mock references server actions
@@ -286,7 +286,8 @@ describe("CanvasDetailView - prompt simplification", () => {
     capturedVariationOnGenerate.current = null;
     capturedImg2imgOnGenerate.current = null;
     mockFetchGenerations.mockResolvedValue([]);
-    mockGetModelSettings.mockResolvedValue([]);
+    mockGetModelSlots.mockResolvedValue([]);
+    mockGetModels.mockResolvedValue([]);
     mockGetProvenanceData.mockResolvedValue([]);
     mockGenerateImages.mockResolvedValue([
       makeGeneration({ id: "gen-new-1", status: "pending" }),
@@ -321,7 +322,7 @@ describe("CanvasDetailView - prompt simplification", () => {
         prompt: "A sunset over ocean waves",
         strength: "balanced",
         count: 2,
-        tier: "draft",
+        modelIds: ["black-forest-labs/flux-schnell"],
         imageParams: {},
       });
     });
@@ -381,7 +382,7 @@ describe("CanvasDetailView - prompt simplification", () => {
         motiv: "A cyberpunk cityscape at night",
         style: "",
         variants: 1,
-        tier: "draft",
+        modelIds: ["black-forest-labs/flux-schnell"],
         imageParams: {},
       });
     });

@@ -144,7 +144,7 @@ function renderChatPanel(
 
   return render(
     <CanvasDetailProvider initialGenerationId={initialGenerationId}>
-      <CanvasChatPanel generation={generation} projectId={projectId} />
+      <CanvasChatPanel generation={generation} projectId={projectId} modelSlots={[]} models={[]} />
     </CanvasDetailProvider>
   );
 }
@@ -189,7 +189,7 @@ function renderChatPanelWithDispatcher(
         action={options.initialAction ?? null}
         triggerOnRender={!!options.initialAction}
       />
-      <CanvasChatPanel generation={generation} projectId={projectId} />
+      <CanvasChatPanel generation={generation} projectId={projectId} modelSlots={[]} models={[]} />
     </CanvasDetailProvider>
   );
 }
@@ -209,7 +209,7 @@ function SwitchableGeneration({
 
   return (
     <>
-      <CanvasChatPanel generation={generations[index]} projectId={projectId} />
+      <CanvasChatPanel generation={generations[index]} projectId={projectId} modelSlots={[]} models={[]} />
       <button
         data-testid="switch-generation-button"
         onClick={() => {

@@ -12,15 +12,12 @@ import {
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { TierToggle } from "@/components/ui/tier-toggle";
-import { ParameterPanel, type SchemaProperties } from "@/components/workspace/parameter-panel";
-import { useModelSchema } from "@/lib/hooks/use-model-schema";
-import { resolveModel } from "@/lib/utils/resolve-model";
-import type { Generation, ModelSetting } from "@/lib/db/queries";
-import type { Tier } from "@/lib/types";
+import { ModelSlots } from "@/components/ui/model-slots";
+import { resolveActiveSlots } from "@/lib/utils/resolve-model";
+import type { Generation, ModelSlot, Model } from "@/lib/db/queries";
 
 // ---------------------------------------------------------------------------
-// Types (exported for slice-14)
+// Types (exported for slice-12)
 // ---------------------------------------------------------------------------
 
 export type VariationStrength = "subtle" | "balanced" | "creative";
@@ -29,7 +26,8 @@ export interface VariationParams {
   prompt: string;
   strength?: VariationStrength;
   count: number;
-  tier: Tier;
+  /** Active model IDs from selected slots. */
+  modelIds: string[];
   imageParams?: Record<string, unknown>;
 }
 
@@ -46,7 +44,10 @@ const COUNT_OPTIONS = [1, 2, 3, 4] as const;
 export interface VariationPopoverProps {
   generation: Generation;
   onGenerate: (params: VariationParams) => void;
-  modelSettings?: ModelSetting[];
+  /** Model slot configurations for the ModelSlots UI. */
+  modelSlots: ModelSlot[];
+  /** Available models for dropdown population. */
+  models: Model[];
 }
 
 // ---------------------------------------------------------------------------
@@ -56,7 +57,8 @@ export interface VariationPopoverProps {
 export function VariationPopover({
   generation,
   onGenerate,
-  modelSettings = [],
+  modelSlots,
+  models,
 }: VariationPopoverProps) {
   const { state, dispatch } = useCanvasDetail();
 
@@ -65,25 +67,12 @@ export function VariationPopover({
   // Local form state
   const [prompt, setPrompt] = useState(generation.prompt ?? "");
   const [count, setCount] = useState<number>(1);
-  const [tier, setTier] = useState<Tier>("draft");
-  const [imageParams, setImageParams] = useState<Record<string, unknown>>({});
-
-  // Resolve modelId from settings for schema fetching
-  const resolved = resolveModel(modelSettings, "img2img", tier);
-  const { schema, isLoading, error } = useModelSchema(resolved?.modelId);
-
-  // Reset imageParams when tier/model changes
-  useEffect(() => {
-    setImageParams({});
-  }, [resolved?.modelId]);
 
   // Reset form state when generation changes or popover reopens
   useEffect(() => {
     if (isOpen) {
       setPrompt(generation.prompt ?? "");
       setCount(1);
-      setTier("draft");
-      setImageParams({});
     }
   }, [isOpen, generation.id]);
 
@@ -95,25 +84,27 @@ export function VariationPopover({
         dispatch({ type: "SET_ACTIVE_TOOL", toolId: "variation" });
       }
     },
-    [dispatch]
+    [dispatch],
   );
-
 
   // Handle generate action
   const handleGenerate = useCallback(() => {
+    const activeSlots = resolveActiveSlots(modelSlots, "txt2img");
+    const modelIds = activeSlots.map((s) => s.modelId);
+
     onGenerate({
       prompt,
       count,
-      tier,
-      imageParams,
+      modelIds,
     });
+
     // Close the popover by setting activeToolId to null via toggle
     dispatch({ type: "SET_ACTIVE_TOOL", toolId: "variation" });
-  }, [onGenerate, prompt, count, tier, imageParams, dispatch]);
+  }, [modelSlots, onGenerate, prompt, count, dispatch]);
 
   return (
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
-      {/* Anchor is invisible — positioned where the toolbar variation button is */}
+      {/* Anchor is invisible -- positioned where the toolbar variation button is */}
       <PopoverAnchor asChild>
         <span
           data-testid="variation-popover-anchor"
@@ -126,7 +117,7 @@ export function VariationPopover({
         side="right"
         align="start"
         sideOffset={8}
-        className="w-80"
+        className="w-80 max-h-[80vh] overflow-y-auto"
         data-testid="variation-popover"
       >
         {/* Header */}
@@ -186,25 +177,16 @@ export function VariationPopover({
             </div>
           </div>
 
-          {/* Tier Toggle */}
-          <div className="space-y-2" data-testid="variation-tier-section">
-            <TierToggle
-              tier={tier}
-              onTierChange={setTier}
+          {/* Model Selection */}
+          <div className="space-y-2" data-testid="variation-model-slots-section">
+            <ModelSlots
+              mode="txt2img"
+              slots={modelSlots}
+              models={models}
+              variant="stacked"
               disabled={state.isGenerating}
             />
           </div>
-
-          {/* Parameter Controls (schema-based) */}
-          {!error && (
-            <ParameterPanel
-              schema={schema as SchemaProperties | null}
-              isLoading={isLoading}
-              values={imageParams}
-              onChange={setImageParams}
-              primaryFields={["aspect_ratio", "megapixels", "resolution"]}
-            />
-          )}
 
           {/* Generate Button */}
           <Button

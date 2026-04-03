@@ -1,0 +1,34 @@
+{
+  "feature": "model-slots",
+  "slice": "slice-01",
+  "timestamp": "2026-03-29T00:03:00Z",
+  "status": "completed",
+  "implementation": {
+    "status": "completed",
+    "files_changed": ["drizzle/0012_add_model_slots.sql", "lib/db/schema.ts", "lib/db/queries.ts", "lib/services/model-settings-service.ts"]
+  },
+  "review": {
+    "verdict": "APPROVED",
+    "findings": [],
+    "iterations": 1
+  },
+  "deterministic_gate": {
+    "detected_stack": "TypeScript",
+    "lint_passed": true,
+    "lint_iterations": 1,
+    "note": "113 pre-existing lint errors, 0 new"
+  },
+  "tests": {
+    "test_files": ["lib/db/__tests__/schema-model-slots.test.ts", "drizzle/__tests__/0012-migration.test.ts", "tests/acceptance/test_slice_01_model_slots.test.ts"],
+    "test_count": {"unit": 4, "integration": 7, "acceptance": 7},
+    "ac_coverage": {"total": 7, "covered": 7, "missing": []}
+  },
+  "validation": {
+    "overall_status": "passed",
+    "unit": "11 passed",
+    "acceptance": "7 passed",
+    "smoke": "200 OK"
+  },
+  "retries": 0,
+  "review_iterations": 1
+}

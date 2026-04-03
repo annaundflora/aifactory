@@ -21,7 +21,7 @@ import { generations } from '../../lib/db/schema'
 type GenerationSelect = InferSelectModel<typeof generations>
 
 const DRIZZLE_DIR = resolve(__dirname, '..', '..', 'drizzle')
-const MIGRATION_FILE = resolve(DRIZZLE_DIR, '0012_drop_prompt_style_negative.sql')
+const MIGRATION_FILE = resolve(DRIZZLE_DIR, '0013_drop_prompt_style_negative.sql')
 const JOURNAL_FILE = resolve(DRIZZLE_DIR, 'meta', '_journal.json')
 
 describe('slice-01-db-schema-migration Acceptance (Prompt Simplification)', () => {
@@ -83,11 +83,11 @@ describe('slice-01-db-schema-migration Acceptance (Prompt Simplification)', () =
   // =================================================================
   // AC-2: Migration-Datei existiert mit korrekten DROP COLUMN Statements
   // =================================================================
-  it('AC-2: GIVEN das bereinigte Schema aus AC-1 WHEN npx drizzle-kit generate ausgefuehrt wird THEN existiert die Datei drizzle/0012_drop_prompt_style_negative.sql mit genau 2 DROP COLUMN Statements', () => {
+  it('AC-2: GIVEN das bereinigte Schema aus AC-1 WHEN npx drizzle-kit generate ausgefuehrt wird THEN existiert die Datei drizzle/0013_drop_prompt_style_negative.sql mit genau 2 DROP COLUMN Statements', () => {
     /**
      * AC-2: GIVEN das bereinigte Schema aus AC-1
      *       WHEN `npx drizzle-kit generate` ausgefuehrt wird
-     *       THEN existiert die Datei `drizzle/0012_drop_prompt_style_negative.sql`
+     *       THEN existiert die Datei `drizzle/0013_drop_prompt_style_negative.sql`
      *       AND die SQL-Datei enthaelt genau 2 `ALTER TABLE ... DROP COLUMN`-Statements:
      *            eines fuer `prompt_style`, eines fuer `negative_prompt`
      *       AND die Statements verwenden `--> statement-breakpoint` als Separator
@@ -114,13 +114,13 @@ describe('slice-01-db-schema-migration Acceptance (Prompt Simplification)', () =
   // =================================================================
   // AC-3: Journal-Eintrag korrekt
   // =================================================================
-  it('AC-3: GIVEN die generierte Migration aus AC-2 WHEN drizzle/meta/_journal.json geprueft wird THEN enthaelt entries einen Eintrag mit idx 12 und tag 0012_drop_prompt_style_negative AND alle 12 vorherigen Eintraege sind intakt', () => {
+  it('AC-3: GIVEN die generierte Migration aus AC-2 WHEN drizzle/meta/_journal.json geprueft wird THEN enthaelt entries einen Eintrag mit idx 13 und tag 0013_drop_prompt_style_negative AND alle 13 vorherigen Eintraege sind intakt', () => {
     /**
      * AC-3: GIVEN die generierte Migration aus AC-2
      *       WHEN die Datei `drizzle/meta/_journal.json` geprueft wird
      *       THEN enthaelt das `entries`-Array einen Eintrag mit
-     *            `"idx": 12` und `"tag": "0012_drop_prompt_style_negative"`
-     *       AND das Journal hat weiterhin alle 12 vorherigen Eintraege (idx 0-11)
+     *            `"idx": 13` und `"tag": "0013_drop_prompt_style_negative"`
+     *       AND das Journal hat weiterhin alle 13 vorherigen Eintraege (idx 0-12)
      */
 
     expect(existsSync(JOURNAL_FILE)).toBe(true)
@@ -129,14 +129,14 @@ describe('slice-01-db-schema-migration Acceptance (Prompt Simplification)', () =
     expect(journal.version).toBe('7')
     expect(journal.dialect).toBe('postgresql')
 
-    // Entry with idx 12 must exist with correct tag
-    const entry12 = journal.entries.find((e: any) => e.idx === 12)
-    expect(entry12).toBeDefined()
-    expect(entry12.tag).toBe('0012_drop_prompt_style_negative')
-    expect(entry12.breakpoints).toBe(true)
+    // Entry with idx 13 must exist with correct tag
+    const entry13 = journal.entries.find((e: any) => e.idx === 13)
+    expect(entry13).toBeDefined()
+    expect(entry13.tag).toBe('0013_drop_prompt_style_negative')
+    expect(entry13.breakpoints).toBe(true)
 
-    // All 12 previous entries (idx 0-11) must still be present
-    for (let i = 0; i <= 11; i++) {
+    // All 13 previous entries (idx 0-12) must still be present
+    for (let i = 0; i <= 12; i++) {
       const entry = journal.entries.find((e: any) => e.idx === i)
       expect(entry, `Journal entry for idx ${i} should exist`).toBeDefined()
     }

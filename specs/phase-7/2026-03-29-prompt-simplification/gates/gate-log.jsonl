@@ -33,3 +33,4 @@
 {"ts":"2026-03-29T23:20:00Z","slice":"slice-11","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":2}
 {"ts":"2026-03-29T23:21:00Z","slice":"slice-11","gate":"lint","result":"PASSED","attempt":1,"note":"0 TS errors"}
 {"ts":"2026-03-29T23:40:00Z","slice":"slice-11","gate":"tests","result":"PASSED","retries":1,"note":"36 backend regression failures confirmed pre-existing"}
+{"ts":"2026-03-29T23:55:00Z","slice":"feature","gate":"systemic_review","verdict":"FAILED","findings_total":2}

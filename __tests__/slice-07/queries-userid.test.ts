@@ -93,7 +93,6 @@ vi.mock("@/lib/db/schema", () => ({
   assistantSessions: {},
   referenceImages: {},
   generationReferences: {},
-  modelSettings: {},
 }));
 
 // ---------------------------------------------------------------------------
