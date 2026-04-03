@@ -140,6 +140,12 @@ function SlotRow({
   );
 
   const handleRemove = useCallback(() => {
+    if (!hasModel) {
+      // Empty slot — just hide it, no server call needed
+      onSlotRemoved();
+      return;
+    }
+
     // Optimistic update: clear model
     onSlotUpdate({ ...slot, modelId: null, modelParams: {}, active: false });
 
@@ -157,7 +163,7 @@ function SlotRow({
         window.dispatchEvent(new CustomEvent("model-slots-changed"));
       }
     });
-  }, [slot, slotNumber, mode, onSlotUpdate, onSlotRemoved, onError]);
+  }, [slot, slotNumber, mode, hasModel, onSlotUpdate, onSlotRemoved, onError]);
 
   if (variant === "compact") {
     return (
@@ -368,12 +374,6 @@ export function ModelSlots({
     [models, mode],
   );
 
-  // Count slots with models to enforce "can't remove last model" rule
-  const slotsWithModels = useMemo(
-    () => sortedSlots.filter((s) => s.modelId !== null).length,
-    [sortedSlots],
-  );
-
   const handleSlotUpdate = useCallback(
     (updatedSlot: ModelSlot) => {
       setOptimisticSlots((prev) =>
@@ -415,7 +415,7 @@ export function ModelSlots({
           slotNumber={slot.slot as SlotNumber}
           mode={mode}
           compatibleModels={compatibleModels}
-          removable={index > 0 && slotsWithModels > 1}
+          removable={index > 0}
           disabled={disabled}
           variant={variant}
           onSlotUpdate={handleSlotUpdate}

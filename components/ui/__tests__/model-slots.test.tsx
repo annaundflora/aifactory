@@ -357,8 +357,30 @@ describe("ModelSlots Remove Button", () => {
 
     await user.click(screen.getByTestId("add-slot-button"));
 
-    // Slot 2 has a model (from standardSlots), so remove is available
     expect(screen.getByTestId("slot-remove-2")).toBeInTheDocument();
+  });
+
+  it("should hide empty slot immediately without server call when remove is clicked", async () => {
+    const user = userEvent.setup();
+    const slotsWithEmpty = [
+      createSlot({ slot: 1, active: true, modelId: "black-forest-labs/flux-schnell" }),
+      createSlot({ slot: 2, active: false, modelId: null }),
+      createSlot({ slot: 3, active: false, modelId: null }),
+    ];
+
+    render(<ModelSlots {...defaultProps({ slots: slotsWithEmpty })} />);
+
+    // Reveal slot 2 (empty)
+    await user.click(screen.getByTestId("add-slot-button"));
+    expect(screen.getByTestId("slot-row-2")).toBeInTheDocument();
+    expect(screen.getByTestId("slot-remove-2")).toBeInTheDocument();
+
+    // Click remove on the empty slot
+    await user.click(screen.getByTestId("slot-remove-2"));
+
+    // Slot should be hidden immediately, no server call
+    expect(screen.queryByTestId("slot-row-2")).not.toBeInTheDocument();
+    expect(mockClearModelSlot).not.toHaveBeenCalled();
   });
 
   it("should call clearModelSlot and hide slot when remove button is clicked", async () => {
