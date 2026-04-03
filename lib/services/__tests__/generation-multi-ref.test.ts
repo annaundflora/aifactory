@@ -86,9 +86,7 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
     projectId: "proj-001",
     prompt: "A fox",
     promptMotiv: "A fox",
-    promptStyle: "",
     isFavorite: false,
-    negativePrompt: null,
     modelId: "black-forest-labs/flux-2-pro",
     modelParams: {},
     status: "pending",
@@ -208,8 +206,6 @@ describe("buildReplicateInput - Multi-Reference", () => {
     await GenerationService.generate(
       "proj-001",
       "A fox",
-      "",
-      undefined,
       ["black-forest-labs/flux-2-pro"],
       {},
       1,
@@ -261,8 +257,6 @@ describe("buildReplicateInput - Multi-Reference", () => {
     await GenerationService.generate(
       "proj-001",
       "A fox",
-      "",
-      undefined,
       ["black-forest-labs/flux-2-pro"],
       {},
       1,
@@ -298,8 +292,6 @@ describe("buildReplicateInput - Multi-Reference", () => {
     await GenerationService.generate(
       "proj-001",
       "A fox",
-      "",
-      undefined,
       ["black-forest-labs/flux-2-pro"],
       {},
       1,
@@ -316,10 +308,9 @@ describe("buildReplicateInput - Multi-Reference", () => {
   });
 
   /**
-   * AC-6: GIVEN generateImages wird mit References aufgerufen und promptMotiv "Extract @3 in style of @1",
-   *       promptStyle "oil painting"
+   * AC-6: GIVEN generateImages wird mit References aufgerufen und promptMotiv "Extract @3 in style of @1"
    *       WHEN der Prompt komponiert wird
-   *       THEN wird composeMultiReferencePrompt() mit dem komponierten Prompt und den References aufgerufen
+   *       THEN wird composeMultiReferencePrompt() mit dem Prompt und den References aufgerufen
    *       und das Ergebnis als prompt an Replicate gesendet
    */
   it("AC-6: should call composeMultiReferencePrompt and use result as prompt when references exist", async () => {
@@ -339,11 +330,11 @@ describe("buildReplicateInput - Multi-Reference", () => {
     });
 
     // The prompt gets composed inside generate():
-    // 1. motivTrimmed + styleTrimmed => "Extract @3 in style of @1. oil painting"
+    // 1. motivTrimmed => "Extract @3 in style of @1" (no style concatenation)
     // 2. composeMultiReferencePrompt maps @N -> @imageN and adds guidance
     // Expected composed prompt from the real composeMultiReferencePrompt:
     const expectedPrompt = composeMultiReferencePrompt(
-      "Extract @3 in style of @1. oil painting",
+      "Extract @3 in style of @1",
       [
         { slotPosition: 1, role: "style", strength: "strong" },
         { slotPosition: 3, role: "content", strength: "moderate" },
@@ -360,8 +351,6 @@ describe("buildReplicateInput - Multi-Reference", () => {
     await GenerationService.generate(
       "proj-001",
       "Extract @3 in style of @1",
-      "oil painting",
-      undefined,
       ["black-forest-labs/flux-2-pro"],
       {},
       1,
@@ -410,8 +399,6 @@ describe("buildReplicateInput - Multi-Reference", () => {
     await GenerationService.generate(
       "proj-001",
       "A fox",
-      "",
-      undefined,
       ["black-forest-labs/flux-2-pro"],
       {},
       1,
@@ -560,8 +547,6 @@ describe("createGenerationReferences - via generate()", () => {
     await GenerationService.generate(
       "proj-001",
       "A fox",
-      "",
-      undefined,
       ["black-forest-labs/flux-2-pro"],
       {},
       1,

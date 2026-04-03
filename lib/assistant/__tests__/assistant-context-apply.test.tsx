@@ -1,4 +1,14 @@
 // @vitest-environment jsdom
+/**
+ * Tests for Slice 10: Assistant Frontend -- applyToWorkspace with single prompt field
+ *
+ * Tests derived from GIVEN/WHEN/THEN Acceptance Criteria:
+ * - AC-2: applyToWorkspace maps draftPrompt.prompt to promptMotiv
+ *         AND does NOT pass promptStyle or negativePrompt to setVariation
+ *
+ * Mocking Strategy: mock_external (per slice spec).
+ * useWorkspaceVariation and sonner toast are mocked.
+ */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
@@ -39,149 +49,101 @@ import {
 function wrapper({ children }: { children: ReactNode }) {
   return createElement(
     PromptAssistantProvider,
-    { projectId: "test-project" } as Record<string, unknown>,
+    null,
     children
   );
 }
 
-describe("PromptAssistantContext - Apply Logic", () => {
+describe("PromptAssistantContext - Apply Logic (Slice 10)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockVariationData = null;
   });
 
   // ---------------------------------------------------------------------------
-  // AC-1: applyToWorkspace function is provided in context
+  // AC-2: GIVEN der State enthaelt ein draftPrompt mit { prompt: "A majestic mountain landscape" }
+  //       WHEN applyToWorkspace() aufgerufen wird
+  //       THEN wird setVariation mit promptMotiv: "A majestic mountain landscape" aufgerufen
+  //       AND die Properties promptStyle und negativePrompt werden NICHT an setVariation uebergeben
   // ---------------------------------------------------------------------------
-  it("AC-1: should provide applyToWorkspace function in context", () => {
+  it("AC-2: should apply draftPrompt.prompt to workspace as promptMotiv", () => {
     /**
-     * AC-1: GIVEN der PromptAssistantContext ist verfuegbar
-     *       WHEN usePromptAssistant() aufgerufen wird
-     *       THEN ist applyToWorkspace als Funktion im Context vorhanden
-     */
-    const { result } = renderHook(() => usePromptAssistant(), { wrapper });
-
-    expect(result.current.applyToWorkspace).toBeDefined();
-    expect(typeof result.current.applyToWorkspace).toBe("function");
-  });
-
-  // ---------------------------------------------------------------------------
-  // AC-1: applyToWorkspace maps canvas fields to workspace fields
-  // ---------------------------------------------------------------------------
-  it("AC-1: should call setVariation with mapped fields when applyToWorkspace is called", () => {
-    /**
-     * AC-1: GIVEN das Canvas-Panel ist sichtbar mit draftPrompt
-     *       WHEN applyToWorkspace aufgerufen wird
-     *       THEN wird setVariation mit den gemappten Feldern aufgerufen
-     *       (motiv -> promptMotiv, style -> promptStyle, negativePrompt -> negativePrompt)
+     * AC-2: applyToWorkspace maps draftPrompt.prompt to setVariation({ promptMotiv }).
+     * Verifies that the single prompt field is correctly forwarded to promptMotiv.
      */
     mockVariationData = {
       promptMotiv: "",
-      promptStyle: "",
-      negativePrompt: "",
       modelId: "flux-2-pro",
       modelParams: { aspect_ratio: "1:1" },
     };
 
     const { result } = renderHook(() => usePromptAssistant(), { wrapper });
 
-    // Set a draft prompt first
+    // Set a draft prompt with the new single-field format
     act(() => {
       result.current.dispatch({
         type: "SET_DRAFT_PROMPT",
         draftPrompt: {
-          motiv: "A woman in autumn forest",
-          style: "photorealistic, golden hour",
-          negativePrompt: "low quality, blurry",
+          prompt: "A majestic mountain landscape",
         },
       });
     });
 
-    // Now apply
-    act(() => {
-      result.current.applyToWorkspace();
-    });
-
-    expect(mockSetVariation).toHaveBeenCalledWith({
-      promptMotiv: "A woman in autumn forest",
-      promptStyle: "photorealistic, golden hour",
-      negativePrompt: "low quality, blurry",
-      modelId: "flux-2-pro",
-      modelParams: { aspect_ratio: "1:1" },
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // AC-4: Previous values are snapshotted before apply
-  // ---------------------------------------------------------------------------
-  it("AC-4: should snapshot current workspace values before applying new ones", () => {
-    /**
-     * AC-4: GIVEN der Workspace hatte vorher die Werte
-     *       { promptMotiv: "old motiv", promptStyle: "old style", negativePrompt: "old negative" }
-     *       WHEN applyToWorkspace aufgerufen wird
-     *       THEN werden die vorherigen Werte gesnapshoted (fuer Undo)
-     */
-    mockVariationData = {
-      promptMotiv: "old motiv",
-      promptStyle: "old style",
-      negativePrompt: "old negative",
-      modelId: "model-1",
-      modelParams: {},
-    };
-
-    const { result } = renderHook(() => usePromptAssistant(), { wrapper });
-
-    // Set draft
-    act(() => {
-      result.current.dispatch({
-        type: "SET_DRAFT_PROMPT",
-        draftPrompt: {
-          motiv: "new motiv",
-          style: "new style",
-          negativePrompt: "new negative",
-        },
-      });
-    });
-
-    // Apply
-    act(() => {
-      result.current.applyToWorkspace();
-    });
-
-    // Verify new values were set
+    // Auto-apply fires via useEffect when draftVersion increments.
+    // Verify setVariation was called with the correct mapped field.
     expect(mockSetVariation).toHaveBeenCalledWith(
       expect.objectContaining({
-        promptMotiv: "new motiv",
-        promptStyle: "new style",
-        negativePrompt: "new negative",
-      })
-    );
-
-    // Verify toast was called (which contains the undo with snapshot)
-    expect(mockToast).toHaveBeenCalledWith(
-      "Prompt uebernommen.",
-      expect.objectContaining({
-        action: expect.objectContaining({
-          label: "Rueckgaengig",
-          onClick: expect.any(Function),
-        }),
+        promptMotiv: "A majestic mountain landscape",
       })
     );
   });
 
-  // ---------------------------------------------------------------------------
-  // AC-4: undoApply restores snapshot values
-  // ---------------------------------------------------------------------------
-  it("AC-4: should restore snapshot values when undoApply is called", () => {
+  it("AC-2: should not pass promptStyle or negativePrompt to setVariation", () => {
     /**
-     * AC-4: GIVEN der User hat Apply geklickt und der Snapshot wurde gespeichert
-     *       WHEN undoApply aufgerufen wird
-     *       THEN werden die gespeicherten vorherigen Werte via setVariation wiederhergestellt
+     * AC-2: Verifies that the old fields promptStyle and negativePrompt
+     * are NOT included in the setVariation call.
+     */
+    mockVariationData = {
+      promptMotiv: "",
+      modelId: "flux-2-pro",
+      modelParams: { aspect_ratio: "1:1" },
+    };
+
+    const { result } = renderHook(() => usePromptAssistant(), { wrapper });
+
+    // Set draft prompt
+    act(() => {
+      result.current.dispatch({
+        type: "SET_DRAFT_PROMPT",
+        draftPrompt: {
+          prompt: "A majestic mountain landscape",
+        },
+      });
+    });
+
+    // Get the actual call arguments
+    const callArgs = mockSetVariation.mock.calls[0][0];
+
+    // Verify promptStyle and negativePrompt are NOT present in the call
+    expect(callArgs).not.toHaveProperty("promptStyle");
+    expect(callArgs).not.toHaveProperty("negativePrompt");
+
+    // Verify the expected properties ARE present
+    expect(callArgs).toHaveProperty("promptMotiv", "A majestic mountain landscape");
+    expect(callArgs).toHaveProperty("modelId");
+    expect(callArgs).toHaveProperty("modelParams");
+  });
+
+  // ---------------------------------------------------------------------------
+  // Undo: Snapshot and restore for single-field format
+  // ---------------------------------------------------------------------------
+  it("AC-2: should snapshot only promptMotiv before applying new prompt", () => {
+    /**
+     * Verifies that the undo snapshot only contains promptMotiv
+     * (no promptStyle or negativePrompt).
      */
     mockVariationData = {
       promptMotiv: "old motiv",
-      promptStyle: "old style",
-      negativePrompt: "old negative",
       modelId: "model-1",
       modelParams: {},
     };
@@ -193,15 +155,12 @@ describe("PromptAssistantContext - Apply Logic", () => {
       result.current.dispatch({
         type: "SET_DRAFT_PROMPT",
         draftPrompt: {
-          motiv: "new motiv",
-          style: "new style",
-          negativePrompt: "",
+          prompt: "new prompt text",
         },
       });
     });
 
-    // Auto-apply fires via useEffect when draftVersion increments from SET_DRAFT_PROMPT
-    // So setVariation is already called once by the auto-apply effect
+    // Auto-apply fires (first setVariation call)
     expect(mockSetVariation).toHaveBeenCalledTimes(1);
 
     // Undo
@@ -209,29 +168,23 @@ describe("PromptAssistantContext - Apply Logic", () => {
       result.current.undoApply();
     });
 
-    // Undo call restores old values (second call total)
+    // Undo call restores old values (second call)
     expect(mockSetVariation).toHaveBeenCalledTimes(2);
-    expect(mockSetVariation).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        promptMotiv: "old motiv",
-        promptStyle: "old style",
-        negativePrompt: "old negative",
-      })
-    );
+    const undoArgs = mockSetVariation.mock.calls[1][0];
+    expect(undoArgs.promptMotiv).toBe("old motiv");
+
+    // No old promptStyle or negativePrompt in undo
+    expect(undoArgs).not.toHaveProperty("promptStyle");
+    expect(undoArgs).not.toHaveProperty("negativePrompt");
 
     // isApplied should be false after undo
     expect(result.current.isApplied).toBe(false);
   });
 
   // ---------------------------------------------------------------------------
-  // AC-1: applyToWorkspace does nothing when draftPrompt is null
+  // Edge: applyToWorkspace does nothing when draftPrompt is null
   // ---------------------------------------------------------------------------
-  it("AC-1: should not call setVariation when draftPrompt is null", () => {
-    /**
-     * AC-6 (related): GIVEN draftPrompt ist null
-     *       WHEN applyToWorkspace aufgerufen wird
-     *       THEN passiert nichts (kein setVariation Aufruf)
-     */
+  it("should not call setVariation when draftPrompt is null", () => {
     const { result } = renderHook(() => usePromptAssistant(), { wrapper });
 
     // draftPrompt is null by default
@@ -244,18 +197,11 @@ describe("PromptAssistantContext - Apply Logic", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // AC-3: isApplied is set to true after apply
+  // isApplied is set to true after apply
   // ---------------------------------------------------------------------------
-  it("AC-3: should set isApplied to true after apply", () => {
-    /**
-     * AC-3: GIVEN applyToWorkspace wurde ausgefuehrt
-     *       WHEN der State geprueft wird
-     *       THEN ist isApplied true
-     */
+  it("should set isApplied to true after apply", () => {
     mockVariationData = {
       promptMotiv: "",
-      promptStyle: "",
-      negativePrompt: "",
       modelId: "",
       modelParams: {},
     };
@@ -266,17 +212,45 @@ describe("PromptAssistantContext - Apply Logic", () => {
       result.current.dispatch({
         type: "SET_DRAFT_PROMPT",
         draftPrompt: {
-          motiv: "test",
-          style: "test",
-          negativePrompt: "",
+          prompt: "test",
         },
       });
     });
 
+    // Auto-apply fires via useEffect
+    expect(result.current.isApplied).toBe(true);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Toast with undo action
+  // ---------------------------------------------------------------------------
+  it("should show toast with undo action on apply", () => {
+    mockVariationData = {
+      promptMotiv: "",
+      modelId: "",
+      modelParams: {},
+    };
+
+    const { result } = renderHook(() => usePromptAssistant(), { wrapper });
+
     act(() => {
-      result.current.applyToWorkspace();
+      result.current.dispatch({
+        type: "SET_DRAFT_PROMPT",
+        draftPrompt: {
+          prompt: "new prompt",
+        },
+      });
     });
 
-    expect(result.current.isApplied).toBe(true);
+    // Auto-apply fires and calls toast
+    expect(mockToast).toHaveBeenCalledWith(
+      "Prompt uebernommen.",
+      expect.objectContaining({
+        action: expect.objectContaining({
+          label: "Rueckgaengig",
+          onClick: expect.any(Function),
+        }),
+      })
+    );
   });
 });

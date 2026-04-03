@@ -185,10 +185,6 @@ export function formatKnowledgeForPrompt(
     lines.push("");
     lines.push(`Prompt style: ${model.promptStyle === "natural" ? "Natural language descriptions" : "Keyword-based prompts"}`);
 
-    if (model.negativePrompts) {
-      lines.push(`Negative prompts: ${model.negativePrompts.supported ? "Supported" : "Not supported"}. ${model.negativePrompts.note}`);
-    }
-
     if (model.strengths.length > 0) {
       lines.push("");
       lines.push("**Strengths:**");

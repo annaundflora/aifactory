@@ -153,23 +153,24 @@ describe('Generations Schema — Multi-Mode Extensions (slice-01-db-schema)', ()
   // -----------------------------------------------------------
   // AC-6: Bestehende Spalten und Indexes unveraendert
   // -----------------------------------------------------------
-  it('AC-6: should preserve all 17 existing columns and all 4 existing indexes; total index count is 5', () => {
+  it('AC-6: should preserve all 15 existing columns (after prompt-simplification) and all 4 existing indexes; total index count is 6', () => {
     /**
      * AC-6: GIVEN die bestehenden Spalten und 4 Indexes der `generations`-Tabelle
-     *       (Stand vor diesem Slice: id, projectId, prompt, negativePrompt, modelId,
+     *       (Stand nach prompt-simplification: id, projectId, prompt, modelId,
      *        modelParams, status, imageUrl, replicatePredictionId, errorMessage,
-     *        width, height, seed, promptMotiv, promptStyle, isFavorite, createdAt)
+     *        width, height, seed, promptMotiv, isFavorite, createdAt)
+     *       NOTE: negative_prompt and prompt_style were removed by prompt-simplification
      *       WHEN die drei neuen Spalten hinzugefuegt werden
      *       THEN bleiben alle bestehenden Spalten mit unveraendertem Typ und allen
-     *            4 bestehenden Indexes erhalten; die Gesamtzahl der Indexes erhoeht sich auf 5
+     *            4 bestehenden Indexes erhalten; die Gesamtzahl der Indexes erhoeht sich auf 6
      */
 
-    // All 17 pre-existing columns (snake_case DB names)
+    // All 15 pre-existing columns after prompt-simplification (snake_case DB names)
+    // negative_prompt and prompt_style were removed
     const existingColumns = [
       'id',
       'project_id',
       'prompt',
-      'negative_prompt',
       'model_id',
       'model_params',
       'status',
@@ -180,15 +181,18 @@ describe('Generations Schema — Multi-Mode Extensions (slice-01-db-schema)', ()
       'height',
       'seed',
       'prompt_motiv',
-      'prompt_style',
       'is_favorite',
       'created_at',
     ]
 
-    // Verify all 17 existing columns are still present
+    // Verify all 15 existing columns are still present
     for (const colName of existingColumns) {
       expect(columnMap[colName], `Column "${colName}" should exist`).toBeDefined()
     }
+
+    // Verify removed columns are gone
+    expect(columnMap['negative_prompt'], 'negative_prompt should be removed').toBeUndefined()
+    expect(columnMap['prompt_style'], 'prompt_style should be removed').toBeUndefined()
 
     // Verify key existing column types are unchanged
     expect(columnMap['id'].columnType).toBe('PgUUID')
@@ -201,7 +205,6 @@ describe('Generations Schema — Multi-Mode Extensions (slice-01-db-schema)', ()
     expect(columnMap['status'].notNull).toBe(true)
     expect(columnMap['prompt_motiv'].columnType).toBe('PgText')
     expect(columnMap['prompt_motiv'].notNull).toBe(true)
-    expect(columnMap['prompt_style'].columnType).toBe('PgText')
     expect(columnMap['is_favorite'].columnType).toBe('PgBoolean')
     expect(columnMap['is_favorite'].notNull).toBe(true)
 
@@ -216,8 +219,8 @@ describe('Generations Schema — Multi-Mode Extensions (slice-01-db-schema)', ()
     // Total: 4 existing + 1 composite (generations_project_mode_idx) + 1 (generations_batch_id_idx) = 6
     expect(config.indexes.length).toBe(6)
 
-    // Total columns: 17 existing + 3 multi-mode + 1 batchId = 21
-    expect(config.columns.length).toBe(21)
+    // Total columns: 15 existing + 3 multi-mode + 1 batchId = 19
+    expect(config.columns.length).toBe(19)
   })
 
   // -----------------------------------------------------------

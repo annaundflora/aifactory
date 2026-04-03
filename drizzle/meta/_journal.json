@@ -92,6 +92,13 @@
       "when": 1774281600000,
       "tag": "0012_add_model_slots",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1774814196882,
+      "tag": "0013_drop_prompt_style_negative",
+      "breakpoints": true
     }
   ]
 }

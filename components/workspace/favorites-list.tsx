@@ -58,10 +58,8 @@ function relativeTimestamp(date: Date): string {
 
 interface FavoritesListProps {
   onLoadEntry: (entry: PromptHistoryEntry) => void;
-  /** Current prompt field values to decide if confirmation dialog is needed */
+  /** Current prompt field value to decide if confirmation dialog is needed */
   promptMotiv?: string;
-  promptStyle?: string;
-  negativePrompt?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -71,8 +69,6 @@ interface FavoritesListProps {
 export function FavoritesList({
   onLoadEntry,
   promptMotiv = "",
-  promptStyle = "",
-  negativePrompt = "",
 }: FavoritesListProps) {
   const [entries, setEntries] = useState<PromptHistoryEntry[]>([]);
   const [hasMore, setHasMore] = useState(true);
@@ -143,8 +139,8 @@ export function FavoritesList({
   // ---------------------------------------------------------------------------
 
   const hasAnyPromptContent = useCallback(() => {
-    return promptMotiv.trim() !== "" || promptStyle.trim() !== "" || negativePrompt.trim() !== "";
-  }, [promptMotiv, promptStyle, negativePrompt]);
+    return promptMotiv.trim() !== "";
+  }, [promptMotiv]);
 
   const handleEntryClick = useCallback(
     (entry: PromptHistoryEntry) => {
@@ -200,7 +196,7 @@ export function FavoritesList({
     <>
       <div data-testid="favorites-list" className="divide-y divide-border">
         {entries.map((entry) => {
-          const preview = truncatePreview(entry.promptMotiv || entry.promptStyle || "");
+          const preview = truncatePreview(entry.promptMotiv || "");
           const timestamp = relativeTimestamp(new Date(entry.createdAt));
 
           return (

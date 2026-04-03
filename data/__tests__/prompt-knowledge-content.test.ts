@@ -95,13 +95,8 @@ describe('prompt-knowledge.json content completeness', () => {
         `${slug}.promptStyle should be "natural" or "keywords"`
       ).toContain(entry.promptStyle)
 
-      // negativePrompts: object with supported (boolean) and note (non-empty string)
-      const neg = entry.negativePrompts as Record<string, unknown>
-      expect(neg, `${slug}.negativePrompts should be an object`).toBeDefined()
-      expect(typeof neg, `${slug}.negativePrompts should be an object`).toBe('object')
-      expect(typeof neg.supported, `${slug}.negativePrompts.supported should be boolean`).toBe('boolean')
-      expect(typeof neg.note, `${slug}.negativePrompts.note should be string`).toBe('string')
-      expect((neg.note as string).length, `${slug}.negativePrompts.note non-empty`).toBeGreaterThan(0)
+      // negativePrompts field was removed by prompt-simplification feature
+      expect(entry.negativePrompts, `${slug} should NOT have negativePrompts (removed)`).toBeUndefined()
 
       // strengths: string[], 2-4 entries
       const strengths = entry.strengths as unknown[]
@@ -223,17 +218,15 @@ describe('prompt-knowledge.json factual correctness', () => {
     expect(models['flux-schnell'].promptStyle).toBe('natural')
   })
 
-  it('should set negativePrompts.supported to true for stable-diffusion-3.5-large', () => {
+  it('should not have negativePrompts field on stable-diffusion-3.5-large (removed by prompt-simplification)', () => {
     const models = data.models as Record<string, Record<string, unknown>>
-    const neg = models['stable-diffusion-3.5-large'].negativePrompts as Record<string, unknown>
 
-    expect(neg.supported).toBe(true)
+    expect(models['stable-diffusion-3.5-large'].negativePrompts).toBeUndefined()
   })
 
-  it('should set negativePrompts.supported to false for flux-2-pro', () => {
+  it('should not have negativePrompts field on flux-2-pro (removed by prompt-simplification)', () => {
     const models = data.models as Record<string, Record<string, unknown>>
-    const neg = models['flux-2-pro'].negativePrompts as Record<string, unknown>
 
-    expect(neg.supported).toBe(false)
+    expect(models['flux-2-pro'].negativePrompts).toBeUndefined()
   })
 })

@@ -1,0 +1,28 @@
+{
+  "spec_path": "specs/phase-7/2026-03-29-prompt-simplification",
+  "status": "completed",
+  "phase": "completed",
+  "started_at": "2026-03-29T12:00:00Z",
+  "detected_stack": "Python + Node.js (Full-Stack)",
+  "total_slices": 11,
+  "current_slice_index": 11,
+  "slices": [
+    { "number": 1, "name": "DB Schema & Migration", "status": "approved", "retries": 0 },
+    { "number": 2, "name": "DB Queries & Prompt History Service", "status": "approved", "retries": 0 },
+    { "number": 3, "name": "Frontend Test-Infrastruktur", "status": "approved", "retries": 0 },
+    { "number": 4, "name": "Generation Service & Server Action", "status": "approved", "retries": 0 },
+    { "number": 5, "name": "Prompt Area UI", "status": "approved", "retries": 1 },
+    { "number": 6, "name": "Workspace State & Prompt Tabs/Lists UI", "status": "approved", "retries": 0 },
+    { "number": 7, "name": "Canvas UI Bereinigung", "status": "approved", "retries": 0 },
+    { "number": 8, "name": "Assistant Backend -- Python Tools & System-Prompt", "status": "approved", "retries": 0 },
+    { "number": 9, "name": "Assistant Backend -- Knowledge & DTO", "status": "approved", "retries": 1 },
+    { "number": 10, "name": "Assistant Frontend Integration", "status": "approved", "retries": 0 },
+    { "number": 11, "name": "End-to-End Verifikation", "status": "approved", "retries": 1 }
+  ],
+  "approved_slices": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+  "failed_slices": [],
+  "gate3_retries": 0,
+  "last_action": "Gate 3 APPROVED - Ready for Orchestration",
+  "completed_at": "2026-03-29T12:45:00Z",
+  "last_updated": "2026-03-29T12:45:00Z"
+}

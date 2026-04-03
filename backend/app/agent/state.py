@@ -18,7 +18,7 @@ class PromptAssistantState(AgentState):
 
     Fields:
         messages: Full conversation history, managed by add_messages reducer (from AgentState).
-        draft_prompt: Current structured prompt draft (motiv, style, negative_prompt).
+        draft_prompt: Current prompt draft (prompt).
         reference_images: List of uploaded reference images with analysis results.
         recommended_model: Currently recommended model (id, name, reason).
         collected_info: Information gathered during conversation (subject, style, purpose, etc.).

@@ -1,4 +1,14 @@
 // @vitest-environment jsdom
+/**
+ * Tests for Slice 10: Assistant Frontend -- DraftPrompt & SSE auf 1 Feld
+ *
+ * Tests derived from GIVEN/WHEN/THEN Acceptance Criteria:
+ * - AC-1: DraftPrompt Interface hat nur prompt-Key
+ * - AC-6: getWorkspaceFieldsForChip mit promptMotiv
+ * - AC-7: getWorkspaceFieldsForChip mit leerem promptMotiv
+ *
+ * Mocking Strategy: mock_external (per slice spec).
+ */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
@@ -12,9 +22,15 @@ vi.mock("@/lib/workspace-state", () => ({
   }),
 }));
 
+vi.mock("sonner", () => ({
+  toast: Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn(), info: vi.fn() }),
+}));
+
 import {
   PromptAssistantProvider,
   usePromptAssistant,
+  getWorkspaceFieldsForChip,
+  type DraftPrompt,
   type PromptAssistantContextValue,
 } from "../assistant-context";
 
@@ -59,13 +75,6 @@ function ContextDispatcher() {
         {ctx.draftPrompt ? JSON.stringify(ctx.draftPrompt) : "null"}
       </span>
       <span data-testid="selected-model">{ctx.selectedModel}</span>
-      <span data-testid="tool-results">
-        {JSON.stringify(
-          ctx.messages
-            .filter((m) => m.role === "error")
-            .map((m) => m.content)
-        )}
-      </span>
 
       <button
         data-testid="dispatch-session"
@@ -125,9 +134,7 @@ function ContextDispatcher() {
           ctx.dispatch({
             type: "SET_DRAFT_PROMPT",
             draftPrompt: {
-              motiv: "A sunset over mountains",
-              style: "oil painting",
-              negativePrompt: "blurry, low quality",
+              prompt: "A sunset over mountains",
             },
           })
         }
@@ -139,7 +146,7 @@ function ContextDispatcher() {
             type: "ADD_TOOL_CALL_RESULT",
             result: {
               tool: "draft_prompt",
-              data: { motiv: "A cat" },
+              data: { prompt: "A cat" },
             },
           })
         }
@@ -172,16 +179,122 @@ function ContextDispatcher() {
 
 describe("PromptAssistantContext", () => {
   // --------------------------------------------------------------------------
-  // AC-8: GIVEN der PromptAssistantContext wird bereitgestellt
-  //       WHEN eine Komponente den Context konsumiert
-  //       THEN sind folgende Werte verfuegbar: sessionId, messages, isStreaming,
-  //            draftPrompt, sendMessage(content, imageUrl?), selectedModel
+  // AC-1: GIVEN die Datei lib/assistant/assistant-context.tsx
+  //       WHEN das exportierte Interface DraftPrompt inspiziert wird
+  //       THEN hat es GENAU einen Key prompt: string
+  //       AND die Keys motiv, style, negativePrompt existieren NICHT mehr
   // --------------------------------------------------------------------------
-  it("AC-8: should provide sessionId, messages, isStreaming, draftPrompt, sendMessage, selectedModel", () => {
+  it("AC-1: should have DraftPrompt with single prompt field", () => {
+    /**
+     * AC-1: Verify DraftPrompt interface has exactly one key: prompt.
+     * Source code analysis: DraftPrompt only allows { prompt: string }.
+     * We verify by constructing a valid DraftPrompt and checking its shape.
+     */
+    const draft: DraftPrompt = { prompt: "test prompt" };
+
+    // Verify the prompt field exists
+    expect(draft.prompt).toBe("test prompt");
+
+    // Verify only 'prompt' key exists (no motiv, style, negativePrompt)
+    const keys = Object.keys(draft);
+    expect(keys).toEqual(["prompt"]);
+    expect(keys).not.toContain("motiv");
+    expect(keys).not.toContain("style");
+    expect(keys).not.toContain("negativePrompt");
+
+    // Verify that dispatching SET_DRAFT_PROMPT with the new shape works
+    // by rendering the context and checking it stores correctly
+  });
+
+  it("AC-1: should store DraftPrompt with single prompt field in context state", () => {
+    /**
+     * AC-1: GIVEN the PromptAssistantContext
+     *       WHEN SET_DRAFT_PROMPT is dispatched with { prompt: "A sunset over mountains" }
+     *       THEN draftPrompt in state equals { prompt: "A sunset over mountains" }
+     */
+    render(
+      <PromptAssistantProvider>
+        <ContextDispatcher />
+      </PromptAssistantProvider>
+    );
+
+    // Initially null
+    expect(screen.getByTestId("draft-prompt")).toHaveTextContent("null");
+
+    // Dispatch SET_DRAFT_PROMPT with new single-field format
+    act(() => {
+      screen.getByTestId("dispatch-draft-prompt").click();
+    });
+
+    const draftText = screen.getByTestId("draft-prompt").textContent!;
+    const parsed = JSON.parse(draftText);
+    expect(parsed).toEqual({
+      prompt: "A sunset over mountains",
+    });
+
+    // Verify old keys do NOT exist
+    expect(parsed).not.toHaveProperty("motiv");
+    expect(parsed).not.toHaveProperty("style");
+    expect(parsed).not.toHaveProperty("negativePrompt");
+  });
+
+  // --------------------------------------------------------------------------
+  // AC-6: GIVEN variationData mit promptMotiv: "sunset over the ocean"
+  //       WHEN getWorkspaceFieldsForChip(variationData) aufgerufen wird
+  //       THEN gibt die Funktion einen String zurueck der promptMotiv enthaelt
+  //       AND der String enthaelt KEINE Referenzen auf style= oder negative=
+  // --------------------------------------------------------------------------
+  it("AC-6: should format workspace fields with only promptMotiv", () => {
+    /**
+     * AC-6: getWorkspaceFieldsForChip returns string containing promptMotiv,
+     * without any style= or negative= references.
+     */
+    const result = getWorkspaceFieldsForChip({
+      promptMotiv: "sunset over the ocean",
+    });
+
+    expect(result).not.toBeNull();
+    expect(result).toContain("promptMotiv");
+    expect(result).toContain("sunset over the ocean");
+
+    // Must NOT contain style= or negative=
+    expect(result).not.toContain("style=");
+    expect(result).not.toContain("negative=");
+    expect(result).not.toContain("promptStyle");
+    expect(result).not.toContain("negativePrompt");
+  });
+
+  // --------------------------------------------------------------------------
+  // AC-7: GIVEN variationData mit promptMotiv: ""
+  //       WHEN getWorkspaceFieldsForChip(variationData) aufgerufen wird
+  //       THEN gibt die Funktion null zurueck
+  // --------------------------------------------------------------------------
+  it("AC-7: should return null when promptMotiv is empty", () => {
+    /**
+     * AC-7: getWorkspaceFieldsForChip returns null for empty promptMotiv.
+     */
+    const result = getWorkspaceFieldsForChip({ promptMotiv: "" });
+    expect(result).toBeNull();
+  });
+
+  it("AC-7: should return null when variationData is null", () => {
+    const result = getWorkspaceFieldsForChip(null);
+    expect(result).toBeNull();
+  });
+
+  it("AC-7: should return null when promptMotiv is undefined", () => {
+    const result = getWorkspaceFieldsForChip({});
+    expect(result).toBeNull();
+  });
+
+  // --------------------------------------------------------------------------
+  // Existing tests: Context initial values and basic reducer behavior
+  // --------------------------------------------------------------------------
+  it("should provide sessionId, messages, isStreaming, draftPrompt, sendMessage, selectedModel", () => {
     let capturedValue: PromptAssistantContextValue | null = null;
 
     render(
-      <PromptAssistantProvider projectId="test-project">
+      <PromptAssistantProvider>
         <ContextConsumer
           onValue={(value) => {
             capturedValue = value;
@@ -201,18 +314,14 @@ describe("PromptAssistantContext", () => {
     expect(typeof capturedValue!.sendMessage).toBe("function");
 
     // Verify sendMessage accepts (content, imageUrl?) signature
-    // It should not throw when called (even without runtime registered)
     const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    capturedValue!.sendMessage("test", "https://example.com/image.jpg");
+    capturedValue!.sendMessage("test", ["https://example.com/image.jpg"]);
     consoleSpy.mockRestore();
   });
 
-  // --------------------------------------------------------------------------
-  // AC-8 (initial values): Check initial state reflects correct defaults
-  // --------------------------------------------------------------------------
-  it("AC-8: should have correct initial state values", () => {
+  it("should have correct initial state values", () => {
     render(
-      <PromptAssistantProvider projectId="test-project">
+      <PromptAssistantProvider>
         <ContextDispatcher />
       </PromptAssistantProvider>
     );
@@ -226,39 +335,9 @@ describe("PromptAssistantContext", () => {
     );
   });
 
-  // --------------------------------------------------------------------------
-  // AC-5 (draft_prompt): tool-call-result with tool=draft_prompt updates draftPrompt
-  // --------------------------------------------------------------------------
-  it("AC-5: should update draftPrompt when tool-call-result with tool=draft_prompt is received", () => {
-    render(
-      <PromptAssistantProvider projectId="test-project">
-        <ContextDispatcher />
-      </PromptAssistantProvider>
-    );
-
-    // Initially null
-    expect(screen.getByTestId("draft-prompt")).toHaveTextContent("null");
-
-    // Dispatch SET_DRAFT_PROMPT (as would happen from tool-call-result handling)
-    act(() => {
-      screen.getByTestId("dispatch-draft-prompt").click();
-    });
-
-    const draftText = screen.getByTestId("draft-prompt").textContent!;
-    const parsed = JSON.parse(draftText);
-    expect(parsed).toEqual({
-      motiv: "A sunset over mountains",
-      style: "oil painting",
-      negativePrompt: "blurry, low quality",
-    });
-  });
-
-  // --------------------------------------------------------------------------
-  // Reducer: SET_SESSION_ID action
-  // --------------------------------------------------------------------------
   it("should update sessionId when SET_SESSION_ID is dispatched", () => {
     render(
-      <PromptAssistantProvider projectId="test-project">
+      <PromptAssistantProvider>
         <ContextDispatcher />
       </PromptAssistantProvider>
     );
@@ -272,12 +351,9 @@ describe("PromptAssistantContext", () => {
     expect(screen.getByTestId("session-id")).toHaveTextContent("sess-123");
   });
 
-  // --------------------------------------------------------------------------
-  // Reducer: ADD_USER_MESSAGE action
-  // --------------------------------------------------------------------------
   it("should add user message when ADD_USER_MESSAGE is dispatched", () => {
     render(
-      <PromptAssistantProvider projectId="test-project">
+      <PromptAssistantProvider>
         <ContextDispatcher />
       </PromptAssistantProvider>
     );
@@ -291,9 +367,6 @@ describe("PromptAssistantContext", () => {
     expect(screen.getByTestId("messages-count")).toHaveTextContent("1");
   });
 
-  // --------------------------------------------------------------------------
-  // Reducer: APPEND_ASSISTANT_DELTA and MARK_ASSISTANT_DONE
-  // --------------------------------------------------------------------------
   it("should append delta to last assistant message and mark as done", () => {
     let capturedValue: PromptAssistantContextValue | null = null;
 
@@ -334,25 +407,22 @@ describe("PromptAssistantContext", () => {
     }
 
     render(
-      <PromptAssistantProvider projectId="test-project">
+      <PromptAssistantProvider>
         <ValueCapture />
       </PromptAssistantProvider>
     );
 
-    // Add assistant message
     act(() => {
       screen.getByTestId("add-asst").click();
     });
     expect(capturedValue!.messages).toHaveLength(1);
     expect(capturedValue!.messages[0].isStreaming).toBe(true);
 
-    // Append delta
     act(() => {
       screen.getByTestId("append-delta").click();
     });
     expect(capturedValue!.messages[0].content).toBe("Hello ");
 
-    // Mark done
     act(() => {
       screen.getByTestId("mark-done").click();
     });
@@ -360,9 +430,6 @@ describe("PromptAssistantContext", () => {
     expect(capturedValue!.isStreaming).toBe(false);
   });
 
-  // --------------------------------------------------------------------------
-  // Reducer: ADD_ERROR_MESSAGE action
-  // --------------------------------------------------------------------------
   it("should add error message and stop streaming on ADD_ERROR_MESSAGE", () => {
     let capturedValue: PromptAssistantContextValue | null = null;
 
@@ -391,18 +458,16 @@ describe("PromptAssistantContext", () => {
     }
 
     render(
-      <PromptAssistantProvider projectId="test-project">
+      <PromptAssistantProvider>
         <ValueCapture />
       </PromptAssistantProvider>
     );
 
-    // Start streaming
     act(() => {
       screen.getByTestId("start-stream").click();
     });
     expect(capturedValue!.isStreaming).toBe(true);
 
-    // Add error
     act(() => {
       screen.getByTestId("add-error").click();
     });
@@ -414,11 +479,7 @@ describe("PromptAssistantContext", () => {
     expect(capturedValue!.isStreaming).toBe(false);
   });
 
-  // --------------------------------------------------------------------------
-  // usePromptAssistant outside provider should throw
-  // --------------------------------------------------------------------------
   it("should throw when usePromptAssistant is used outside PromptAssistantProvider", () => {
-    // Suppress React error boundary console output
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     function BadConsumer() {

@@ -58,10 +58,8 @@ function relativeTimestamp(date: Date): string {
 
 interface HistoryListProps {
   onLoadEntry: (entry: PromptHistoryEntry) => void;
-  /** Current prompt field values to decide if confirmation dialog is needed */
+  /** Current prompt field value to decide if confirmation dialog is needed */
   promptMotiv?: string;
-  promptStyle?: string;
-  negativePrompt?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -71,8 +69,6 @@ interface HistoryListProps {
 export function HistoryList({
   onLoadEntry,
   promptMotiv = "",
-  promptStyle = "",
-  negativePrompt = "",
 }: HistoryListProps) {
   const [entries, setEntries] = useState<PromptHistoryEntry[]>([]);
   const [hasMore, setHasMore] = useState(true);
@@ -142,8 +138,8 @@ export function HistoryList({
   // ---------------------------------------------------------------------------
 
   const hasAnyPromptContent = useCallback(() => {
-    return promptMotiv.trim() !== "" || promptStyle.trim() !== "" || negativePrompt.trim() !== "";
-  }, [promptMotiv, promptStyle, negativePrompt]);
+    return promptMotiv.trim() !== "";
+  }, [promptMotiv]);
 
   const handleEntryClick = useCallback(
     (entry: PromptHistoryEntry) => {
@@ -194,7 +190,7 @@ export function HistoryList({
     <>
       <div data-testid="history-list" className="divide-y divide-border">
         {entries.map((entry) => {
-          const preview = truncatePreview(entry.promptMotiv || entry.promptStyle || "");
+          const preview = truncatePreview(entry.promptMotiv || "");
           const timestamp = relativeTimestamp(new Date(entry.createdAt));
 
           return (

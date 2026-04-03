@@ -23,9 +23,7 @@ export type { ChatMessage as Message } from "@/lib/types/chat-message";
 import type { ChatMessage as Message } from "@/lib/types/chat-message";
 
 export interface DraftPrompt {
-  motiv: string;
-  style: string;
-  negativePrompt: string;
+  prompt: string;
 }
 
 /** Field names for the DraftPrompt type */
@@ -46,9 +44,11 @@ export type ActiveView = "chat" | "session-list" | "startscreen";
 interface SessionDetailState {
   messages: Array<{ role: string; content: string }>;
   draft_prompt: {
-    motiv: string;
-    style: string;
-    negative_prompt: string;
+    prompt?: string;
+    /** Legacy fields from old sessions (backwards-compat) */
+    motiv?: string;
+    style?: string;
+    negative_prompt?: string;
   } | null;
 }
 
@@ -349,8 +349,6 @@ export function PromptAssistantProvider({
   // Snapshot of workspace values before apply, for undo
   const undoSnapshotRef = useRef<{
     promptMotiv: string;
-    promptStyle: string;
-    negativePrompt: string;
   } | null>(null);
   const sendMessageRef = useRef<
     ((content: string, imageUrls?: string[]) => void) | null
@@ -448,14 +446,16 @@ export function PromptAssistantProvider({
           })
         );
 
-        // Convert backend draft_prompt (snake_case) to frontend DraftPrompt (camelCase)
-        const draftPrompt: DraftPrompt | null = data.state.draft_prompt
-          ? {
-              motiv: data.state.draft_prompt.motiv,
-              style: data.state.draft_prompt.style,
-              negativePrompt: data.state.draft_prompt.negative_prompt,
-            }
-          : null;
+        // Convert backend draft_prompt to frontend DraftPrompt.
+        // Backwards-compat: old sessions may have { motiv, style, negative_prompt },
+        // new sessions have { prompt }. Map old format to { prompt: motiv }.
+        let draftPrompt: DraftPrompt | null = null;
+        if (data.state.draft_prompt) {
+          const draft = data.state.draft_prompt;
+          draftPrompt = {
+            prompt: draft.prompt ?? draft.motiv ?? "",
+          };
+        }
 
         // AC-10: Replace current session state entirely
         dispatch({
@@ -490,15 +490,11 @@ export function PromptAssistantProvider({
     // AC-4: Snapshot current workspace values before applying
     undoSnapshotRef.current = {
       promptMotiv: variationData?.promptMotiv ?? "",
-      promptStyle: variationData?.promptStyle ?? "",
-      negativePrompt: variationData?.negativePrompt ?? "",
     };
 
-    // AC-1: Map canvas fields to workspace fields, preserving modelId and modelParams
+    // AC-1: Map draftPrompt.prompt to workspace promptMotiv, preserving modelId and modelParams
     setVariation({
-      promptMotiv: state.draftPrompt.motiv,
-      promptStyle: state.draftPrompt.style,
-      negativePrompt: state.draftPrompt.negativePrompt,
+      promptMotiv: state.draftPrompt.prompt,
       modelId: variationData?.modelId ?? "",
       modelParams: variationData?.modelParams ?? {},
     });
@@ -515,8 +511,6 @@ export function PromptAssistantProvider({
           if (snapshot) {
             setVariation({
               promptMotiv: snapshot.promptMotiv,
-              promptStyle: snapshot.promptStyle,
-              negativePrompt: snapshot.negativePrompt,
               modelId: variationData?.modelId ?? "",
               modelParams: variationData?.modelParams ?? {},
             });
@@ -537,8 +531,6 @@ export function PromptAssistantProvider({
 
     setVariation({
       promptMotiv: snapshot.promptMotiv,
-      promptStyle: snapshot.promptStyle,
-      negativePrompt: snapshot.negativePrompt,
       modelId: variationData?.modelId ?? "",
       modelParams: variationData?.modelParams ?? {},
     });
@@ -615,25 +607,16 @@ export function PromptAssistantProvider({
  */
 export function getWorkspaceFieldsForChip(variationData: {
   promptMotiv?: string;
-  promptStyle?: string;
-  negativePrompt?: string;
 } | null): string | null {
   const motiv = variationData?.promptMotiv ?? "";
-  const style = variationData?.promptStyle ?? "";
-  const negative = variationData?.negativePrompt ?? "";
 
-  // AC-9: All fields empty -> return null
-  if (!motiv && !style && !negative) {
+  // AC-9: Empty promptMotiv -> return null
+  if (!motiv) {
     return null;
   }
 
-  // AC-8: Format fields as context string
-  const parts: string[] = [];
-  if (motiv) parts.push(`motiv=${motiv}`);
-  if (style) parts.push(`style=${style}`);
-  if (negative) parts.push(`negative=${negative}`);
-
-  return `[Aktueller Prompt: ${parts.join(", ")}]`;
+  // AC-8: Format promptMotiv as context string
+  return `[Aktueller Prompt: promptMotiv=${motiv}]`;
 }
 
 // ---------------------------------------------------------------------------

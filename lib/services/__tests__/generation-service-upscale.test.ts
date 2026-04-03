@@ -84,7 +84,6 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
     id: "gen-001",
     projectId: "proj-001",
     prompt: "Upscale 2x",
-    negativePrompt: null,
     modelId: "nightmareai/real-esrgan",
     modelParams: {},
     status: "pending",

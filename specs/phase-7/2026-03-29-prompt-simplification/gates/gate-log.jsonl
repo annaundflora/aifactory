@@ -1,0 +1,36 @@
+{"ts":"2026-03-29T19:55:00Z","slice":"slice-01","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-29T19:57:00Z","slice":"slice-01","gate":"lint","result":"PASSED","attempt":1,"note":"107 pre-existing lint errors, 0 in slice-01 files. TS errors in later-slice files expected per spec."}
+{"ts":"2026-03-29T20:02:00Z","slice":"slice-01","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-29T20:08:00Z","slice":"slice-02","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-29T20:09:00Z","slice":"slice-02","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-03-29T20:15:00Z","slice":"slice-02","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-29T20:22:00Z","slice":"slice-03","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-29T20:22:30Z","slice":"slice-03","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-03-29T20:28:00Z","slice":"slice-03","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-29T20:35:00Z","slice":"slice-04","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-29T20:35:30Z","slice":"slice-04","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-03-29T20:42:00Z","slice":"slice-04","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-29T20:48:00Z","slice":"slice-08","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-29T20:48:30Z","slice":"slice-08","gate":"lint","result":"PASSED","attempt":1,"note":"ruff not available, py_compile passed"}
+{"ts":"2026-03-29T20:55:00Z","slice":"slice-08","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-29T21:02:00Z","slice":"slice-06","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-29T21:03:00Z","slice":"slice-06","gate":"lint","result":"PASSED","attempt":1,"note":"2 pre-existing react-hooks/exhaustive-deps config errors, not from slice-06"}
+{"ts":"2026-03-29T21:12:00Z","slice":"slice-06","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-29T21:18:00Z","slice":"slice-09","gate":"code_review","verdict":"REJECTED","findings_count":1,"findings":["assistant_service.py does not map old 3-field checkpoint format to new single-field format"],"attempt":1}
+{"ts":"2026-03-29T21:25:00Z","slice":"slice-09","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":2}
+{"ts":"2026-03-29T21:27:00Z","slice":"slice-09","gate":"lint","result":"PASSED","attempt":1,"note":"py_compile passed, TS errors only in later-slice files (assistant-context.tsx = slice-10)"}
+{"ts":"2026-03-29T21:35:00Z","slice":"slice-09","gate":"tests","result":"PASSED","retries":1}
+{"ts":"2026-03-29T21:50:00Z","slice":"slice-05","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-29T21:51:00Z","slice":"slice-05","gate":"lint","result":"PASSED","attempt":1,"note":"TS errors only in later-slice files: canvas (slice-07), assistant-context (slice-10)"}
+{"ts":"2026-03-29T22:00:00Z","slice":"slice-05","gate":"tests","result":"PASSED","retries":1}
+{"ts":"2026-03-29T22:10:00Z","slice":"slice-10","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-29T22:11:00Z","slice":"slice-10","gate":"lint","result":"PASSED","attempt":1,"note":"TS errors only in canvas files (slice-07 scope)"}
+{"ts":"2026-03-29T22:25:00Z","slice":"slice-10","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-29T22:40:00Z","slice":"slice-07","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
+{"ts":"2026-03-29T22:41:00Z","slice":"slice-07","gate":"lint","result":"PASSED","attempt":1,"note":"0 TS errors - all slices now clean"}
+{"ts":"2026-03-29T22:55:00Z","slice":"slice-07","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-03-29T23:10:00Z","slice":"slice-11","gate":"code_review","verdict":"REJECTED","findings_count":3,"findings":["Missing deliverable: __tests__/e2e/prompt-simplification-smoke.test.ts","Missing deliverable: backend/tests/e2e/test_prompt_simplification_smoke.py","lib/types/__tests__/prompt-knowledge.test.ts has 3 failures from removed NegativePromptInfo"],"attempt":1}
+{"ts":"2026-03-29T23:20:00Z","slice":"slice-11","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":2}
+{"ts":"2026-03-29T23:21:00Z","slice":"slice-11","gate":"lint","result":"PASSED","attempt":1,"note":"0 TS errors"}
+{"ts":"2026-03-29T23:40:00Z","slice":"slice-11","gate":"tests","result":"PASSED","retries":1,"note":"36 backend regression failures confirmed pre-existing"}
+{"ts":"2026-03-29T23:55:00Z","slice":"feature","gate":"systemic_review","verdict":"FAILED","findings_total":2}

@@ -205,15 +205,6 @@ def format_knowledge_for_prompt(result: dict) -> str:
         )
         lines.append(f"Prompt style: {prompt_style}")
 
-        negative_prompts = model.get("negativePrompts")
-        if negative_prompts:
-            supported_text = (
-                "Supported" if negative_prompts["supported"] else "Not supported"
-            )
-            lines.append(
-                f"Negative prompts: {supported_text}. {negative_prompts['note']}"
-            )
-
         strengths = model.get("strengths", [])
         if len(strengths) > 0:
             lines.append("")

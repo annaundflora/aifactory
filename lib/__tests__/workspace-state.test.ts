@@ -59,17 +59,16 @@ describe("WorkspaceState", () => {
   // ---------------------------------------------------------------------------
   // AC-3: Negativ-Prompt uebernehmen
   // ---------------------------------------------------------------------------
-  it("should include negativePrompt in variation state when generation has a value", () => {
+  it("should store and retrieve variation state without removed fields", () => {
     /**
-     * AC-3: GIVEN eine Generation mit negative_prompt: "blurry, low quality"
-     *       WHEN der User auf "Variation" klickt
-     *       THEN wird negativePrompt mit dem Wert "blurry, low quality" in den WorkspaceVariationState geschrieben
+     * AC-3 (updated for slice-06): promptStyle and negativePrompt have been
+     * removed from WorkspaceVariationState. Variation data should work
+     * with only the remaining fields.
      */
     const { result } = renderHook(() => useWorkspaceVariation(), { wrapper });
 
     const variationData: WorkspaceVariationState = {
       promptMotiv: "A landscape",
-      negativePrompt: "blurry, low quality",
       modelId: "black-forest-labs/flux-2-pro",
       modelParams: {},
     };
@@ -79,26 +78,22 @@ describe("WorkspaceState", () => {
     });
 
     expect(result.current.variationData).not.toBeNull();
-    expect(result.current.variationData!.negativePrompt).toBe(
-      "blurry, low quality"
-    );
+    expect(result.current.variationData!.promptMotiv).toBe("A landscape");
+    expect(result.current.variationData!.modelId).toBe("black-forest-labs/flux-2-pro");
   });
 
   // ---------------------------------------------------------------------------
   // AC-4: Negativ-Prompt null behandeln
   // ---------------------------------------------------------------------------
-  it("should set negativePrompt to undefined or empty string when generation negative_prompt is null", () => {
+  it("should handle minimal variation state without removed fields", () => {
     /**
-     * AC-4: GIVEN eine Generation mit negative_prompt: null
-     *       WHEN der User auf "Variation" klickt
-     *       THEN wird negativePrompt als undefined oder leerer String in den WorkspaceVariationState geschrieben
+     * AC-4 (updated for slice-06): promptStyle and negativePrompt have been
+     * removed. Minimal state with only required fields should work correctly.
      */
     const { result } = renderHook(() => useWorkspaceVariation(), { wrapper });
 
-    // Simulate what the LightboxModal does: generation.negativePrompt ?? undefined
     const variationData: WorkspaceVariationState = {
       promptMotiv: "A landscape",
-      negativePrompt: undefined,
       modelId: "black-forest-labs/flux-2-pro",
       modelParams: {},
     };
@@ -108,10 +103,10 @@ describe("WorkspaceState", () => {
     });
 
     expect(result.current.variationData).not.toBeNull();
-    const negPrompt = result.current.variationData!.negativePrompt;
-    expect(
-      negPrompt === undefined || negPrompt === ""
-    ).toBe(true);
+    expect(result.current.variationData!.promptMotiv).toBe("A landscape");
+    // Removed fields should not exist on the type
+    expect(Object.keys(result.current.variationData!)).not.toContain("promptStyle");
+    expect(Object.keys(result.current.variationData!)).not.toContain("negativePrompt");
   });
 
   // ---------------------------------------------------------------------------
@@ -172,15 +167,14 @@ describe("WorkspaceState Extension (slice-10)", () => {
      */
     const { result } = renderHook(() => useWorkspaceVariation(), { wrapper });
 
-    // Create a state object with all 9 fields (5 existing + 4 new)
+    // Create a state object with all fields (3 required + optional)
+    // Note: promptStyle and negativePrompt were removed in slice-06
     const fullState: WorkspaceVariationState = {
-      // 5 existing fields
+      // 3 required fields
       promptMotiv: "test prompt",
-      promptStyle: "oil painting",
-      negativePrompt: "blurry",
       modelId: "model-1",
       modelParams: { steps: 20 },
-      // 4 new optional fields
+      // optional fields
       targetMode: "img2img",
       sourceImageUrl: "https://example.com/image.png",
       strength: 0.75,
@@ -191,11 +185,9 @@ describe("WorkspaceState Extension (slice-10)", () => {
       result.current.setVariation(fullState);
     });
 
-    // Verify all 9 fields are present
+    // Verify all fields are present
     const data = result.current.variationData!;
     expect(data.promptMotiv).toBe("test prompt");
-    expect(data.promptStyle).toBe("oil painting");
-    expect(data.negativePrompt).toBe("blurry");
     expect(data.modelId).toBe("model-1");
     expect(data.modelParams).toEqual({ steps: 20 });
     expect(data.targetMode).toBe("img2img");

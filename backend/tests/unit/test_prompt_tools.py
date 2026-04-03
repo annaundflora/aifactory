@@ -1,7 +1,10 @@
-"""Unit tests for prompt_tools (Slice 12).
+"""Unit tests for prompt_tools.
 
 Tests the pure logic of draft_prompt and refine_prompt tool functions
 in isolation -- input validation, default values, field construction.
+
+After Slice-08 simplification, both tools return ``{"prompt": str}``
+instead of the old 3-field format (motiv / style / negative_prompt).
 
 Mocking Strategy: mock_external (as specified in Slice-Spec).
 No external calls needed here; these are pure functions.
@@ -48,8 +51,8 @@ class TestDraftPromptValidation:
         with pytest.raises((ValueError, TypeError, Exception)):
             draft_prompt.invoke({"collected_info": None})
 
-    def test_draft_prompt_returns_three_keys(self):
-        """draft_prompt must return dict with exactly motiv, style, negative_prompt."""
+    def test_draft_prompt_returns_prompt_key(self):
+        """draft_prompt must return dict with exactly one 'prompt' key."""
         from app.agent.tools.prompt_tools import draft_prompt
 
         result = draft_prompt.invoke({
@@ -57,53 +60,51 @@ class TestDraftPromptValidation:
         })
 
         assert isinstance(result, dict)
-        assert set(result.keys()) == {"motiv", "style", "negative_prompt"}
+        assert set(result.keys()) == {"prompt"}
 
-    def test_draft_prompt_all_values_are_nonempty_strings(self):
-        """All three returned fields must be non-empty strings."""
+    def test_draft_prompt_value_is_nonempty_string(self):
+        """The returned 'prompt' field must be a non-empty string."""
         from app.agent.tools.prompt_tools import draft_prompt
 
         result = draft_prompt.invoke({
             "collected_info": {"subject": "mountain landscape"},
         })
 
-        for key in ("motiv", "style", "negative_prompt"):
-            assert isinstance(result[key], str), f"{key} must be a string"
-            assert len(result[key]) > 0, f"{key} must be non-empty"
+        assert isinstance(result["prompt"], str), "prompt must be a string"
+        assert len(result["prompt"]) > 0, "prompt must be non-empty"
 
     def test_draft_prompt_uses_default_style_when_not_provided(self):
-        """When style is not in collected_info, a default is used."""
+        """When style is not in collected_info, the default 'photorealistic' appears in prompt."""
         from app.agent.tools.prompt_tools import draft_prompt
 
         result = draft_prompt.invoke({
             "collected_info": {"subject": "sunset"},
         })
 
-        # Style should contain something (default is "photorealistic")
-        assert len(result["style"]) > 0
+        # Default style "photorealistic" should be embedded in the prompt
+        assert "photorealistic" in result["prompt"].lower()
 
-    def test_draft_prompt_uses_default_negative_when_not_provided(self):
-        """When negative_prompt is not in collected_info, sensible defaults are used."""
+    def test_draft_prompt_includes_quality_markers(self):
+        """draft_prompt should include quality markers in the generated prompt."""
         from app.agent.tools.prompt_tools import draft_prompt
 
         result = draft_prompt.invoke({
             "collected_info": {"subject": "forest path"},
         })
 
-        assert len(result["negative_prompt"]) > 0
-        # Default negatives should contain common quality guards
-        neg_lower = result["negative_prompt"].lower()
-        assert "blurry" in neg_lower or "low quality" in neg_lower
+        prompt_lower = result["prompt"].lower()
+        # Default purpose ("general") adds quality markers
+        assert "detailed" in prompt_lower or "professional" in prompt_lower or "quality" in prompt_lower
 
-    def test_draft_prompt_subject_appears_in_motiv(self):
-        """The subject text should appear in the motiv field."""
+    def test_draft_prompt_subject_appears_in_prompt(self):
+        """The subject text should appear in the prompt field."""
         from app.agent.tools.prompt_tools import draft_prompt
 
         result = draft_prompt.invoke({
             "collected_info": {"subject": "a golden retriever in a meadow"},
         })
 
-        assert "golden retriever" in result["motiv"].lower()
+        assert "golden retriever" in result["prompt"].lower()
 
     def test_draft_prompt_with_all_optional_fields(self):
         """draft_prompt handles all optional fields without error."""
@@ -118,87 +119,77 @@ class TestDraftPromptValidation:
                 "lighting": "dramatic",
                 "composition": "wide angle",
                 "color_palette": "warm earth tones",
-                "negative_prompt": "cartoon, anime",
             },
         })
 
         assert isinstance(result, dict)
-        assert set(result.keys()) == {"motiv", "style", "negative_prompt"}
-        for key in ("motiv", "style", "negative_prompt"):
-            assert isinstance(result[key], str) and len(result[key]) > 0
+        assert set(result.keys()) == {"prompt"}
+        assert isinstance(result["prompt"], str) and len(result["prompt"]) > 0
+        # Verify optional fields are incorporated into the prompt
+        prompt_lower = result["prompt"].lower()
+        assert "castle" in prompt_lower
+        assert "oil painting" in prompt_lower
 
-    def test_draft_prompt_passthrough_when_motiv_and_negative_provided(self):
-        """When agent provides fully formed motiv+negative_prompt, tool passes through."""
+    def test_draft_prompt_passthrough_when_prompt_provided(self):
+        """When agent provides a complete prompt, tool passes it through."""
         from app.agent.tools.prompt_tools import draft_prompt
 
         result = draft_prompt.invoke({
             "collected_info": {
                 "subject": "dog",
-                "motiv": "a majestic golden retriever sitting in sunlit meadow",
-                "style": "cinematic photography",
-                "negative_prompt": "blurry, cartoon",
+                "prompt": "a majestic golden retriever sitting in sunlit meadow, cinematic photography",
             },
         })
 
-        assert result["motiv"] == "a majestic golden retriever sitting in sunlit meadow"
-        assert result["negative_prompt"] == "blurry, cartoon"
+        assert result["prompt"] == "a majestic golden retriever sitting in sunlit meadow, cinematic photography"
 
 
 class TestRefinePromptValidation:
     """Unit tests for refine_prompt input validation and behavior."""
 
-    def test_refine_prompt_returns_three_keys(self):
-        """refine_prompt must return dict with exactly motiv, style, negative_prompt."""
+    def test_refine_prompt_returns_prompt_key(self):
+        """refine_prompt must return dict with exactly one 'prompt' key."""
         from app.agent.tools.prompt_tools import refine_prompt
 
         result = refine_prompt.invoke({
             "current_draft": {
-                "motiv": "a cat on a roof",
-                "style": "photorealistic",
-                "negative_prompt": "blurry",
+                "prompt": "a cat on a roof, photorealistic",
             },
             "feedback": "add dramatic lighting",
         })
 
         assert isinstance(result, dict)
-        assert set(result.keys()) == {"motiv", "style", "negative_prompt"}
+        assert set(result.keys()) == {"prompt"}
 
-    def test_refine_prompt_all_values_are_nonempty_strings(self):
-        """All returned fields must be non-empty strings."""
+    def test_refine_prompt_value_is_nonempty_string(self):
+        """The returned 'prompt' field must be a non-empty string."""
         from app.agent.tools.prompt_tools import refine_prompt
 
         result = refine_prompt.invoke({
             "current_draft": {
-                "motiv": "sunset over ocean",
-                "style": "watercolor",
-                "negative_prompt": "blurry",
+                "prompt": "sunset over ocean, watercolor",
             },
             "feedback": "make colors more vibrant",
         })
 
-        for key in ("motiv", "style", "negative_prompt"):
-            assert isinstance(result[key], str), f"{key} must be a string"
-            assert len(result[key]) > 0, f"{key} must be non-empty"
+        assert isinstance(result["prompt"], str), "prompt must be a string"
+        assert len(result["prompt"]) > 0, "prompt must be non-empty"
 
-    def test_refine_prompt_handles_empty_draft_fields(self):
-        """refine_prompt fills in defaults when draft fields are empty."""
+    def test_refine_prompt_handles_empty_draft_prompt(self):
+        """refine_prompt falls back to feedback when draft prompt is empty."""
         from app.agent.tools.prompt_tools import refine_prompt
 
         result = refine_prompt.invoke({
             "current_draft": {
-                "motiv": "",
-                "style": "",
-                "negative_prompt": "",
+                "prompt": "",
             },
             "feedback": "create a portrait of a woman",
         })
 
-        # All fields must still be non-empty after refinement
-        for key in ("motiv", "style", "negative_prompt"):
-            assert isinstance(result[key], str) and len(result[key]) > 0
+        assert isinstance(result["prompt"], str) and len(result["prompt"]) > 0
 
     def test_refine_prompt_handles_missing_draft_keys(self):
-        """refine_prompt handles a current_draft missing some keys."""
+        """refine_prompt handles a current_draft missing the prompt key."""
         from app.agent.tools.prompt_tools import refine_prompt
 
         result = refine_prompt.invoke({
@@ -207,9 +198,8 @@ class TestRefinePromptValidation:
         })
 
         assert isinstance(result, dict)
-        assert set(result.keys()) == {"motiv", "style", "negative_prompt"}
-        for key in ("motiv", "style", "negative_prompt"):
-            assert isinstance(result[key], str) and len(result[key]) > 0
+        assert set(result.keys()) == {"prompt"}
+        assert isinstance(result["prompt"], str) and len(result["prompt"]) > 0
 
 
 class TestToolDecorators:

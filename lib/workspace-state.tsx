@@ -9,8 +9,6 @@ import type { ReactNode } from "react";
 
 export interface WorkspaceVariationState {
   promptMotiv: string;
-  promptStyle?: string;
-  negativePrompt?: string;
   modelId: string;
   modelParams: Record<string, unknown>;
   targetMode?: string;

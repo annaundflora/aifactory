@@ -99,10 +99,6 @@ describe('DB Schema Definition', () => {
       expect(columnMap['prompt'].columnType).toBe('PgText')
       expect(columnMap['prompt'].notNull).toBe(true)
 
-      // negative_prompt: TEXT (nullable)
-      expect(columnMap['negative_prompt']).toBeDefined()
-      expect(columnMap['negative_prompt'].columnType).toBe('PgText')
-
       // model_id: VARCHAR(255) NOT NULL
       expect(columnMap['model_id']).toBeDefined()
       expect(columnMap['model_id'].columnType).toBe('PgVarchar')

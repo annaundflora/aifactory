@@ -166,7 +166,6 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
     id: overrides.id ?? "gen-slot-test-1",
     projectId: overrides.projectId ?? "project-1",
     prompt: overrides.prompt ?? "A test prompt for slot testing",
-    negativePrompt: overrides.negativePrompt ?? null,
     modelId: overrides.modelId ?? "model-1",
     modelParams: overrides.modelParams ?? {},
     status: overrides.status ?? "completed",
@@ -178,7 +177,6 @@ function makeGeneration(overrides: Partial<Generation> = {}): Generation {
     seed: overrides.seed ?? null,
     createdAt: overrides.createdAt ?? new Date("2025-06-15T12:00:00Z"),
     promptMotiv: overrides.promptMotiv ?? "",
-    promptStyle: overrides.promptStyle ?? "",
     isFavorite: overrides.isFavorite ?? false,
     generationMode: overrides.generationMode ?? "txt2img",
     sourceImageUrl: overrides.sourceImageUrl ?? null,
@@ -436,29 +434,23 @@ describe("VariationPopover ModelSlots Acceptance", () => {
    * AC-4: GIVEN das VariationParams Interface
    *       WHEN es importiert wird
    *       THEN enthaelt es modelIds: string[] als Pflichtfeld
-   *       AND alle anderen Felder (prompt, promptStyle, negativePrompt, strength, count, imageParams)
+   *       AND alle anderen Felder (prompt, strength, count, imageParams)
    *       bleiben unveraendert
    */
   it("AC-4: should include modelIds in VariationParams as required field", () => {
     // Type-level check: VariationParams must accept modelIds as required field
     const paramsWithModelIds: VariationParams = {
       prompt: "test prompt",
-      promptStyle: "test style",
-      negativePrompt: "negative",
       count: 2,
       modelIds: ["model-a", "model-b"],
     };
     expect(paramsWithModelIds.modelIds).toEqual(["model-a", "model-b"]);
     expect(paramsWithModelIds.prompt).toBe("test prompt");
-    expect(paramsWithModelIds.promptStyle).toBe("test style");
-    expect(paramsWithModelIds.negativePrompt).toBe("negative");
     expect(paramsWithModelIds.count).toBe(2);
 
     // strength remains optional
     const paramsWithStrength: VariationParams = {
       prompt: "test",
-      promptStyle: "",
-      negativePrompt: "",
       count: 1,
       modelIds: ["model-a"],
       strength: "subtle",
@@ -468,8 +460,6 @@ describe("VariationPopover ModelSlots Acceptance", () => {
     // imageParams remains optional
     const paramsWithImageParams: VariationParams = {
       prompt: "test",
-      promptStyle: "",
-      negativePrompt: "",
       count: 1,
       modelIds: ["model-a"],
       imageParams: { aspect_ratio: "16:9" },
@@ -715,8 +705,6 @@ describe("VariationPopover Unit -- Type Contracts", () => {
     // If modelIds were removed from the interface, the test file would not compile.
     const params: VariationParams = {
       prompt: "a",
-      promptStyle: "b",
-      negativePrompt: "c",
       count: 1,
       modelIds: ["id-1"],
     };
@@ -787,7 +775,7 @@ describe("VariationPopover Integration -- ModelSlots", () => {
 
     renderPopoverOpen({
       onGenerate,
-      generation: makeGeneration({ prompt: "initial prompt", promptStyle: "watercolor" }),
+      generation: makeGeneration({ prompt: "initial prompt" }),
       modelSlots: standardSlots,
       models: standardModels,
     });
@@ -803,7 +791,6 @@ describe("VariationPopover Integration -- ModelSlots", () => {
     expect(onGenerate).toHaveBeenCalledTimes(1);
     const params = onGenerate.mock.calls[0][0] as VariationParams;
     expect(params.prompt).toBe("initial prompt");
-    expect(params.promptStyle).toBe("watercolor");
     expect(params.count).toBe(4);
     expect(params.modelIds).toEqual(["black-forest-labs/flux-schnell"]);
   });

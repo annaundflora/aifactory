@@ -24,8 +24,6 @@ export type VariationStrength = "subtle" | "balanced" | "creative";
 
 export interface VariationParams {
   prompt: string;
-  promptStyle: string;
-  negativePrompt: string;
   strength?: VariationStrength;
   count: number;
   /** Active model IDs from selected slots. */
@@ -68,16 +66,12 @@ export function VariationPopover({
 
   // Local form state
   const [prompt, setPrompt] = useState(generation.prompt ?? "");
-  const [promptStyle, setPromptStyle] = useState(generation.promptStyle ?? "");
-  const [negativePrompt, setNegativePrompt] = useState(generation.negativePrompt ?? "");
   const [count, setCount] = useState<number>(1);
 
   // Reset form state when generation changes or popover reopens
   useEffect(() => {
     if (isOpen) {
       setPrompt(generation.prompt ?? "");
-      setPromptStyle(generation.promptStyle ?? "");
-      setNegativePrompt(generation.negativePrompt ?? "");
       setCount(1);
     }
   }, [isOpen, generation.id]);
@@ -100,23 +94,13 @@ export function VariationPopover({
 
     onGenerate({
       prompt,
-      promptStyle,
-      negativePrompt,
       count,
       modelIds,
     });
 
     // Close the popover by setting activeToolId to null via toggle
     dispatch({ type: "SET_ACTIVE_TOOL", toolId: "variation" });
-  }, [
-    modelSlots,
-    onGenerate,
-    prompt,
-    promptStyle,
-    negativePrompt,
-    count,
-    dispatch,
-  ]);
+  }, [modelSlots, onGenerate, prompt, count, dispatch]);
 
   return (
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
@@ -161,44 +145,6 @@ export function VariationPopover({
               placeholder="Describe the variation..."
               className="min-h-20 resize-none text-sm"
               rows={3}
-            />
-          </div>
-
-          {/* Style */}
-          <div className="space-y-1.5">
-            <label
-              htmlFor="variation-style"
-              className="text-xs font-medium text-muted-foreground"
-            >
-              Style
-            </label>
-            <Textarea
-              id="variation-style"
-              data-testid="variation-style"
-              value={promptStyle}
-              onChange={(e) => setPromptStyle(e.target.value)}
-              placeholder="Style prompt..."
-              className="min-h-14 resize-none text-sm"
-              rows={2}
-            />
-          </div>
-
-          {/* Negative Prompt */}
-          <div className="space-y-1.5">
-            <label
-              htmlFor="variation-negative-prompt"
-              className="text-xs font-medium text-muted-foreground"
-            >
-              Negative Prompt
-            </label>
-            <Textarea
-              id="variation-negative-prompt"
-              data-testid="variation-negative-prompt"
-              value={negativePrompt}
-              onChange={(e) => setNegativePrompt(e.target.value)}
-              placeholder="Negative prompt..."
-              className="min-h-14 resize-none text-sm"
-              rows={2}
             />
           </div>
 

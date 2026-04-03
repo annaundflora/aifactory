@@ -22,8 +22,6 @@ import { requireAuth } from "@/lib/auth/guard";
 interface GenerateImagesInput {
   projectId: string;
   promptMotiv: string;
-  promptStyle?: string;
-  negativePrompt?: string;
   modelIds: string[];
   params: Record<string, unknown>;
   count: number;
@@ -143,8 +141,6 @@ export async function generateImages(
     const generations = await GenerationService.generate(
       input.projectId,
       input.promptMotiv,
-      input.promptStyle ?? '',
-      input.negativePrompt,
       input.modelIds,
       input.params,
       input.count,

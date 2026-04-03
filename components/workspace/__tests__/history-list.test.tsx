@@ -65,8 +65,6 @@ function makeEntry(overrides: Partial<PromptHistoryEntry> = {}): PromptHistoryEn
   return {
     generationId: overrides.generationId ?? crypto.randomUUID(),
     promptMotiv: overrides.promptMotiv ?? "A test prompt",
-    promptStyle: overrides.promptStyle ?? "cinematic",
-    negativePrompt: overrides.negativePrompt ?? null,
     modelId: overrides.modelId ?? "vendor/model-test",
     modelParams: overrides.modelParams ?? {},
     isFavorite: overrides.isFavorite ?? false,
@@ -95,8 +93,6 @@ async function renderHistoryList(props: Partial<React.ComponentProps<typeof Hist
     <HistoryList
       onLoadEntry={onLoadEntry}
       promptMotiv={props.promptMotiv ?? ""}
-      promptStyle={props.promptStyle ?? ""}
-      negativePrompt={props.negativePrompt ?? ""}
     />
   );
   // Wait for initial load to complete (mockGetPromptHistory called + useTransition flushed)
@@ -384,8 +380,6 @@ describe("History List", () => {
     const user = userEvent.setup();
     const entry = makeEntry({
       promptMotiv: "Eagle in flight",
-      promptStyle: "photorealistic",
-      negativePrompt: "blur, noise",
     });
     mockGetPromptHistory.mockResolvedValue([entry]);
 
@@ -394,8 +388,6 @@ describe("History List", () => {
       <HistoryList
         onLoadEntry={onLoadEntry}
         promptMotiv=""
-        promptStyle=""
-        negativePrompt=""
       />
     );
 
@@ -432,8 +424,6 @@ describe("History List", () => {
       <HistoryList
         onLoadEntry={onLoadEntry}
         promptMotiv="existing prompt text"
-        promptStyle=""
-        negativePrompt=""
       />
     );
 
@@ -470,8 +460,6 @@ describe("History List", () => {
     const user = userEvent.setup();
     const entry = makeEntry({
       promptMotiv: "Apply this prompt",
-      promptStyle: "watercolor",
-      negativePrompt: "noise",
     });
     mockGetPromptHistory.mockResolvedValue([entry]);
 
@@ -480,8 +468,6 @@ describe("History List", () => {
       <HistoryList
         onLoadEntry={onLoadEntry}
         promptMotiv="existing text"
-        promptStyle=""
-        negativePrompt=""
       />
     );
 
@@ -531,8 +517,6 @@ describe("History List", () => {
       <HistoryList
         onLoadEntry={onLoadEntry}
         promptMotiv="keep this"
-        promptStyle="keep style"
-        negativePrompt=""
       />
     );
 

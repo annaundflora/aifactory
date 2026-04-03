@@ -21,7 +21,6 @@ vi.mock('@/lib/db/queries', () => {
         modelId: input.modelId,
         batchId: input.batchId ?? null,
         status: 'pending',
-        negativePrompt: null,
         modelParams: {},
         imageUrl: null,
         replicatePredictionId: null,
@@ -30,7 +29,6 @@ vi.mock('@/lib/db/queries', () => {
         height: null,
         seed: null,
         promptMotiv: '',
-        promptStyle: '',
         isFavorite: false,
         createdAt: new Date(),
         generationMode: 'txt2img',
@@ -111,8 +109,6 @@ describe('GenerationService.generate — batchId assignment', () => {
     const results = await GenerationService.generate(
       'project-1',     // projectId
       'a cat',          // promptMotiv
-      'watercolor',     // promptStyle
-      undefined,        // negativePrompt
       ['owner/model-a'], // modelIds (single model)
       {},               // params
       3,                // count = 3
@@ -150,8 +146,6 @@ describe('GenerationService.generate — batchId assignment', () => {
     const results = await GenerationService.generate(
       'project-1',            // projectId
       'a dog',                // promptMotiv
-      'oil painting',         // promptStyle
-      undefined,              // negativePrompt
       ['model/a', 'model/b'], // modelIds (multi-model)
       {},                     // params
       1,                      // count (ignored in multi-model, 1 per model)

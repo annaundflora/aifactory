@@ -70,11 +70,9 @@ export async function deleteProject(id: string, userId: string): Promise<void> {
 export interface CreateGenerationInput {
   projectId: string;
   prompt: string;
-  negativePrompt?: string;
   modelId: string;
   modelParams?: Record<string, unknown>;
   promptMotiv?: string;
-  promptStyle?: string;
   generationMode?: string;
   sourceImageUrl?: string | null;
   sourceGenerationId?: string | null;
@@ -87,11 +85,9 @@ export async function createGeneration(input: CreateGenerationInput): Promise<Ge
     .values({
       projectId: input.projectId,
       prompt: input.prompt,
-      negativePrompt: input.negativePrompt ?? null,
       modelId: input.modelId,
       modelParams: input.modelParams ?? {},
       promptMotiv: input.promptMotiv ?? '',
-      promptStyle: input.promptStyle ?? '',
       generationMode: input.generationMode ?? 'txt2img',
       sourceImageUrl: input.sourceImageUrl ?? null,
       sourceGenerationId: input.sourceGenerationId ?? null,
@@ -269,8 +265,6 @@ export async function updateProjectThumbnail(input: {
 export type PromptHistoryRow = {
   id: string;
   promptMotiv: string;
-  promptStyle: string | null;
-  negativePrompt: string | null;
   modelId: string;
   modelParams: unknown;
   isFavorite: boolean;
@@ -289,11 +283,9 @@ export async function getPromptHistoryQuery(
   const rows = await db.execute(
     sql`
       SELECT * FROM (
-        SELECT DISTINCT ON (g.prompt_motiv, g.prompt_style, g.negative_prompt, g.model_id)
+        SELECT DISTINCT ON (g.prompt_motiv, g.model_id)
           g.id,
           g.prompt_motiv AS "promptMotiv",
-          g.prompt_style AS "promptStyle",
-          g.negative_prompt AS "negativePrompt",
           g.model_id AS "modelId",
           g.model_params AS "modelParams",
           g.is_favorite AS "isFavorite",
@@ -301,7 +293,7 @@ export async function getPromptHistoryQuery(
         FROM generations g
         INNER JOIN projects p ON g.project_id = p.id
         WHERE p.user_id = ${userId}
-        ORDER BY g.prompt_motiv, g.prompt_style, g.negative_prompt, g.model_id, g.created_at DESC
+        ORDER BY g.prompt_motiv, g.model_id, g.created_at DESC
       ) sub
       ORDER BY sub."createdAt" DESC
       LIMIT ${limit}
@@ -323,8 +315,6 @@ export async function getFavoritesQuery(
     .select({
       id: generations.id,
       promptMotiv: generations.promptMotiv,
-      promptStyle: generations.promptStyle,
-      negativePrompt: generations.negativePrompt,
       modelId: generations.modelId,
       modelParams: generations.modelParams,
       isFavorite: generations.isFavorite,
