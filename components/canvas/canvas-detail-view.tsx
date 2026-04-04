@@ -15,6 +15,7 @@ import { Img2imgPopover } from "@/components/canvas/popovers/img2img-popover";
 import { UpscalePopover } from "@/components/canvas/popovers/upscale-popover";
 import { CanvasChatPanel } from "@/components/canvas/canvas-chat-panel";
 import { MaskCanvas } from "@/components/canvas/mask-canvas";
+import { FloatingBrushToolbar } from "@/components/canvas/floating-brush-toolbar";
 import { generateImages, upscaleImage, fetchGenerations } from "@/app/actions/generations";
 import { deleteGeneration } from "@/app/actions/generations";
 import { getModelSlots } from "@/app/actions/model-slots";
@@ -51,6 +52,9 @@ export interface CanvasDetailViewProps {
   toolbarSlot?: ReactNode;
   chatSlot?: ReactNode;
   undoRedoSlot?: ReactNode;
+  /** Callback for the erase action button in the floating brush toolbar.
+   *  Connected to generation logic in later slices. */
+  onEraseAction?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -65,6 +69,7 @@ export function CanvasDetailView({
   toolbarSlot,
   chatSlot,
   undoRedoSlot,
+  onEraseAction,
 }: CanvasDetailViewProps) {
   const { state, dispatch } = useCanvasDetail();
   const [chatOpen, setChatOpen] = useState(true);
@@ -221,6 +226,14 @@ export function CanvasDetailView({
       toast.error("Loeschen fehlgeschlagen");
     }
   }, [state.currentGenerationId, onBack]);
+
+  // ---------------------------------------------------------------------------
+  // Erase action: forwarded to FloatingBrushToolbar, connected in later slices
+  // ---------------------------------------------------------------------------
+
+  const handleEraseAction = useCallback(() => {
+    onEraseAction?.();
+  }, [onEraseAction]);
 
   // ---------------------------------------------------------------------------
   // Polling: check for generation completion / failure
@@ -623,6 +636,9 @@ export function CanvasDetailView({
             currentGenerationId={state.currentGenerationId}
             onNavigate={handleNavigate}
           />
+
+          {/* Floating Brush Toolbar — positioned absolute top-center inside main */}
+          <FloatingBrushToolbar onEraseAction={handleEraseAction} />
 
           {/* Image + Mask overlay */}
           <div
