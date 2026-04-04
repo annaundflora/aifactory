@@ -155,16 +155,41 @@ export function MaskCanvas({ imageRef }: MaskCanvasProps) {
   }, [syncCanvasSize, syncCanvasPosition]);
 
   // -------------------------------------------------------------------------
-  // CLEAR_MASK support (AC-5)
+  // CLEAR_MASK support (AC-5) + restore mask on remount
   // -------------------------------------------------------------------------
 
   useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
     if (state.maskData === null) {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+      // Clear the canvas when mask data is reset
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+    } else if (canvas.width > 0 && canvas.height > 0) {
+      // Restore non-null maskData onto the canvas (e.g. after remount from
+      // an editMode round-trip like inpaint -> null -> inpaint). When the
+      // component unmounts the canvas DOM element is destroyed, but
+      // state.maskData survives in context. On remount we need to put the
+      // saved ImageData back onto the fresh canvas.
+      if (
+        state.maskData.width === canvas.width &&
+        state.maskData.height === canvas.height
+      ) {
+        ctx.putImageData(state.maskData, 0, 0);
+      } else {
+        // Dimensions differ (e.g. resize happened while unmounted) — scale
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = state.maskData.width;
+        tempCanvas.height = state.maskData.height;
+        const tempCtx = tempCanvas.getContext("2d");
+        if (tempCtx) {
+          tempCtx.putImageData(state.maskData, 0, 0);
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
+        }
+      }
     }
   }, [state.maskData]);
 
