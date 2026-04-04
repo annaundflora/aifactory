@@ -14,6 +14,7 @@ import { VariationPopover } from "@/components/canvas/popovers/variation-popover
 import { Img2imgPopover } from "@/components/canvas/popovers/img2img-popover";
 import { UpscalePopover } from "@/components/canvas/popovers/upscale-popover";
 import { CanvasChatPanel } from "@/components/canvas/canvas-chat-panel";
+import { MaskCanvas } from "@/components/canvas/mask-canvas";
 import { generateImages, upscaleImage, fetchGenerations } from "@/app/actions/generations";
 import { deleteGeneration } from "@/app/actions/generations";
 import { getModelSlots } from "@/app/actions/model-slots";
@@ -116,6 +117,19 @@ export function CanvasDetailView({
         console.error("Failed to fetch models:", err);
       });
   }, []);
+
+  // ---------------------------------------------------------------------------
+  // Image ref for MaskCanvas overlay — resolved from DOM after CanvasImage mount
+  // ---------------------------------------------------------------------------
+  const imageContainerRef = useRef<HTMLDivElement | null>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    const container = imageContainerRef.current;
+    if (!container) return;
+    const img = container.querySelector<HTMLImageElement>('[data-testid="canvas-image"]');
+    imageRef.current = img;
+  });
 
   // Track pending generation IDs for polling via ref to avoid effect churn.
   // A counter state triggers re-renders when pending list changes.
@@ -610,12 +624,16 @@ export function CanvasDetailView({
             onNavigate={handleNavigate}
           />
 
-          {/* Image */}
-          <div className="relative flex min-h-0 flex-1 items-center justify-center p-4">
+          {/* Image + Mask overlay */}
+          <div
+            ref={imageContainerRef}
+            className="relative flex min-h-0 flex-1 items-center justify-center p-4"
+          >
             <CanvasImage
               generation={currentGeneration}
               isLoading={state.isGenerating}
             />
+            <MaskCanvas imageRef={imageRef} />
           </div>
 
           {/* Sibling thumbnails below the image */}
