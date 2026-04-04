@@ -93,8 +93,8 @@ function makeSlot(overrides: Partial<{
   }
 }
 
-/** All 15 seed default rows as described in architecture.md */
-function makeAll15Rows(): Record<string, unknown>[] {
+/** All 21 seed default rows as described in architecture.md */
+function makeAll21Rows(): Record<string, unknown>[] {
   return [
     makeSlot({ id: 'uuid-01', mode: 'txt2img', slot: 1, modelId: 'black-forest-labs/flux-schnell', modelParams: {}, active: true }),
     makeSlot({ id: 'uuid-02', mode: 'txt2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro', modelParams: {}, active: false }),
@@ -105,12 +105,18 @@ function makeAll15Rows(): Record<string, unknown>[] {
     makeSlot({ id: 'uuid-07', mode: 'upscale', slot: 1, modelId: 'philz1337x/crystal-upscaler', modelParams: { scale: 4 }, active: true }),
     makeSlot({ id: 'uuid-08', mode: 'upscale', slot: 2, modelId: 'nightmareai/real-esrgan', modelParams: { scale: 2 }, active: false }),
     makeSlot({ id: 'uuid-09', mode: 'upscale', slot: 3, modelId: null, modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-10', mode: 'inpaint', slot: 1, modelId: null, modelParams: {}, active: true }),
+    makeSlot({ id: 'uuid-10', mode: 'inpaint', slot: 1, modelId: 'black-forest-labs/flux-fill-pro', modelParams: {}, active: true }),
     makeSlot({ id: 'uuid-11', mode: 'inpaint', slot: 2, modelId: null, modelParams: {}, active: false }),
     makeSlot({ id: 'uuid-12', mode: 'inpaint', slot: 3, modelId: null, modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-13', mode: 'outpaint', slot: 1, modelId: null, modelParams: {}, active: true }),
+    makeSlot({ id: 'uuid-13', mode: 'outpaint', slot: 1, modelId: 'black-forest-labs/flux-fill-pro', modelParams: {}, active: true }),
     makeSlot({ id: 'uuid-14', mode: 'outpaint', slot: 2, modelId: null, modelParams: {}, active: false }),
     makeSlot({ id: 'uuid-15', mode: 'outpaint', slot: 3, modelId: null, modelParams: {}, active: false }),
+    makeSlot({ id: 'uuid-16', mode: 'erase', slot: 1, modelId: 'bria/eraser', modelParams: {}, active: true }),
+    makeSlot({ id: 'uuid-17', mode: 'erase', slot: 2, modelId: null, modelParams: {}, active: false }),
+    makeSlot({ id: 'uuid-18', mode: 'erase', slot: 3, modelId: null, modelParams: {}, active: false }),
+    makeSlot({ id: 'uuid-19', mode: 'instruction', slot: 1, modelId: 'black-forest-labs/flux-kontext-pro', modelParams: {}, active: true }),
+    makeSlot({ id: 'uuid-20', mode: 'instruction', slot: 2, modelId: null, modelParams: {}, active: false }),
+    makeSlot({ id: 'uuid-21', mode: 'instruction', slot: 3, modelId: null, modelParams: {}, active: false }),
   ]
 }
 
@@ -124,19 +130,19 @@ describe('model_slots query functions (slice-02-db-queries)', () => {
   })
 
   // =========================================================================
-  // AC-1: GIVEN die model_slots Tabelle enthaelt 15 Rows (5 Modes x 3 Slots)
+  // AC-1: GIVEN die model_slots Tabelle enthaelt 21 Rows (7 Modes x 3 Slots)
   //       WHEN getAllModelSlots() aufgerufen wird
-  //       THEN wird ein Array mit exakt 15 Elementen zurueckgegeben
+  //       THEN wird ein Array mit exakt 21 Elementen zurueckgegeben
   //       AND jedes Element entspricht dem ModelSlot inferred Type
   // =========================================================================
-  it('AC-1: should return all 15 model slot rows', async () => {
-    const all15 = makeAll15Rows()
-    mockChain = createChainableMock(all15)
+  it('AC-1: should return all 21 model slot rows', async () => {
+    const all21 = makeAll21Rows()
+    mockChain = createChainableMock(all21)
 
     const result = await getAllModelSlots()
 
-    // Must return exactly 15 elements
-    expect(result).toHaveLength(15)
+    // Must return exactly 21 elements
+    expect(result).toHaveLength(21)
 
     // Each element must have all ModelSlot fields
     for (const row of result) {
@@ -155,7 +161,7 @@ describe('model_slots query functions (slice-02-db-queries)', () => {
     expect(mockChain.from).toHaveBeenCalled()
 
     // Verify the result matches fixtures exactly
-    expect(result).toEqual(all15)
+    expect(result).toEqual(all21)
   })
 
   // =========================================================================
@@ -273,11 +279,11 @@ describe('model_slots query functions (slice-02-db-queries)', () => {
   // =========================================================================
   // AC-5: GIVEN model_slots ist leer (0 Rows)
   //       WHEN seedModelSlotDefaults() aufgerufen wird
-  //       THEN enthaelt model_slots exakt 15 Rows
-  //       AND die Seed-Daten entsprechen der Tabelle in architecture.md Section "Seed Defaults (15 rows)"
+  //       THEN enthaelt model_slots exakt 21 Rows
+  //       AND die Seed-Daten entsprechen der Tabelle in architecture.md Section "Seed Defaults"
   //       AND fuer jeden Mode ist slot 1 active=true, slots 2 und 3 active=false
   // =========================================================================
-  it('AC-5: should seed 15 default rows matching architecture.md defaults', async () => {
+  it('AC-5: should seed 21 default rows matching architecture.md defaults', async () => {
     mockChain = createChainableMock(undefined)
 
     await seedModelSlotDefaults()
@@ -295,12 +301,12 @@ describe('model_slots query functions (slice-02-db-queries)', () => {
       active: boolean
     }>
 
-    // Must be exactly 15 rows
-    expect(valuesCall).toHaveLength(15)
+    // Must be exactly 21 rows
+    expect(valuesCall).toHaveLength(21)
 
-    // -- Verify all 5 modes are present --
+    // -- Verify all 7 modes are present --
     const modes = [...new Set(valuesCall.map((v) => v.mode))]
-    expect(modes.sort()).toEqual(['img2img', 'inpaint', 'outpaint', 'txt2img', 'upscale'])
+    expect(modes.sort()).toEqual(['erase', 'img2img', 'inpaint', 'instruction', 'outpaint', 'txt2img', 'upscale'])
 
     // -- Verify each mode has exactly 3 slots --
     for (const mode of modes) {
@@ -364,9 +370,9 @@ describe('model_slots query functions (slice-02-db-queries)', () => {
     expect(upscale3!.modelId).toBeNull()
     expect(upscale3!.modelParams).toEqual({})
 
-    // inpaint (all null model_id)
+    // inpaint (slot 1 has flux-fill-pro, slots 2/3 null)
     const inpaint1 = valuesCall.find((v) => v.mode === 'inpaint' && v.slot === 1)
-    expect(inpaint1!.modelId).toBeNull()
+    expect(inpaint1!.modelId).toBe('black-forest-labs/flux-fill-pro')
     expect(inpaint1!.modelParams).toEqual({})
 
     const inpaint2 = valuesCall.find((v) => v.mode === 'inpaint' && v.slot === 2)
@@ -375,9 +381,9 @@ describe('model_slots query functions (slice-02-db-queries)', () => {
     const inpaint3 = valuesCall.find((v) => v.mode === 'inpaint' && v.slot === 3)
     expect(inpaint3!.modelId).toBeNull()
 
-    // outpaint (all null model_id)
+    // outpaint (slot 1 has flux-fill-pro, slots 2/3 null)
     const outpaint1 = valuesCall.find((v) => v.mode === 'outpaint' && v.slot === 1)
-    expect(outpaint1!.modelId).toBeNull()
+    expect(outpaint1!.modelId).toBe('black-forest-labs/flux-fill-pro')
     expect(outpaint1!.modelParams).toEqual({})
 
     const outpaint2 = valuesCall.find((v) => v.mode === 'outpaint' && v.slot === 2)
@@ -386,14 +392,36 @@ describe('model_slots query functions (slice-02-db-queries)', () => {
     const outpaint3 = valuesCall.find((v) => v.mode === 'outpaint' && v.slot === 3)
     expect(outpaint3!.modelId).toBeNull()
 
+    // erase (slot 1 has bria/eraser, slots 2/3 null)
+    const erase1 = valuesCall.find((v) => v.mode === 'erase' && v.slot === 1)
+    expect(erase1!.modelId).toBe('bria/eraser')
+    expect(erase1!.modelParams).toEqual({})
+
+    const erase2 = valuesCall.find((v) => v.mode === 'erase' && v.slot === 2)
+    expect(erase2!.modelId).toBeNull()
+
+    const erase3 = valuesCall.find((v) => v.mode === 'erase' && v.slot === 3)
+    expect(erase3!.modelId).toBeNull()
+
+    // instruction (slot 1 has flux-kontext-pro, slots 2/3 null)
+    const instruction1 = valuesCall.find((v) => v.mode === 'instruction' && v.slot === 1)
+    expect(instruction1!.modelId).toBe('black-forest-labs/flux-kontext-pro')
+    expect(instruction1!.modelParams).toEqual({})
+
+    const instruction2 = valuesCall.find((v) => v.mode === 'instruction' && v.slot === 2)
+    expect(instruction2!.modelId).toBeNull()
+
+    const instruction3 = valuesCall.find((v) => v.mode === 'instruction' && v.slot === 3)
+    expect(instruction3!.modelId).toBeNull()
+
     // Verify onConflictDoNothing was used for idempotency
     expect(mockChain.onConflictDoNothing).toHaveBeenCalled()
   })
 
   // =========================================================================
-  // AC-6: GIVEN model_slots enthaelt bereits 15 Rows (vollstaendig geseeded)
+  // AC-6: GIVEN model_slots enthaelt bereits 21 Rows (vollstaendig geseeded)
   //       WHEN seedModelSlotDefaults() erneut aufgerufen wird
-  //       THEN bleiben alle 15 Rows unveraendert (idempotent, ON CONFLICT DO NOTHING)
+  //       THEN bleiben alle 21 Rows unveraendert (idempotent, ON CONFLICT DO NOTHING)
   //       AND kein Fehler wird geworfen
   // =========================================================================
   it('AC-6: should not modify existing rows when called again', async () => {
@@ -405,24 +433,24 @@ describe('model_slots query functions (slice-02-db-queries)', () => {
     expect(firstInsertCallCount).toBe(1)
     expect(mockChain.onConflictDoNothing).toHaveBeenCalledTimes(1)
 
-    // Second call (simulates calling again with all 15 rows already existing)
+    // Second call (simulates calling again with all 21 rows already existing)
     vi.clearAllMocks()
     mockChain = createChainableMock(undefined)
 
     // Must not throw
     await expect(seedModelSlotDefaults()).resolves.not.toThrow()
 
-    // The function still calls insert with the same 15 values,
+    // The function still calls insert with the same 21 values,
     // but with onConflictDoNothing so no rows are actually modified.
     expect(mockChain.insert).toHaveBeenCalledTimes(1)
     expect(mockChain.onConflictDoNothing).toHaveBeenCalledTimes(1)
 
-    // Verify the same 15 values are passed on each call (idempotent payload)
+    // Verify the same 21 values are passed on each call (idempotent payload)
     const valuesCall = mockChain.values.mock.calls[0][0] as Array<{
       mode: string
       slot: number
     }>
-    expect(valuesCall).toHaveLength(15)
+    expect(valuesCall).toHaveLength(21)
 
     // Verify onConflictDoNothing ensures existing rows remain unchanged
     // (The DB layer handles this — the function just sends the same payload with DO NOTHING)

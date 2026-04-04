@@ -63,8 +63,8 @@ async function checkCompatibility(
  */
 export const ModelSlotService = {
   /**
-   * Returns all model slots. If the table is empty, seeds the 15 default
-   * rows first (5 modes x 3 slots), then returns them.
+   * Returns all model slots. If the table is empty, seeds the 21 default
+   * rows first (7 modes x 3 slots), then returns them.
    */
   async getAll(): Promise<ModelSlot[]> {
     const slots = await getAllModelSlots();
@@ -208,7 +208,7 @@ export const ModelSlotService = {
   },
 
   /**
-   * Seeds the 15 default model slot rows (5 modes x 3 slots).
+   * Seeds the 21 default model slot rows (7 modes x 3 slots).
    * Idempotent — existing rows are not overwritten.
    */
   async seedDefaults(): Promise<void> {

@@ -126,7 +126,7 @@ function makeSlot(
 }
 
 /**
- * 15 slots: 5 modes x 3 slots each. Mix of active, inactive, and empty.
+ * 21 slots: 7 modes x 3 slots each. Mix of active, inactive, and empty.
  */
 const FULL_SLOTS: MockModelSlot[] = [
   // txt2img
@@ -142,13 +142,21 @@ const FULL_SLOTS: MockModelSlot[] = [
   makeSlot("upscale", 2, "nightmareai/real-esrgan", false),
   makeSlot("upscale", 3, null, false),
   // inpaint
-  makeSlot("inpaint", 1, "stability-ai/stable-diffusion-inpaint", true),
+  makeSlot("inpaint", 1, "black-forest-labs/flux-fill-pro", true),
   makeSlot("inpaint", 2, null, false),
   makeSlot("inpaint", 3, null, false),
   // outpaint
-  makeSlot("outpaint", 1, "stability-ai/stable-diffusion-outpaint", true),
+  makeSlot("outpaint", 1, "black-forest-labs/flux-fill-pro", true),
   makeSlot("outpaint", 2, null, false),
   makeSlot("outpaint", 3, null, false),
+  // erase
+  makeSlot("erase", 1, "bria/eraser", true),
+  makeSlot("erase", 2, null, false),
+  makeSlot("erase", 3, null, false),
+  // instruction
+  makeSlot("instruction", 1, "black-forest-labs/flux-kontext-pro", true),
+  makeSlot("instruction", 2, null, false),
+  makeSlot("instruction", 3, null, false),
 ];
 
 function makeModel(
@@ -217,6 +225,24 @@ const ALL_MODELS = [
     upscale: false,
     inpaint: false,
     outpaint: true,
+  }),
+  makeModel("bria", "eraser", {
+    txt2img: false,
+    img2img: false,
+    upscale: false,
+    inpaint: false,
+    outpaint: false,
+    erase: true,
+    instruction: false,
+  }),
+  makeModel("black-forest-labs", "flux-kontext-pro", {
+    txt2img: false,
+    img2img: false,
+    upscale: false,
+    inpaint: false,
+    outpaint: false,
+    erase: false,
+    instruction: true,
   }),
 ];
 
@@ -322,15 +348,15 @@ describe("Slice 14: Settings Dialog Read-Only — Acceptance Tests", () => {
   // =========================================================================
 
   /**
-   * AC-1: GIVEN der Settings-Dialog wird geoeffnet und `getModelSlots()` liefert 15 Slots (5 Modes x 3 Slots)
+   * AC-1: GIVEN der Settings-Dialog wird geoeffnet und `getModelSlots()` liefert 21 Slots (7 Modes x 3 Slots)
    *       WHEN der Dialog gerendert wird
-   *       THEN werden alle 5 Mode-Sections angezeigt (TEXT TO IMAGE, IMAGE TO IMAGE, UPSCALE, INPAINT, OUTPAINT)
+   *       THEN werden alle 7 Mode-Sections angezeigt (TEXT TO IMAGE, IMAGE TO IMAGE, UPSCALE, INPAINT, OUTPAINT, ERASE, INSTRUCTION)
    *       AND jede Section zeigt genau 3 Slot-Zeilen (Slot 1, Slot 2, Slot 3)
    */
-  it("AC-1: should render 5 mode sections with 3 slot rows each", async () => {
+  it("AC-1: should render 7 mode sections with 3 slot rows each", async () => {
     renderDialog();
 
-    // All 5 mode section headings must appear
+    // All 7 mode section headings must appear
     await waitFor(() => {
       expect(screen.getByText("TEXT TO IMAGE")).toBeInTheDocument();
     });
@@ -338,9 +364,11 @@ describe("Slice 14: Settings Dialog Read-Only — Acceptance Tests", () => {
     expect(screen.getByText("UPSCALE")).toBeInTheDocument();
     expect(screen.getByText("INPAINT")).toBeInTheDocument();
     expect(screen.getByText("OUTPAINT")).toBeInTheDocument();
+    expect(screen.getByText("ERASE")).toBeInTheDocument();
+    expect(screen.getByText("INSTRUCTION")).toBeInTheDocument();
 
     // Each mode must have exactly 3 slot rows
-    const modes = ["txt2img", "img2img", "upscale", "inpaint", "outpaint"];
+    const modes = ["txt2img", "img2img", "upscale", "inpaint", "outpaint", "erase", "instruction"];
     for (const mode of modes) {
       for (const slotNum of [1, 2, 3]) {
         const slotRow = screen.getByTestId(`slot-row-${mode}-${slotNum}`);
@@ -348,9 +376,9 @@ describe("Slice 14: Settings Dialog Read-Only — Acceptance Tests", () => {
       }
     }
 
-    // Total slot rows = 15
+    // Total slot rows = 21
     const allSlotRows = screen.getAllByTestId(/^slot-row-/);
-    expect(allSlotRows).toHaveLength(15);
+    expect(allSlotRows).toHaveLength(21);
   });
 
   // =========================================================================
@@ -625,7 +653,7 @@ describe("Slice 14: Settings Dialog Read-Only — Acceptance Tests", () => {
     renderDialog();
 
     // Each mode section should show an empty state message
-    const modes = ["txt2img", "img2img", "upscale", "inpaint", "outpaint"];
+    const modes = ["txt2img", "img2img", "upscale", "inpaint", "outpaint", "erase", "instruction"];
     for (const mode of modes) {
       await waitFor(() => {
         const emptyState = screen.getByTestId(`empty-state-${mode}`);

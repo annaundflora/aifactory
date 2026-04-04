@@ -7,7 +7,7 @@
  *   - getModelByReplicateId is mocked (DB dependency for capability lookup)
  *
  * ACs covered:
- *   AC-1:  getAll returns all 15 slots
+ *   AC-1:  getAll returns all 21 slots
  *   AC-2:  getAll seeds defaults when table is empty
  *   AC-3:  getForMode returns 3 slots for a given mode
  *   AC-4:  update changes model_id when model is compatible
@@ -17,7 +17,7 @@
  *   AC-8:  toggleActive deactivates slot when min-1 fulfilled
  *   AC-9:  toggleActive prevents deactivation of last active slot
  *   AC-10: toggleActive prevents activation of empty slot
- *   AC-11: seedDefaults creates 15 default rows
+ *   AC-11: seedDefaults creates 21 default rows
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -71,8 +71,8 @@ function makeSlot(overrides: Partial<{
   }
 }
 
-/** All 15 seed default rows as described in architecture.md "Seed Defaults (15 rows)" */
-function makeAll15Rows(): Record<string, unknown>[] {
+/** All 21 seed default rows as described in architecture.md "Seed Defaults" */
+function makeAll21Rows(): Record<string, unknown>[] {
   return [
     makeSlot({ id: 'uuid-01', mode: 'txt2img', slot: 1, modelId: 'black-forest-labs/flux-schnell', modelParams: {}, active: true }),
     makeSlot({ id: 'uuid-02', mode: 'txt2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro', modelParams: {}, active: false }),
@@ -83,12 +83,18 @@ function makeAll15Rows(): Record<string, unknown>[] {
     makeSlot({ id: 'uuid-07', mode: 'upscale', slot: 1, modelId: 'philz1337x/crystal-upscaler', modelParams: { scale: 4 }, active: true }),
     makeSlot({ id: 'uuid-08', mode: 'upscale', slot: 2, modelId: 'nightmareai/real-esrgan', modelParams: { scale: 2 }, active: false }),
     makeSlot({ id: 'uuid-09', mode: 'upscale', slot: 3, modelId: null, modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-10', mode: 'inpaint', slot: 1, modelId: null, modelParams: {}, active: true }),
+    makeSlot({ id: 'uuid-10', mode: 'inpaint', slot: 1, modelId: 'black-forest-labs/flux-fill-pro', modelParams: {}, active: true }),
     makeSlot({ id: 'uuid-11', mode: 'inpaint', slot: 2, modelId: null, modelParams: {}, active: false }),
     makeSlot({ id: 'uuid-12', mode: 'inpaint', slot: 3, modelId: null, modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-13', mode: 'outpaint', slot: 1, modelId: null, modelParams: {}, active: true }),
+    makeSlot({ id: 'uuid-13', mode: 'outpaint', slot: 1, modelId: 'black-forest-labs/flux-fill-pro', modelParams: {}, active: true }),
     makeSlot({ id: 'uuid-14', mode: 'outpaint', slot: 2, modelId: null, modelParams: {}, active: false }),
     makeSlot({ id: 'uuid-15', mode: 'outpaint', slot: 3, modelId: null, modelParams: {}, active: false }),
+    makeSlot({ id: 'uuid-16', mode: 'erase', slot: 1, modelId: 'bria/eraser', modelParams: {}, active: true }),
+    makeSlot({ id: 'uuid-17', mode: 'erase', slot: 2, modelId: null, modelParams: {}, active: false }),
+    makeSlot({ id: 'uuid-18', mode: 'erase', slot: 3, modelId: null, modelParams: {}, active: false }),
+    makeSlot({ id: 'uuid-19', mode: 'instruction', slot: 1, modelId: 'black-forest-labs/flux-kontext-pro', modelParams: {}, active: true }),
+    makeSlot({ id: 'uuid-20', mode: 'instruction', slot: 2, modelId: null, modelParams: {}, active: false }),
+    makeSlot({ id: 'uuid-21', mode: 'instruction', slot: 3, modelId: null, modelParams: {}, active: false }),
   ]
 }
 
@@ -127,19 +133,19 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
 
   describe('getAll()', () => {
     /**
-     * AC-1: GIVEN die model_slots Tabelle enthaelt 15 Rows (5 Modes x 3 Slots)
+     * AC-1: GIVEN die model_slots Tabelle enthaelt 21 Rows (7 Modes x 3 Slots)
      *       WHEN ModelSlotService.getAll() aufgerufen wird
-     *       THEN wird ein Array mit 15 Elementen zurueckgegeben
+     *       THEN wird ein Array mit 21 Elementen zurueckgegeben
      */
-    it('AC-1: should return all 15 model slots', async () => {
-      const all15 = makeAll15Rows()
-      mockGetAllModelSlots.mockResolvedValueOnce(all15)
+    it('AC-1: should return all 21 model slots', async () => {
+      const all21 = makeAll21Rows()
+      mockGetAllModelSlots.mockResolvedValueOnce(all21)
 
       const result = await ModelSlotService.getAll()
 
-      // Must return exactly 15 elements
-      expect(result).toHaveLength(15)
-      expect(result).toEqual(all15)
+      // Must return exactly 21 elements
+      expect(result).toHaveLength(21)
+      expect(result).toEqual(all21)
 
       // getAllModelSlots called once (table was not empty, no seeding)
       expect(mockGetAllModelSlots).toHaveBeenCalledTimes(1)
@@ -150,14 +156,14 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
     /**
      * AC-2: GIVEN die model_slots Tabelle ist leer (0 Rows)
      *       WHEN ModelSlotService.getAll() aufgerufen wird
-     *       THEN werden erst Defaults geseeded (15 Rows) und danach alle 15 Rows zurueckgegeben
+     *       THEN werden erst Defaults geseeded (21 Rows) und danach alle 21 Rows zurueckgegeben
      */
-    it('AC-2: should seed defaults and return 15 rows when table is empty', async () => {
-      const all15 = makeAll15Rows()
+    it('AC-2: should seed defaults and return 21 rows when table is empty', async () => {
+      const all21 = makeAll21Rows()
       // First call returns empty (table is empty), second call returns seeded defaults
       mockGetAllModelSlots
         .mockResolvedValueOnce([])        // first check: empty
-        .mockResolvedValueOnce(all15)     // after seeding: 15 entries
+        .mockResolvedValueOnce(all21)     // after seeding: 21 entries
       mockSeedModelSlotDefaults.mockResolvedValueOnce(undefined)
 
       const result = await ModelSlotService.getAll()
@@ -166,9 +172,9 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
       expect(mockSeedModelSlotDefaults).toHaveBeenCalledTimes(1)
       // Verify getAllModelSlots was called twice: once to check, once after seed
       expect(mockGetAllModelSlots).toHaveBeenCalledTimes(2)
-      // Verify 15 entries returned
-      expect(result).toHaveLength(15)
-      expect(result).toEqual(all15)
+      // Verify 21 entries returned
+      expect(result).toHaveLength(21)
+      expect(result).toEqual(all21)
     })
   })
 
@@ -178,7 +184,7 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
 
   describe('getForMode()', () => {
     /**
-     * AC-3: GIVEN model_slots enthaelt Rows fuer 5 Modes
+     * AC-3: GIVEN model_slots enthaelt Rows fuer 7 Modes
      *       WHEN ModelSlotService.getForMode("txt2img") aufgerufen wird
      *       THEN wird ein Array mit exakt 3 Elementen zurueckgegeben (slot 1, 2, 3)
      *       AND alle Elemente haben mode === "txt2img"
@@ -468,17 +474,17 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
     /**
      * AC-11: GIVEN die model_slots Tabelle ist leer
      *        WHEN ModelSlotService.seedDefaults() aufgerufen wird
-     *        THEN enthaelt die Tabelle exakt 15 Rows (5 Modes x 3 Slots)
-     *        AND die Seed-Daten entsprechen architecture.md Section "Seed Defaults (15 rows)"
+     *        THEN enthaelt die Tabelle exakt 21 Rows (7 Modes x 3 Slots)
+     *        AND die Seed-Daten entsprechen architecture.md Section "Seed Defaults"
      */
-    it('AC-11: should seed 15 default rows matching architecture.md seed defaults', async () => {
+    it('AC-11: should seed 21 default rows matching architecture.md seed defaults', async () => {
       mockSeedModelSlotDefaults.mockResolvedValueOnce(undefined)
 
       await ModelSlotService.seedDefaults()
 
       // seedModelSlotDefaults was called exactly once
       expect(mockSeedModelSlotDefaults).toHaveBeenCalledTimes(1)
-      // No arguments passed (the query function handles the 15 seed rows internally)
+      // No arguments passed (the query function handles the 21 seed rows internally)
       expect(mockSeedModelSlotDefaults).toHaveBeenCalledWith()
     })
   })
