@@ -11,6 +11,7 @@ import {
 import { ModelCatalogService } from "@/lib/services/model-catalog-service";
 import { getImg2ImgFieldName, type SchemaProperties } from "@/lib/services/capability-detection";
 import type { ReferenceRole, ReferenceStrength } from "@/lib/types/reference";
+import { VALID_GENERATION_MODES } from "@/lib/types";
 
 const MODEL_ID_REGEX = /^[a-z0-9-]+\/[a-z0-9._-]+$/;
 
@@ -297,6 +298,33 @@ async function buildReplicateInput(
     // prompt_strength is already spread from modelParams via params above
   }
 
+  // Inpaint: image + mask + prompt (FLUX Fill Pro)
+  if (generation.generationMode === "inpaint") {
+    input.image = generation.sourceImageUrl;
+    input.mask = params.maskUrl as string;
+    // prompt is already set above from generation.prompt
+  }
+
+  // Erase: image + mask, no prompt (Bria Eraser)
+  if (generation.generationMode === "erase") {
+    input.image = generation.sourceImageUrl;
+    input.mask = params.maskUrl as string;
+    delete input.prompt;
+  }
+
+  // Instruction: image_url + prompt, no mask (FLUX Kontext Pro)
+  if (generation.generationMode === "instruction") {
+    input.image_url = generation.sourceImageUrl;
+    // prompt is already set above from generation.prompt
+  }
+
+  // Outpaint: image + mask + prompt (FLUX Fill Pro, reused)
+  if (generation.generationMode === "outpaint") {
+    input.image = generation.sourceImageUrl;
+    input.mask = params.maskUrl as string;
+    // prompt is already set above from generation.prompt
+  }
+
   return input;
 }
 
@@ -324,7 +352,10 @@ async function generate(
   sourceImageUrl?: string,
   strength?: number,
   references?: ReferenceInput[],
-  sourceGenerationId?: string
+  sourceGenerationId?: string,
+  maskUrl?: string,
+  outpaintDirections?: string[],
+  outpaintSize?: number
 ): Promise<Generation[]> {
   // Validate
   if (!promptMotiv || promptMotiv.trim().length === 0) {
@@ -347,7 +378,7 @@ async function generate(
   }
 
   // Validate generationMode value
-  if (generationMode !== undefined && !["txt2img", "img2img"].includes(generationMode)) {
+  if (generationMode !== undefined && !(VALID_GENERATION_MODES as readonly string[]).includes(generationMode)) {
     throw new Error("Ungueltiger Generierungsmodus");
   }
 
@@ -364,6 +395,36 @@ async function generate(
     }
     if (strength !== undefined && (strength < 0 || strength > 1)) {
       throw new Error("Strength muss zwischen 0 und 1 liegen");
+    }
+  }
+
+  // Edit mode validations
+  const EDIT_MODES = ["inpaint", "erase", "instruction", "outpaint"];
+  if (EDIT_MODES.includes(effectiveMode)) {
+    if (!sourceImageUrl) {
+      throw new Error("Source-Image ist erforderlich");
+    }
+  }
+
+  // maskUrl required for inpaint/erase
+  if ((effectiveMode === "inpaint" || effectiveMode === "erase") && !maskUrl) {
+    throw new Error("Maske ist erforderlich fuer Inpaint/Erase");
+  }
+
+  // outpaint validations
+  if (effectiveMode === "outpaint") {
+    if (!outpaintDirections || outpaintDirections.length === 0) {
+      throw new Error("Mindestens eine Richtung erforderlich");
+    }
+    const VALID_DIRECTIONS = ["top", "bottom", "left", "right"];
+    for (const dir of outpaintDirections) {
+      if (!VALID_DIRECTIONS.includes(dir)) {
+        throw new Error("Mindestens eine Richtung erforderlich");
+      }
+    }
+    const VALID_OUTPAINT_SIZES = [25, 50, 100];
+    if (outpaintSize === undefined || !VALID_OUTPAINT_SIZES.includes(outpaintSize)) {
+      throw new Error("Ungueltiger Erweiterungswert");
     }
   }
 
@@ -389,10 +450,20 @@ async function generate(
   }
 
   // For img2img: embed prompt_strength in stored modelParams so retry works
-  const storedParams =
-    effectiveMode === "img2img"
-      ? { ...params, prompt_strength: strength ?? 0.6 }
-      : params;
+  // For edit modes: embed maskUrl, outpaintDirections, outpaintSize for retry/audit
+  let storedParams: Record<string, unknown>;
+  if (effectiveMode === "img2img") {
+    storedParams = { ...params, prompt_strength: strength ?? 0.6 };
+  } else if (EDIT_MODES.includes(effectiveMode)) {
+    storedParams = {
+      ...params,
+      ...(maskUrl ? { maskUrl } : {}),
+      ...(outpaintDirections ? { outpaintDirections } : {}),
+      ...(outpaintSize !== undefined ? { outpaintSize } : {}),
+    };
+  } else {
+    storedParams = params;
+  }
 
   // Generate a shared batchId for all generations in this request
   const batchId = crypto.randomUUID();
