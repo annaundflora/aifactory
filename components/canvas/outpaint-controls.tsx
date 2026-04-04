@@ -13,17 +13,6 @@ import {
 // Constants
 // ---------------------------------------------------------------------------
 
-const DIRECTIONS: {
-  direction: OutpaintDirection;
-  label: string;
-  icon: typeof ChevronUp;
-}[] = [
-  { direction: "top", label: "Top", icon: ChevronUp },
-  { direction: "bottom", label: "Bottom", icon: ChevronDown },
-  { direction: "left", label: "Left", icon: ChevronLeft },
-  { direction: "right", label: "Right", icon: ChevronRight },
-];
-
 const SIZE_OPTIONS: OutpaintSize[] = [25, 50, 100];
 
 // ---------------------------------------------------------------------------
