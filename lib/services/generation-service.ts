@@ -325,6 +325,12 @@ async function buildReplicateInput(
     // prompt is already set above from generation.prompt
   }
 
+  // Remove internal audit fields that were stored in modelParams for retry/audit
+  // but must not be sent to the Replicate API (strict schema validation).
+  delete input.maskUrl;
+  delete input.outpaintDirections;
+  delete input.outpaintSize;
+
   return input;
 }
 
