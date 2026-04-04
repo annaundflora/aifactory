@@ -98,6 +98,12 @@ describe("canvasDetailReducer (after cleanup)", () => {
       redoStack: [],
       isGenerating: false,
       chatSessionId: null,
+      editMode: null,
+      maskData: null,
+      brushSize: 40,
+      brushTool: "brush",
+      outpaintDirections: [],
+      outpaintSize: 50,
     };
 
     // Dispatching a removed action type should hit the default case and return state unchanged

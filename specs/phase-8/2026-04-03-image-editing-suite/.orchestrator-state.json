@@ -2,8 +2,8 @@
   "spec_path": "/home/dev/aifactory/.claude/worktrees/image-editing-suite/specs/phase-8/2026-04-03-image-editing-suite",
   "feature_name": "image-editing-suite",
   "status": "in_progress",
-  "current_state": "deterministic_gate",
-  "current_slice_id": "slice-01",
+  "current_state": "implementing",
+  "current_slice_id": "slice-02",
   "retry_count": 0,
   "failed_stage": null,
   "waves": [
@@ -14,8 +14,8 @@
     {"id": 5, "slices": ["slice-08", "slice-09", "slice-10", "slice-14", "slice-15"], "parallel": true},
     {"id": 6, "slices": ["slice-11", "slice-13", "slice-16"], "parallel": false}
   ],
-  "completed_slices": [],
-  "evidence_files": [],
+  "completed_slices": ["slice-01"],
+  "evidence_files": ["evidence/slice-01.json"],
   "worktree_path": "/home/dev/aifactory/.claude/worktrees/image-editing-suite",
   "branch": "feature/image-editing-suite",
   "github_available": true,
