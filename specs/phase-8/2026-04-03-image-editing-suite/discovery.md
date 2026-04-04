@@ -231,6 +231,7 @@
 | `painting` | Mask-Overlay sichtbar, Floating Toolbar, Cursor als Kreis | Malen, Radieren, Clear, Brush-Groesse aendern, Chat-Prompt senden, Erase-Action (nur Erase-Modus) |
 | `click-waiting` | Cursor als Fadenkreuz, kein Overlay | Auf Bild klicken |
 | `sam-processing` | Loading-Indicator auf Bild | Warten auf SAM-Ergebnis |
+| `sam-confirm` | Confirmation Dialog ueber dem Bild | Bestaetigen oder Abbrechen (nur wenn Maske bereits existiert) |
 | `outpaint-config` | Direction Controls an Bildkanten | Richtung(en) waehlen, Groesse waehlen, Chat-Prompt senden |
 | `generating` | Loading-Overlay auf Bild, Tools disabled | Warten auf API-Ergebnis |
 | `result` | Neues Bild angezeigt, Maske bleibt (wenn vorher Mask-Modus) | Undo, weitere Edits, Navigation (blockiert wenn Maske existiert) |
@@ -248,16 +249,26 @@
 | `painting` | Erase-Action-Button klicken | Loading-Overlay, Maske bleibt | `generating` | Maske ohne Prompt -> Erase-Modell |
 | `painting` | Klick auf expand-btn | Direction Controls erscheinen, Mask-Canvas hidden | `outpaint-config` | Maske bleibt im State, wird ausgeblendet |
 | `painting` | Klick auf click-edit-btn | Cursor wird Fadenkreuz, Mask-Canvas hidden | `click-waiting` | Maske bleibt im State, wird ausgeblendet |
+| `painting` | Klick auf aktiven Edit-Button (gleicher Button) | Floating Toolbar verschwindet, Mask-Canvas hidden, Cursor normal | `idle` | Maske bleibt im State (Toggle-Off, nutzt bestehendes SET_ACTIVE_TOOL Pattern) |
+| `painting` | Klick auf Toggle-Tool (Details, Variation, img2img, Upscale) | Edit-Mode deaktiviert, Floating Toolbar hidden, Mask-Canvas hidden, Toggle-Tool Popover oeffnet | `idle` | Maske bleibt im State. Mutual Exclusion: nur ein activeToolId gleichzeitig |
 | `painting` | Klick auf anderes Tool (Download, Delete, etc.) | Tool-Aktion ausfuehren | `painting` | Maske bleibt bei Tool-Wechsel |
 | `painting` | Klick auf Clear | Maske wird geloescht | `painting` | -- |
+| `click-waiting` | Klick auf click-edit-btn (gleicher Button) | Cursor normal | `idle` | Toggle-Off |
+| `click-waiting` | Klick auf Toggle-Tool (Details, Variation, etc.) | Toggle-Tool Popover oeffnet | `idle` | Mutual Exclusion |
 | `click-waiting` | Klick auf brush-edit-btn / erase-btn | Floating Toolbar erscheint, Mask-Canvas visible | `painting` | Vorherige Maske wiederhergestellt (falls vorhanden) |
 | `click-waiting` | Klick auf expand-btn | Direction Controls erscheinen | `outpaint-config` | -- |
-| `click-waiting` | Klick auf Bild | Loading-Indicator | `sam-processing` | Klick-Koordinaten an SAM 2 API |
+| `click-waiting` | Klick auf Bild (keine Maske vorhanden) | Loading-Indicator | `sam-processing` | Klick-Koordinaten an SAM 2 API |
+| `click-waiting` | Klick auf Bild (Maske vorhanden) | Confirmation Dialog: "Maske ersetzen?" | `sam-confirm` | Verhindert versehentlichen Mask-Verlust |
+| `sam-confirm` | User bestaetigt "Ersetzen" | Loading-Indicator | `sam-processing` | Bestehende Maske wird verworfen, SAM-Mask ersetzt |
+| `sam-confirm` | User klickt "Abbrechen" | Dialog schliesst | `click-waiting` | Maske bleibt erhalten |
 | `sam-processing` | SAM-Ergebnis erfolgreich | Auto-Mask als rotes Overlay, Floating Toolbar erscheint | `painting` | User kann Maske anpassen |
 | `sam-processing` | SAM-Fehler | Error-Toast | `click-waiting` | -- |
+| `outpaint-config` | Klick auf expand-btn (gleicher Button) | Direction Controls verschwinden | `idle` | Toggle-Off |
+| `outpaint-config` | Klick auf Toggle-Tool (Details, Variation, etc.) | Toggle-Tool Popover oeffnet, Direction Controls hidden | `idle` | Mutual Exclusion |
 | `outpaint-config` | Klick auf brush-edit-btn / erase-btn | Floating Toolbar erscheint, Mask-Canvas visible | `painting` | Vorherige Maske wiederhergestellt (falls vorhanden) |
 | `outpaint-config` | Klick auf click-edit-btn | Cursor wird Fadenkreuz | `click-waiting` | -- |
 | `outpaint-config` | Chat-Prompt senden (mit Richtung gewaehlt) | Loading-Overlay | `generating` | Bild + Canvas-Erweiterung + Maske -> Outpaint-Modell |
+| `outpaint-config` | Chat-Prompt senden (keine Richtung gewaehlt) | Warnung: "Waehle mindestens eine Richtung" | `outpaint-config` | Send-Button disabled wenn keine Richtung gewaehlt. Falls trotzdem ausgeloest: Inline-Warnung |
 | `generating` | API-Erfolg | Neues Bild, PUSH_UNDO | `result` | Altes Bild in Undo Stack |
 | `generating` | API-Fehler | Error-Toast | Vorheriger State (painting/outpaint-config) | Bild + Maske bleiben |
 | `result` | Undo | Vorheriges Bild aus Stack | `result` | -- |
@@ -272,7 +283,7 @@
 - **Mask-Format:** Grayscale PNG, gleiche Dimensionen wie Bild. Weiss = Edit-Bereich, Schwarz = Beibehalten
 - **Mask-Lifecycle:** Session-only. Bleibt im State bei Tool-Wechsel und nach Edit. Wird verworfen bei: Browser-Refresh, Navigation weg vom Canvas, explizitem Clear
 - **Mask-Sichtbarkeit:** Mask-Canvas nur sichtbar in Modi die Masken nutzen (Brush Edit, Erase, Click Edit). In Outpaint-Modus: Maske hidden aber im State erhalten. Bei Rueckwechsel zu Mask-Modus: Maske wieder sichtbar
-- **SAM-Mask ersetzt manuelle Maske:** Click-to-Edit generiert neue SAM-Maske die eine vorhandene manuelle Maske ersetzt (kein Merge)
+- **SAM-Mask ersetzt manuelle Maske:** Click-to-Edit generiert neue SAM-Maske die eine vorhandene manuelle Maske ersetzt (kein Merge). Wenn bereits eine Maske existiert: Confirmation Dialog ("Diese Aktion ersetzt deine aktuelle Maske. Fortfahren?" mit Abbrechen/Ersetzen). Ohne bestehende Maske: kein Dialog
 - **Navigation-Sperre:** Prev/Next Navigation blockiert wenn Maske existiert. User muss erst Clear oder das Bild verlassen
 - **Minimum Mask Size:** Warnung wenn markierter Bereich < 10px in beiden Dimensionen
 - **Intent-Erkennung (Canvas Agent):** Chat-Prompt im Canvas Detail-View wird vom Canvas Agent via LLM klassifiziert: Edit-Intent (Bild veraendern) vs. Generate-Intent (neues Bild). Edit -> Instruction Editing Flow. Generate -> bestehender txt2img Flow
@@ -289,6 +300,10 @@
 - **Outpaint-Richtungen:** Mehrere Richtungen gleichzeitig waehlbar (z.B. oben + rechts)
 - **Mask-Export Skalierung:** Mask-Canvas wird in Display-Aufloesung gerendert, beim Export auf Original-Bildaufloesung skaliert. Maske muss exakt auf Original-Koordinaten gemappt sein (Skalierungsfaktor = Original / Display)
 - **Post-Edit:** In-Place Replace + Undo Stack. Ergebnis ersetzt aktuelles Bild, altes wird in Undo Stack gepusht
+- **Toolbar Mutual Exclusion:** Nur ein activeToolId gleichzeitig (bestehendes Pattern). Klick auf Toggle-Tool (Details, Variation, img2img, Upscale) waehrend Edit-Modus aktiv: Edit-Modus wird deaktiviert (Floating Toolbar/Controls hidden), Maske bleibt im State erhalten. Rueckwechsel zum Edit-Tool stellt Maske wieder her
+- **Erase-Modus + Chat:** Chat-Panel bleibt im Erase-Modus sichtbar und aktiv. Wenn User im Erase-Modus einen Chat-Prompt sendet, wird dies als Inpaint-Request behandelt (Maske + Prompt -> Inpaint-Modell). Erase-Modus wird implizit zu Inpaint "upgraded"
+- **Outpaint-Validierung:** Send-Button im Chat disabled wenn Outpaint-Modus aktiv aber keine Richtung gewaehlt. Inline-Hinweis: "Waehle mindestens eine Richtung zum Erweitern"
+- **Keyboard Shortcuts (Mask-Painting):** `[` / `]` fuer Brush-Groesse verkleinern/vergroessern, `E` fuer Brush/Eraser Toggle, `Ctrl+Z` / `Cmd+Z` fuer Mask-Undo (eigener Mask-Undo-Stack, getrennt vom Bild-Undo)
 
 ---
 
