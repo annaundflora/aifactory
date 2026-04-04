@@ -134,12 +134,13 @@
 
 1. User ist im Canvas, kein Edit-Tool aktiv
 2. User tippt im Canvas-Chat: "Mach den Himmel blauer" / "Aendere die Haarfarbe zu blond"
-3. Canvas Agent erkennt Edit-Intent (keine Maske vorhanden) -> waehlt FLUX Kontext Pro
+3. Canvas Agent klassifiziert Prompt via LLM: Edit-Intent erkannt (keine Maske vorhanden) -> waehlt FLUX Kontext Pro
 4. System: Bild + Text-Instruktion -> Replicate API
 5. System: Loading-Overlay, Ergebnis ersetzt Bild, Undo Stack
 
 **Error Paths:**
 - Modell kann Intent nicht umsetzen -> Ergebnis zeigt wenig/keine Aenderung, User kann reformulieren
+- Canvas Agent klassifiziert Prompt als Generate-Intent -> bestehender txt2img Flow (neues Bild statt Edit)
 
 ### Flow 4: Click-to-Edit (SAM Auto-Mask)
 
@@ -242,14 +243,20 @@
 | `idle` | Klick auf erase-btn | Floating Toolbar erscheint (mit Entfernen-Button), Cursor wird Kreis | `painting` | -- |
 | `idle` | Klick auf click-edit-btn | Cursor wird Fadenkreuz | `click-waiting` | -- |
 | `idle` | Klick auf expand-btn | Direction Controls erscheinen an Bildkanten | `outpaint-config` | -- |
-| `idle` | Chat-Prompt (Edit-Intent) | Loading-Overlay | `generating` | Kein Mask -> Instruction Editing via FLUX Kontext Pro |
+| `idle` | Chat-Prompt | Loading-Overlay | `generating` | Canvas Agent klassifiziert Intent via LLM (Edit vs. Generate). Edit -> Instruction Editing. Generate -> txt2img |
 | `painting` | Chat-Prompt senden | Loading-Overlay, Maske bleibt | `generating` | Maske + Prompt -> Inpaint-Modell |
 | `painting` | Erase-Action-Button klicken | Loading-Overlay, Maske bleibt | `generating` | Maske ohne Prompt -> Erase-Modell |
+| `painting` | Klick auf expand-btn | Direction Controls erscheinen, Mask-Canvas hidden | `outpaint-config` | Maske bleibt im State, wird ausgeblendet |
+| `painting` | Klick auf click-edit-btn | Cursor wird Fadenkreuz, Mask-Canvas hidden | `click-waiting` | Maske bleibt im State, wird ausgeblendet |
 | `painting` | Klick auf anderes Tool (Download, Delete, etc.) | Tool-Aktion ausfuehren | `painting` | Maske bleibt bei Tool-Wechsel |
 | `painting` | Klick auf Clear | Maske wird geloescht | `painting` | -- |
+| `click-waiting` | Klick auf brush-edit-btn / erase-btn | Floating Toolbar erscheint, Mask-Canvas visible | `painting` | Vorherige Maske wiederhergestellt (falls vorhanden) |
+| `click-waiting` | Klick auf expand-btn | Direction Controls erscheinen | `outpaint-config` | -- |
 | `click-waiting` | Klick auf Bild | Loading-Indicator | `sam-processing` | Klick-Koordinaten an SAM 2 API |
 | `sam-processing` | SAM-Ergebnis erfolgreich | Auto-Mask als rotes Overlay, Floating Toolbar erscheint | `painting` | User kann Maske anpassen |
 | `sam-processing` | SAM-Fehler | Error-Toast | `click-waiting` | -- |
+| `outpaint-config` | Klick auf brush-edit-btn / erase-btn | Floating Toolbar erscheint, Mask-Canvas visible | `painting` | Vorherige Maske wiederhergestellt (falls vorhanden) |
+| `outpaint-config` | Klick auf click-edit-btn | Cursor wird Fadenkreuz | `click-waiting` | -- |
 | `outpaint-config` | Chat-Prompt senden (mit Richtung gewaehlt) | Loading-Overlay | `generating` | Bild + Canvas-Erweiterung + Maske -> Outpaint-Modell |
 | `generating` | API-Erfolg | Neues Bild, PUSH_UNDO | `result` | Altes Bild in Undo Stack |
 | `generating` | API-Fehler | Error-Toast | Vorheriger State (painting/outpaint-config) | Bild + Maske bleiben |
@@ -263,19 +270,24 @@
 
 - **Mask-Feathering:** Automatisch 10px Gaussian Blur auf Mask-Kanten vor API-Call (unsichtbar fuer User)
 - **Mask-Format:** Grayscale PNG, gleiche Dimensionen wie Bild. Weiss = Edit-Bereich, Schwarz = Beibehalten
-- **Mask-Lifecycle:** Session-only. Bleibt bei Tool-Wechsel und nach Edit. Wird verworfen bei: Browser-Refresh, Navigation weg vom Canvas, explizitem Clear
+- **Mask-Lifecycle:** Session-only. Bleibt im State bei Tool-Wechsel und nach Edit. Wird verworfen bei: Browser-Refresh, Navigation weg vom Canvas, explizitem Clear
+- **Mask-Sichtbarkeit:** Mask-Canvas nur sichtbar in Modi die Masken nutzen (Brush Edit, Erase, Click Edit). In Outpaint-Modus: Maske hidden aber im State erhalten. Bei Rueckwechsel zu Mask-Modus: Maske wieder sichtbar
+- **SAM-Mask ersetzt manuelle Maske:** Click-to-Edit generiert neue SAM-Maske die eine vorhandene manuelle Maske ersetzt (kein Merge)
 - **Navigation-Sperre:** Prev/Next Navigation blockiert wenn Maske existiert. User muss erst Clear oder das Bild verlassen
 - **Minimum Mask Size:** Warnung wenn markierter Bereich < 10px in beiden Dimensionen
+- **Intent-Erkennung (Canvas Agent):** Chat-Prompt im Canvas Detail-View wird vom Canvas Agent via LLM klassifiziert: Edit-Intent (Bild veraendern) vs. Generate-Intent (neues Bild). Edit -> Instruction Editing Flow. Generate -> bestehender txt2img Flow
 - **Modell-Routing (Canvas Agent):**
   - Maske vorhanden + Prompt -> Inpaint-Modell (Default: FLUX Fill Pro)
   - Maske vorhanden + kein Prompt / Erase-Action -> Erase-Modell (Default: Bria Eraser)
-  - Keine Maske + Edit-Instruktion -> Instruction-Modell (Default: FLUX Kontext Pro)
+  - Keine Maske + Edit-Intent -> Instruction-Modell (Default: FLUX Kontext Pro)
+  - Keine Maske + Generate-Intent -> txt2img (bestehendes Verhalten)
   - Outpaint-Kontext -> Outpaint-Modell (Default: FLUX Fill Pro)
   - SAM-Click -> SAM 2 fuer Mask, dann Inpaint/Erase je nach Folge-Aktion
 - **Model Slots:** Neue `mode`-Werte: `inpaint`, `erase`, `outpaint`. Je 3 Slots mit Smart Defaults
 - **Smart Default + Override:** Jeder Modus hat ein Default-Modell. User kann im Model-Slot-System ein anderes Modell konfigurieren
-- **Outpaint-Groessen:** Prozent-basiert (25%, 50%, 100% der aktuellen Bildgroesse in der gewaehlten Richtung)
+- **Outpaint-Groessen:** Prozent-basiert (25%, 50%, 100% der aktuellen Bildgroesse in der gewaehlten Richtung). Default: 50% (vorausgewaehlt bei Aktivierung des Expand-Tools)
 - **Outpaint-Richtungen:** Mehrere Richtungen gleichzeitig waehlbar (z.B. oben + rechts)
+- **Mask-Export Skalierung:** Mask-Canvas wird in Display-Aufloesung gerendert, beim Export auf Original-Bildaufloesung skaliert. Maske muss exakt auf Original-Koordinaten gemappt sein (Skalierungsfaktor = Original / Display)
 - **Post-Edit:** In-Place Replace + Undo Stack. Ergebnis ersetzt aktuelles Bild, altes wird in Undo Stack gepusht
 
 ---
@@ -415,3 +427,9 @@ Slice 7 (Instruction Edit) -- unabhaengig (nutzt bestehenden Chat)
 | 26 | Was passiert mit der Maske bei Tool-Wechsel? | Maske beibehalten -- erst bei explizitem Clear oder Navigation weg |
 | 27 | Navigation (Prev/Next) bei aktiver Maske? | Navigation blockieren -- User muss erst Clear/Generate |
 | 28 | Visuelle Darstellung der Maske? | Semi-transparentes Rot (50% Opacity) auf maskierten Bereichen |
+| 29 | Wie werden State-Transitions zwischen Edit-Modi gehandhabt? | Direkte Transitions zwischen allen Modi. Maske bleibt im State erhalten bei Wechsel |
+| 30 | Wie unterscheidet der Canvas Agent Edit-Intent von Generate-Intent im Chat? | LLM-basierte Intent-Erkennung. Canvas Agent klassifiziert jeden Prompt als Edit oder Generate |
+| 31 | Was ist der Default fuer Outpaint-Groesse? | 50% vorausgewaehlt bei Aktivierung des Expand-Tools |
+| 32 | Was passiert mit der Maske bei Wechsel zu einem Modus der keine Maske nutzt (z.B. Outpaint)? | Maske wird ausgeblendet (hidden) aber im State behalten. Bei Rueckwechsel zu Mask-Modus wieder sichtbar |
+| 33 | Wie werden Mask-Koordinaten auf die Original-Bildgroesse gemappt? | Mask-Canvas rendert in Display-Aufloesung, Export skaliert auf Original-Bildaufloesung. Explizite Business Rule |
+| 34 | Aendert sich das Canvas-Layout nach Outpainting (groesseres Bild)? | Nein -- bestehendes object-fit Verhalten. Groesseres Bild wird in gleichen Container eingepasst |
