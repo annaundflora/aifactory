@@ -247,7 +247,7 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
       })
       mockUpsertModelSlot.mockResolvedValueOnce(updatedRow)
 
-      const result = await ModelSlotService.update('txt2img', 1 as 1, 'black-forest-labs/flux-2-pro')
+      const result = await ModelSlotService.update('txt2img', 1 as const, 'black-forest-labs/flux-2-pro')
 
       // Must return the updated row
       expect(result).not.toHaveProperty('error')
@@ -277,7 +277,7 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
         makeModel('some-org/img-only-model', { txt2img: true, img2img: false, upscale: false, inpaint: false, outpaint: false })
       )
 
-      const result = await ModelSlotService.update('img2img', 1 as 1, 'some-org/img-only-model')
+      const result = await ModelSlotService.update('img2img', 1 as const, 'some-org/img-only-model')
 
       // Must return error object
       expect(result).toEqual({ error: 'Model not compatible with mode' })
@@ -316,7 +316,7 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
       })
       mockUpsertModelSlot.mockResolvedValueOnce(updatedRow)
 
-      const result = await ModelSlotService.update('img2img', 1 as 1, 'unknown-org/new-model')
+      const result = await ModelSlotService.update('img2img', 1 as const, 'unknown-org/new-model')
 
       // Must return updated row (no error)
       expect(result).not.toHaveProperty('error')
@@ -354,7 +354,7 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
       })
       mockUpsertModelSlot.mockResolvedValueOnce(updatedRow)
 
-      const result = await ModelSlotService.update('txt2img', 2 as 2, 'black-forest-labs/flux-2-pro')
+      const result = await ModelSlotService.update('txt2img', 2 as const, 'black-forest-labs/flux-2-pro')
 
       // Must return updated row (no error)
       expect(result).not.toHaveProperty('error')
@@ -401,7 +401,7 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
       })
       mockUpsertModelSlot.mockResolvedValueOnce(updatedRow)
 
-      const result = await ModelSlotService.toggleActive('txt2img', 2 as 2, false)
+      const result = await ModelSlotService.toggleActive('txt2img', 2 as const, false)
 
       // Must return updated row with active=false
       expect(result).not.toHaveProperty('error')
@@ -433,7 +433,7 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
       ]
       mockGetModelSlotsByMode.mockResolvedValueOnce(existingSlots)
 
-      const result = await ModelSlotService.toggleActive('txt2img', 1 as 1, false)
+      const result = await ModelSlotService.toggleActive('txt2img', 1 as const, false)
 
       // Must return error object
       expect(result).toEqual({ error: 'Cannot deactivate last active slot' })
@@ -456,7 +456,7 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
       ]
       mockGetModelSlotsByMode.mockResolvedValueOnce(existingSlots)
 
-      const result = await ModelSlotService.toggleActive('txt2img', 3 as 3, true)
+      const result = await ModelSlotService.toggleActive('txt2img', 3 as const, true)
 
       // Must return error object
       expect(result).toEqual({ error: 'Cannot activate empty slot' })
@@ -504,7 +504,7 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
         makeSlot({ modelId: 'any/model', mode: 'txt2img', slot: 1, active: true })
       )
 
-      const result = await ModelSlotService.update('txt2img', 1 as 1, 'any/model')
+      const result = await ModelSlotService.update('txt2img', 1 as const, 'any/model')
 
       // No error returned
       expect(result).not.toHaveProperty('error')
@@ -527,7 +527,7 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
         makeSlot({ modelId: 'owner/model', mode: 'img2img', slot: 1, active: true })
       )
 
-      const result = await ModelSlotService.update('img2img', 1 as 1, 'owner/model')
+      const result = await ModelSlotService.update('img2img', 1 as const, 'owner/model')
 
       // Fallback: null capabilities -> allow update
       expect(result).not.toHaveProperty('error')
@@ -545,7 +545,7 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
         makeSlot({ modelId: 'owner/model', mode: 'img2img', slot: 1, active: true })
       )
 
-      const result = await ModelSlotService.update('img2img', 1 as 1, 'owner/model')
+      const result = await ModelSlotService.update('img2img', 1 as const, 'owner/model')
 
       // Fallback: DB error -> allow update
       expect(result).not.toHaveProperty('error')
@@ -567,7 +567,7 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
       })
       mockUpsertModelSlot.mockResolvedValueOnce(updatedRow)
 
-      const result = await ModelSlotService.update('txt2img', 1 as 1, 'new/model')
+      const result = await ModelSlotService.update('txt2img', 1 as const, 'new/model')
 
       expect(result).not.toHaveProperty('error')
       // active should be preserved as false (slot was not empty)
@@ -591,7 +591,7 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
       ]
       mockGetModelSlotsByMode.mockResolvedValueOnce(existingSlots)
 
-      const result = await ModelSlotService.toggleActive('txt2img', 3 as 3, true)
+      const result = await ModelSlotService.toggleActive('txt2img', 3 as const, true)
 
       expect(result).toEqual({ error: 'Slot not found' })
       expect(mockUpsertModelSlot).not.toHaveBeenCalled()
