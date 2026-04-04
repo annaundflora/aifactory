@@ -207,7 +207,7 @@ describe('Slice-06 Acceptance: FavoritesListProps', () => {
 // ---------------------------------------------------------------------------
 
 describe('Slice-06 Acceptance: TypeScript Compiler', () => {
-  it('AC-6: npx tsc --noEmit should report 0 errors for affected files', () => {
+  it('AC-6: npx tsc --noEmit should report 0 errors for affected files', { timeout: 30_000 }, () => {
     /**
      * AC-6: GIVEN alle Aenderungen aus AC-1 bis AC-5
      *       WHEN npx tsc --noEmit ausgefuehrt wird

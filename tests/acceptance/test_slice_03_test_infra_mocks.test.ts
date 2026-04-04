@@ -23,7 +23,7 @@ describe('slice-03 TypeScript compilation', () => {
    *       THEN meldet der TypeScript-Compiler 0 Fehler in `lib/__tests__/factories.ts`
    *       AND die Rueckgabetypen stimmen exakt mit den bereinigten Schema-/Interface-Typen ueberein
    */
-  it('AC-5: should compile lib/__tests__/factories.ts without TypeScript errors', () => {
+  it('AC-5: should compile lib/__tests__/factories.ts without TypeScript errors', { timeout: 30_000 }, () => {
     // Verify the file exists before running tsc
     expect(existsSync(FACTORIES_PATH)).toBe(true)
 

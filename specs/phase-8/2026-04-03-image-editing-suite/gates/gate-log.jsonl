@@ -4,3 +4,15 @@
 {"ts":"2026-04-04T23:00:00Z","slice":"slice-02","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
 {"ts":"2026-04-04T23:01:00Z","slice":"slice-02","gate":"lint","result":"PASSED","attempt":1}
 {"ts":"2026-04-04T23:02:00Z","slice":"slice-02","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-04-04T23:30:00Z","slice":"slice-03","gate":"code_review","verdict":"APPROVED","attempt":1}
+{"ts":"2026-04-04T23:31:00Z","slice":"slice-03","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-04-04T23:32:00Z","slice":"slice-03","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-04-04T23:30:00Z","slice":"slice-06a","gate":"code_review","verdict":"APPROVED","attempt":1}
+{"ts":"2026-04-04T23:31:00Z","slice":"slice-06a","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-04-04T23:32:00Z","slice":"slice-06a","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-04-04T23:30:00Z","slice":"slice-06b","gate":"code_review","verdict":"APPROVED","attempt":1}
+{"ts":"2026-04-04T23:31:00Z","slice":"slice-06b","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-04-04T23:32:00Z","slice":"slice-06b","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-04-04T23:30:00Z","slice":"slice-12","gate":"code_review","verdict":"APPROVED","attempt":1}
+{"ts":"2026-04-04T23:31:00Z","slice":"slice-12","gate":"lint","result":"PASSED","attempt":1}
+{"ts":"2026-04-04T23:32:00Z","slice":"slice-12","gate":"tests","result":"PASSED","retries":0}
