@@ -363,6 +363,27 @@ export function CanvasDetailView({
         }
         ctx.drawImage(img, 0, 0);
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+        // Convert grayscale SAM mask to red semi-transparent overlay (AC-4).
+        // SAM mask: white (255) = masked area, black (0) = unmasked.
+        // Target: masked pixels -> rgba(255, 0, 0, 128), unmasked -> rgba(0, 0, 0, 0).
+        const pixels = imageData.data;
+        for (let i = 0; i < pixels.length; i += 4) {
+          // Use the red channel as luminance proxy (grayscale R==G==B)
+          const luminance = pixels[i];
+          if (luminance > 127) {
+            pixels[i] = 255;     // R
+            pixels[i + 1] = 0;   // G
+            pixels[i + 2] = 0;   // B
+            pixels[i + 3] = 128; // A (50% opacity)
+          } else {
+            pixels[i] = 0;
+            pixels[i + 1] = 0;
+            pixels[i + 2] = 0;
+            pixels[i + 3] = 0;   // fully transparent
+          }
+        }
+
         resolve(imageData);
       };
       img.onerror = () => reject(new Error("Failed to load mask image"));
