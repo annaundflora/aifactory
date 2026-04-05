@@ -199,6 +199,11 @@ export function CanvasDetailView({
   const handleTouchEnd = useCallback(
     (e: React.TouchEvent) => {
       if (touchStartXRef.current === null) return;
+      // Block swipe navigation when a mask exists (same lock as button navigation)
+      if (state.maskData !== null) {
+        touchStartXRef.current = null;
+        return;
+      }
       const delta = e.changedTouches[0].clientX - touchStartXRef.current;
       touchStartXRef.current = null;
 
@@ -213,7 +218,7 @@ export function CanvasDetailView({
         handleNavigate(localGenerations[currentIndex + 1].id);
       }
     },
-    [currentIndex, localGenerations, handleNavigate]
+    [currentIndex, localGenerations, handleNavigate, state.maskData]
   );
 
   // ---------------------------------------------------------------------------
@@ -719,10 +724,12 @@ export function CanvasDetailView({
           <DetailsOverlay generation={currentGeneration} />
 
           {/* Prev/Next navigation — positioned relative to <main> for stable centering */}
+          {/* Navigation disabled when a mask exists to prevent losing unsaved mask work */}
           <CanvasNavigation
             allGenerations={localGenerations}
             currentGenerationId={state.currentGenerationId}
             onNavigate={handleNavigate}
+            disabled={state.maskData !== null}
           />
 
           {/* Floating Brush Toolbar — positioned absolute top-center inside main */}

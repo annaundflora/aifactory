@@ -133,9 +133,13 @@ export function CanvasToolbar({ generation, onDelete }: CanvasToolbarProps) {
       }
 
       // Toggle tools dispatch SET_ACTIVE_TOOL (reducer handles toggle logic)
+      // Mutual exclusion: deactivate editMode when switching to a non-edit tool
+      if (state.editMode !== null) {
+        dispatch({ type: "SET_EDIT_MODE", editMode: null });
+      }
       dispatch({ type: "SET_ACTIVE_TOOL", toolId: tool.id });
     },
-    [isDisabled, dispatch, handleDownload, state.activeToolId]
+    [isDisabled, dispatch, handleDownload, state.activeToolId, state.editMode]
   );
 
   const handleDeleteConfirm = useCallback(() => {
