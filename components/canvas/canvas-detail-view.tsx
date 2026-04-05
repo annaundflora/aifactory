@@ -21,6 +21,14 @@ import { deleteGeneration } from "@/app/actions/generations";
 import { getModelSlots } from "@/app/actions/model-slots";
 import { getModels } from "@/app/actions/models";
 import { uploadReferenceImage, addGalleryAsReference } from "@/app/actions/references";
+import { uploadMask } from "@/app/actions/upload";
+import {
+  validateMinSize,
+  applyFeathering,
+  scaleToOriginal,
+  toGrayscalePng,
+} from "@/lib/services/mask-service";
+import { resolveActiveSlots } from "@/lib/utils/resolve-model";
 import { Button } from "@/components/ui/button";
 import { type Generation, type ModelSlot, type Model } from "@/lib/db/queries";
 import type { VariationParams } from "@/components/canvas/popovers/variation-popover";
@@ -52,9 +60,6 @@ export interface CanvasDetailViewProps {
   toolbarSlot?: ReactNode;
   chatSlot?: ReactNode;
   undoRedoSlot?: ReactNode;
-  /** Callback for the erase action button in the floating brush toolbar.
-   *  Connected to generation logic in later slices. */
-  onEraseAction?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -69,7 +74,6 @@ export function CanvasDetailView({
   toolbarSlot,
   chatSlot,
   undoRedoSlot,
-  onEraseAction,
 }: CanvasDetailViewProps) {
   const { state, dispatch } = useCanvasDetail();
   const [chatOpen, setChatOpen] = useState(true);
@@ -228,12 +232,96 @@ export function CanvasDetailView({
   }, [state.currentGenerationId, onBack]);
 
   // ---------------------------------------------------------------------------
-  // Erase action: forwarded to FloatingBrushToolbar, connected in later slices
+  // Erase action: mask pipeline + direct generateImages() call (no SSE/Agent)
+  // AC-1: Mask export pipeline -> R2 upload -> generateImages(mode: "erase")
+  // AC-2: PUSH_UNDO + SET_CURRENT_IMAGE handled by existing polling logic
+  // AC-3: Toast on mask too small
+  // AC-6: Toast on R2 upload failure
   // ---------------------------------------------------------------------------
 
-  const handleEraseAction = useCallback(() => {
-    onEraseAction?.();
-  }, [onEraseAction]);
+  const handleEraseAction = useCallback(async () => {
+    // AC-4: No mask -> button should be disabled, but guard anyway
+    if (!state.maskData) return;
+    if (state.isGenerating) return;
+
+    dispatch({ type: "SET_GENERATING", isGenerating: true });
+
+    try {
+      // Step 1: Validate minimum size (10px bounding box) -- AC-3
+      const validation = validateMinSize(state.maskData, 10);
+      if (!validation.valid) {
+        toast.error("Markiere einen groesseren Bereich");
+        dispatch({ type: "SET_GENERATING", isGenerating: false });
+        return;
+      }
+
+      // Step 2: Apply feathering (10px Gaussian blur)
+      const feathered = applyFeathering(state.maskData, 10);
+
+      // Step 3: Scale to original image dimensions
+      const originalWidth = currentGeneration.width ?? state.maskData.width;
+      const originalHeight = currentGeneration.height ?? state.maskData.height;
+      const scaled = scaleToOriginal(feathered, originalWidth, originalHeight);
+
+      // Step 4: Convert to grayscale PNG
+      const pngBlob = await toGrayscalePng(scaled);
+
+      // Step 5: Upload to R2 via FormData -- AC-6
+      const formData = new FormData();
+      formData.append("mask", new File([pngBlob], "mask.png", { type: "image/png" }));
+      const uploadResult = await uploadMask(formData);
+      if ("error" in uploadResult) {
+        toast.error("Mask-Upload fehlgeschlagen");
+        dispatch({ type: "SET_GENERATING", isGenerating: false });
+        return;
+      }
+
+      const maskUrl = uploadResult.url;
+      const sourceImageUrl = currentGeneration.imageUrl ?? undefined;
+
+      // Resolve model from active erase slots
+      const activeSlots = resolveActiveSlots(modelSlots, "erase");
+      const modelIds = activeSlots.length > 0
+        ? activeSlots.map((s) => s.modelId)
+        : [currentGeneration.modelId];
+
+      // Step 6: Call generateImages() directly -- AC-1 (no SSE/Agent)
+      const result = await generateImages({
+        projectId: currentGeneration.projectId,
+        promptMotiv: "erase",
+        modelIds,
+        params: activeSlots.length > 0 ? { ...activeSlots[0].modelParams } : {},
+        count: 1,
+        generationMode: "erase",
+        sourceImageUrl,
+        maskUrl,
+        sourceGenerationId: currentGeneration.id,
+      });
+
+      if ("error" in result) {
+        toast.error(result.error);
+        dispatch({ type: "SET_GENERATING", isGenerating: false });
+        return;
+      }
+
+      // Notify parent so gallery state stays in sync
+      onGenerationsCreated?.(result);
+
+      // Start polling for pending generations -- AC-2 handled by poll logic
+      const pendingIds = result
+        .filter((g) => g.status === "pending")
+        .map((g) => g.id);
+      if (pendingIds.length > 0) {
+        setPendingGenerationIds(pendingIds);
+      } else {
+        dispatch({ type: "SET_GENERATING", isGenerating: false });
+      }
+    } catch (error) {
+      console.error("Erase action error:", error);
+      dispatch({ type: "SET_GENERATING", isGenerating: false });
+      toast.error("Erase fehlgeschlagen.");
+    }
+  }, [state.maskData, state.isGenerating, currentGeneration, modelSlots, dispatch, setPendingGenerationIds, onGenerationsCreated]);
 
   // ---------------------------------------------------------------------------
   // Polling: check for generation completion / failure

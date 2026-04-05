@@ -40,7 +40,7 @@ export interface FloatingBrushToolbarProps {
 export function FloatingBrushToolbar({ onEraseAction }: FloatingBrushToolbarProps) {
   const { state, dispatch } = useCanvasDetail();
 
-  const { editMode, brushSize, brushTool, maskData } = state;
+  const { editMode, brushSize, brushTool, maskData, isGenerating } = state;
 
   // -------------------------------------------------------------------------
   // Visibility: only show for inpaint/erase modes
@@ -65,6 +65,7 @@ export function FloatingBrushToolbar({ onEraseAction }: FloatingBrushToolbarProp
       brushTool={brushTool}
       hasMask={hasMask}
       isEraseMode={isEraseMode}
+      isGenerating={isGenerating}
       dispatch={dispatch}
       onEraseAction={onEraseAction}
     />
@@ -80,6 +81,7 @@ interface FloatingBrushToolbarInnerProps {
   brushTool: "brush" | "eraser";
   hasMask: boolean;
   isEraseMode: boolean;
+  isGenerating: boolean;
   dispatch: ReturnType<typeof useCanvasDetail>["dispatch"];
   onEraseAction: () => void;
 }
@@ -89,6 +91,7 @@ function FloatingBrushToolbarInner({
   brushTool,
   hasMask,
   isEraseMode,
+  isGenerating,
   dispatch,
   onEraseAction,
 }: FloatingBrushToolbarInnerProps) {
@@ -115,10 +118,10 @@ function FloatingBrushToolbarInner({
   }, [dispatch]);
 
   const handleEraseAction = useCallback(() => {
-    if (hasMask) {
+    if (hasMask && !isGenerating) {
       onEraseAction();
     }
-  }, [hasMask, onEraseAction]);
+  }, [hasMask, isGenerating, onEraseAction]);
 
   // -------------------------------------------------------------------------
   // Render
@@ -150,6 +153,7 @@ function FloatingBrushToolbarInner({
             value={[brushSize]}
             onValueChange={handleBrushSizeChange}
             className="w-28"
+            disabled={isGenerating}
             data-testid="brush-size-slider"
           />
           <span
@@ -170,6 +174,7 @@ function FloatingBrushToolbarInner({
               variant={brushTool === "brush" ? "secondary" : "ghost"}
               size="icon-sm"
               onClick={handleToggleBrushTool}
+              disabled={isGenerating}
               aria-label={brushTool === "brush" ? "Wechsel zu Radierer" : "Wechsel zu Pinsel"}
               aria-pressed={brushTool === "brush"}
               data-testid="brush-tool-toggle"
@@ -196,7 +201,7 @@ function FloatingBrushToolbarInner({
               variant="ghost"
               size="icon-sm"
               onClick={handleClearMask}
-              disabled={!hasMask}
+              disabled={!hasMask || isGenerating}
               aria-label="Maske loeschen"
               data-testid="clear-mask-btn"
             >
@@ -218,7 +223,7 @@ function FloatingBrushToolbarInner({
                   variant="default"
                   size="sm"
                   onClick={handleEraseAction}
-                  disabled={!hasMask}
+                  disabled={!hasMask || isGenerating}
                   data-testid="erase-action-btn"
                 >
                   <Sparkles className="size-4 mr-1" />

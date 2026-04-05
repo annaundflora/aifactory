@@ -387,6 +387,14 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
 
       const isEditAction = event.action === "inpaint" || event.action === "erase";
 
+      // --- AC-5 (Slice 09): Erase-to-Inpaint upgrade ---
+      // When the user is in erase mode with a mask and sends a chat prompt,
+      // upgrade from erase to inpaint so the prompt is used for generation.
+      let effectiveAction = event.action;
+      if (state.editMode === "erase" && state.maskData && event.prompt) {
+        effectiveAction = "inpaint";
+      }
+
       // --- Inpaint/Erase branch: mask processing pipeline ---
       if (isEditAction) {
         // Fallback: no mask -> instruction mode
@@ -444,7 +452,8 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
           return;
         }
 
-        const generationMode = ACTION_MODE_MAP[event.action] ?? event.action;
+        // Use effectiveAction for mode resolution (supports erase-to-inpaint upgrade)
+        const generationMode = ACTION_MODE_MAP[effectiveAction] ?? effectiveAction;
         const resolvedMode = generationMode as import("@/lib/types").GenerationMode;
         const activeSlots = resolveActiveSlots(modelSlots, resolvedMode);
         const modelIds = activeSlots.length > 0
@@ -551,7 +560,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
         dispatch({ type: "SET_GENERATING", isGenerating: false });
       }
     },
-    [dispatch, projectId, onPendingGenerations, onGenerationsCreated, modelSlots, generation.modelId, state.maskData, exportMaskToR2]
+    [dispatch, projectId, onPendingGenerations, onGenerationsCreated, modelSlots, generation.modelId, state.maskData, state.editMode, exportMaskToR2]
   );
 
   // ---------------------------------------------------------------------------
