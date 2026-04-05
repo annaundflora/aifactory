@@ -39,7 +39,7 @@ type SyncButtonState = "idle" | "syncing" | "sync_partial";
 // Constants
 // ---------------------------------------------------------------------------
 
-const MODES: GenerationMode[] = ["txt2img", "img2img", "upscale", "inpaint", "outpaint"];
+const MODES: GenerationMode[] = ["txt2img", "img2img", "upscale", "inpaint", "outpaint", "erase", "instruction"];
 
 const SYNC_TIMEOUT_MS = 60_000;
 
@@ -55,6 +55,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     upscale: [],
     inpaint: [],
     outpaint: [],
+    erase: [],
+    instruction: [],
   });
 
   const [, setLoadError] = useState<string | null>(null);
@@ -100,6 +102,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       upscale: [],
       inpaint: [],
       outpaint: [],
+      erase: [],
+      instruction: [],
     };
 
     let hasError = false;

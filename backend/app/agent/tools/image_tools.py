@@ -303,12 +303,25 @@ async def analyze_image(image_url: str, config: RunnableConfig = None) -> dict:
     return result
 
 
+# Valid actions for the generate_image tool.
+VALID_GENERATE_ACTIONS = ("variation", "img2img", "inpaint", "erase", "instruction", "outpaint")
+
+# Valid outpaint directions.
+VALID_OUTPAINT_DIRECTIONS = {"top", "bottom", "left", "right"}
+
+# Valid outpaint sizes.
+VALID_OUTPAINT_SIZES = (25, 50, 100)
+
+
 @tool
 def generate_image(
     action: str,
     prompt: str,
     model_id: str,
     params: dict,
+    mask_url: str = None,
+    outpaint_directions: list[str] = None,
+    outpaint_size: int = None,
 ) -> dict:
     """Signal that the user wants to generate a new image.
 
@@ -317,30 +330,76 @@ def generate_image(
     via the generateImages() server action.
 
     Use this tool when the user asks to:
-    - Generate a new image based on a prompt
-    - Create a variation of an existing image
-    - Apply style changes or prompt modifications to generate an image
+    - Generate a new image based on a prompt (action="variation")
+    - Create an image-to-image variation (action="img2img")
+    - Inpaint a masked region with a prompt (action="inpaint", requires mask_url)
+    - Erase a masked region (action="erase", requires mask_url)
+    - Edit an image via instruction without a mask (action="instruction")
+    - Outpaint/extend an image in specified directions (action="outpaint", requires outpaint_directions)
 
     Args:
-        action: Either "variation" (text-to-image variation) or "img2img"
-            (image-to-image with a reference image).
+        action: One of "variation", "img2img", "inpaint", "erase", "instruction", "outpaint".
             Use "variation" for prompt-only generation.
             Use "img2img" when a source image structure should be preserved.
+            Use "inpaint" when a mask is present and the user wants to replace the masked area.
+            Use "erase" when a mask is present and the user wants to remove the masked area.
+            Use "instruction" when no mask is present but the user wants to edit the image.
+            Use "outpaint" when the user wants to extend the image beyond its borders.
         prompt: The optimized English prompt for image generation.
-        model_id: The model ID to use (e.g., "flux-2-max", "flux-1.1-pro").
+        model_id: The model ID to use (e.g., "flux-2-max", "black-forest-labs/flux-fill-pro").
         params: Additional generation parameters as a dict.
             May include strength, guidance_scale, etc. for img2img.
             Use an empty dict {} if no special parameters are needed.
+        mask_url: Optional URL of the mask image. Required for "inpaint" and "erase" actions.
+        outpaint_directions: Optional list of directions to extend the image.
+            Valid values: "top", "bottom", "left", "right". Required for "outpaint" action.
+        outpaint_size: Optional size in pixels for outpaint extension.
+            Valid values: 25, 50, 100. Defaults to 50 if not provided for outpaint.
 
     Returns:
-        Dict with action, prompt, model_id, and params for the frontend.
+        Dict with action, prompt, model_id, params, and optional mask_url,
+        outpaint_directions, outpaint_size for the frontend.
     """
-    if action not in ("variation", "img2img"):
+    # Validate action: fall back to "variation" for unknown actions
+    if action not in VALID_GENERATE_ACTIONS:
         action = "variation"
 
-    return {
+    # Validate action-specific required fields
+    if action == "inpaint" and not mask_url:
+        return {"error": "mask_url is required for inpaint action"}
+
+    if action == "erase" and not mask_url:
+        return {"error": "mask_url is required for erase action"}
+
+    if action == "outpaint" and not outpaint_directions:
+        return {"error": "outpaint_directions is required for outpaint action"}
+
+    # Validate outpaint_directions values if provided
+    if outpaint_directions is not None:
+        invalid_dirs = [d for d in outpaint_directions if d not in VALID_OUTPAINT_DIRECTIONS]
+        if invalid_dirs:
+            return {"error": f"Invalid outpaint directions: {invalid_dirs}. Valid: {sorted(VALID_OUTPAINT_DIRECTIONS)}"}
+
+    # Validate outpaint_size if provided
+    if outpaint_size is not None and outpaint_size not in VALID_OUTPAINT_SIZES:
+        return {"error": f"Invalid outpaint_size: {outpaint_size}. Valid: {list(VALID_OUTPAINT_SIZES)}"}
+
+    # Build the result dict
+    result = {
         "action": action,
         "prompt": str(prompt),
         "model_id": str(model_id),
         "params": params if isinstance(params, dict) else {},
     }
+
+    # Add optional fields only when relevant to the action
+    if mask_url is not None:
+        result["mask_url"] = str(mask_url)
+
+    if outpaint_directions is not None:
+        result["outpaint_directions"] = outpaint_directions
+
+    if outpaint_size is not None:
+        result["outpaint_size"] = outpaint_size
+
+    return result

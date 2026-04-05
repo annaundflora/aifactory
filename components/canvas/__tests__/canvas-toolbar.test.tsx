@@ -31,6 +31,18 @@ vi.mock("lucide-react", () => ({
   PanelLeftIcon: (props: Record<string, unknown>) => (
     <span data-testid="icon-panel-left" {...props} />
   ),
+  Paintbrush: (props: Record<string, unknown>) => (
+    <span data-testid="icon-paintbrush" {...props} />
+  ),
+  Eraser: (props: Record<string, unknown>) => (
+    <span data-testid="icon-eraser" {...props} />
+  ),
+  MousePointerClick: (props: Record<string, unknown>) => (
+    <span data-testid="icon-mouse-pointer-click" {...props} />
+  ),
+  Expand: (props: Record<string, unknown>) => (
+    <span data-testid="icon-expand" {...props} />
+  ),
 }));
 
 // Mock the downloadImage utility — it does fetch+blob+anchor click which is not
@@ -147,19 +159,24 @@ describe("CanvasToolbar", () => {
   /**
    * AC-1: GIVEN die CanvasDetailView ist sichtbar
    *       WHEN die Toolbar gerendert wird
-   *       THEN zeigt sie 6 Icons vertikal gestapelt in folgender Reihenfolge
-   *            (top-down): Variation, img2img, Upscale, Download, Delete, Details
+   *       THEN zeigt sie 10 Icons vertikal gestapelt in folgender Reihenfolge
+   *            (top-down): Variation, img2img, Upscale, Brush Edit, Erase,
+   *            Click Edit, Expand, Download, Delete, Details
    */
-  it("AC-1: should render 6 tool icons in correct order: Variation, img2img, Upscale, Download, Delete, Details", () => {
+  it("AC-1: should render 10 tool icons in correct order", () => {
     renderToolbarDefault();
 
     const toolbar = screen.getByTestId("canvas-toolbar");
     expect(toolbar).toBeInTheDocument();
 
-    // All 6 buttons should exist with correct test IDs
+    // All 10 buttons should exist with correct test IDs
     const variationBtn = screen.getByTestId("toolbar-variation");
     const img2imgBtn = screen.getByTestId("toolbar-img2img");
     const upscaleBtn = screen.getByTestId("toolbar-upscale");
+    const brushEditBtn = screen.getByTestId("toolbar-brush-edit");
+    const eraseBtn = screen.getByTestId("toolbar-erase");
+    const clickEditBtn = screen.getByTestId("toolbar-click-edit");
+    const expandBtn = screen.getByTestId("toolbar-expand");
     const downloadBtn = screen.getByTestId("toolbar-download");
     const deleteBtn = screen.getByTestId("toolbar-delete");
     const detailsBtn = screen.getByTestId("toolbar-details");
@@ -167,15 +184,19 @@ describe("CanvasToolbar", () => {
     expect(variationBtn).toBeInTheDocument();
     expect(img2imgBtn).toBeInTheDocument();
     expect(upscaleBtn).toBeInTheDocument();
+    expect(brushEditBtn).toBeInTheDocument();
+    expect(eraseBtn).toBeInTheDocument();
+    expect(clickEditBtn).toBeInTheDocument();
+    expect(expandBtn).toBeInTheDocument();
     expect(downloadBtn).toBeInTheDocument();
     expect(deleteBtn).toBeInTheDocument();
     expect(detailsBtn).toBeInTheDocument();
 
     // Verify order: all buttons should be within the toolbar nav
     // and their DOM order should match the expected top-down order
-    // (1 expand/collapse toggle at top + 6 tool buttons = 7 total)
+    // (1 expand/collapse toggle at top + 10 tool buttons = 11 total)
     const allButtons = within(toolbar).getAllByRole("button");
-    expect(allButtons).toHaveLength(7);
+    expect(allButtons).toHaveLength(11);
 
     // Verify aria-labels match the expected order (first is the toggle)
     const labels = allButtons.map((btn) => btn.getAttribute("aria-label"));
@@ -184,6 +205,10 @@ describe("CanvasToolbar", () => {
       "Variation",
       "img2img",
       "Upscale",
+      "Brush Edit",
+      "Erase",
+      "Click Edit",
+      "Expand",
       "Download",
       "Delete",
       "Details",
@@ -381,16 +406,16 @@ describe("CanvasToolbar", () => {
     const onDelete = vi.fn();
     renderToolbarWithGenerating({ onDelete });
 
-    // All 6 tool buttons should be aria-disabled (toggle button excluded)
+    // All 10 tool buttons should be aria-disabled (toggle button excluded)
     const toolbar = screen.getByTestId("canvas-toolbar");
     const allButtons = within(toolbar).getAllByRole("button");
-    expect(allButtons).toHaveLength(7); // 6 tools + 1 toggle
+    expect(allButtons).toHaveLength(11); // 10 tools + 1 toggle
 
     const toolButtons = allButtons.filter(
       (btn) => btn.getAttribute("aria-label") !== "Expand toolbar"
         && btn.getAttribute("aria-label") !== "Collapse toolbar"
     );
-    expect(toolButtons).toHaveLength(6);
+    expect(toolButtons).toHaveLength(10);
 
     for (const btn of toolButtons) {
       expect(btn).toHaveAttribute("aria-disabled", "true");

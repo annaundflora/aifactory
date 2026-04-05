@@ -162,6 +162,10 @@ vi.mock("lucide-react", () => {
     Sparkles: stub("Sparkles"), Library: stub("Library"), Star: stub("Star"),
     ChevronLeft: stub("ChevronLeft"), ChevronRight: stub("ChevronRight"),
     PanelLeftOpen: stub("PanelLeftOpen"),
+    Paintbrush: stub("Paintbrush"),
+    Eraser: stub("Eraser"),
+    MousePointerClick: stub("MousePointerClick"),
+    Expand: stub("Expand"),
   };
 });
 

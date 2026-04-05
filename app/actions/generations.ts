@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { GenerationService, validateTotalMegapixels } from "@/lib/services/generation-service";
+import { VALID_GENERATION_MODES } from "@/lib/types";
 import {
   getGenerations,
   getGeneration,
@@ -40,6 +41,12 @@ interface GenerateImagesInput {
     width?: number;
     height?: number;
   }>;
+  /** Mask URL for inpaint/erase modes (R2 URL of grayscale PNG mask). */
+  maskUrl?: string;
+  /** Outpaint directions, subset of ["top","bottom","left","right"]. */
+  outpaintDirections?: string[];
+  /** Outpaint size in pixels. Must be one of 25, 50, 100. */
+  outpaintSize?: number;
 }
 
 interface UpscaleImageInput {
@@ -114,7 +121,7 @@ export async function generateImages(
   // Validate generationMode if provided
   if (
     input.generationMode !== undefined &&
-    !["txt2img", "img2img"].includes(input.generationMode)
+    !(VALID_GENERATION_MODES as readonly string[]).includes(input.generationMode)
   ) {
     return { error: "Ungueltiger Generierungsmodus" };
   }
@@ -126,6 +133,28 @@ export async function generateImages(
     }
     if (input.strength !== undefined && (input.strength < 0 || input.strength > 1)) {
       return { error: "Strength muss zwischen 0 und 1 liegen" };
+    }
+  }
+
+  // Edit mode validations (inpaint, erase, instruction, outpaint)
+  const EDIT_MODES = ["inpaint", "erase", "instruction", "outpaint"];
+  if (input.generationMode && EDIT_MODES.includes(input.generationMode)) {
+    if (!input.sourceImageUrl) {
+      return { error: "Source-Image ist erforderlich" };
+    }
+  }
+
+  if ((input.generationMode === "inpaint" || input.generationMode === "erase") && !input.maskUrl) {
+    return { error: "Maske ist erforderlich fuer Inpaint/Erase" };
+  }
+
+  if (input.generationMode === "outpaint") {
+    if (!input.outpaintDirections || input.outpaintDirections.length === 0) {
+      return { error: "Mindestens eine Richtung erforderlich" };
+    }
+    const VALID_OUTPAINT_SIZES = [25, 50, 100];
+    if (input.outpaintSize === undefined || !VALID_OUTPAINT_SIZES.includes(input.outpaintSize)) {
+      return { error: "Ungueltiger Erweiterungswert" };
     }
   }
 
@@ -148,7 +177,10 @@ export async function generateImages(
       input.sourceImageUrl,
       input.strength,
       input.references,
-      input.sourceGenerationId
+      input.sourceGenerationId,
+      input.maskUrl,
+      input.outpaintDirections,
+      input.outpaintSize
     );
     return generations;
   } catch (error: unknown) {

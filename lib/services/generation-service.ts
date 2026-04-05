@@ -11,6 +11,7 @@ import {
 import { ModelCatalogService } from "@/lib/services/model-catalog-service";
 import { getImg2ImgFieldName, type SchemaProperties } from "@/lib/services/capability-detection";
 import type { ReferenceRole, ReferenceStrength } from "@/lib/types/reference";
+import { VALID_GENERATION_MODES } from "@/lib/types";
 
 const MODEL_ID_REGEX = /^[a-z0-9-]+\/[a-z0-9._-]+$/;
 
@@ -297,6 +298,133 @@ async function buildReplicateInput(
     // prompt_strength is already spread from modelParams via params above
   }
 
+  // Inpaint: image + mask + prompt (FLUX Fill Pro)
+  if (generation.generationMode === "inpaint") {
+    input.image = generation.sourceImageUrl;
+    input.mask = params.maskUrl as string;
+    // prompt is already set above from generation.prompt
+  }
+
+  // Erase: image + mask, no prompt (Bria Eraser)
+  if (generation.generationMode === "erase") {
+    input.image = generation.sourceImageUrl;
+    input.mask = params.maskUrl as string;
+    delete input.prompt;
+  }
+
+  // Instruction: image_url + prompt, no mask (FLUX Kontext Pro)
+  if (generation.generationMode === "instruction") {
+    input.image_url = generation.sourceImageUrl;
+    // prompt is already set above from generation.prompt
+  }
+
+  // Outpaint: extended canvas + auto-generated mask + prompt (FLUX Fill Pro, reused)
+  // Slice 13 AC-5/6/7: Server-side canvas extension via sharp
+  if (generation.generationMode === "outpaint") {
+    const outpaintDirections = (params.outpaintDirections as string[] | undefined) ?? [];
+    const outpaintSize = (params.outpaintSize as number | undefined) ?? 50;
+
+    if (generation.sourceImageUrl && outpaintDirections.length > 0) {
+      // Fetch the source image
+      const sourceResponse = await fetch(generation.sourceImageUrl);
+      const sourceBuffer = Buffer.from(await sourceResponse.arrayBuffer());
+      const sourceMeta = await sharp(sourceBuffer).metadata();
+      const origWidth = sourceMeta.width ?? 1024;
+      const origHeight = sourceMeta.height ?? 1024;
+
+      // Calculate padding in pixels per direction
+      // paddingPx = Math.round(originalDimension * (outpaintSize / 100))
+      const padTop = outpaintDirections.includes("top")
+        ? Math.round(origHeight * (outpaintSize / 100))
+        : 0;
+      const padBottom = outpaintDirections.includes("bottom")
+        ? Math.round(origHeight * (outpaintSize / 100))
+        : 0;
+      const padLeft = outpaintDirections.includes("left")
+        ? Math.round(origWidth * (outpaintSize / 100))
+        : 0;
+      const padRight = outpaintDirections.includes("right")
+        ? Math.round(origWidth * (outpaintSize / 100))
+        : 0;
+
+      const newWidth = origWidth + padLeft + padRight;
+      const newHeight = origHeight + padTop + padBottom;
+
+      // Create extended image: transparent background with original image composited
+      const extendedImageBuffer = await sharp({
+        create: {
+          width: newWidth,
+          height: newHeight,
+          channels: 4,
+          background: { r: 0, g: 0, b: 0, alpha: 0 },
+        },
+      })
+        .composite([
+          {
+            input: sourceBuffer,
+            left: padLeft,
+            top: padTop,
+          },
+        ])
+        .png()
+        .toBuffer();
+
+      // Create mask: white background (extended area) with black rectangle for original area
+      // black = original area (keep), white = new area (generate)
+      const blackRect = await sharp({
+        create: {
+          width: origWidth,
+          height: origHeight,
+          channels: 3,
+          background: { r: 0, g: 0, b: 0 },
+        },
+      })
+        .png()
+        .toBuffer();
+
+      const maskBuffer = await sharp({
+        create: {
+          width: newWidth,
+          height: newHeight,
+          channels: 3,
+          background: { r: 255, g: 255, b: 255 },
+        },
+      })
+        .composite([
+          {
+            input: blackRect,
+            left: padLeft,
+            top: padTop,
+          },
+        ])
+        .png()
+        .toBuffer();
+
+      // Upload extended image and mask to R2
+      const extImageKey = `masks/outpaint-ext-${generation.id}.png`;
+      const extMaskKey = `masks/outpaint-mask-${generation.id}.png`;
+
+      const [extImageUrl, extMaskUrl] = await Promise.all([
+        StorageService.upload(extendedImageBuffer, extImageKey),
+        StorageService.upload(maskBuffer, extMaskKey),
+      ]);
+
+      input.image = extImageUrl;
+      input.mask = extMaskUrl;
+    } else {
+      // Fallback: no source image or no directions (shouldn't happen due to validation)
+      input.image = generation.sourceImageUrl;
+      input.mask = params.maskUrl as string;
+    }
+    // prompt is already set above from generation.prompt
+  }
+
+  // Remove internal audit fields that were stored in modelParams for retry/audit
+  // but must not be sent to the Replicate API (strict schema validation).
+  delete input.maskUrl;
+  delete input.outpaintDirections;
+  delete input.outpaintSize;
+
   return input;
 }
 
@@ -324,7 +452,10 @@ async function generate(
   sourceImageUrl?: string,
   strength?: number,
   references?: ReferenceInput[],
-  sourceGenerationId?: string
+  sourceGenerationId?: string,
+  maskUrl?: string,
+  outpaintDirections?: string[],
+  outpaintSize?: number
 ): Promise<Generation[]> {
   // Validate
   if (!promptMotiv || promptMotiv.trim().length === 0) {
@@ -347,7 +478,7 @@ async function generate(
   }
 
   // Validate generationMode value
-  if (generationMode !== undefined && !["txt2img", "img2img"].includes(generationMode)) {
+  if (generationMode !== undefined && !(VALID_GENERATION_MODES as readonly string[]).includes(generationMode)) {
     throw new Error("Ungueltiger Generierungsmodus");
   }
 
@@ -364,6 +495,36 @@ async function generate(
     }
     if (strength !== undefined && (strength < 0 || strength > 1)) {
       throw new Error("Strength muss zwischen 0 und 1 liegen");
+    }
+  }
+
+  // Edit mode validations
+  const EDIT_MODES = ["inpaint", "erase", "instruction", "outpaint"];
+  if (EDIT_MODES.includes(effectiveMode)) {
+    if (!sourceImageUrl) {
+      throw new Error("Source-Image ist erforderlich");
+    }
+  }
+
+  // maskUrl required for inpaint/erase
+  if ((effectiveMode === "inpaint" || effectiveMode === "erase") && !maskUrl) {
+    throw new Error("Maske ist erforderlich fuer Inpaint/Erase");
+  }
+
+  // outpaint validations
+  if (effectiveMode === "outpaint") {
+    if (!outpaintDirections || outpaintDirections.length === 0) {
+      throw new Error("Mindestens eine Richtung erforderlich");
+    }
+    const VALID_DIRECTIONS = ["top", "bottom", "left", "right"];
+    for (const dir of outpaintDirections) {
+      if (!VALID_DIRECTIONS.includes(dir)) {
+        throw new Error("Mindestens eine Richtung erforderlich");
+      }
+    }
+    const VALID_OUTPAINT_SIZES = [25, 50, 100];
+    if (outpaintSize === undefined || !VALID_OUTPAINT_SIZES.includes(outpaintSize)) {
+      throw new Error("Ungueltiger Erweiterungswert");
     }
   }
 
@@ -389,10 +550,20 @@ async function generate(
   }
 
   // For img2img: embed prompt_strength in stored modelParams so retry works
-  const storedParams =
-    effectiveMode === "img2img"
-      ? { ...params, prompt_strength: strength ?? 0.6 }
-      : params;
+  // For edit modes: embed maskUrl, outpaintDirections, outpaintSize for retry/audit
+  let storedParams: Record<string, unknown>;
+  if (effectiveMode === "img2img") {
+    storedParams = { ...params, prompt_strength: strength ?? 0.6 };
+  } else if (EDIT_MODES.includes(effectiveMode)) {
+    storedParams = {
+      ...params,
+      ...(maskUrl ? { maskUrl } : {}),
+      ...(outpaintDirections ? { outpaintDirections } : {}),
+      ...(outpaintSize !== undefined ? { outpaintSize } : {}),
+    };
+  } else {
+    storedParams = params;
+  }
 
   // Generate a shared batchId for all generations in this request
   const batchId = crypto.randomUUID();

@@ -70,20 +70,22 @@ describe("lib/types.ts — Slice 03 Acceptance Tests", () => {
   // ---------------------------------------------------------------------------
 
   it("AC-2: should still export GenerationMode and VALID_GENERATION_MODES unchanged", () => {
-    // Type-level: GenerationMode is exactly the 5-member union
+    // Type-level: GenerationMode is exactly the 7-member union
     expectTypeOf<GenerationMode>().toEqualTypeOf<
-      "txt2img" | "img2img" | "upscale" | "inpaint" | "outpaint"
+      "txt2img" | "img2img" | "upscale" | "inpaint" | "outpaint" | "erase" | "instruction"
     >();
 
-    // Runtime: VALID_GENERATION_MODES has all 5 entries in order
+    // Runtime: VALID_GENERATION_MODES has all 7 entries in order
     expect(VALID_GENERATION_MODES).toEqual([
       "txt2img",
       "img2img",
       "upscale",
       "inpaint",
       "outpaint",
+      "erase",
+      "instruction",
     ]);
-    expect(VALID_GENERATION_MODES).toHaveLength(5);
+    expect(VALID_GENERATION_MODES).toHaveLength(7);
 
     // Verify each value
     const txt2img: GenerationMode = "txt2img";
@@ -91,11 +93,15 @@ describe("lib/types.ts — Slice 03 Acceptance Tests", () => {
     const upscale: GenerationMode = "upscale";
     const inpaint: GenerationMode = "inpaint";
     const outpaint: GenerationMode = "outpaint";
+    const erase: GenerationMode = "erase";
+    const instruction: GenerationMode = "instruction";
 
     expect(txt2img).toBe("txt2img");
     expect(img2img).toBe("img2img");
     expect(upscale).toBe("upscale");
     expect(inpaint).toBe("inpaint");
     expect(outpaint).toBe("outpaint");
+    expect(erase).toBe("erase");
+    expect(instruction).toBe("instruction");
   });
 });

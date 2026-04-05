@@ -1,0 +1,32 @@
+{
+  "feature": "image-editing-suite",
+  "slice": "slice-01",
+  "timestamp": "2026-04-04T22:52:00Z",
+  "status": "completed",
+  "implementation": {
+    "status": "completed",
+    "files_changed": ["lib/types.ts", "lib/db/queries.ts", "lib/services/model-slot-service.ts", "components/settings/model-mode-section.tsx", "components/settings/settings-dialog.tsx"]
+  },
+  "review": {
+    "verdict": "APPROVED",
+    "findings": [],
+    "iterations": 1
+  },
+  "deterministic_gate": {
+    "detected_stack": "TypeScript",
+    "lint_passed": true,
+    "lint_iterations": 1
+  },
+  "tests": {
+    "test_files": ["lib/db/__tests__/queries.seed.test.ts", "tests/acceptance/test_slice_01_types_model_slots.test.ts"],
+    "ac_coverage": {"total": 7, "covered": 7, "missing": []}
+  },
+  "validation": {
+    "overall_status": "passed",
+    "unit": "19 passed",
+    "integration": "11 passed",
+    "acceptance": "7 passed"
+  },
+  "retries": 0,
+  "review_iterations": 1
+}

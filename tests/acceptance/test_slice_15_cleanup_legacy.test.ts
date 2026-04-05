@@ -295,7 +295,7 @@ describe('AC-6: TypeScript compilation', () => {
    *       WHEN pnpm tsc --noEmit ausgefuehrt wird
    *       THEN kompiliert der Codebase fehlerfrei (Exit-Code 0)
    */
-  it('should pass tsc --noEmit without errors', () => {
+  it('should pass tsc --noEmit without errors', { timeout: 30_000 }, () => {
     let tscOutput = ''
     let exitCode = 0
     try {

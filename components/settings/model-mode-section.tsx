@@ -30,6 +30,8 @@ const MODE_LABELS: Record<GenerationMode, string> = {
   upscale: "UPSCALE",
   inpaint: "INPAINT",
   outpaint: "OUTPAINT",
+  erase: "ERASE",
+  instruction: "INSTRUCTION",
 };
 
 const SLOT_LABELS: Record<number, string> = {

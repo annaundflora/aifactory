@@ -12,6 +12,8 @@ export interface CanvasNavigationProps {
   allGenerations: Generation[];
   currentGenerationId: string;
   onNavigate: (id: string) => void;
+  /** When true, prev/next buttons are visually disabled and arrow key navigation is suppressed */
+  disabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -28,6 +30,7 @@ export function CanvasNavigation({
   allGenerations,
   currentGenerationId,
   onNavigate,
+  disabled = false,
 }: CanvasNavigationProps) {
   const currentIndex = useMemo(
     () => allGenerations.findIndex((g) => g.id === currentGenerationId),
@@ -49,8 +52,10 @@ export function CanvasNavigation({
 
   // Arrow key navigation: Left → prev (newer), Right → next (older)
   // Suppressed when input/textarea/contentEditable has focus.
+  // Suppressed when disabled (e.g. mask exists).
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      if (disabled) return;
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
 
       const activeEl = document.activeElement;
@@ -69,7 +74,7 @@ export function CanvasNavigation({
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [goPrev, goNext]);
+  }, [goPrev, goNext, disabled]);
 
   // Hide both buttons when there's only one image or index not found
   if (allGenerations.length <= 1 || currentIndex < 0) {
@@ -81,10 +86,12 @@ export function CanvasNavigation({
       {/* Prev button (towards newer images, i.e. lower index) */}
       {hasPrev && (
         <button
-          className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-background/80 p-2 text-foreground shadow-md transition-colors hover:bg-background"
-          onClick={goPrev}
+          className={`absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-background/80 p-2 text-foreground shadow-md transition-colors hover:bg-background${disabled ? " opacity-50 pointer-events-none" : ""}`}
+          onClick={disabled ? undefined : goPrev}
           aria-label="Previous image"
+          aria-disabled={disabled}
           data-testid="canvas-nav-prev"
+          disabled={disabled}
         >
           <ChevronLeft className="size-5" />
         </button>
@@ -93,10 +100,12 @@ export function CanvasNavigation({
       {/* Next button (towards older images, i.e. higher index) */}
       {hasNext && (
         <button
-          className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-background/80 p-2 text-foreground shadow-md transition-colors hover:bg-background"
-          onClick={goNext}
+          className={`absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-background/80 p-2 text-foreground shadow-md transition-colors hover:bg-background${disabled ? " opacity-50 pointer-events-none" : ""}`}
+          onClick={disabled ? undefined : goNext}
           aria-label="Next image"
+          aria-disabled={disabled}
           data-testid="canvas-nav-next"
+          disabled={disabled}
         >
           <ChevronRight className="size-5" />
         </button>

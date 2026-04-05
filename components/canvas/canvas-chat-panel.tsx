@@ -25,6 +25,13 @@ import {
   type SSECanvasGenerateEvent,
 } from "@/lib/canvas-chat-service";
 import { generateImages } from "@/app/actions/generations";
+import { uploadMask } from "@/app/actions/upload";
+import {
+  validateMinSize,
+  applyFeathering,
+  scaleToOriginal,
+  toGrayscalePng,
+} from "@/lib/services/mask-service";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -274,16 +281,318 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
   );
 
   // ---------------------------------------------------------------------------
+  // Mask export pipeline: validate -> feather -> scale -> grayscale -> upload
+  // Used by inpaint and erase action branches.
+  // Returns the R2 mask URL, or null if validation fails.
+  // ---------------------------------------------------------------------------
+  const exportMaskToR2 = useCallback(
+    async (maskData: ImageData): Promise<string | null> => {
+      // 1. Validate minimum size (10px bounding box)
+      const validation = validateMinSize(maskData, 10);
+      if (!validation.valid) {
+        toast.error("Markiere einen groesseren Bereich");
+        return null;
+      }
+
+      // 2. Apply feathering (10px Gaussian blur)
+      const feathered = applyFeathering(maskData, 10);
+
+      // 3. Scale to original image dimensions
+      const originalWidth = generation.width ?? maskData.width;
+      const originalHeight = generation.height ?? maskData.height;
+      const scaled = scaleToOriginal(feathered, originalWidth, originalHeight);
+
+      // 4. Convert to grayscale PNG
+      const pngBlob = await toGrayscalePng(scaled);
+
+      // 5. Upload to R2 via FormData (server action serialization)
+      const formData = new FormData();
+      formData.append("mask", new File([pngBlob], "mask.png", { type: "image/png" }));
+      const uploadResult = await uploadMask(formData);
+      if ("error" in uploadResult) {
+        toast.error("Mask-Upload fehlgeschlagen");
+        return null;
+      }
+
+      return uploadResult.url;
+    },
+    [generation.width, generation.height]
+  );
+
+  // ---------------------------------------------------------------------------
   // AC-6: Handle canvas-generate event -> call generateImages()
-  // Model resolution: resolve from active img2img slots.
+  // Model resolution: resolve from active mode-specific slots.
   // Fallback: generation.modelId if no active slots (AC-10).
+  // Action mapping: inpaint/erase/instruction/outpaint -> same generationMode.
   // ---------------------------------------------------------------------------
   const handleCanvasGenerate = useCallback(
     async (event: SSECanvasGenerateEvent) => {
       dispatch({ type: "SET_GENERATING", isGenerating: true });
 
-      // Resolve models from active img2img slots
-      const activeSlots = resolveActiveSlots(modelSlots, "img2img");
+      // Map SSE action to generationMode (1:1 mapping per spec)
+      const ACTION_MODE_MAP: Record<string, string> = {
+        variation: "txt2img",
+        img2img: "img2img",
+        inpaint: "inpaint",
+        erase: "erase",
+        instruction: "instruction",
+        outpaint: "outpaint",
+      };
+
+      // --- Instruction branch: text instruction editing (no mask) ---
+      if (event.action === "instruction") {
+        const activeSlots = resolveActiveSlots(modelSlots, "instruction");
+        const modelIds = activeSlots.length > 0
+          ? activeSlots.map((s) => s.modelId)
+          : [generation.modelId];
+        const baseParams = activeSlots.length > 0
+          ? { ...activeSlots[0].modelParams, ...(event.params ?? {}) }
+          : (event.params ?? {});
+
+        try {
+          const result = await generateImages({
+            projectId,
+            promptMotiv: event.prompt,
+            modelIds,
+            params: baseParams,
+            count: 1,
+            generationMode: "instruction",
+            sourceImageUrl: imageContextRef.current.image_url,
+          });
+
+          if (result && "error" in result) {
+            console.error("[CanvasChatPanel] generateImages returned error:", result.error);
+            toast.error(result.error);
+            dispatch({ type: "SET_GENERATING", isGenerating: false });
+            return;
+          }
+
+          onGenerationsCreated?.(result as Generation[]);
+          const pendingIds = (result as Generation[])
+            .filter((g) => g.status === "pending")
+            .map((g) => g.id);
+
+          if (pendingIds.length > 0 && onPendingGenerations) {
+            onPendingGenerations(pendingIds);
+          } else {
+            dispatch({ type: "SET_GENERATING", isGenerating: false });
+          }
+        } catch (error) {
+          console.error("[CanvasChatPanel] generateImages failed:", error);
+          toast.error("Generierung fehlgeschlagen.");
+          dispatch({ type: "SET_GENERATING", isGenerating: false });
+        }
+        return;
+      }
+
+      // --- Outpaint branch: canvas extension via sharp (Slice 13 AC-4, AC-8) ---
+      if (event.action === "outpaint") {
+        // Use directions/size from context state (primary) or SSE event (fallback)
+        const directions = state.outpaintDirections.length > 0
+          ? state.outpaintDirections
+          : (event.outpaint_directions ?? []);
+        const size = state.outpaintSize ?? event.outpaint_size ?? 50;
+
+        // Pre-validate: no directions selected
+        if (directions.length === 0) {
+          toast.error("Waehle mindestens eine Richtung zum Erweitern");
+          dispatch({ type: "SET_GENERATING", isGenerating: false });
+          return;
+        }
+
+        // Pre-validate: resulting dimensions must not exceed 2048px (AC-8)
+        const imgWidth = generation.width ?? 1024;
+        const imgHeight = generation.height ?? 1024;
+        let extWidth = imgWidth;
+        let extHeight = imgHeight;
+
+        if (directions.includes("left")) {
+          extWidth += Math.round(imgWidth * (size / 100));
+        }
+        if (directions.includes("right")) {
+          extWidth += Math.round(imgWidth * (size / 100));
+        }
+        if (directions.includes("top")) {
+          extHeight += Math.round(imgHeight * (size / 100));
+        }
+        if (directions.includes("bottom")) {
+          extHeight += Math.round(imgHeight * (size / 100));
+        }
+
+        if (extWidth > 2048 || extHeight > 2048) {
+          toast.error("Bild wuerde API-Limit ueberschreiten");
+          dispatch({ type: "SET_GENERATING", isGenerating: false });
+          return;
+        }
+
+        // Resolve outpaint model slots (same as inpaint: FLUX Fill Pro)
+        const activeSlots = resolveActiveSlots(modelSlots, "outpaint");
+        const modelIds = activeSlots.length > 0
+          ? activeSlots.map((s) => s.modelId)
+          : [generation.modelId];
+        const baseParams = activeSlots.length > 0
+          ? { ...activeSlots[0].modelParams, ...(event.params ?? {}) }
+          : (event.params ?? {});
+
+        try {
+          const result = await generateImages({
+            projectId,
+            promptMotiv: event.prompt,
+            modelIds,
+            params: baseParams,
+            count: 1,
+            generationMode: "outpaint",
+            sourceImageUrl: imageContextRef.current.image_url,
+            outpaintDirections: directions as string[],
+            outpaintSize: size,
+          });
+
+          if (result && "error" in result) {
+            console.error("[CanvasChatPanel] generateImages returned error:", result.error);
+            toast.error(result.error);
+            dispatch({ type: "SET_GENERATING", isGenerating: false });
+            return;
+          }
+
+          onGenerationsCreated?.(result as Generation[]);
+          const pendingIds = (result as Generation[])
+            .filter((g) => g.status === "pending")
+            .map((g) => g.id);
+
+          if (pendingIds.length > 0 && onPendingGenerations) {
+            onPendingGenerations(pendingIds);
+          } else {
+            dispatch({ type: "SET_GENERATING", isGenerating: false });
+          }
+        } catch (error) {
+          console.error("[CanvasChatPanel] generateImages failed:", error);
+          toast.error("Generierung fehlgeschlagen.");
+          dispatch({ type: "SET_GENERATING", isGenerating: false });
+        }
+        return;
+      }
+
+      const isEditAction = event.action === "inpaint" || event.action === "erase";
+
+      // --- AC-5 (Slice 09): Erase-to-Inpaint upgrade ---
+      // When the user is in erase mode with a mask and sends a chat prompt,
+      // upgrade from erase to inpaint so the prompt is used for generation.
+      let effectiveAction = event.action;
+      if (state.editMode === "erase" && state.maskData && event.prompt) {
+        effectiveAction = "inpaint";
+      }
+
+      // --- Inpaint/Erase branch: mask processing pipeline ---
+      if (isEditAction) {
+        // Fallback: no mask -> instruction mode
+        if (!state.maskData) {
+          const activeSlots = resolveActiveSlots(modelSlots, "instruction");
+          const modelIds = activeSlots.length > 0
+            ? activeSlots.map((s) => s.modelId)
+            : [generation.modelId];
+          const baseParams = activeSlots.length > 0
+            ? { ...activeSlots[0].modelParams, ...(event.params ?? {}) }
+            : (event.params ?? {});
+
+          try {
+            const result = await generateImages({
+              projectId,
+              promptMotiv: event.prompt,
+              modelIds,
+              params: baseParams,
+              count: 1,
+              generationMode: "instruction",
+              sourceImageUrl: imageContextRef.current.image_url,
+            });
+
+            if (result && "error" in result) {
+              console.error("[CanvasChatPanel] generateImages returned error:", result.error);
+              toast.error(result.error);
+              dispatch({ type: "SET_GENERATING", isGenerating: false });
+              return;
+            }
+
+            onGenerationsCreated?.(result as Generation[]);
+            const pendingIds = (result as Generation[])
+              .filter((g) => g.status === "pending")
+              .map((g) => g.id);
+
+            if (pendingIds.length > 0 && onPendingGenerations) {
+              onPendingGenerations(pendingIds);
+            } else {
+              dispatch({ type: "SET_GENERATING", isGenerating: false });
+            }
+          } catch (error) {
+            console.error("[CanvasChatPanel] generateImages failed:", error);
+            toast.error("Generierung fehlgeschlagen.");
+            dispatch({ type: "SET_GENERATING", isGenerating: false });
+          }
+          return;
+        }
+
+        // Mask present: run export pipeline
+        const maskUrl = await exportMaskToR2(state.maskData);
+
+        // Validation failure (mask too small or upload failed) -> abort
+        if (!maskUrl) {
+          dispatch({ type: "SET_GENERATING", isGenerating: false });
+          return;
+        }
+
+        // Use effectiveAction for mode resolution (supports erase-to-inpaint upgrade)
+        const generationMode = ACTION_MODE_MAP[effectiveAction] ?? effectiveAction;
+        const resolvedMode = generationMode as import("@/lib/types").GenerationMode;
+        const activeSlots = resolveActiveSlots(modelSlots, resolvedMode);
+        const modelIds = activeSlots.length > 0
+          ? activeSlots.map((s) => s.modelId)
+          : [generation.modelId];
+        const baseParams = activeSlots.length > 0
+          ? { ...activeSlots[0].modelParams, ...(event.params ?? {}) }
+          : (event.params ?? {});
+
+        try {
+          const result = await generateImages({
+            projectId,
+            promptMotiv: event.prompt,
+            modelIds,
+            params: baseParams,
+            count: 1,
+            generationMode,
+            sourceImageUrl: imageContextRef.current.image_url,
+            maskUrl,
+          });
+
+          if (result && "error" in result) {
+            console.error("[CanvasChatPanel] generateImages returned error:", result.error);
+            toast.error(result.error);
+            dispatch({ type: "SET_GENERATING", isGenerating: false });
+            return;
+          }
+
+          onGenerationsCreated?.(result as Generation[]);
+          const pendingIds = (result as Generation[])
+            .filter((g) => g.status === "pending")
+            .map((g) => g.id);
+
+          if (pendingIds.length > 0 && onPendingGenerations) {
+            onPendingGenerations(pendingIds);
+          } else {
+            dispatch({ type: "SET_GENERATING", isGenerating: false });
+          }
+        } catch (error) {
+          console.error("[CanvasChatPanel] generateImages failed:", error);
+          toast.error("Generierung fehlgeschlagen.");
+          dispatch({ type: "SET_GENERATING", isGenerating: false });
+        }
+        return;
+      }
+
+      // --- Default branch: variation / img2img / other actions ---
+      const generationMode = ACTION_MODE_MAP[event.action] ?? "txt2img";
+
+      // Resolve models from active mode-specific slots
+      const resolvedMode = generationMode as import("@/lib/types").GenerationMode;
+      const activeSlots = resolveActiveSlots(modelSlots, resolvedMode);
 
       // Use active slot modelIds, or fall back to generation.modelId (AC-10)
       const modelIds = activeSlots.length > 0
@@ -302,7 +611,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
           modelIds,
           params: baseParams,
           count: 1,
-          generationMode: event.action === "img2img" ? "img2img" : "txt2img",
+          generationMode,
           sourceImageUrl:
             event.action === "img2img"
               ? imageContextRef.current.image_url
@@ -338,7 +647,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
         dispatch({ type: "SET_GENERATING", isGenerating: false });
       }
     },
-    [dispatch, projectId, onPendingGenerations, onGenerationsCreated, modelSlots, generation.modelId]
+    [dispatch, projectId, onPendingGenerations, onGenerationsCreated, modelSlots, generation.modelId, generation.width, generation.height, state.maskData, state.editMode, state.outpaintDirections, state.outpaintSize, exportMaskToR2]
   );
 
   // ---------------------------------------------------------------------------
@@ -553,7 +862,9 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
   }, [generation, projectId, dispatch]);
 
   // AC-7: Chat input disabled while isGenerating
-  const inputDisabled = state.isGenerating || isStreaming;
+  // Slice 13 AC-3: Disable send when in outpaint mode with no directions selected
+  const isOutpaintNoDirections = state.editMode === "outpaint" && state.outpaintDirections.length === 0;
+  const inputDisabled = state.isGenerating || isStreaming || isOutpaintNoDirections;
 
   // ---------------------------------------------------------------------------
   // Collapsed: 48px icon strip
@@ -650,6 +961,16 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
           disabled={state.isGenerating}
         />
       </div>
+
+      {/* Slice 13 AC-3: Inline hint when outpaint mode but no directions selected */}
+      {isOutpaintNoDirections && (
+        <div
+          className="px-3 py-1 text-xs text-muted-foreground"
+          data-testid="outpaint-no-directions-hint"
+        >
+          Waehle mindestens eine Richtung zum Erweitern
+        </div>
+      )}
 
       {/* Input — disabled while generating or streaming */}
       <ChatInput

@@ -702,7 +702,7 @@ export async function clearModelSlot(
 }
 
 /**
- * Seeds the default 15 model slot rows (5 modes x 3 slots).
+ * Seeds the default 21 model slot rows (7 modes x 3 slots).
  * Uses `onConflictDoNothing` so existing rows are not overwritten (idempotent).
  */
 export async function seedModelSlotDefaults(): Promise<void> {
@@ -726,13 +726,21 @@ export async function seedModelSlotDefaults(): Promise<void> {
     { mode: "upscale", slot: 2, modelId: "nightmareai/real-esrgan", modelParams: { scale: 2 }, active: false },
     { mode: "upscale", slot: 3, modelId: null, modelParams: {}, active: false },
     // inpaint
-    { mode: "inpaint", slot: 1, modelId: null, modelParams: {}, active: true },
+    { mode: "inpaint", slot: 1, modelId: "black-forest-labs/flux-fill-pro", modelParams: {}, active: true },
     { mode: "inpaint", slot: 2, modelId: null, modelParams: {}, active: false },
     { mode: "inpaint", slot: 3, modelId: null, modelParams: {}, active: false },
     // outpaint
-    { mode: "outpaint", slot: 1, modelId: null, modelParams: {}, active: true },
+    { mode: "outpaint", slot: 1, modelId: "black-forest-labs/flux-fill-pro", modelParams: {}, active: true },
     { mode: "outpaint", slot: 2, modelId: null, modelParams: {}, active: false },
     { mode: "outpaint", slot: 3, modelId: null, modelParams: {}, active: false },
+    // erase
+    { mode: "erase", slot: 1, modelId: "bria/eraser", modelParams: {}, active: true },
+    { mode: "erase", slot: 2, modelId: null, modelParams: {}, active: false },
+    { mode: "erase", slot: 3, modelId: null, modelParams: {}, active: false },
+    // instruction
+    { mode: "instruction", slot: 1, modelId: "black-forest-labs/flux-kontext-pro", modelParams: {}, active: true },
+    { mode: "instruction", slot: 2, modelId: null, modelParams: {}, active: false },
+    { mode: "instruction", slot: 3, modelId: null, modelParams: {}, active: false },
   ];
 
   await db

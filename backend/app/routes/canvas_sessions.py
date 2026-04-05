@@ -50,6 +50,7 @@ class CanvasImageContext(BaseModel):
         model_id: Model ID used for the current image (e.g., "flux-2-max").
         model_params: Additional model parameters as a dict.
         generation_id: UUID of the generation record.
+        mask_url: Optional URL of a mask image for inpaint/erase operations.
     """
 
     image_url: HttpUrl = Field(..., description="URL of the current image")
@@ -64,6 +65,10 @@ class CanvasImageContext(BaseModel):
     selected_tier: Optional[str] = Field(
         default=None,
         description="Currently selected tier in the canvas chat (draft, quality, or max)",
+    )
+    mask_url: Optional[HttpUrl] = Field(
+        default=None,
+        description="Optional URL of a mask image for inpaint/erase operations",
     )
 
 
