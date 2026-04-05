@@ -2,8 +2,8 @@
   "spec_path": "/home/dev/aifactory/.claude/worktrees/image-editing-suite/specs/phase-8/2026-04-03-image-editing-suite",
   "feature_name": "image-editing-suite",
   "status": "in_progress",
-  "current_state": "implementing",
-  "current_slice_id": "slice-11,slice-13",
+  "current_state": "final_validation",
+  "current_slice_id": null,
   "retry_count": 0,
   "failed_stage": null,
   "waves": [
@@ -14,8 +14,8 @@
     {"id": 5, "slices": ["slice-08", "slice-09", "slice-10", "slice-14", "slice-15"], "parallel": true},
     {"id": 6, "slices": ["slice-11", "slice-13", "slice-16"], "parallel": false}
   ],
-  "completed_slices": ["slice-01", "slice-02", "slice-03", "slice-06a", "slice-06b", "slice-12", "slice-04", "slice-05", "slice-07", "slice-08", "slice-09", "slice-10", "slice-14", "slice-15"],
-  "evidence_files": ["evidence/slice-01.json", "evidence/slice-02.json", "evidence/slice-03.json", "evidence/slice-06a.json", "evidence/slice-06b.json", "evidence/slice-12.json", "evidence/slice-04.json", "evidence/slice-05.json", "evidence/slice-07.json", "evidence/slice-08.json", "evidence/slice-09.json", "evidence/slice-10.json", "evidence/slice-14.json", "evidence/slice-15.json"],
+  "completed_slices": ["slice-01", "slice-02", "slice-03", "slice-06a", "slice-06b", "slice-12", "slice-04", "slice-05", "slice-07", "slice-08", "slice-09", "slice-10", "slice-14", "slice-15", "slice-11", "slice-13", "slice-16"],
+  "evidence_files": ["evidence/slice-01.json", "evidence/slice-02.json", "evidence/slice-03.json", "evidence/slice-06a.json", "evidence/slice-06b.json", "evidence/slice-12.json", "evidence/slice-04.json", "evidence/slice-05.json", "evidence/slice-07.json", "evidence/slice-08.json", "evidence/slice-09.json", "evidence/slice-10.json", "evidence/slice-14.json", "evidence/slice-15.json", "evidence/slice-11.json", "evidence/slice-13.json", "evidence/slice-16.json"],
   "worktree_path": "/home/dev/aifactory/.claude/worktrees/image-editing-suite",
   "branch": "feature/image-editing-suite",
   "github_available": true,

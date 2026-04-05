@@ -47,6 +47,7 @@ vi.mock("@/lib/services/capability-detection", async (importOriginal) => {
 vi.mock("sharp", () => {
   const sharpInstance = {
     png: vi.fn().mockReturnThis(),
+    composite: vi.fn().mockReturnThis(),
     toBuffer: vi.fn().mockResolvedValue(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0])),
     metadata: vi.fn().mockResolvedValue({ width: 1024, height: 768 }),
   };
@@ -473,10 +474,15 @@ describe("GenerationService Edit Modes", () => {
       expect(replicateInput).not.toHaveProperty("image");
     });
 
-    // AC-12: GIVEN eine Generation mit generationMode: "outpaint", sourceImageUrl, maskUrl und Prompt
+    // AC-12: GIVEN eine Generation mit generationMode: "outpaint", sourceImageUrl, outpaintDirections und Prompt
     //        WHEN buildReplicateInput() das Input-Objekt baut
-    //        THEN enthaelt das Result die Keys image (= sourceImageUrl), mask (= maskUrl), prompt
+    //        THEN fetcht es das Source-Image, erstellt extended canvas + mask via sharp,
+    //             uploaded beides zu R2 via StorageService.upload(),
+    //             und uebergibt die R2-URLs als image/mask an ReplicateClient.run
     it("AC-12: should build outpaint input with image, mask, and prompt keys", async () => {
+      const EXTENDED_IMAGE_URL = "https://r2.example.com/outpaint-ext.png";
+      const GENERATED_MASK_URL = "https://r2.example.com/outpaint-mask.png";
+
       (createGeneration as Mock).mockResolvedValue(
         makeGeneration({
           generationMode: "outpaint",
@@ -485,6 +491,21 @@ describe("GenerationService Edit Modes", () => {
           prompt: PROMPT,
         })
       );
+
+      // Mock fetch for source image retrieval (slice-13 server-side canvas extension)
+      const sourceImageBuffer = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0]);
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+        arrayBuffer: () => Promise.resolve(sourceImageBuffer.buffer.slice(
+          sourceImageBuffer.byteOffset,
+          sourceImageBuffer.byteOffset + sourceImageBuffer.byteLength
+        )),
+      }));
+
+      // Mock StorageService.upload to return distinct URLs for extended image and mask
+      (StorageService.upload as Mock)
+        .mockResolvedValueOnce(EXTENDED_IMAGE_URL)   // first call: extended image
+        .mockResolvedValueOnce(GENERATED_MASK_URL)   // second call: generated mask
+        .mockResolvedValue("https://r2.example.com/result.png"); // subsequent: final result
 
       await GenerationService.generate(
         PROJECT_ID,
@@ -506,9 +527,23 @@ describe("GenerationService Edit Modes", () => {
         expect(ReplicateClient.run).toHaveBeenCalledTimes(1);
       });
 
+      // Verify fetch was called with the source image URL
+      expect(fetch).toHaveBeenCalledWith(SOURCE_IMAGE_URL);
+
+      // Verify StorageService.upload was called for extended image and mask
+      expect(StorageService.upload).toHaveBeenCalledWith(
+        expect.any(Buffer),
+        expect.stringContaining("outpaint-ext-")
+      );
+      expect(StorageService.upload).toHaveBeenCalledWith(
+        expect.any(Buffer),
+        expect.stringContaining("outpaint-mask-")
+      );
+
       const replicateInput = (ReplicateClient.run as Mock).mock.calls[0][1];
-      expect(replicateInput).toHaveProperty("image", SOURCE_IMAGE_URL);
-      expect(replicateInput).toHaveProperty("mask", MASK_URL);
+      // image and mask should be the R2 URLs from StorageService.upload, not the original URLs
+      expect(replicateInput).toHaveProperty("image", EXTENDED_IMAGE_URL);
+      expect(replicateInput).toHaveProperty("mask", GENERATED_MASK_URL);
       expect(replicateInput).toHaveProperty("prompt", PROMPT);
       // Internal audit fields must not leak into Replicate input
       expect(replicateInput).not.toHaveProperty("maskUrl");
