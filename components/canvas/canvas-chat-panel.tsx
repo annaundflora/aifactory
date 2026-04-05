@@ -339,15 +339,59 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
         outpaint: "outpaint",
       };
 
+      // --- Instruction branch: text instruction editing (no mask) ---
+      if (event.action === "instruction") {
+        const activeSlots = resolveActiveSlots(modelSlots, "instruction");
+        const modelIds = activeSlots.length > 0
+          ? activeSlots.map((s) => s.modelId)
+          : [generation.modelId];
+        const baseParams = activeSlots.length > 0
+          ? { ...activeSlots[0].modelParams, ...(event.params ?? {}) }
+          : (event.params ?? {});
+
+        try {
+          const result = await generateImages({
+            projectId,
+            promptMotiv: event.prompt,
+            modelIds,
+            params: baseParams,
+            count: 1,
+            generationMode: "instruction",
+            sourceImageUrl: imageContextRef.current.image_url,
+          });
+
+          if (result && "error" in result) {
+            console.error("[CanvasChatPanel] generateImages returned error:", result.error);
+            toast.error(result.error);
+            dispatch({ type: "SET_GENERATING", isGenerating: false });
+            return;
+          }
+
+          onGenerationsCreated?.(result as Generation[]);
+          const pendingIds = (result as Generation[])
+            .filter((g) => g.status === "pending")
+            .map((g) => g.id);
+
+          if (pendingIds.length > 0 && onPendingGenerations) {
+            onPendingGenerations(pendingIds);
+          } else {
+            dispatch({ type: "SET_GENERATING", isGenerating: false });
+          }
+        } catch (error) {
+          console.error("[CanvasChatPanel] generateImages failed:", error);
+          toast.error("Generierung fehlgeschlagen.");
+          dispatch({ type: "SET_GENERATING", isGenerating: false });
+        }
+        return;
+      }
+
       const isEditAction = event.action === "inpaint" || event.action === "erase";
 
       // --- Inpaint/Erase branch: mask processing pipeline ---
       if (isEditAction) {
-        // Fallback: no mask -> instruction mode (AC-4)
+        // Fallback: no mask -> instruction mode
         if (!state.maskData) {
-          const generationMode = "instruction";
-          const resolvedMode = generationMode as import("@/lib/types").GenerationMode;
-          const activeSlots = resolveActiveSlots(modelSlots, resolvedMode);
+          const activeSlots = resolveActiveSlots(modelSlots, "instruction");
           const modelIds = activeSlots.length > 0
             ? activeSlots.map((s) => s.modelId)
             : [generation.modelId];
