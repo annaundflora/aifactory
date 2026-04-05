@@ -18,6 +18,39 @@ const MIME_TO_EXT: Record<string, string> = {
 };
 
 // ---------------------------------------------------------------------------
+// uploadMask — Upload a grayscale PNG mask to R2 (prefix: masks/)
+// ---------------------------------------------------------------------------
+
+export async function uploadMask(
+  formData: FormData
+): Promise<{ url: string } | { error: string }> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
+  const maskFile = formData.get("mask");
+  if (!maskFile || typeof maskFile === "string") {
+    return { error: "Mask-Upload fehlgeschlagen" };
+  }
+
+  if (maskFile.size > MAX_FILE_SIZE) {
+    return { error: "Mask-Upload fehlgeschlagen" };
+  }
+
+  try {
+    const uuid = crypto.randomUUID();
+    const key = `masks/${uuid}.png`;
+    const buffer = Buffer.from(await maskFile.arrayBuffer());
+    const url = await StorageService.upload(buffer, key, "image/png");
+    return { url };
+  } catch (error: unknown) {
+    console.error("uploadMask error:", error);
+    return { error: "Mask-Upload fehlgeschlagen" };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // uploadSourceImage
 // ---------------------------------------------------------------------------
 

@@ -9,10 +9,14 @@ import {
   Trash2,
   Info,
   PanelLeftIcon,
+  Paintbrush,
+  Eraser,
+  MousePointerClick,
+  Expand,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { useCanvasDetail } from "@/lib/canvas-detail-context";
+import { useCanvasDetail, type EditMode } from "@/lib/canvas-detail-context";
 import { ToolbarButton } from "@/components/canvas/toolbar-button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
@@ -32,7 +36,7 @@ import type { Generation } from "@/lib/db/queries";
 // Tool definitions
 // ---------------------------------------------------------------------------
 
-type ToolId = "variation" | "img2img" | "upscale" | "download" | "delete" | "details";
+type ToolId = "variation" | "img2img" | "upscale" | "download" | "delete" | "details" | "brush-edit" | "erase" | "click-edit" | "expand";
 
 interface ToolDef {
   id: ToolId;
@@ -46,6 +50,10 @@ const TOOLS: ToolDef[] = [
   { id: "variation", icon: Copy, tooltip: "Variation", toggle: true },
   { id: "img2img", icon: ArrowRightLeft, tooltip: "img2img", toggle: true },
   { id: "upscale", icon: ZoomIn, tooltip: "Upscale", toggle: true },
+  { id: "brush-edit", icon: Paintbrush, tooltip: "Brush Edit", toggle: true },
+  { id: "erase", icon: Eraser, tooltip: "Erase", toggle: true },
+  { id: "click-edit", icon: MousePointerClick, tooltip: "Click Edit", toggle: true },
+  { id: "expand", icon: Expand, tooltip: "Expand", toggle: true },
   { id: "download", icon: Download, tooltip: "Download", toggle: false },
   { id: "delete", icon: Trash2, tooltip: "Delete", toggle: false },
   { id: "details", icon: Info, tooltip: "Details", toggle: true },
@@ -92,6 +100,14 @@ export function CanvasToolbar({ generation, onDelete }: CanvasToolbarProps) {
     }
   }, [isDisabled, generation.imageUrl, generation.prompt, generation.createdAt, isDownloading]);
 
+  // Map edit tool IDs to EditMode values for SET_EDIT_MODE dispatch
+  const EDIT_TOOL_MODE_MAP: Record<string, EditMode> = {
+    "brush-edit": "inpaint",
+    "erase": "erase",
+    "click-edit": "inpaint",
+    "expand": "outpaint",
+  };
+
   const handleToolClick = useCallback(
     (tool: ToolDef) => {
       if (isDisabled) return;
@@ -106,10 +122,20 @@ export function CanvasToolbar({ generation, onDelete }: CanvasToolbarProps) {
         return;
       }
 
+      // Edit tools dispatch SET_EDIT_MODE (toggle behavior)
+      const editMode = EDIT_TOOL_MODE_MAP[tool.id];
+      if (editMode) {
+        // Toggle: if already active, deactivate; otherwise activate
+        const isCurrentlyActive = state.activeToolId === tool.id;
+        dispatch({ type: "SET_EDIT_MODE", editMode: isCurrentlyActive ? null : editMode });
+        dispatch({ type: "SET_ACTIVE_TOOL", toolId: tool.id });
+        return;
+      }
+
       // Toggle tools dispatch SET_ACTIVE_TOOL (reducer handles toggle logic)
       dispatch({ type: "SET_ACTIVE_TOOL", toolId: tool.id });
     },
-    [isDisabled, dispatch, handleDownload]
+    [isDisabled, dispatch, handleDownload, state.activeToolId]
   );
 
   const handleDeleteConfirm = useCallback(() => {
@@ -170,11 +196,29 @@ export function CanvasToolbar({ generation, onDelete }: CanvasToolbarProps) {
           />
         ))}
 
-        {/* Separator between Upscale and Download */}
+        {/* Separator between generation and edit tools */}
+        <div className="mx-2 my-1 border-t border-border/60" />
+
+        {/* Edit tools: Brush Edit, Erase, Click Edit, Expand */}
+        {TOOLS.slice(3, 7).map((tool) => (
+          <ToolbarButton
+            key={tool.id}
+            icon={tool.icon}
+            tooltip={tool.tooltip}
+            label={tool.tooltip}
+            expanded={expanded}
+            isActive={tool.toggle && state.activeToolId === tool.id}
+            disabled={isDisabled}
+            onClick={() => handleToolClick(tool)}
+            data-testid={`toolbar-${tool.id}`}
+          />
+        ))}
+
+        {/* Separator between edit and action tools */}
         <div className="mx-2 my-1 border-t border-border/60" />
 
         {/* Action tools: Download, Delete */}
-        {TOOLS.slice(3, 5).map((tool) => (
+        {TOOLS.slice(7, 9).map((tool) => (
           <ToolbarButton
             key={tool.id}
             icon={tool.icon}
@@ -192,7 +236,7 @@ export function CanvasToolbar({ generation, onDelete }: CanvasToolbarProps) {
         <div className="mx-2 my-1 border-t border-border/60" />
 
         {/* Info tools: Details */}
-        {TOOLS.slice(5).map((tool) => (
+        {TOOLS.slice(9).map((tool) => (
           <ToolbarButton
             key={tool.id}
             icon={tool.icon}

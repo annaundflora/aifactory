@@ -37,10 +37,16 @@ export interface SSETextDoneEvent {
 
 export interface SSECanvasGenerateEvent {
   type: "canvas-generate";
-  action: "variation" | "img2img";
+  action: "variation" | "img2img" | "inpaint" | "erase" | "instruction" | "outpaint";
   prompt: string;
   model_id: string;
   params: Record<string, unknown>;
+  /** R2 URL of the grayscale mask PNG (set by backend for inpaint/erase). */
+  mask_url?: string;
+  /** Outpaint expansion directions (set by backend for outpaint). */
+  outpaint_directions?: string[];
+  /** Outpaint expansion size percentage (set by backend for outpaint). */
+  outpaint_size?: number;
 }
 
 export interface SSEErrorEvent {
@@ -95,10 +101,13 @@ export function parseSSEEvent(
 
       case "canvas-generate": {
         const ev = data as {
-          action: "variation" | "img2img";
+          action: "variation" | "img2img" | "inpaint" | "erase" | "instruction" | "outpaint";
           prompt: string;
           model_id: string;
           params: Record<string, unknown>;
+          mask_url?: string;
+          outpaint_directions?: string[];
+          outpaint_size?: number;
         };
         return {
           type: "canvas-generate",
@@ -106,6 +115,9 @@ export function parseSSEEvent(
           prompt: ev.prompt,
           model_id: ev.model_id,
           params: ev.params ?? {},
+          ...(ev.mask_url ? { mask_url: ev.mask_url } : {}),
+          ...(ev.outpaint_directions ? { outpaint_directions: ev.outpaint_directions } : {}),
+          ...(ev.outpaint_size !== undefined ? { outpaint_size: ev.outpaint_size } : {}),
         };
       }
 

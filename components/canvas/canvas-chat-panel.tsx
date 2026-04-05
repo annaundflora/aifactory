@@ -25,6 +25,13 @@ import {
   type SSECanvasGenerateEvent,
 } from "@/lib/canvas-chat-service";
 import { generateImages } from "@/app/actions/generations";
+import { uploadMask } from "@/app/actions/upload";
+import {
+  validateMinSize,
+  applyFeathering,
+  scaleToOriginal,
+  toGrayscalePng,
+} from "@/lib/services/mask-service";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -274,16 +281,178 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
   );
 
   // ---------------------------------------------------------------------------
+  // Mask export pipeline: validate -> feather -> scale -> grayscale -> upload
+  // Used by inpaint and erase action branches.
+  // Returns the R2 mask URL, or null if validation fails.
+  // ---------------------------------------------------------------------------
+  const exportMaskToR2 = useCallback(
+    async (maskData: ImageData): Promise<string | null> => {
+      // 1. Validate minimum size (10px bounding box)
+      const validation = validateMinSize(maskData, 10);
+      if (!validation.valid) {
+        toast.error("Markiere einen groesseren Bereich");
+        return null;
+      }
+
+      // 2. Apply feathering (10px Gaussian blur)
+      const feathered = applyFeathering(maskData, 10);
+
+      // 3. Scale to original image dimensions
+      const originalWidth = generation.width ?? maskData.width;
+      const originalHeight = generation.height ?? maskData.height;
+      const scaled = scaleToOriginal(feathered, originalWidth, originalHeight);
+
+      // 4. Convert to grayscale PNG
+      const pngBlob = await toGrayscalePng(scaled);
+
+      // 5. Upload to R2 via FormData (server action serialization)
+      const formData = new FormData();
+      formData.append("mask", new File([pngBlob], "mask.png", { type: "image/png" }));
+      const uploadResult = await uploadMask(formData);
+      if ("error" in uploadResult) {
+        toast.error("Mask-Upload fehlgeschlagen");
+        return null;
+      }
+
+      return uploadResult.url;
+    },
+    [generation.width, generation.height]
+  );
+
+  // ---------------------------------------------------------------------------
   // AC-6: Handle canvas-generate event -> call generateImages()
-  // Model resolution: resolve from active img2img slots.
+  // Model resolution: resolve from active mode-specific slots.
   // Fallback: generation.modelId if no active slots (AC-10).
+  // Action mapping: inpaint/erase/instruction/outpaint -> same generationMode.
   // ---------------------------------------------------------------------------
   const handleCanvasGenerate = useCallback(
     async (event: SSECanvasGenerateEvent) => {
       dispatch({ type: "SET_GENERATING", isGenerating: true });
 
-      // Resolve models from active img2img slots
-      const activeSlots = resolveActiveSlots(modelSlots, "img2img");
+      // Map SSE action to generationMode (1:1 mapping per spec)
+      const ACTION_MODE_MAP: Record<string, string> = {
+        variation: "txt2img",
+        img2img: "img2img",
+        inpaint: "inpaint",
+        erase: "erase",
+        instruction: "instruction",
+        outpaint: "outpaint",
+      };
+
+      const isEditAction = event.action === "inpaint" || event.action === "erase";
+
+      // --- Inpaint/Erase branch: mask processing pipeline ---
+      if (isEditAction) {
+        // Fallback: no mask -> instruction mode (AC-4)
+        if (!state.maskData) {
+          const generationMode = "instruction";
+          const resolvedMode = generationMode as import("@/lib/types").GenerationMode;
+          const activeSlots = resolveActiveSlots(modelSlots, resolvedMode);
+          const modelIds = activeSlots.length > 0
+            ? activeSlots.map((s) => s.modelId)
+            : [generation.modelId];
+          const baseParams = activeSlots.length > 0
+            ? { ...activeSlots[0].modelParams, ...(event.params ?? {}) }
+            : (event.params ?? {});
+
+          try {
+            const result = await generateImages({
+              projectId,
+              promptMotiv: event.prompt,
+              modelIds,
+              params: baseParams,
+              count: 1,
+              generationMode: "instruction",
+              sourceImageUrl: imageContextRef.current.image_url,
+            });
+
+            if (result && "error" in result) {
+              console.error("[CanvasChatPanel] generateImages returned error:", result.error);
+              toast.error(result.error);
+              dispatch({ type: "SET_GENERATING", isGenerating: false });
+              return;
+            }
+
+            onGenerationsCreated?.(result as Generation[]);
+            const pendingIds = (result as Generation[])
+              .filter((g) => g.status === "pending")
+              .map((g) => g.id);
+
+            if (pendingIds.length > 0 && onPendingGenerations) {
+              onPendingGenerations(pendingIds);
+            } else {
+              dispatch({ type: "SET_GENERATING", isGenerating: false });
+            }
+          } catch (error) {
+            console.error("[CanvasChatPanel] generateImages failed:", error);
+            toast.error("Generierung fehlgeschlagen.");
+            dispatch({ type: "SET_GENERATING", isGenerating: false });
+          }
+          return;
+        }
+
+        // Mask present: run export pipeline
+        const maskUrl = await exportMaskToR2(state.maskData);
+
+        // Validation failure (mask too small or upload failed) -> abort
+        if (!maskUrl) {
+          dispatch({ type: "SET_GENERATING", isGenerating: false });
+          return;
+        }
+
+        const generationMode = ACTION_MODE_MAP[event.action] ?? event.action;
+        const resolvedMode = generationMode as import("@/lib/types").GenerationMode;
+        const activeSlots = resolveActiveSlots(modelSlots, resolvedMode);
+        const modelIds = activeSlots.length > 0
+          ? activeSlots.map((s) => s.modelId)
+          : [generation.modelId];
+        const baseParams = activeSlots.length > 0
+          ? { ...activeSlots[0].modelParams, ...(event.params ?? {}) }
+          : (event.params ?? {});
+
+        try {
+          const result = await generateImages({
+            projectId,
+            promptMotiv: event.prompt,
+            modelIds,
+            params: baseParams,
+            count: 1,
+            generationMode,
+            sourceImageUrl: imageContextRef.current.image_url,
+            maskUrl,
+          });
+
+          if (result && "error" in result) {
+            console.error("[CanvasChatPanel] generateImages returned error:", result.error);
+            toast.error(result.error);
+            dispatch({ type: "SET_GENERATING", isGenerating: false });
+            return;
+          }
+
+          onGenerationsCreated?.(result as Generation[]);
+          const pendingIds = (result as Generation[])
+            .filter((g) => g.status === "pending")
+            .map((g) => g.id);
+
+          if (pendingIds.length > 0 && onPendingGenerations) {
+            onPendingGenerations(pendingIds);
+          } else {
+            dispatch({ type: "SET_GENERATING", isGenerating: false });
+          }
+        } catch (error) {
+          console.error("[CanvasChatPanel] generateImages failed:", error);
+          toast.error("Generierung fehlgeschlagen.");
+          dispatch({ type: "SET_GENERATING", isGenerating: false });
+        }
+        return;
+      }
+
+      // --- Default branch: variation / img2img / other actions ---
+      const generationMode = ACTION_MODE_MAP[event.action] ?? "txt2img";
+
+      // Resolve models from active mode-specific slots
+      const resolvedMode = generationMode as import("@/lib/types").GenerationMode;
+      const activeSlots = resolveActiveSlots(modelSlots, resolvedMode);
 
       // Use active slot modelIds, or fall back to generation.modelId (AC-10)
       const modelIds = activeSlots.length > 0
@@ -302,7 +471,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
           modelIds,
           params: baseParams,
           count: 1,
-          generationMode: event.action === "img2img" ? "img2img" : "txt2img",
+          generationMode,
           sourceImageUrl:
             event.action === "img2img"
               ? imageContextRef.current.image_url
@@ -338,7 +507,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
         dispatch({ type: "SET_GENERATING", isGenerating: false });
       }
     },
-    [dispatch, projectId, onPendingGenerations, onGenerationsCreated, modelSlots, generation.modelId]
+    [dispatch, projectId, onPendingGenerations, onGenerationsCreated, modelSlots, generation.modelId, state.maskData, exportMaskToR2]
   );
 
   // ---------------------------------------------------------------------------
