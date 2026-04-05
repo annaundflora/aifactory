@@ -4,6 +4,22 @@ import { createContext, useContext, useReducer, useEffect } from "react";
 import type { Dispatch, ReactNode } from "react";
 
 // ---------------------------------------------------------------------------
+// Edit-Mode Types
+// ---------------------------------------------------------------------------
+
+/** Subset of GenerationMode used for edit operations */
+export type EditMode = "inpaint" | "erase" | "instruction" | "outpaint";
+
+/** Direction for outpainting — which edges to extend */
+export type OutpaintDirection = "top" | "bottom" | "left" | "right";
+
+/** Brush tool toggle — paint mask or erase mask */
+export type BrushTool = "brush" | "eraser";
+
+/** Outpaint extension size as percentage */
+export type OutpaintSize = 25 | 50 | 100;
+
+// ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
 
@@ -18,6 +34,18 @@ export interface CanvasDetailState {
   redoStack: string[];
   isGenerating: boolean;
   chatSessionId: string | null;
+  /** Current edit mode — null when not in edit mode */
+  editMode: EditMode | null;
+  /** Mask pixel data for inpaint/erase — null when no mask painted */
+  maskData: ImageData | null;
+  /** Brush size for mask painting (1-100) */
+  brushSize: number;
+  /** Current brush tool — paint or erase mask strokes */
+  brushTool: BrushTool;
+  /** Selected outpaint directions */
+  outpaintDirections: OutpaintDirection[];
+  /** Outpaint extension size as percentage */
+  outpaintSize: OutpaintSize;
 }
 
 // ---------------------------------------------------------------------------
@@ -32,7 +60,14 @@ export type CanvasDetailAction =
   | { type: "POP_REDO" }
   | { type: "CLEAR_REDO" }
   | { type: "SET_GENERATING"; isGenerating: boolean }
-  | { type: "SET_CHAT_SESSION"; chatSessionId: string | null };
+  | { type: "SET_CHAT_SESSION"; chatSessionId: string | null }
+  | { type: "SET_EDIT_MODE"; editMode: EditMode | null }
+  | { type: "SET_MASK_DATA"; maskData: ImageData | null }
+  | { type: "SET_BRUSH_SIZE"; brushSize: number }
+  | { type: "SET_BRUSH_TOOL"; brushTool: BrushTool }
+  | { type: "SET_OUTPAINT_DIRECTIONS"; outpaintDirections: OutpaintDirection[] }
+  | { type: "SET_OUTPAINT_SIZE"; outpaintSize: OutpaintSize }
+  | { type: "CLEAR_MASK" };
 
 // ---------------------------------------------------------------------------
 // Reducer (pure function, no side effects)
@@ -119,6 +154,48 @@ export function canvasDetailReducer(
         chatSessionId: action.chatSessionId,
       };
 
+    case "SET_EDIT_MODE":
+      return {
+        ...state,
+        editMode: action.editMode,
+      };
+
+    case "SET_MASK_DATA":
+      return {
+        ...state,
+        maskData: action.maskData,
+      };
+
+    case "SET_BRUSH_SIZE":
+      return {
+        ...state,
+        brushSize: action.brushSize,
+      };
+
+    case "SET_BRUSH_TOOL":
+      return {
+        ...state,
+        brushTool: action.brushTool,
+      };
+
+    case "SET_OUTPAINT_DIRECTIONS":
+      return {
+        ...state,
+        outpaintDirections: action.outpaintDirections,
+      };
+
+    case "SET_OUTPAINT_SIZE":
+      return {
+        ...state,
+        outpaintSize: action.outpaintSize,
+      };
+
+    case "CLEAR_MASK":
+      return {
+        ...state,
+        maskData: null,
+      };
+
     default:
       return state;
   }
@@ -156,6 +233,12 @@ export function CanvasDetailProvider({
     redoStack: [],
     isGenerating: false,
     chatSessionId: null,
+    editMode: null,
+    maskData: null,
+    brushSize: 40,
+    brushTool: "brush",
+    outpaintDirections: [],
+    outpaintSize: 50,
   });
 
   // ---------------------------------------------------------------------------

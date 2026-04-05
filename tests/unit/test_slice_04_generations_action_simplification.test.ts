@@ -185,9 +185,9 @@ describe("generateImages action - prompt simplification (Slice 04)", () => {
 
       expect(GenerationService.generate).toHaveBeenCalledTimes(1);
 
-      // Verify the call arguments: should be exactly 10
+      // Verify the call arguments: should be exactly 13
       const callArgs = (GenerationService.generate as Mock).mock.calls[0];
-      expect(callArgs).toHaveLength(10);
+      expect(callArgs).toHaveLength(13);
 
       // Verify the argument order matches the cleaned-up signature
       expect(callArgs[0]).toBe("proj-001");      // projectId
@@ -200,9 +200,12 @@ describe("generateImages action - prompt simplification (Slice 04)", () => {
       expect(callArgs[7]).toBeUndefined();         // strength
       expect(callArgs[8]).toBeUndefined();         // references
       expect(callArgs[9]).toBeUndefined();         // sourceGenerationId
+      expect(callArgs[10]).toBeUndefined();        // maskUrl
+      expect(callArgs[11]).toBeUndefined();        // outpaintDirections
+      expect(callArgs[12]).toBeUndefined();        // outpaintSize
     });
 
-    it("should call GenerationService.generate with 10 args for img2img with all fields", async () => {
+    it("should call GenerationService.generate with 13 args for img2img with all fields", async () => {
       const mockGenerations = [makeGeneration({ id: "gen-ac6-002" })];
       (GenerationService.generate as Mock).mockResolvedValue(mockGenerations);
 
@@ -228,10 +231,10 @@ describe("generateImages action - prompt simplification (Slice 04)", () => {
       expect(GenerationService.generate).toHaveBeenCalledTimes(1);
 
       const callArgs = (GenerationService.generate as Mock).mock.calls[0];
-      // Exactly 10 arguments
-      expect(callArgs).toHaveLength(10);
+      // Exactly 13 arguments
+      expect(callArgs).toHaveLength(13);
 
-      // Verify all 10 positional args
+      // Verify all 13 positional args
       expect(callArgs[0]).toBe("proj-001");
       expect(callArgs[1]).toBe("A fox in the wild");
       expect(callArgs[2]).toEqual(["black-forest-labs/flux-2-pro"]);
@@ -248,6 +251,9 @@ describe("generateImages action - prompt simplification (Slice 04)", () => {
         slotPosition: 1,
       }]);
       expect(callArgs[9]).toBe("gen-source-001");
+      expect(callArgs[10]).toBeUndefined();        // maskUrl
+      expect(callArgs[11]).toBeUndefined();        // outpaintDirections
+      expect(callArgs[12]).toBeUndefined();        // outpaintSize
     });
 
     it("should not apply promptStyle default value in source code", () => {

@@ -1,0 +1,15 @@
+{
+  "spec_path": "/home/dev/aifactory/.claude/worktrees/image-editing-suite/specs/phase-8/2026-04-03-image-editing-suite",
+  "feature_name": "image-editing-suite",
+  "status": "completed",
+  "current_state": "feature_complete",
+  "current_slice_id": null,
+  "retry_count": 0,
+  "failed_stage": null,
+  "completed_slices": ["slice-01", "slice-02", "slice-03", "slice-06a", "slice-06b", "slice-12", "slice-04", "slice-05", "slice-07", "slice-08", "slice-09", "slice-10", "slice-14", "slice-15", "slice-11", "slice-13", "slice-16"],
+  "worktree_path": "/home/dev/aifactory/.claude/worktrees/image-editing-suite",
+  "branch": "feature/image-editing-suite",
+  "github_available": true,
+  "repo": "annaundflora/aifactory",
+  "pr_number": 24
+}

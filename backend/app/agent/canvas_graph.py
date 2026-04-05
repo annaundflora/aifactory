@@ -199,9 +199,24 @@ EDITING-INTENTS (erkenne diese):
 TOOL-NUTZUNG (generate_image):
 - Verwende action="variation" wenn der Prompt angepasst wird (meist)
 - Verwende action="img2img" wenn die Struktur/Komposition des Bildes erhalten bleiben soll
+- Verwende action="inpaint" wenn eine Maske vorhanden ist UND der User einen Prompt fuer den maskierten Bereich gibt
+- Verwende action="erase" wenn eine Maske vorhanden ist UND der User den maskierten Bereich entfernen/loeschen will (ohne Ersatz-Prompt)
+- Verwende action="instruction" wenn KEINE Maske vorhanden ist UND der User eine Bearbeitungsanweisung gibt (z.B. "mach den Himmel blauer")
+- Verwende action="outpaint" wenn der User das Bild erweitern/vergroessern will (in bestimmte Richtungen)
 - Behalte die model_id des aktuellen Bildes (ausser der User wechselt explizit)
 - Optimiere den prompt auf Englisch mit Prompt-Engineering Best Practices
 - Uebergib params als leeres Dict {} wenn keine speziellen Parameter noetig sind
+
+EDIT-ROUTING-REGELN (Intent-Klassifikation):
+- Mask vorhanden + Prompt vorhanden -> action="inpaint" mit mask_url und prompt
+- Mask vorhanden + Loesch-Intent (ohne inhaltlichen Ersatz) -> action="erase" mit mask_url
+- Keine Mask + Edit-Intent (Aenderungswunsch am Bild) -> action="instruction" mit prompt
+- Outpaint-Kontext (Bild erweitern/vergroessern) -> action="outpaint" mit outpaint_directions und outpaint_size
+
+PARAMETER-REGELN:
+- mask_url: Pflicht fuer action="inpaint" und action="erase". Wird aus dem image_context uebernommen.
+- outpaint_directions: Pflicht fuer action="outpaint". Liste aus ["top", "bottom", "left", "right"].
+- outpaint_size: Optional fuer action="outpaint". Wert aus [25, 50, 100]. Standard: 50.
 
 WICHTIG:
 - Das generate_image Tool ruft KEINE externe API auf
@@ -220,6 +235,7 @@ WICHTIG:
         model_params = image_context.get("model_params", {})
         tier_models = image_context.get("tier_models") or {}
         selected_tier = image_context.get("selected_tier") or ""
+        mask_url = image_context.get("mask_url")
 
         # Resolve the currently selected model from tier
         selected_model_id = ""
@@ -237,6 +253,23 @@ WICHTIG:
             if tier_lines:
                 tier_section = "\nVERFUEGBARE MODELLE (Tier-Auswahl des Users):\n" + "\n".join(tier_lines) + "\n"
 
+        # Build mask awareness section
+        mask_section = ""
+        if mask_url:
+            mask_section = f"""
+MASK-KONTEXT:
+- Eine Maske ist vorhanden: {mask_url}
+- Bei Bearbeitungsanfragen mit Prompt -> verwende action="inpaint" mit mask_url="{mask_url}"
+- Bei Loesch-Anfragen (entfernen, loeschen) -> verwende action="erase" mit mask_url="{mask_url}"
+"""
+        else:
+            mask_section = """
+MASK-KONTEXT:
+- Keine Maske vorhanden
+- Bei Bearbeitungsanfragen -> verwende action="instruction" (ohne mask_url)
+- Der User muss zuerst eine Maske erstellen fuer Inpaint/Erase-Operationen
+"""
+
         # The effective model: selected tier model if available, else image model
         effective_model_id = selected_model_id or model_id
 
@@ -247,7 +280,7 @@ AKTUELLES BILD (Editing-Kontext):
 - Dieses Bild wurde generiert mit: {model_id}
 - Aktuell ausgewaehltes Modell: {effective_model_id} (Tier: {selected_tier or 'unbekannt'})
 - Modell-Parameter: {json.dumps(model_params, ensure_ascii=False)}
-{tier_section}
+{tier_section}{mask_section}
 VISUELLES FEEDBACK:
 - Beschreibe was du im Bild siehst, wenn der User danach fragt
 - Nutze deine visuelle Analyse fuer gezielte Verbesserungsvorschlaege

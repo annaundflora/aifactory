@@ -180,7 +180,7 @@ describe("generation-service - prompt simplification (Slice 04)", () => {
         /^[a-zA-Z_]\w*[\?]?\s*:/.test(l)
       ).length;
 
-      expect(paramCount).toBe(10);
+      expect(paramCount).toBe(13);
     });
   });
 

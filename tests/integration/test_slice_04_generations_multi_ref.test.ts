@@ -86,7 +86,7 @@ describe("generateImages multi-ref - prompt simplification (Slice 04)", () => {
    * AC-6: GIVEN die Server Action generateImages() in generations.ts
    * WHEN der GenerationService.generate()-Aufruf mit references im multi-ref Szenario geprueft wird
    * THEN wird KEIN input.promptStyle und KEIN input.negativePrompt weitergereicht
-   * AND der Aufruf hat 10 Argumente (statt 12)
+   * AND der Aufruf hat 13 Argumente (projectId, promptMotiv, modelIds, params, count, generationMode, sourceImageUrl, strength, references, sourceGenerationId, maskUrl, outpaintDirections, outpaintSize)
    *
    * This tests the multi-reference scenario specifically, ensuring that even with
    * references the cleaned-up interface works correctly without promptStyle/negativePrompt.
@@ -128,9 +128,9 @@ describe("generateImages multi-ref - prompt simplification (Slice 04)", () => {
 
     expect(GenerationService.generate).toHaveBeenCalledTimes(1);
 
-    // Verify exactly 10 arguments
+    // Verify exactly 13 arguments (10 original + 3 from slice-06a: maskUrl, outpaintDirections, outpaintSize)
     const callArgs = (GenerationService.generate as Mock).mock.calls[0];
-    expect(callArgs).toHaveLength(10);
+    expect(callArgs).toHaveLength(13);
 
     // Verify argument positions (no promptStyle/negativePrompt slots)
     expect(callArgs[0]).toBe("proj-001");          // projectId
@@ -143,6 +143,9 @@ describe("generateImages multi-ref - prompt simplification (Slice 04)", () => {
     expect(callArgs[7]).toBeUndefined();             // strength
     expect(callArgs[8]).toEqual(references);          // references (at position 8, not 10)
     expect(callArgs[9]).toBeUndefined();             // sourceGenerationId
+    expect(callArgs[10]).toBeUndefined();            // maskUrl (slice-06a)
+    expect(callArgs[11]).toBeUndefined();            // outpaintDirections (slice-06a)
+    expect(callArgs[12]).toBeUndefined();            // outpaintSize (slice-06a)
 
     // Verify result is success
     expect(Array.isArray(result)).toBe(true);
@@ -167,11 +170,16 @@ describe("generateImages multi-ref - prompt simplification (Slice 04)", () => {
 
     const callArgs = (GenerationService.generate as Mock).mock.calls[0];
 
-    // Exactly 10 arguments: the old promptStyle and negativePrompt slots are gone
-    expect(callArgs).toHaveLength(10);
+    // Exactly 13 arguments: 10 original (no promptStyle/negativePrompt) + 3 from slice-06a
+    expect(callArgs).toHaveLength(13);
 
     // sourceGenerationId is now at position 9 (was previously at a higher index)
     expect(callArgs[9]).toBe("gen-source-001");
+
+    // Trailing slice-06a params are undefined in this scenario
+    expect(callArgs[10]).toBeUndefined();            // maskUrl
+    expect(callArgs[11]).toBeUndefined();            // outpaintDirections
+    expect(callArgs[12]).toBeUndefined();            // outpaintSize
 
     expect(Array.isArray(result)).toBe(true);
   });
