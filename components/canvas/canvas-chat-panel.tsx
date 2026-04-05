@@ -385,6 +385,93 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
         return;
       }
 
+      // --- Outpaint branch: canvas extension via sharp (Slice 13 AC-4, AC-8) ---
+      if (event.action === "outpaint") {
+        // Use directions/size from context state (primary) or SSE event (fallback)
+        const directions = state.outpaintDirections.length > 0
+          ? state.outpaintDirections
+          : (event.outpaint_directions ?? []);
+        const size = state.outpaintSize ?? event.outpaint_size ?? 50;
+
+        // Pre-validate: no directions selected
+        if (directions.length === 0) {
+          toast.error("Waehle mindestens eine Richtung zum Erweitern");
+          dispatch({ type: "SET_GENERATING", isGenerating: false });
+          return;
+        }
+
+        // Pre-validate: resulting dimensions must not exceed 2048px (AC-8)
+        const imgWidth = generation.width ?? 1024;
+        const imgHeight = generation.height ?? 1024;
+        let extWidth = imgWidth;
+        let extHeight = imgHeight;
+
+        if (directions.includes("left")) {
+          extWidth += Math.round(imgWidth * (size / 100));
+        }
+        if (directions.includes("right")) {
+          extWidth += Math.round(imgWidth * (size / 100));
+        }
+        if (directions.includes("top")) {
+          extHeight += Math.round(imgHeight * (size / 100));
+        }
+        if (directions.includes("bottom")) {
+          extHeight += Math.round(imgHeight * (size / 100));
+        }
+
+        if (extWidth > 2048 || extHeight > 2048) {
+          toast.error("Bild wuerde API-Limit ueberschreiten");
+          dispatch({ type: "SET_GENERATING", isGenerating: false });
+          return;
+        }
+
+        // Resolve outpaint model slots (same as inpaint: FLUX Fill Pro)
+        const activeSlots = resolveActiveSlots(modelSlots, "outpaint");
+        const modelIds = activeSlots.length > 0
+          ? activeSlots.map((s) => s.modelId)
+          : [generation.modelId];
+        const baseParams = activeSlots.length > 0
+          ? { ...activeSlots[0].modelParams, ...(event.params ?? {}) }
+          : (event.params ?? {});
+
+        try {
+          const result = await generateImages({
+            projectId,
+            promptMotiv: event.prompt,
+            modelIds,
+            params: baseParams,
+            count: 1,
+            generationMode: "outpaint",
+            sourceImageUrl: imageContextRef.current.image_url,
+            outpaintDirections: directions as string[],
+            outpaintSize: size,
+          });
+
+          if (result && "error" in result) {
+            console.error("[CanvasChatPanel] generateImages returned error:", result.error);
+            toast.error(result.error);
+            dispatch({ type: "SET_GENERATING", isGenerating: false });
+            return;
+          }
+
+          onGenerationsCreated?.(result as Generation[]);
+          const pendingIds = (result as Generation[])
+            .filter((g) => g.status === "pending")
+            .map((g) => g.id);
+
+          if (pendingIds.length > 0 && onPendingGenerations) {
+            onPendingGenerations(pendingIds);
+          } else {
+            dispatch({ type: "SET_GENERATING", isGenerating: false });
+          }
+        } catch (error) {
+          console.error("[CanvasChatPanel] generateImages failed:", error);
+          toast.error("Generierung fehlgeschlagen.");
+          dispatch({ type: "SET_GENERATING", isGenerating: false });
+        }
+        return;
+      }
+
       const isEditAction = event.action === "inpaint" || event.action === "erase";
 
       // --- AC-5 (Slice 09): Erase-to-Inpaint upgrade ---
@@ -560,7 +647,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
         dispatch({ type: "SET_GENERATING", isGenerating: false });
       }
     },
-    [dispatch, projectId, onPendingGenerations, onGenerationsCreated, modelSlots, generation.modelId, state.maskData, state.editMode, exportMaskToR2]
+    [dispatch, projectId, onPendingGenerations, onGenerationsCreated, modelSlots, generation.modelId, generation.width, generation.height, state.maskData, state.editMode, state.outpaintDirections, state.outpaintSize, exportMaskToR2]
   );
 
   // ---------------------------------------------------------------------------
@@ -775,7 +862,9 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
   }, [generation, projectId, dispatch]);
 
   // AC-7: Chat input disabled while isGenerating
-  const inputDisabled = state.isGenerating || isStreaming;
+  // Slice 13 AC-3: Disable send when in outpaint mode with no directions selected
+  const isOutpaintNoDirections = state.editMode === "outpaint" && state.outpaintDirections.length === 0;
+  const inputDisabled = state.isGenerating || isStreaming || isOutpaintNoDirections;
 
   // ---------------------------------------------------------------------------
   // Collapsed: 48px icon strip
@@ -872,6 +961,16 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
           disabled={state.isGenerating}
         />
       </div>
+
+      {/* Slice 13 AC-3: Inline hint when outpaint mode but no directions selected */}
+      {isOutpaintNoDirections && (
+        <div
+          className="px-3 py-1 text-xs text-muted-foreground"
+          data-testid="outpaint-no-directions-hint"
+        >
+          Waehle mindestens eine Richtung zum Erweitern
+        </div>
+      )}
 
       {/* Input — disabled while generating or streaming */}
       <ChatInput

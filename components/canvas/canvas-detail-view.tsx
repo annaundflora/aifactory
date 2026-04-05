@@ -17,6 +17,7 @@ import { UpscalePopover } from "@/components/canvas/popovers/upscale-popover";
 import { CanvasChatPanel } from "@/components/canvas/canvas-chat-panel";
 import { MaskCanvas } from "@/components/canvas/mask-canvas";
 import { FloatingBrushToolbar } from "@/components/canvas/floating-brush-toolbar";
+import { OutpaintControls } from "@/components/canvas/outpaint-controls";
 import { generateImages, upscaleImage, fetchGenerations } from "@/app/actions/generations";
 import { deleteGeneration } from "@/app/actions/generations";
 import { getModelSlots } from "@/app/actions/model-slots";
@@ -883,7 +884,8 @@ export function CanvasDetailView({
 
           {/* Floating Brush Toolbar — positioned absolute top-center inside main */}
           {/* Hidden during click-edit mode (before SAM response) per AC-1 */}
-          {!isClickEditActive && (
+          {/* Hidden during outpaint mode — outpaint has its own controls (Slice 13 AC-1) */}
+          {!isClickEditActive && state.editMode !== "outpaint" && (
             <FloatingBrushToolbar onEraseAction={handleEraseAction} />
           )}
 
@@ -899,7 +901,15 @@ export function CanvasDetailView({
               generation={currentGeneration}
               isLoading={state.isGenerating}
             />
-            <MaskCanvas imageRef={imageRef} />
+            {/* MaskCanvas hidden during outpaint mode (Slice 13 AC-1) */}
+            {state.editMode !== "outpaint" && (
+              <MaskCanvas imageRef={imageRef} />
+            )}
+
+            {/* OutpaintControls visible only in outpaint mode (Slice 13 AC-1, AC-2) */}
+            {state.editMode === "outpaint" && (
+              <OutpaintControls />
+            )}
 
             {/* SAM loading spinner overlay — AC-3 */}
             {isSamLoading && (

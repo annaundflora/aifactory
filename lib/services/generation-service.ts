@@ -318,10 +318,104 @@ async function buildReplicateInput(
     // prompt is already set above from generation.prompt
   }
 
-  // Outpaint: image + mask + prompt (FLUX Fill Pro, reused)
+  // Outpaint: extended canvas + auto-generated mask + prompt (FLUX Fill Pro, reused)
+  // Slice 13 AC-5/6/7: Server-side canvas extension via sharp
   if (generation.generationMode === "outpaint") {
-    input.image = generation.sourceImageUrl;
-    input.mask = params.maskUrl as string;
+    const outpaintDirections = (params.outpaintDirections as string[] | undefined) ?? [];
+    const outpaintSize = (params.outpaintSize as number | undefined) ?? 50;
+
+    if (generation.sourceImageUrl && outpaintDirections.length > 0) {
+      // Fetch the source image
+      const sourceResponse = await fetch(generation.sourceImageUrl);
+      const sourceBuffer = Buffer.from(await sourceResponse.arrayBuffer());
+      const sourceMeta = await sharp(sourceBuffer).metadata();
+      const origWidth = sourceMeta.width ?? 1024;
+      const origHeight = sourceMeta.height ?? 1024;
+
+      // Calculate padding in pixels per direction
+      // paddingPx = Math.round(originalDimension * (outpaintSize / 100))
+      const padTop = outpaintDirections.includes("top")
+        ? Math.round(origHeight * (outpaintSize / 100))
+        : 0;
+      const padBottom = outpaintDirections.includes("bottom")
+        ? Math.round(origHeight * (outpaintSize / 100))
+        : 0;
+      const padLeft = outpaintDirections.includes("left")
+        ? Math.round(origWidth * (outpaintSize / 100))
+        : 0;
+      const padRight = outpaintDirections.includes("right")
+        ? Math.round(origWidth * (outpaintSize / 100))
+        : 0;
+
+      const newWidth = origWidth + padLeft + padRight;
+      const newHeight = origHeight + padTop + padBottom;
+
+      // Create extended image: transparent background with original image composited
+      const extendedImageBuffer = await sharp({
+        create: {
+          width: newWidth,
+          height: newHeight,
+          channels: 4,
+          background: { r: 0, g: 0, b: 0, alpha: 0 },
+        },
+      })
+        .composite([
+          {
+            input: sourceBuffer,
+            left: padLeft,
+            top: padTop,
+          },
+        ])
+        .png()
+        .toBuffer();
+
+      // Create mask: white background (extended area) with black rectangle for original area
+      // black = original area (keep), white = new area (generate)
+      const blackRect = await sharp({
+        create: {
+          width: origWidth,
+          height: origHeight,
+          channels: 3,
+          background: { r: 0, g: 0, b: 0 },
+        },
+      })
+        .png()
+        .toBuffer();
+
+      const maskBuffer = await sharp({
+        create: {
+          width: newWidth,
+          height: newHeight,
+          channels: 3,
+          background: { r: 255, g: 255, b: 255 },
+        },
+      })
+        .composite([
+          {
+            input: blackRect,
+            left: padLeft,
+            top: padTop,
+          },
+        ])
+        .png()
+        .toBuffer();
+
+      // Upload extended image and mask to R2
+      const extImageKey = `masks/outpaint-ext-${generation.id}.png`;
+      const extMaskKey = `masks/outpaint-mask-${generation.id}.png`;
+
+      const [extImageUrl, extMaskUrl] = await Promise.all([
+        StorageService.upload(extendedImageBuffer, extImageKey),
+        StorageService.upload(maskBuffer, extMaskKey),
+      ]);
+
+      input.image = extImageUrl;
+      input.mask = extMaskUrl;
+    } else {
+      // Fallback: no source image or no directions (shouldn't happen due to validation)
+      input.image = generation.sourceImageUrl;
+      input.mask = params.maskUrl as string;
+    }
     // prompt is already set above from generation.prompt
   }
 
