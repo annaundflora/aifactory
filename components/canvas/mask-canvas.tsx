@@ -259,24 +259,44 @@ export function MaskCanvas({ imageRef }: MaskCanvasProps) {
   // -------------------------------------------------------------------------
 
   useEffect(() => {
-    const img = imageRef.current;
-    if (!img) return;
+    // Only set up observer in painting modes — avoids rAF polling when
+    // the component is mounted but returns null (editMode is inactive)
+    if (state.editMode !== "inpaint" && state.editMode !== "erase") return;
 
-    const observer = new ResizeObserver(() => {
+    let observer: ResizeObserver | null = null;
+    let rafId: number | null = null;
+    let disposed = false;
+
+    function setup() {
+      if (disposed) return;
+      const img = imageRef.current;
+      if (!img) {
+        // Image ref not yet available — retry next frame (React timing:
+        // child effects may run before parent ref is assigned)
+        rafId = requestAnimationFrame(setup);
+        return;
+      }
+
+      observer = new ResizeObserver(() => {
+        syncCanvasSize();
+        syncCanvasPosition();
+      });
+
+      observer.observe(img);
+
+      // Initial sync
       syncCanvasSize();
       syncCanvasPosition();
-    });
+    }
 
-    observer.observe(img);
-
-    // Initial sync
-    syncCanvasSize();
-    syncCanvasPosition();
+    setup();
 
     return () => {
-      observer.disconnect();
+      disposed = true;
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      if (observer) observer.disconnect();
     };
-  }, [imageRef, syncCanvasSize, syncCanvasPosition]);
+  }, [state.editMode, imageRef, syncCanvasSize, syncCanvasPosition]);
 
   // Also sync on window resize for layout shifts
   useEffect(() => {

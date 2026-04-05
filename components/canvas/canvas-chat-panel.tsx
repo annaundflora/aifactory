@@ -123,6 +123,10 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
   // Abort controller for ongoing SSE streams
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Mask URL uploaded in sendMessageToBackend, consumed by handleCanvasGenerate
+  // to avoid double-uploading the same mask
+  const pendingMaskUrlRef = useRef<string | null>(null);
+
   // ---------------------------------------------------------------------------
   // AC-1: Auto-create canvas session when the panel mounts (expanded)
   // ---------------------------------------------------------------------------
@@ -530,8 +534,10 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
           return;
         }
 
-        // Mask present: run export pipeline
-        const maskUrl = await exportMaskToR2(state.maskData);
+        // Use mask_url already uploaded in sendMessageToBackend (via ref),
+        // or from backend event, with fallback to full export pipeline
+        const maskUrl = pendingMaskUrlRef.current ?? event.mask_url ?? await exportMaskToR2(state.maskData);
+        pendingMaskUrlRef.current = null;
 
         // Validation failure (mask too small or upload failed) -> abort
         if (!maskUrl) {
@@ -688,6 +694,18 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
           ...imageContextRef.current,
           ...(activeModelIds.length > 0 ? { active_model_ids: activeModelIds } : {}),
         };
+
+        // Export mask to R2 before sending so the agent can detect
+        // inpaint/erase intent and route correctly (BUG-2 fix)
+        pendingMaskUrlRef.current = null;
+        if (state.maskData) {
+          const maskUrl = await exportMaskToR2(state.maskData);
+          if (maskUrl) {
+            contextWithModels.mask_url = maskUrl;
+            pendingMaskUrlRef.current = maskUrl;
+          }
+        }
+
         await sendCanvasMessage(
           sessionIdRef.current,
           text,
@@ -792,7 +810,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
         abortControllerRef.current = null;
       }
     },
-    [projectId, dispatch, handleCanvasGenerate, chatModelSlug, modelSlots]
+    [projectId, dispatch, handleCanvasGenerate, chatModelSlug, modelSlots, state.maskData, exportMaskToR2]
   );
 
   // ---------------------------------------------------------------------------

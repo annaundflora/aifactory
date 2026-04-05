@@ -20,6 +20,7 @@ export interface CanvasImageContext {
   generation_id: string;
   tier_models?: Record<string, string>;
   selected_tier?: string;
+  mask_url?: string;
 }
 
 // ---------------------------------------------------------------------------
