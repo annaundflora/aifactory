@@ -38,3 +38,4 @@
 {"ts":"2026-04-05T02:31:00Z","slice":"slice-13","gate":"tests","result":"PASSED","retries":1}
 {"ts":"2026-04-05T03:00:00Z","slice":"slice-16","gate":"code_review","verdict":"APPROVED","attempt":1}
 {"ts":"2026-04-05T03:01:00Z","slice":"slice-16","gate":"tests","result":"PASSED_REVIEW_ONLY","retries":0}
+{"ts":"2026-04-05T03:30:00Z","slice":"feature","gate":"systemic_review","verdict":"FAILED","findings_total":6}

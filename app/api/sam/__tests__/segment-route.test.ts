@@ -4,7 +4,7 @@
  *
  * Mocking Strategy: mock_external (from Slice Spec)
  *   - requireAuth (@/lib/auth/guard): globally mocked in vitest.setup.ts, overridden per-test
- *   - replicateRun (@/lib/clients/replicate): mocked via vi.mock
+ *   - Replicate (replicate): mocked via vi.mock — the route uses `new Replicate().run()`
  *   - StorageService (@/lib/clients/storage): mocked via vi.mock
  *   - crypto.randomUUID: mocked for deterministic mask keys
  *
@@ -21,15 +21,36 @@ const mockReplicateRun = vi.fn();
 const mockStorageUpload = vi.fn();
 const MOCK_UUID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 
-vi.mock("@/lib/clients/replicate", () => ({
-  replicateRun: (...args: unknown[]) => mockReplicateRun(...args),
-}));
+// Mock the `replicate` npm package — the route does `new Replicate().run()`
+vi.mock("replicate", () => {
+  return {
+    default: class MockReplicate {
+      run(...args: unknown[]) {
+        return mockReplicateRun(...args);
+      }
+    },
+  };
+});
 
 vi.mock("@/lib/clients/storage", () => ({
   StorageService: {
     upload: (...args: unknown[]) => mockStorageUpload(...args),
   },
 }));
+
+// Mock sharp — used for maskContainsPoint
+vi.mock("sharp", () => {
+  const sharpInstance = {
+    metadata: vi.fn().mockResolvedValue({ width: 100, height: 100 }),
+    grayscale: vi.fn().mockReturnThis(),
+    extract: vi.fn().mockReturnThis(),
+    raw: vi.fn().mockReturnThis(),
+    toBuffer: vi.fn().mockResolvedValue({
+      data: Buffer.from([255, 255, 255, 255, 255]), // Non-zero = mask hit
+    }),
+  };
+  return { default: vi.fn(() => sharpInstance) };
+});
 
 vi.mock("crypto", () => ({
   randomUUID: () => MOCK_UUID,
@@ -65,15 +86,16 @@ function validBody(): Record<string, unknown> {
 }
 
 /**
- * Creates a minimal ReadableStream to simulate Replicate mask output.
+ * SAM 2 returns { combined_mask: string, individual_masks: string[] }
  */
-function fakeMaskStream(): ReadableStream<Uint8Array> {
-  return new ReadableStream({
-    start(controller) {
-      controller.enqueue(new Uint8Array([0x89, 0x50, 0x4e, 0x47])); // PNG header bytes
-      controller.close();
-    },
-  });
+function fakeSamOutput() {
+  return {
+    combined_mask: "https://replicate.delivery/combined-mask.png",
+    individual_masks: [
+      "https://replicate.delivery/mask-0.png",
+      "https://replicate.delivery/mask-1.png",
+    ],
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -94,20 +116,27 @@ beforeEach(() => {
     email: "test@example.com",
   });
 
-  // Default: Replicate returns a valid mask output
-  mockReplicateRun.mockResolvedValue({
-    output: fakeMaskStream(),
-    predictionId: "pred-123",
-    seed: null,
-  });
+  // Default: Replicate returns valid SAM output
+  mockReplicateRun.mockResolvedValue(fakeSamOutput());
 
   // Default: StorageService returns a valid URL
   mockStorageUpload.mockResolvedValue(
     `${R2_PUBLIC_URL}/masks/${MOCK_UUID}.png`
   );
+
+  // Mock global fetch for mask download (maskContainsPoint + re-upload)
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: () =>
+        Promise.resolve(new Uint8Array([0x89, 0x50, 0x4e, 0x47]).buffer),
+    })
+  );
 });
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   // Restore original env
   if (originalEnv !== undefined) {
     process.env.R2_PUBLIC_URL = originalEnv;
@@ -123,11 +152,6 @@ afterEach(() => {
 describe("POST /api/sam/segment", () => {
   // AC-1: Valid request returns 200 + mask_url
   it("should return 200 with mask_url for valid SAM segment request", async () => {
-    /**
-     * AC-1: GIVEN ein authentifizierter User
-     *       WHEN POST /api/sam/segment mit { image_url, click_x: 0.5, click_y: 0.3 } aufgerufen wird
-     *       THEN antwortet der Endpoint mit HTTP 200 und Body { mask_url: "<valid R2 URL>" }
-     */
     const response = await POST(makeRequest(validBody()));
 
     expect(response.status).toBe(200);
@@ -139,11 +163,6 @@ describe("POST /api/sam/segment", () => {
 
   // AC-2: No auth returns 401
   it("should return 401 when user is not authenticated", async () => {
-    /**
-     * AC-2: GIVEN ein nicht-authentifizierter Request
-     *       WHEN POST /api/sam/segment aufgerufen wird
-     *       THEN antwortet der Endpoint mit HTTP 401
-     */
     mockRequireAuth.mockResolvedValueOnce({ error: "Unauthorized" });
 
     const response = await POST(makeRequest(validBody()));
@@ -155,11 +174,6 @@ describe("POST /api/sam/segment", () => {
 
   // AC-3: Invalid coordinates returns 400
   it("should return 400 when click_x is outside 0-1 range", async () => {
-    /**
-     * AC-3: GIVEN ein authentifizierter User
-     *       WHEN POST /api/sam/segment mit { click_x: 1.5, click_y: 0.3, image_url } aufgerufen wird (click_x ausserhalb 0.0-1.0)
-     *       THEN antwortet der Endpoint mit HTTP 400 und Body { error: "Koordinaten muessen normalisiert sein (0-1)" }
-     */
     const response = await POST(
       makeRequest({
         image_url: `${R2_PUBLIC_URL}/img.png`,
@@ -176,9 +190,6 @@ describe("POST /api/sam/segment", () => {
   });
 
   it("should return 400 when click_y is outside 0-1 range", async () => {
-    /**
-     * AC-3 (additional): Validates click_y out of range as well.
-     */
     const response = await POST(
       makeRequest({
         image_url: `${R2_PUBLIC_URL}/img.png`,
@@ -196,11 +207,6 @@ describe("POST /api/sam/segment", () => {
 
   // AC-4: Missing image_url returns 400
   it("should return 400 when image_url is missing", async () => {
-    /**
-     * AC-4: GIVEN ein authentifizierter User
-     *       WHEN POST /api/sam/segment mit { click_x: 0.5, click_y: 0.3 } aufgerufen wird (image_url fehlt)
-     *       THEN antwortet der Endpoint mit HTTP 400 und Body { error: "image_url ist erforderlich" }
-     */
     const response = await POST(
       makeRequest({
         click_x: 0.5,
@@ -213,13 +219,8 @@ describe("POST /api/sam/segment", () => {
     expect(body).toEqual({ error: "image_url ist erforderlich" });
   });
 
-  // AC-5: Replicate called with meta/sam-2
-  it("should call Replicate with meta/sam-2 model and provided coordinates", async () => {
-    /**
-     * AC-5: GIVEN ein authentifizierter User
-     *       WHEN POST /api/sam/segment mit gueltigem Body aufgerufen wird
-     *       THEN wird der Replicate Client mit Modell "meta/sam-2" und den uebergebenen Koordinaten + Bild-URL aufgerufen
-     */
+  // AC-5: Replicate called with correct model + auto-segmentation params
+  it("should call Replicate with SAM 2 model version and auto-segmentation params", async () => {
     const imageUrl = `${R2_PUBLIC_URL}/image.png`;
     const response = await POST(
       makeRequest({
@@ -231,54 +232,35 @@ describe("POST /api/sam/segment", () => {
 
     expect(response.status).toBe(200);
     expect(mockReplicateRun).toHaveBeenCalledTimes(1);
-    expect(mockReplicateRun).toHaveBeenCalledWith("meta/sam-2", {
-      image: imageUrl,
-      point_coords: [[0.5, 0.3]],
-      point_labels: [1],
-    });
+    expect(mockReplicateRun).toHaveBeenCalledWith(
+      "meta/sam-2:fe97b453a6455861e3bac769b441ca1f1086110da7466dbb65cf1eecfd60dc83",
+      {
+        input: {
+          image: imageUrl,
+          points_per_side: 16,
+          pred_iou_thresh: 0.86,
+          stability_score_thresh: 0.92,
+        },
+      }
+    );
   });
 
   // AC-6: Mask uploaded with masks/ prefix
-  it("should upload mask PNG to R2 with masks/ prefix and return R2 URL as mask_url", async () => {
-    /**
-     * AC-6: GIVEN der Replicate-Aufruf liefert eine Mask-PNG zurueck
-     *       WHEN die Response verarbeitet wird
-     *       THEN wird die Mask-PNG via StorageService.upload() zu R2 hochgeladen mit Prefix "masks/" und temporaerem TTL
-     *       AND die resultierende R2-URL wird als mask_url zurueckgegeben
-     */
-    const mockStream = fakeMaskStream();
-    mockReplicateRun.mockResolvedValueOnce({
-      output: mockStream,
-      predictionId: "pred-456",
-      seed: null,
-    });
-
-    const expectedUrl = `${R2_PUBLIC_URL}/masks/${MOCK_UUID}.png`;
-    mockStorageUpload.mockResolvedValueOnce(expectedUrl);
-
+  it("should upload selected mask to R2 with masks/ prefix", async () => {
     const response = await POST(makeRequest(validBody()));
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body).toEqual({ mask_url: expectedUrl });
+    expect(body).toEqual({ mask_url: `${R2_PUBLIC_URL}/masks/${MOCK_UUID}.png` });
 
-    // Verify upload was called with masks/ prefix key
     expect(mockStorageUpload).toHaveBeenCalledTimes(1);
-    const [uploadStream, uploadKey, uploadContentType] =
-      mockStorageUpload.mock.calls[0];
+    const [, uploadKey, uploadContentType] = mockStorageUpload.mock.calls[0];
     expect(uploadKey).toBe(`masks/${MOCK_UUID}.png`);
-    expect(uploadKey).toMatch(/^masks\//);
     expect(uploadContentType).toBe("image/png");
-    expect(uploadStream).toBe(mockStream);
   });
 
   // AC-7: Replicate error returns 502
   it("should return 502 with SAM error message when Replicate call fails", async () => {
-    /**
-     * AC-7: GIVEN der Replicate-Aufruf schlaegt fehl (Timeout oder API-Error)
-     *       WHEN die Response verarbeitet wird
-     *       THEN antwortet der Endpoint mit HTTP 502 und Body { error: "SAM-Fehler. Versuche manuelles Maskieren." }
-     */
     mockReplicateRun.mockRejectedValueOnce(new Error("Replicate API timeout"));
 
     const response = await POST(makeRequest(validBody()));
@@ -292,16 +274,7 @@ describe("POST /api/sam/segment", () => {
 
   // AC-8: Empty mask returns 422
   it("should return 422 when SAM returns empty mask (null output)", async () => {
-    /**
-     * AC-8: GIVEN der Replicate-Aufruf liefert eine leere Mask (kein Objekt erkannt)
-     *       WHEN die Response verarbeitet wird
-     *       THEN antwortet der Endpoint mit HTTP 422 und Body { error: "Kein Objekt erkannt. Versuche einen anderen Punkt." }
-     */
-    mockReplicateRun.mockResolvedValueOnce({
-      output: null,
-      predictionId: "pred-789",
-      seed: null,
-    });
+    mockReplicateRun.mockResolvedValueOnce(null);
 
     const response = await POST(makeRequest(validBody()));
 
@@ -313,10 +286,6 @@ describe("POST /api/sam/segment", () => {
   });
 
   it('should return 422 when Replicate throws "kein Output" error', async () => {
-    /**
-     * AC-8 (additional): The route also catches errors containing "Replicate lieferte kein Output"
-     * and maps them to 422.
-     */
     mockReplicateRun.mockRejectedValueOnce(
       new Error("Replicate lieferte kein Output.")
     );
@@ -328,6 +297,17 @@ describe("POST /api/sam/segment", () => {
     expect(body).toEqual({
       error: "Kein Objekt erkannt. Versuche einen anderen Punkt.",
     });
+  });
+
+  it("should handle SAM output with empty individual_masks", async () => {
+    mockReplicateRun.mockResolvedValueOnce({
+      combined_mask: "https://replicate.delivery/combined.png",
+      individual_masks: [],
+    });
+
+    const response = await POST(makeRequest(validBody()));
+
+    expect(response.status).toBe(200);
   });
 });
 

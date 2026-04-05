@@ -296,11 +296,14 @@ export function CanvasDetailView({
       const maskUrl = uploadResult.url;
       const sourceImageUrl = currentGeneration.imageUrl ?? undefined;
 
-      // Resolve model from active erase slots
+      // Resolve model from active erase slots.
+      // Fallback to bria/eraser — NOT the original generation model,
+      // which likely doesn't support mask-based erasing.
+      const ERASE_FALLBACK_MODEL = "bria/eraser";
       const activeSlots = resolveActiveSlots(modelSlots, "erase");
       const modelIds = activeSlots.length > 0
         ? activeSlots.map((s) => s.modelId)
-        : [currentGeneration.modelId];
+        : [ERASE_FALLBACK_MODEL];
 
       // Step 6: Call generateImages() directly -- AC-1 (no SSE/Agent)
       const result = await generateImages({

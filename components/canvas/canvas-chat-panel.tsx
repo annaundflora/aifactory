@@ -343,12 +343,28 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
         outpaint: "outpaint",
       };
 
+      // --- Safety net: override agent routing when user has mask in edit mode ---
+      // The LLM agent may return ANY action even when mask_url was sent.
+      // Trust the user's UI state (edit mode + painted mask) over the LLM decision.
+      let resolvedAction = event.action;
+      if (
+        state.maskData &&
+        (state.editMode === "inpaint" || state.editMode === "erase") &&
+        event.action !== "inpaint" &&
+        event.action !== "erase"
+      ) {
+        resolvedAction = state.editMode;
+      }
+
       // --- Instruction branch: text instruction editing (no mask) ---
-      if (event.action === "instruction") {
+      // Fallback to flux-kontext-pro — NOT the original generation model,
+      // which likely doesn't support text instruction editing.
+      const INSTRUCTION_FALLBACK_MODEL = "black-forest-labs/flux-kontext-pro";
+      if (resolvedAction === "instruction") {
         const activeSlots = resolveActiveSlots(modelSlots, "instruction");
         const modelIds = activeSlots.length > 0
           ? activeSlots.map((s) => s.modelId)
-          : [generation.modelId];
+          : [INSTRUCTION_FALLBACK_MODEL];
         const baseParams = activeSlots.length > 0
           ? { ...activeSlots[0].modelParams, ...(event.params ?? {}) }
           : (event.params ?? {});
@@ -390,7 +406,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
       }
 
       // --- Outpaint branch: canvas extension via sharp (Slice 13 AC-4, AC-8) ---
-      if (event.action === "outpaint") {
+      if (resolvedAction === "outpaint") {
         // Use directions/size from context state (primary) or SSE event (fallback)
         const directions = state.outpaintDirections.length > 0
           ? state.outpaintDirections
@@ -476,12 +492,12 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
         return;
       }
 
-      const isEditAction = event.action === "inpaint" || event.action === "erase";
+      const isEditAction = resolvedAction === "inpaint" || resolvedAction === "erase";
 
       // --- AC-5 (Slice 09): Erase-to-Inpaint upgrade ---
       // When the user is in erase mode with a mask and sends a chat prompt,
       // upgrade from erase to inpaint so the prompt is used for generation.
-      let effectiveAction = event.action;
+      let effectiveAction = resolvedAction;
       if (state.editMode === "erase" && state.maskData && event.prompt) {
         effectiveAction = "inpaint";
       }
@@ -493,7 +509,7 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
           const activeSlots = resolveActiveSlots(modelSlots, "instruction");
           const modelIds = activeSlots.length > 0
             ? activeSlots.map((s) => s.modelId)
-            : [generation.modelId];
+            : [INSTRUCTION_FALLBACK_MODEL];
           const baseParams = activeSlots.length > 0
             ? { ...activeSlots[0].modelParams, ...(event.params ?? {}) }
             : (event.params ?? {});
@@ -549,9 +565,13 @@ export function CanvasChatPanel({ generation, projectId, onPendingGenerations, o
         const generationMode = ACTION_MODE_MAP[effectiveAction] ?? effectiveAction;
         const resolvedMode = generationMode as import("@/lib/types").GenerationMode;
         const activeSlots = resolveActiveSlots(modelSlots, resolvedMode);
+        // Inpaint/erase require a model that supports image+mask input (e.g. FLUX Fill Pro).
+        // If no slot is configured for this mode, fall back to flux-fill-pro — NOT the
+        // original generation model, which likely doesn't support mask-based editing.
+        const INPAINT_FALLBACK_MODEL = "black-forest-labs/flux-fill-pro";
         const modelIds = activeSlots.length > 0
           ? activeSlots.map((s) => s.modelId)
-          : [generation.modelId];
+          : [INPAINT_FALLBACK_MODEL];
         const baseParams = activeSlots.length > 0
           ? { ...activeSlots[0].modelParams, ...(event.params ?? {}) }
           : (event.params ?? {});
