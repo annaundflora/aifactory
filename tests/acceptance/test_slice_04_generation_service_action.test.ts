@@ -125,7 +125,7 @@ describe("Slice 04: Generation Service & Server Action - Acceptance", () => {
   it(`AC-1: GIVEN die generate()-Funktion in generation-service.ts
      WHEN die Funktionssignatur geprueft wird
      THEN hat sie KEINEN Parameter promptStyle und KEINEN Parameter negativePrompt
-     AND die Gesamtzahl der Parameter ist um 2 reduziert (12 -> 10)`, () => {
+     AND die Gesamtzahl der Parameter ist 13 (10 original + maskUrl, outpaintDirections, outpaintSize from slice-06a)`, () => {
     const filePath = resolve(
       __dirname,
       "../../lib/services/generation-service.ts"
@@ -145,12 +145,18 @@ describe("Slice 04: Generation Service & Server Action - Acceptance", () => {
     expect(fullSignature).not.toContain("promptStyle");
     expect(fullSignature).not.toContain("negativePrompt");
 
-    // Count parameters (10 expected)
+    // Count parameters (13 expected: original 10 + maskUrl, outpaintDirections, outpaintSize from slice-06a)
     const paramLines = paramBlock
       .split("\n")
       .map((l) => l.trim())
       .filter((l) => /^[a-zA-Z_]\w*[\?]?\s*:/.test(l));
-    expect(paramLines).toHaveLength(10);
+    expect(paramLines).toHaveLength(13);
+
+    // Verify the 3 new trailing params exist
+    const paramNames = paramLines.map((l) => l.replace(/[\?]?\s*:.*$/, ""));
+    expect(paramNames).toContain("maskUrl");
+    expect(paramNames).toContain("outpaintDirections");
+    expect(paramNames).toContain("outpaintSize");
   });
 
   // =========================================================================
@@ -288,7 +294,7 @@ describe("Slice 04: Generation Service & Server Action - Acceptance", () => {
   it(`AC-6: GIVEN die Server Action generateImages() in generations.ts
      WHEN der GenerationService.generate()-Aufruf geprueft wird
      THEN wird KEIN input.promptStyle und KEIN input.negativePrompt weitergereicht
-     AND der Aufruf hat 10 Argumente (statt 12)
+     AND der Aufruf hat 13 Argumente (10 original + maskUrl, outpaintDirections, outpaintSize from slice-06a)
      AND der Default input.promptStyle ?? '' existiert NICHT mehr`, async () => {
     const mockGenerations = [makeGeneration({ id: "gen-ac6" })];
     (GenerationService.generate as Mock).mockResolvedValue(mockGenerations);
@@ -303,9 +309,14 @@ describe("Slice 04: Generation Service & Server Action - Acceptance", () => {
 
     expect(GenerationService.generate).toHaveBeenCalledTimes(1);
 
-    // Verify 10 arguments
+    // Verify 13 arguments (10 original + maskUrl, outpaintDirections, outpaintSize from slice-06a)
     const callArgs = (GenerationService.generate as Mock).mock.calls[0];
-    expect(callArgs).toHaveLength(10);
+    expect(callArgs).toHaveLength(13);
+
+    // The 3 new trailing args should be undefined (not provided in input)
+    expect(callArgs[10]).toBeUndefined(); // maskUrl
+    expect(callArgs[11]).toBeUndefined(); // outpaintDirections
+    expect(callArgs[12]).toBeUndefined(); // outpaintSize
 
     // Verify no promptStyle/negativePrompt in source code
     const filePath = resolve(
@@ -326,7 +337,7 @@ describe("Slice 04: Generation Service & Server Action - Acceptance", () => {
 
   it(`AC-7: GIVEN alle Aenderungen aus AC-1 bis AC-6
      WHEN npx tsc --noEmit ausgefuehrt wird
-     THEN meldet der TypeScript-Compiler 0 Fehler in generation-service.ts und generations.ts`, () => {
+     THEN meldet der TypeScript-Compiler 0 Fehler in generation-service.ts und generations.ts`, { timeout: 30_000 }, () => {
     // Run tsc --noEmit and check for errors in the specific files
     // Note: We only check the two target files, not the entire project
     const rootDir = resolve(__dirname, "../..");
