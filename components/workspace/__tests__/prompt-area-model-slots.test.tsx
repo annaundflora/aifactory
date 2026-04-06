@@ -272,12 +272,12 @@ function makeFullSlots() {
   ];
 }
 
-/** Single active txt2img slot only */
+/** Single populated txt2img slot only */
 function makeSingleSlotTxt2img() {
   return [
-    makeSlot({ id: "s1", mode: "txt2img", slot: 1, modelId: "black-forest-labs/flux-schnell", active: true }),
-    makeSlot({ id: "s2", mode: "txt2img", slot: 2, modelId: "black-forest-labs/flux-2-pro", active: false }),
-    makeSlot({ id: "s3", mode: "txt2img", slot: 3, modelId: null, active: false }),
+    makeSlot({ id: "s1", mode: "txt2img", slot: 1, modelId: "black-forest-labs/flux-schnell" }),
+    makeSlot({ id: "s2", mode: "txt2img", slot: 2, modelId: null }),
+    makeSlot({ id: "s3", mode: "txt2img", slot: 3, modelId: null }),
   ];
 }
 
@@ -816,8 +816,8 @@ describe("resolveActiveSlots (Unit)", () => {
 
   it("should skip slots with null modelId", () => {
     const slots = [
-      makeSlot({ mode: "txt2img", slot: 1, modelId: null, active: true }),
-      makeSlot({ mode: "txt2img", slot: 2, modelId: "black-forest-labs/flux-schnell", active: true }),
+      makeSlot({ mode: "txt2img", slot: 1, modelId: null }),
+      makeSlot({ mode: "txt2img", slot: 2, modelId: "black-forest-labs/flux-schnell" }),
     ];
     const result = resolveActiveSlots(slots, "txt2img");
 
@@ -825,18 +825,9 @@ describe("resolveActiveSlots (Unit)", () => {
     expect(result[0].modelId).toBe("black-forest-labs/flux-schnell");
   });
 
-  it("should skip inactive slots", () => {
-    const slots = [
-      makeSlot({ mode: "txt2img", slot: 1, modelId: "black-forest-labs/flux-schnell", active: false }),
-    ];
-    const result = resolveActiveSlots(slots, "txt2img");
-
-    expect(result).toHaveLength(0);
-  });
-
   it("should normalize null modelParams to empty object", () => {
     const slots = [
-      makeSlot({ mode: "txt2img", slot: 1, modelId: "black-forest-labs/flux-schnell", active: true, modelParams: null }),
+      makeSlot({ mode: "txt2img", slot: 1, modelId: "black-forest-labs/flux-schnell", modelParams: null }),
     ];
     const result = resolveActiveSlots(slots, "txt2img");
 
@@ -848,14 +839,14 @@ describe("resolveActiveSlots (Unit)", () => {
     const result = resolveActiveSlots(slots, "txt2img");
     const upscaleResult = resolveActiveSlots(slots, "upscale");
 
-    expect(result.length).toBeGreaterThan(0); // txt2img has active slots
-    expect(upscaleResult).toHaveLength(1); // Only 1 active upscale slot
+    expect(result.length).toBeGreaterThan(0); // txt2img has populated slots
+    expect(upscaleResult).toHaveLength(1); // Only 1 populated upscale slot
   });
 
   it("should return slots in input order", () => {
     const slots = [
-      makeSlot({ mode: "txt2img", slot: 2, modelId: "model-b", active: true }),
-      makeSlot({ mode: "txt2img", slot: 1, modelId: "model-a", active: true }),
+      makeSlot({ mode: "txt2img", slot: 2, modelId: "model-b" }),
+      makeSlot({ mode: "txt2img", slot: 1, modelId: "model-a" }),
     ];
     const result = resolveActiveSlots(slots, "txt2img");
 

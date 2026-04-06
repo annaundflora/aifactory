@@ -2,12 +2,12 @@ import type { ModelSlot } from "@/lib/db/queries";
 import type { GenerationMode } from "@/lib/types";
 
 /**
- * Resolve active model slots for a given generation mode.
+ * Resolve model slots for a given generation mode.
  *
- * Filters the provided slots by mode and active status, then returns
+ * Filters the provided slots by mode and assigned model, then returns
  * an array of { modelId, modelParams } for each matching slot.
  *
- * - Slots with `modelId === null` are skipped (even if active).
+ * - Slots with `modelId === null` are skipped.
  * - Null/undefined `modelParams` are normalized to `{}`.
  * - Result order follows the input array order (no sorting applied).
  */
@@ -18,7 +18,7 @@ export function resolveActiveSlots(
   return slots
     .filter(
       (s): s is ModelSlot & { modelId: string } =>
-        s.mode === mode && s.active === true && s.modelId != null,
+        s.mode === mode && s.modelId != null,
     )
     .map((s) => ({
       modelId: s.modelId,

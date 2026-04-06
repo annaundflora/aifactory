@@ -1,29 +1,19 @@
 /**
  * Unit & Acceptance Tests for ModelSlotService
- * Slice: slice-04-model-slot-service
  *
  * Mocking Strategy: mock_external
- *   - DB query functions from lib/db/queries are mocked (per spec)
+ *   - DB query functions from lib/db/queries are mocked
  *   - getModelByReplicateId is mocked (DB dependency for capability lookup)
  *
- * ACs covered:
- *   AC-1:  getAll returns all 21 slots
- *   AC-2:  getAll seeds defaults when table is empty
- *   AC-3:  getForMode returns 3 slots for a given mode
- *   AC-4:  update changes model_id when model is compatible
- *   AC-5:  update rejects incompatible model
- *   AC-6:  update allows unknown model (fallback)
- *   AC-7:  update auto-activates empty slot on model assignment
- *   AC-8:  toggleActive deactivates slot when min-1 fulfilled
- *   AC-9:  toggleActive prevents deactivation of last active slot
- *   AC-10: toggleActive prevents activation of empty slot
- *   AC-11: seedDefaults creates 21 default rows
+ * The active toggle was removed in favor of "slot has a model" semantics.
+ * Any slot with an assigned model is considered live; there is no
+ * separate toggleActive path.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ---------------------------------------------------------------------------
-// Mock the DB query functions (mock_external strategy per spec)
+// Mock the DB query functions
 // ---------------------------------------------------------------------------
 const mockGetAllModelSlots = vi.fn()
 const mockGetModelSlotsByMode = vi.fn()
@@ -35,6 +25,7 @@ vi.mock('@/lib/db/queries', () => ({
   getAllModelSlots: (...args: unknown[]) => mockGetAllModelSlots(...args),
   getModelSlotsByMode: (...args: unknown[]) => mockGetModelSlotsByMode(...args),
   upsertModelSlot: (...args: unknown[]) => mockUpsertModelSlot(...args),
+  clearModelSlot: vi.fn(),
   seedModelSlotDefaults: (...args: unknown[]) => mockSeedModelSlotDefaults(...args),
   getModelByReplicateId: (...args: unknown[]) => mockGetModelByReplicateId(...args),
 }))
@@ -55,7 +46,6 @@ function makeSlot(overrides: Partial<{
   slot: number
   modelId: string | null
   modelParams: Record<string, unknown>
-  active: boolean
   createdAt: Date
   updatedAt: Date
 }>): Record<string, unknown> {
@@ -65,36 +55,35 @@ function makeSlot(overrides: Partial<{
     slot: overrides.slot !== undefined ? overrides.slot : 1,
     modelId: 'modelId' in overrides ? overrides.modelId : 'black-forest-labs/flux-schnell',
     modelParams: overrides.modelParams !== undefined ? overrides.modelParams : {},
-    active: overrides.active !== undefined ? overrides.active : true,
     createdAt: overrides.createdAt !== undefined ? overrides.createdAt : NOW,
     updatedAt: overrides.updatedAt !== undefined ? overrides.updatedAt : NOW,
   }
 }
 
-/** All 21 seed default rows as described in architecture.md "Seed Defaults" */
+/** All 21 seed default rows. */
 function makeAll21Rows(): Record<string, unknown>[] {
   return [
-    makeSlot({ id: 'uuid-01', mode: 'txt2img', slot: 1, modelId: 'black-forest-labs/flux-schnell', modelParams: {}, active: true }),
-    makeSlot({ id: 'uuid-02', mode: 'txt2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro', modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-03', mode: 'txt2img', slot: 3, modelId: 'black-forest-labs/flux-2-max', modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-04', mode: 'img2img', slot: 1, modelId: 'black-forest-labs/flux-schnell', modelParams: { prompt_strength: 0.6 }, active: true }),
-    makeSlot({ id: 'uuid-05', mode: 'img2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro', modelParams: { prompt_strength: 0.6 }, active: false }),
-    makeSlot({ id: 'uuid-06', mode: 'img2img', slot: 3, modelId: 'black-forest-labs/flux-2-max', modelParams: { prompt_strength: 0.6 }, active: false }),
-    makeSlot({ id: 'uuid-07', mode: 'upscale', slot: 1, modelId: 'philz1337x/crystal-upscaler', modelParams: { scale: 4 }, active: true }),
-    makeSlot({ id: 'uuid-08', mode: 'upscale', slot: 2, modelId: 'nightmareai/real-esrgan', modelParams: { scale: 2 }, active: false }),
-    makeSlot({ id: 'uuid-09', mode: 'upscale', slot: 3, modelId: null, modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-10', mode: 'inpaint', slot: 1, modelId: 'black-forest-labs/flux-fill-pro', modelParams: {}, active: true }),
-    makeSlot({ id: 'uuid-11', mode: 'inpaint', slot: 2, modelId: null, modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-12', mode: 'inpaint', slot: 3, modelId: null, modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-13', mode: 'outpaint', slot: 1, modelId: 'black-forest-labs/flux-fill-pro', modelParams: {}, active: true }),
-    makeSlot({ id: 'uuid-14', mode: 'outpaint', slot: 2, modelId: null, modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-15', mode: 'outpaint', slot: 3, modelId: null, modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-16', mode: 'erase', slot: 1, modelId: 'bria/eraser', modelParams: {}, active: true }),
-    makeSlot({ id: 'uuid-17', mode: 'erase', slot: 2, modelId: null, modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-18', mode: 'erase', slot: 3, modelId: null, modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-19', mode: 'instruction', slot: 1, modelId: 'black-forest-labs/flux-kontext-pro', modelParams: {}, active: true }),
-    makeSlot({ id: 'uuid-20', mode: 'instruction', slot: 2, modelId: null, modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-21', mode: 'instruction', slot: 3, modelId: null, modelParams: {}, active: false }),
+    makeSlot({ id: 'uuid-01', mode: 'txt2img', slot: 1, modelId: 'black-forest-labs/flux-schnell', modelParams: {} }),
+    makeSlot({ id: 'uuid-02', mode: 'txt2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro', modelParams: {} }),
+    makeSlot({ id: 'uuid-03', mode: 'txt2img', slot: 3, modelId: 'black-forest-labs/flux-2-max', modelParams: {} }),
+    makeSlot({ id: 'uuid-04', mode: 'img2img', slot: 1, modelId: 'black-forest-labs/flux-schnell', modelParams: { prompt_strength: 0.6 } }),
+    makeSlot({ id: 'uuid-05', mode: 'img2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro', modelParams: { prompt_strength: 0.6 } }),
+    makeSlot({ id: 'uuid-06', mode: 'img2img', slot: 3, modelId: 'black-forest-labs/flux-2-max', modelParams: { prompt_strength: 0.6 } }),
+    makeSlot({ id: 'uuid-07', mode: 'upscale', slot: 1, modelId: 'philz1337x/crystal-upscaler', modelParams: { scale: 4 } }),
+    makeSlot({ id: 'uuid-08', mode: 'upscale', slot: 2, modelId: 'nightmareai/real-esrgan', modelParams: { scale: 2 } }),
+    makeSlot({ id: 'uuid-09', mode: 'upscale', slot: 3, modelId: null, modelParams: {} }),
+    makeSlot({ id: 'uuid-10', mode: 'inpaint', slot: 1, modelId: 'black-forest-labs/flux-fill-pro', modelParams: {} }),
+    makeSlot({ id: 'uuid-11', mode: 'inpaint', slot: 2, modelId: null, modelParams: {} }),
+    makeSlot({ id: 'uuid-12', mode: 'inpaint', slot: 3, modelId: null, modelParams: {} }),
+    makeSlot({ id: 'uuid-13', mode: 'outpaint', slot: 1, modelId: 'black-forest-labs/flux-fill-pro', modelParams: {} }),
+    makeSlot({ id: 'uuid-14', mode: 'outpaint', slot: 2, modelId: null, modelParams: {} }),
+    makeSlot({ id: 'uuid-15', mode: 'outpaint', slot: 3, modelId: null, modelParams: {} }),
+    makeSlot({ id: 'uuid-16', mode: 'erase', slot: 1, modelId: 'bria/eraser', modelParams: {} }),
+    makeSlot({ id: 'uuid-17', mode: 'erase', slot: 2, modelId: null, modelParams: {} }),
+    makeSlot({ id: 'uuid-18', mode: 'erase', slot: 3, modelId: null, modelParams: {} }),
+    makeSlot({ id: 'uuid-19', mode: 'instruction', slot: 1, modelId: 'black-forest-labs/flux-kontext-pro', modelParams: {} }),
+    makeSlot({ id: 'uuid-20', mode: 'instruction', slot: 2, modelId: null, modelParams: {} }),
+    makeSlot({ id: 'uuid-21', mode: 'instruction', slot: 3, modelId: null, modelParams: {} }),
   ]
 }
 
@@ -122,7 +111,7 @@ function makeModel(replicateId: string, capabilities: Record<string, boolean>) {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('ModelSlotService (slice-04-model-slot-service)', () => {
+describe('ModelSlotService', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -132,47 +121,30 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
   // =========================================================================
 
   describe('getAll()', () => {
-    /**
-     * AC-1: GIVEN die model_slots Tabelle enthaelt 21 Rows (7 Modes x 3 Slots)
-     *       WHEN ModelSlotService.getAll() aufgerufen wird
-     *       THEN wird ein Array mit 21 Elementen zurueckgegeben
-     */
-    it('AC-1: should return all 21 model slots', async () => {
+    it('should return all 21 model slots', async () => {
       const all21 = makeAll21Rows()
       mockGetAllModelSlots.mockResolvedValueOnce(all21)
 
       const result = await ModelSlotService.getAll()
 
-      // Must return exactly 21 elements
       expect(result).toHaveLength(21)
       expect(result).toEqual(all21)
 
-      // getAllModelSlots called once (table was not empty, no seeding)
       expect(mockGetAllModelSlots).toHaveBeenCalledTimes(1)
-      // seedModelSlotDefaults must NOT have been called
       expect(mockSeedModelSlotDefaults).not.toHaveBeenCalled()
     })
 
-    /**
-     * AC-2: GIVEN die model_slots Tabelle ist leer (0 Rows)
-     *       WHEN ModelSlotService.getAll() aufgerufen wird
-     *       THEN werden erst Defaults geseeded (21 Rows) und danach alle 21 Rows zurueckgegeben
-     */
-    it('AC-2: should seed defaults and return 21 rows when table is empty', async () => {
+    it('should seed defaults and return 21 rows when table is empty', async () => {
       const all21 = makeAll21Rows()
-      // First call returns empty (table is empty), second call returns seeded defaults
       mockGetAllModelSlots
-        .mockResolvedValueOnce([])        // first check: empty
-        .mockResolvedValueOnce(all21)     // after seeding: 21 entries
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce(all21)
       mockSeedModelSlotDefaults.mockResolvedValueOnce(undefined)
 
       const result = await ModelSlotService.getAll()
 
-      // Verify seeding was triggered
       expect(mockSeedModelSlotDefaults).toHaveBeenCalledTimes(1)
-      // Verify getAllModelSlots was called twice: once to check, once after seed
       expect(mockGetAllModelSlots).toHaveBeenCalledTimes(2)
-      // Verify 21 entries returned
       expect(result).toHaveLength(21)
       expect(result).toEqual(all21)
     })
@@ -183,35 +155,25 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
   // =========================================================================
 
   describe('getForMode()', () => {
-    /**
-     * AC-3: GIVEN model_slots enthaelt Rows fuer 7 Modes
-     *       WHEN ModelSlotService.getForMode("txt2img") aufgerufen wird
-     *       THEN wird ein Array mit exakt 3 Elementen zurueckgegeben (slot 1, 2, 3)
-     *       AND alle Elemente haben mode === "txt2img"
-     */
-    it('AC-3: should return exactly 3 slots for the given mode', async () => {
+    it('should return exactly 3 slots for the given mode', async () => {
       const txt2imgSlots = [
-        makeSlot({ id: 'uuid-01', mode: 'txt2img', slot: 1, modelId: 'black-forest-labs/flux-schnell', active: true }),
-        makeSlot({ id: 'uuid-02', mode: 'txt2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro', active: false }),
-        makeSlot({ id: 'uuid-03', mode: 'txt2img', slot: 3, modelId: 'black-forest-labs/flux-2-max', active: false }),
+        makeSlot({ id: 'uuid-01', mode: 'txt2img', slot: 1, modelId: 'black-forest-labs/flux-schnell' }),
+        makeSlot({ id: 'uuid-02', mode: 'txt2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro' }),
+        makeSlot({ id: 'uuid-03', mode: 'txt2img', slot: 3, modelId: 'black-forest-labs/flux-2-max' }),
       ]
       mockGetModelSlotsByMode.mockResolvedValueOnce(txt2imgSlots)
 
       const result = await ModelSlotService.getForMode('txt2img')
 
-      // Exactly 3 elements
       expect(result).toHaveLength(3)
 
-      // All elements have mode === "txt2img"
       for (const row of result) {
         expect(row.mode).toBe('txt2img')
       }
 
-      // Slots are 1, 2, 3
       const slotNumbers = result.map((r: Record<string, unknown>) => r.slot)
       expect(slotNumbers).toEqual([1, 2, 3])
 
-      // getModelSlotsByMode was called with the correct mode
       expect(mockGetModelSlotsByMode).toHaveBeenCalledWith('txt2img')
       expect(mockGetModelSlotsByMode).toHaveBeenCalledTimes(1)
     })
@@ -222,18 +184,11 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
   // =========================================================================
 
   describe('update()', () => {
-    /**
-     * AC-4: GIVEN slot 1 fuer mode txt2img hat model_id "black-forest-labs/flux-schnell"
-     *       WHEN ModelSlotService.update("txt2img", 1, "black-forest-labs/flux-2-pro") aufgerufen wird
-     *       AND das Model flux-2-pro ist kompatibel mit txt2img
-     *       THEN wird die aktualisierte Row zurueckgegeben mit modelId === "black-forest-labs/flux-2-pro"
-     */
-    it('AC-4: should update model_id when model is compatible with mode', async () => {
-      // txt2img is always compatible -- no DB lookup needed for compatibility
+    it('should update model_id when model is compatible with mode', async () => {
       const existingSlots = [
-        makeSlot({ id: 'uuid-01', mode: 'txt2img', slot: 1, modelId: 'black-forest-labs/flux-schnell', active: true }),
-        makeSlot({ id: 'uuid-02', mode: 'txt2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro', active: false }),
-        makeSlot({ id: 'uuid-03', mode: 'txt2img', slot: 3, modelId: 'black-forest-labs/flux-2-max', active: false }),
+        makeSlot({ id: 'uuid-01', mode: 'txt2img', slot: 1, modelId: 'black-forest-labs/flux-schnell' }),
+        makeSlot({ id: 'uuid-02', mode: 'txt2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro' }),
+        makeSlot({ id: 'uuid-03', mode: 'txt2img', slot: 3, modelId: 'black-forest-labs/flux-2-max' }),
       ]
       mockGetModelSlotsByMode.mockResolvedValueOnce(existingSlots)
 
@@ -242,66 +197,43 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
         mode: 'txt2img',
         slot: 1,
         modelId: 'black-forest-labs/flux-2-pro',
-        active: true,
         updatedAt: new Date('2026-03-29T13:00:00Z'),
       })
       mockUpsertModelSlot.mockResolvedValueOnce(updatedRow)
 
       const result = await ModelSlotService.update('txt2img', 1 as const, 'black-forest-labs/flux-2-pro')
 
-      // Must return the updated row
       expect(result).not.toHaveProperty('error')
       expect((result as Record<string, unknown>).modelId).toBe('black-forest-labs/flux-2-pro')
 
-      // upsertModelSlot was called with correct args
       expect(mockUpsertModelSlot).toHaveBeenCalledTimes(1)
       expect(mockUpsertModelSlot).toHaveBeenCalledWith(
         'txt2img',
         1,
         'black-forest-labs/flux-2-pro',
-        {},  // existing modelParams
-        true // preserve existing active state
+        {}  // existing modelParams
       )
     })
 
-    /**
-     * AC-5: GIVEN ein Model "some-org/img-only-model" das in der models Tabelle capabilities.txt2img === false hat
-     *       WHEN ModelSlotService.update("txt2img", 1, "some-org/img-only-model") aufgerufen wird
-     *       THEN wird { error: "Model not compatible with mode" } zurueckgegeben
-     *       AND die bestehende Row bleibt unveraendert
-     */
-    it('AC-5: should return error when model capabilities indicate incompatibility', async () => {
-      // For a non-txt2img mode the compatibility check actually hits getModelByReplicateId
-      // (txt2img is always compatible, so we test with img2img to hit the capability check)
+    it('should return error when model capabilities indicate incompatibility', async () => {
       mockGetModelByReplicateId.mockResolvedValueOnce(
         makeModel('some-org/img-only-model', { txt2img: true, img2img: false, upscale: false, inpaint: false, outpaint: false })
       )
 
       const result = await ModelSlotService.update('img2img', 1 as const, 'some-org/img-only-model')
 
-      // Must return error object
       expect(result).toEqual({ error: 'Model not compatible with mode' })
-
-      // DB must NOT have been written to
       expect(mockUpsertModelSlot).not.toHaveBeenCalled()
-
-      // getModelByReplicateId was called for the capability check
       expect(mockGetModelByReplicateId).toHaveBeenCalledWith('some-org/img-only-model')
     })
 
-    /**
-     * AC-6: GIVEN ein Model das NICHT in der models Tabelle existiert (kein DB-Eintrag)
-     *       WHEN ModelSlotService.update("img2img", 1, "unknown-org/new-model") aufgerufen wird
-     *       THEN wird der Update durchgefuehrt (Fallback: allow if model not in catalog)
-     */
-    it('AC-6: should allow update when model is not found in catalog', async () => {
-      // Model not found in DB -> returns null -> fallback: allow
+    it('should allow update when model is not found in catalog', async () => {
       mockGetModelByReplicateId.mockResolvedValueOnce(null)
 
       const existingSlots = [
-        makeSlot({ id: 'uuid-04', mode: 'img2img', slot: 1, modelId: 'black-forest-labs/flux-schnell', modelParams: { prompt_strength: 0.6 }, active: true }),
-        makeSlot({ id: 'uuid-05', mode: 'img2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro', modelParams: { prompt_strength: 0.6 }, active: false }),
-        makeSlot({ id: 'uuid-06', mode: 'img2img', slot: 3, modelId: 'black-forest-labs/flux-2-max', modelParams: { prompt_strength: 0.6 }, active: false }),
+        makeSlot({ id: 'uuid-04', mode: 'img2img', slot: 1, modelId: 'black-forest-labs/flux-schnell', modelParams: { prompt_strength: 0.6 } }),
+        makeSlot({ id: 'uuid-05', mode: 'img2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro', modelParams: { prompt_strength: 0.6 } }),
+        makeSlot({ id: 'uuid-06', mode: 'img2img', slot: 3, modelId: 'black-forest-labs/flux-2-max', modelParams: { prompt_strength: 0.6 } }),
       ]
       mockGetModelSlotsByMode.mockResolvedValueOnce(existingSlots)
 
@@ -311,36 +243,24 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
         slot: 1,
         modelId: 'unknown-org/new-model',
         modelParams: { prompt_strength: 0.6 },
-        active: true,
         updatedAt: new Date('2026-03-29T13:00:00Z'),
       })
       mockUpsertModelSlot.mockResolvedValueOnce(updatedRow)
 
       const result = await ModelSlotService.update('img2img', 1 as const, 'unknown-org/new-model')
 
-      // Must return updated row (no error)
       expect(result).not.toHaveProperty('error')
       expect((result as Record<string, unknown>).modelId).toBe('unknown-org/new-model')
 
-      // upsertModelSlot was called (update proceeded)
       expect(mockUpsertModelSlot).toHaveBeenCalledTimes(1)
-
-      // getModelByReplicateId was called for fallback check
       expect(mockGetModelByReplicateId).toHaveBeenCalledWith('unknown-org/new-model')
     })
 
-    /**
-     * AC-7: GIVEN slot 2 fuer mode txt2img hat model_id=NULL (leerer Slot)
-     *       WHEN ModelSlotService.update("txt2img", 2, "black-forest-labs/flux-2-pro") aufgerufen wird
-     *       THEN wird die Row aktualisiert mit dem neuen model_id
-     *       AND active wird automatisch auf true gesetzt (Auto-Aktivierung)
-     */
-    it('AC-7: should auto-activate slot when assigning model to empty slot', async () => {
-      // txt2img is always compatible -- no DB lookup for compatibility
+    it('should assign a model to a previously empty slot', async () => {
       const existingSlots = [
-        makeSlot({ id: 'uuid-01', mode: 'txt2img', slot: 1, modelId: 'black-forest-labs/flux-schnell', active: true }),
-        makeSlot({ id: 'uuid-02', mode: 'txt2img', slot: 2, modelId: null, active: false }),
-        makeSlot({ id: 'uuid-03', mode: 'txt2img', slot: 3, modelId: 'black-forest-labs/flux-2-max', active: false }),
+        makeSlot({ id: 'uuid-01', mode: 'txt2img', slot: 1, modelId: 'black-forest-labs/flux-schnell' }),
+        makeSlot({ id: 'uuid-02', mode: 'txt2img', slot: 2, modelId: null }),
+        makeSlot({ id: 'uuid-03', mode: 'txt2img', slot: 3, modelId: 'black-forest-labs/flux-2-max' }),
       ]
       mockGetModelSlotsByMode.mockResolvedValueOnce(existingSlots)
 
@@ -349,120 +269,22 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
         mode: 'txt2img',
         slot: 2,
         modelId: 'black-forest-labs/flux-2-pro',
-        active: true,  // auto-activated
         updatedAt: new Date('2026-03-29T13:00:00Z'),
       })
       mockUpsertModelSlot.mockResolvedValueOnce(updatedRow)
 
       const result = await ModelSlotService.update('txt2img', 2 as const, 'black-forest-labs/flux-2-pro')
 
-      // Must return updated row (no error)
       expect(result).not.toHaveProperty('error')
       expect((result as Record<string, unknown>).modelId).toBe('black-forest-labs/flux-2-pro')
-      expect((result as Record<string, unknown>).active).toBe(true)
 
-      // upsertModelSlot must have been called with active=true (auto-activation)
       expect(mockUpsertModelSlot).toHaveBeenCalledTimes(1)
       expect(mockUpsertModelSlot).toHaveBeenCalledWith(
         'txt2img',
         2,
         'black-forest-labs/flux-2-pro',
-        {},    // modelParams from existing slot
-        true   // auto-activated because slot was empty
+        {}
       )
-    })
-  })
-
-  // =========================================================================
-  // toggleActive()
-  // =========================================================================
-
-  describe('toggleActive()', () => {
-    /**
-     * AC-8: GIVEN fuer mode txt2img sind slot 1 (active=true) und slot 2 (active=true) aktiv, slot 3 (active=false) inaktiv
-     *       WHEN ModelSlotService.toggleActive("txt2img", 2, false) aufgerufen wird
-     *       THEN wird slot 2 auf active=false gesetzt und die aktualisierte Row zurueckgegeben
-     */
-    it('AC-8: should deactivate slot when at least one other slot remains active', async () => {
-      const existingSlots = [
-        makeSlot({ id: 'uuid-01', mode: 'txt2img', slot: 1, modelId: 'black-forest-labs/flux-schnell', active: true }),
-        makeSlot({ id: 'uuid-02', mode: 'txt2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro', active: true }),
-        makeSlot({ id: 'uuid-03', mode: 'txt2img', slot: 3, modelId: 'black-forest-labs/flux-2-max', active: false }),
-      ]
-      mockGetModelSlotsByMode.mockResolvedValueOnce(existingSlots)
-
-      const updatedRow = makeSlot({
-        id: 'uuid-02',
-        mode: 'txt2img',
-        slot: 2,
-        modelId: 'black-forest-labs/flux-2-pro',
-        active: false,
-        updatedAt: new Date('2026-03-29T13:00:00Z'),
-      })
-      mockUpsertModelSlot.mockResolvedValueOnce(updatedRow)
-
-      const result = await ModelSlotService.toggleActive('txt2img', 2 as const, false)
-
-      // Must return updated row with active=false
-      expect(result).not.toHaveProperty('error')
-      expect((result as Record<string, unknown>).active).toBe(false)
-      expect((result as Record<string, unknown>).slot).toBe(2)
-
-      // upsertModelSlot was called with active=false
-      expect(mockUpsertModelSlot).toHaveBeenCalledTimes(1)
-      expect(mockUpsertModelSlot).toHaveBeenCalledWith(
-        'txt2img',
-        2,
-        'black-forest-labs/flux-2-pro',
-        {},
-        false
-      )
-    })
-
-    /**
-     * AC-9: GIVEN fuer mode txt2img ist NUR slot 1 aktiv (active=true), slots 2+3 sind inactive
-     *       WHEN ModelSlotService.toggleActive("txt2img", 1, false) aufgerufen wird
-     *       THEN wird { error: "Cannot deactivate last active slot" } zurueckgegeben
-     *       AND slot 1 bleibt active=true
-     */
-    it('AC-9: should return error when attempting to deactivate last active slot', async () => {
-      const existingSlots = [
-        makeSlot({ id: 'uuid-01', mode: 'txt2img', slot: 1, modelId: 'black-forest-labs/flux-schnell', active: true }),
-        makeSlot({ id: 'uuid-02', mode: 'txt2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro', active: false }),
-        makeSlot({ id: 'uuid-03', mode: 'txt2img', slot: 3, modelId: 'black-forest-labs/flux-2-max', active: false }),
-      ]
-      mockGetModelSlotsByMode.mockResolvedValueOnce(existingSlots)
-
-      const result = await ModelSlotService.toggleActive('txt2img', 1 as const, false)
-
-      // Must return error object
-      expect(result).toEqual({ error: 'Cannot deactivate last active slot' })
-
-      // DB must NOT have been written to
-      expect(mockUpsertModelSlot).not.toHaveBeenCalled()
-    })
-
-    /**
-     * AC-10: GIVEN slot 3 fuer mode txt2img hat model_id=NULL (leerer Slot)
-     *        WHEN ModelSlotService.toggleActive("txt2img", 3, true) aufgerufen wird
-     *        THEN wird { error: "Cannot activate empty slot" } zurueckgegeben
-     *        AND slot 3 bleibt active=false
-     */
-    it('AC-10: should return error when attempting to activate slot with no model', async () => {
-      const existingSlots = [
-        makeSlot({ id: 'uuid-01', mode: 'txt2img', slot: 1, modelId: 'black-forest-labs/flux-schnell', active: true }),
-        makeSlot({ id: 'uuid-02', mode: 'txt2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro', active: false }),
-        makeSlot({ id: 'uuid-03', mode: 'txt2img', slot: 3, modelId: null, active: false }),
-      ]
-      mockGetModelSlotsByMode.mockResolvedValueOnce(existingSlots)
-
-      const result = await ModelSlotService.toggleActive('txt2img', 3 as const, true)
-
-      // Must return error object
-      expect(result).toEqual({ error: 'Cannot activate empty slot' })
-
-      // DB must NOT have been written to
-      expect(mockUpsertModelSlot).not.toHaveBeenCalled()
     })
   })
 
@@ -471,20 +293,12 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
   // =========================================================================
 
   describe('seedDefaults()', () => {
-    /**
-     * AC-11: GIVEN die model_slots Tabelle ist leer
-     *        WHEN ModelSlotService.seedDefaults() aufgerufen wird
-     *        THEN enthaelt die Tabelle exakt 21 Rows (7 Modes x 3 Slots)
-     *        AND die Seed-Daten entsprechen architecture.md Section "Seed Defaults"
-     */
-    it('AC-11: should seed 21 default rows matching architecture.md seed defaults', async () => {
+    it('should call seedModelSlotDefaults once', async () => {
       mockSeedModelSlotDefaults.mockResolvedValueOnce(undefined)
 
       await ModelSlotService.seedDefaults()
 
-      // seedModelSlotDefaults was called exactly once
       expect(mockSeedModelSlotDefaults).toHaveBeenCalledTimes(1)
-      // No arguments passed (the query function handles the 21 seed rows internally)
       expect(mockSeedModelSlotDefaults).toHaveBeenCalledWith()
     })
   })
@@ -495,22 +309,18 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
 
   describe('checkCompatibility (internal, tested via update())', () => {
     it('should skip DB lookup for txt2img mode (always compatible)', async () => {
-      // txt2img mode: checkCompatibility returns true without DB lookup
       const existingSlots = [
-        makeSlot({ id: 'uuid-01', mode: 'txt2img', slot: 1, modelId: 'black-forest-labs/flux-schnell', active: true }),
+        makeSlot({ id: 'uuid-01', mode: 'txt2img', slot: 1, modelId: 'black-forest-labs/flux-schnell' }),
       ]
       mockGetModelSlotsByMode.mockResolvedValueOnce(existingSlots)
       mockUpsertModelSlot.mockResolvedValueOnce(
-        makeSlot({ modelId: 'any/model', mode: 'txt2img', slot: 1, active: true })
+        makeSlot({ modelId: 'any/model', mode: 'txt2img', slot: 1 })
       )
 
       const result = await ModelSlotService.update('txt2img', 1 as const, 'any/model')
 
-      // No error returned
       expect(result).not.toHaveProperty('error')
-      // getModelByReplicateId must NOT be called for txt2img
       expect(mockGetModelByReplicateId).not.toHaveBeenCalled()
-      // upsertModelSlot was called (update proceeded)
       expect(mockUpsertModelSlot).toHaveBeenCalledTimes(1)
     })
 
@@ -520,16 +330,15 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
       mockGetModelByReplicateId.mockResolvedValueOnce(modelWithNullCaps)
 
       const existingSlots = [
-        makeSlot({ id: 'uuid-04', mode: 'img2img', slot: 1, modelId: 'old/model', modelParams: { prompt_strength: 0.6 }, active: true }),
+        makeSlot({ id: 'uuid-04', mode: 'img2img', slot: 1, modelId: 'old/model', modelParams: { prompt_strength: 0.6 } }),
       ]
       mockGetModelSlotsByMode.mockResolvedValueOnce(existingSlots)
       mockUpsertModelSlot.mockResolvedValueOnce(
-        makeSlot({ modelId: 'owner/model', mode: 'img2img', slot: 1, active: true })
+        makeSlot({ modelId: 'owner/model', mode: 'img2img', slot: 1 })
       )
 
       const result = await ModelSlotService.update('img2img', 1 as const, 'owner/model')
 
-      // Fallback: null capabilities -> allow update
       expect(result).not.toHaveProperty('error')
       expect(mockUpsertModelSlot).toHaveBeenCalledTimes(1)
     })
@@ -538,63 +347,17 @@ describe('ModelSlotService (slice-04-model-slot-service)', () => {
       mockGetModelByReplicateId.mockRejectedValueOnce(new Error('DB connection failed'))
 
       const existingSlots = [
-        makeSlot({ id: 'uuid-04', mode: 'img2img', slot: 1, modelId: 'old/model', modelParams: { prompt_strength: 0.6 }, active: true }),
+        makeSlot({ id: 'uuid-04', mode: 'img2img', slot: 1, modelId: 'old/model', modelParams: { prompt_strength: 0.6 } }),
       ]
       mockGetModelSlotsByMode.mockResolvedValueOnce(existingSlots)
       mockUpsertModelSlot.mockResolvedValueOnce(
-        makeSlot({ modelId: 'owner/model', mode: 'img2img', slot: 1, active: true })
+        makeSlot({ modelId: 'owner/model', mode: 'img2img', slot: 1 })
       )
 
       const result = await ModelSlotService.update('img2img', 1 as const, 'owner/model')
 
-      // Fallback: DB error -> allow update
       expect(result).not.toHaveProperty('error')
       expect(mockUpsertModelSlot).toHaveBeenCalledTimes(1)
-    })
-
-    it('should preserve existing active state when updating a slot that already has a model', async () => {
-      // Slot already has a model and active=false -- updating model should keep active=false
-      const existingSlots = [
-        makeSlot({ id: 'uuid-01', mode: 'txt2img', slot: 1, modelId: 'old/model', active: false }),
-      ]
-      mockGetModelSlotsByMode.mockResolvedValueOnce(existingSlots)
-
-      const updatedRow = makeSlot({
-        mode: 'txt2img',
-        slot: 1,
-        modelId: 'new/model',
-        active: false,
-      })
-      mockUpsertModelSlot.mockResolvedValueOnce(updatedRow)
-
-      const result = await ModelSlotService.update('txt2img', 1 as const, 'new/model')
-
-      expect(result).not.toHaveProperty('error')
-      // active should be preserved as false (slot was not empty)
-      expect(mockUpsertModelSlot).toHaveBeenCalledWith(
-        'txt2img',
-        1,
-        'new/model',
-        {},
-        false  // preserve existing active state
-      )
-    })
-  })
-
-  describe('toggleActive() edge cases', () => {
-    it('should return error when slot is not found', async () => {
-      // Mode has no slots matching the requested slot number
-      const existingSlots = [
-        makeSlot({ id: 'uuid-01', mode: 'txt2img', slot: 1, modelId: 'model/a', active: true }),
-        makeSlot({ id: 'uuid-02', mode: 'txt2img', slot: 2, modelId: 'model/b', active: false }),
-        // slot 3 missing from the query result
-      ]
-      mockGetModelSlotsByMode.mockResolvedValueOnce(existingSlots)
-
-      const result = await ModelSlotService.toggleActive('txt2img', 3 as const, true)
-
-      expect(result).toEqual({ error: 'Slot not found' })
-      expect(mockUpsertModelSlot).not.toHaveBeenCalled()
     })
   })
 })

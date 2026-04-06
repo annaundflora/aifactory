@@ -77,9 +77,9 @@ type SlotImageContext = CanvasImageContext & {
 };
 
 function buildImageContext(generation: Generation, modelSlots: ModelSlot[]): SlotImageContext {
-  // Build active_model_ids from active img2img model slots
+  // Build active_model_ids from img2img model slots with an assigned model
   const activeModelIds = modelSlots
-    .filter((s) => s.mode === "img2img" && s.active && s.modelId != null)
+    .filter((s) => s.mode === "img2img" && s.modelId != null)
     .map((s) => s.modelId as string);
 
   return {

@@ -77,7 +77,6 @@ function makeSlot(overrides: Partial<{
   slot: number
   modelId: string | null
   modelParams: Record<string, unknown>
-  active: boolean
   createdAt: Date
   updatedAt: Date
 }>): Record<string, unknown> {
@@ -87,36 +86,35 @@ function makeSlot(overrides: Partial<{
     slot: overrides.slot ?? 1,
     modelId: overrides.modelId ?? 'black-forest-labs/flux-schnell',
     modelParams: overrides.modelParams ?? {},
-    active: overrides.active ?? true,
     createdAt: overrides.createdAt ?? NOW,
     updatedAt: overrides.updatedAt ?? NOW,
   }
 }
 
-/** All 21 seed default rows as described in architecture.md */
+/** All 21 seed default rows. */
 function makeAll21Rows(): Record<string, unknown>[] {
   return [
-    makeSlot({ id: 'uuid-01', mode: 'txt2img', slot: 1, modelId: 'black-forest-labs/flux-schnell', modelParams: {}, active: true }),
-    makeSlot({ id: 'uuid-02', mode: 'txt2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro', modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-03', mode: 'txt2img', slot: 3, modelId: 'black-forest-labs/flux-2-max', modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-04', mode: 'img2img', slot: 1, modelId: 'black-forest-labs/flux-schnell', modelParams: { prompt_strength: 0.6 }, active: true }),
-    makeSlot({ id: 'uuid-05', mode: 'img2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro', modelParams: { prompt_strength: 0.6 }, active: false }),
-    makeSlot({ id: 'uuid-06', mode: 'img2img', slot: 3, modelId: 'black-forest-labs/flux-2-max', modelParams: { prompt_strength: 0.6 }, active: false }),
-    makeSlot({ id: 'uuid-07', mode: 'upscale', slot: 1, modelId: 'philz1337x/crystal-upscaler', modelParams: { scale: 4 }, active: true }),
-    makeSlot({ id: 'uuid-08', mode: 'upscale', slot: 2, modelId: 'nightmareai/real-esrgan', modelParams: { scale: 2 }, active: false }),
-    makeSlot({ id: 'uuid-09', mode: 'upscale', slot: 3, modelId: null, modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-10', mode: 'inpaint', slot: 1, modelId: 'black-forest-labs/flux-fill-pro', modelParams: {}, active: true }),
-    makeSlot({ id: 'uuid-11', mode: 'inpaint', slot: 2, modelId: null, modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-12', mode: 'inpaint', slot: 3, modelId: null, modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-13', mode: 'outpaint', slot: 1, modelId: 'black-forest-labs/flux-fill-pro', modelParams: {}, active: true }),
-    makeSlot({ id: 'uuid-14', mode: 'outpaint', slot: 2, modelId: null, modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-15', mode: 'outpaint', slot: 3, modelId: null, modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-16', mode: 'erase', slot: 1, modelId: 'bria/eraser', modelParams: {}, active: true }),
-    makeSlot({ id: 'uuid-17', mode: 'erase', slot: 2, modelId: null, modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-18', mode: 'erase', slot: 3, modelId: null, modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-19', mode: 'instruction', slot: 1, modelId: 'black-forest-labs/flux-kontext-pro', modelParams: {}, active: true }),
-    makeSlot({ id: 'uuid-20', mode: 'instruction', slot: 2, modelId: null, modelParams: {}, active: false }),
-    makeSlot({ id: 'uuid-21', mode: 'instruction', slot: 3, modelId: null, modelParams: {}, active: false }),
+    makeSlot({ id: 'uuid-01', mode: 'txt2img', slot: 1, modelId: 'black-forest-labs/flux-schnell', modelParams: {} }),
+    makeSlot({ id: 'uuid-02', mode: 'txt2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro', modelParams: {} }),
+    makeSlot({ id: 'uuid-03', mode: 'txt2img', slot: 3, modelId: 'black-forest-labs/flux-2-max', modelParams: {} }),
+    makeSlot({ id: 'uuid-04', mode: 'img2img', slot: 1, modelId: 'black-forest-labs/flux-schnell', modelParams: { prompt_strength: 0.6 } }),
+    makeSlot({ id: 'uuid-05', mode: 'img2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro', modelParams: { prompt_strength: 0.6 } }),
+    makeSlot({ id: 'uuid-06', mode: 'img2img', slot: 3, modelId: 'black-forest-labs/flux-2-max', modelParams: { prompt_strength: 0.6 } }),
+    makeSlot({ id: 'uuid-07', mode: 'upscale', slot: 1, modelId: 'philz1337x/crystal-upscaler', modelParams: { scale: 4 } }),
+    makeSlot({ id: 'uuid-08', mode: 'upscale', slot: 2, modelId: 'nightmareai/real-esrgan', modelParams: { scale: 2 } }),
+    makeSlot({ id: 'uuid-09', mode: 'upscale', slot: 3, modelId: null, modelParams: {} }),
+    makeSlot({ id: 'uuid-10', mode: 'inpaint', slot: 1, modelId: 'black-forest-labs/flux-fill-pro', modelParams: {} }),
+    makeSlot({ id: 'uuid-11', mode: 'inpaint', slot: 2, modelId: null, modelParams: {} }),
+    makeSlot({ id: 'uuid-12', mode: 'inpaint', slot: 3, modelId: null, modelParams: {} }),
+    makeSlot({ id: 'uuid-13', mode: 'outpaint', slot: 1, modelId: 'black-forest-labs/flux-fill-pro', modelParams: {} }),
+    makeSlot({ id: 'uuid-14', mode: 'outpaint', slot: 2, modelId: null, modelParams: {} }),
+    makeSlot({ id: 'uuid-15', mode: 'outpaint', slot: 3, modelId: null, modelParams: {} }),
+    makeSlot({ id: 'uuid-16', mode: 'erase', slot: 1, modelId: 'bria/eraser', modelParams: {} }),
+    makeSlot({ id: 'uuid-17', mode: 'erase', slot: 2, modelId: null, modelParams: {} }),
+    makeSlot({ id: 'uuid-18', mode: 'erase', slot: 3, modelId: null, modelParams: {} }),
+    makeSlot({ id: 'uuid-19', mode: 'instruction', slot: 1, modelId: 'black-forest-labs/flux-kontext-pro', modelParams: {} }),
+    makeSlot({ id: 'uuid-20', mode: 'instruction', slot: 2, modelId: null, modelParams: {} }),
+    makeSlot({ id: 'uuid-21', mode: 'instruction', slot: 3, modelId: null, modelParams: {} }),
   ]
 }
 
@@ -151,7 +149,6 @@ describe('model_slots query functions (slice-02-db-queries)', () => {
       expect(row).toHaveProperty('slot')
       expect(row).toHaveProperty('modelId')
       expect(row).toHaveProperty('modelParams')
-      expect(row).toHaveProperty('active')
       expect(row).toHaveProperty('createdAt')
       expect(row).toHaveProperty('updatedAt')
     }
@@ -173,9 +170,9 @@ describe('model_slots query functions (slice-02-db-queries)', () => {
   // =========================================================================
   it('AC-2: should return only slots for the given mode sorted by slot asc', async () => {
     const txt2imgSlots = [
-      makeSlot({ id: 'uuid-01', mode: 'txt2img', slot: 1, modelId: 'black-forest-labs/flux-schnell', active: true }),
-      makeSlot({ id: 'uuid-02', mode: 'txt2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro', active: false }),
-      makeSlot({ id: 'uuid-03', mode: 'txt2img', slot: 3, modelId: 'black-forest-labs/flux-2-max', active: false }),
+      makeSlot({ id: 'uuid-01', mode: 'txt2img', slot: 1, modelId: 'black-forest-labs/flux-schnell' }),
+      makeSlot({ id: 'uuid-02', mode: 'txt2img', slot: 2, modelId: 'black-forest-labs/flux-2-pro' }),
+      makeSlot({ id: 'uuid-03', mode: 'txt2img', slot: 3, modelId: 'black-forest-labs/flux-2-max' }),
     ]
     mockChain = createChainableMock(txt2imgSlots)
 
@@ -214,19 +211,17 @@ describe('model_slots query functions (slice-02-db-queries)', () => {
       slot: 1,
       modelId: 'black-forest-labs/flux-2-pro',
       modelParams: { guidance: 3.5 },
-      active: true,
       createdAt: NOW,
       updatedAt: LATER,
     })
     // Drizzle upsert returns [row] from .returning()
     mockChain = createChainableMock([updatedRow])
 
-    const result = await upsertModelSlot('txt2img', 1, 'black-forest-labs/flux-2-pro', { guidance: 3.5 }, true)
+    const result = await upsertModelSlot('txt2img', 1, 'black-forest-labs/flux-2-pro', { guidance: 3.5 })
 
     // Verify the returned row fields
     expect(result.modelId).toBe('black-forest-labs/flux-2-pro')
     expect(result.modelParams).toEqual({ guidance: 3.5 })
-    expect(result.active).toBe(true)
     expect(result.mode).toBe('txt2img')
     expect(result.slot).toBe(1)
 
@@ -254,20 +249,18 @@ describe('model_slots query functions (slice-02-db-queries)', () => {
       slot: 2,
       modelId: 'some-model/id',
       modelParams: {},
-      active: false,
       createdAt: NOW,
       updatedAt: NOW,
     })
     mockChain = createChainableMock([insertedRow])
 
-    const result = await upsertModelSlot('inpaint', 2, 'some-model/id', {}, false)
+    const result = await upsertModelSlot('inpaint', 2, 'some-model/id', {})
 
     // Verify the returned row fields
     expect(result.mode).toBe('inpaint')
     expect(result.slot).toBe(2)
     expect(result.modelId).toBe('some-model/id')
     expect(result.modelParams).toEqual({})
-    expect(result.active).toBe(false)
 
     // Verify the upsert chain was invoked
     expect(mockChain.insert).toHaveBeenCalled()
@@ -298,7 +291,6 @@ describe('model_slots query functions (slice-02-db-queries)', () => {
       slot: number
       modelId: string | null
       modelParams: Record<string, unknown>
-      active: boolean
     }>
 
     // Must be exactly 21 rows
@@ -317,16 +309,9 @@ describe('model_slots query functions (slice-02-db-queries)', () => {
       expect(slotNumbers, `${mode} slots should be 1, 2, 3`).toEqual([1, 2, 3])
     }
 
-    // -- Verify slot 1 is active=true, slots 2 and 3 are active=false for every mode --
-    for (const mode of modes) {
-      const modeRows = valuesCall.filter((v) => v.mode === mode)
-      const slot1 = modeRows.find((v) => v.slot === 1)
-      const slot2 = modeRows.find((v) => v.slot === 2)
-      const slot3 = modeRows.find((v) => v.slot === 3)
-
-      expect(slot1!.active, `${mode} slot 1 should be active`).toBe(true)
-      expect(slot2!.active, `${mode} slot 2 should be inactive`).toBe(false)
-      expect(slot3!.active, `${mode} slot 3 should be inactive`).toBe(false)
+    // -- Verify no row carries an `active` flag (removed in migration 0014) --
+    for (const row of valuesCall) {
+      expect(row as Record<string, unknown>).not.toHaveProperty('active')
     }
 
     // -- Verify specific seed data from architecture.md --

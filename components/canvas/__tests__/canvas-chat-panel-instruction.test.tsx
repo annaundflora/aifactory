@@ -146,7 +146,6 @@ function makeModelSlot(overrides: Partial<ModelSlot> = {}): ModelSlot {
     slot: overrides.slot ?? 1,
     modelId: overrides.modelId ?? "flux-kontext-pro",
     modelParams: overrides.modelParams ?? { guidance_scale: 7.5 },
-    active: overrides.active ?? true,
     createdAt: overrides.createdAt ?? new Date(),
     updatedAt: overrides.updatedAt ?? new Date(),
   };

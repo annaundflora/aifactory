@@ -17,12 +17,6 @@ export type UpdateModelSlotInput = {
   modelParams?: Record<string, unknown>;
 };
 
-export type ToggleSlotActiveInput = {
-  mode: GenerationMode;
-  slot: SlotNumber;
-  active: boolean;
-};
-
 export type ClearModelSlotInput = {
   mode: GenerationMode;
   slot: SlotNumber;
@@ -111,32 +105,7 @@ export async function updateModelSlot(
 }
 
 /**
- * Toggles the active state of a model slot. Validates mode and slot
- * before delegating to ModelSlotService.toggleActive(). Returns the
- * updated ModelSlot on success, or an error object on validation failure
- * or business rule violation (e.g. min-1-active).
- */
-export async function toggleSlotActive(
-  input: ToggleSlotActiveInput
-): Promise<ModelSlot | { error: string }> {
-  const auth = await requireAuth();
-  if ("error" in auth) {
-    return { error: auth.error };
-  }
-
-  // Validate mode
-  const modeError = validateMode(input.mode);
-  if (modeError) return modeError;
-
-  // Validate slot
-  const slotError = validateSlot(input.slot);
-  if (slotError) return slotError;
-
-  return ModelSlotService.toggleActive(input.mode, input.slot, input.active);
-}
-
-/**
- * Clears a model slot (removes model assignment, sets inactive).
+ * Clears a model slot (removes model assignment).
  * Validates mode and slot before delegating to ModelSlotService.clear().
  */
 export async function clearModelSlot(

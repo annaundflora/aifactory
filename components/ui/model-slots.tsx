@@ -93,8 +93,8 @@ function SlotRow({
 
   const handleModelChange = useCallback(
     (modelId: string) => {
-      // Optimistic update: set model and auto-activate
-      onSlotUpdate({ ...slot, modelId, active: true });
+      // Optimistic update: set model
+      onSlotUpdate({ ...slot, modelId });
 
       startTransition(async () => {
         const result = await updateModelSlot({
@@ -147,7 +147,7 @@ function SlotRow({
     }
 
     // Optimistic update: clear model
-    onSlotUpdate({ ...slot, modelId: null, modelParams: {}, active: false });
+    onSlotUpdate({ ...slot, modelId: null, modelParams: {} });
 
     startTransition(async () => {
       const result = await clearModelSlotAction({
@@ -326,7 +326,7 @@ export function ModelSlots({
   // Sync optimistic state when props change (e.g. mode switch, external refresh)
   // Use a stable key check on slot IDs + model assignments
   const slotsKey = slots
-    .map((s) => `${s.id}:${s.modelId}:${s.active}:${s.slot}`)
+    .map((s) => `${s.id}:${s.modelId}:${s.slot}`)
     .join("|");
   const [prevSlotsKey, setPrevSlotsKey] = useState(slotsKey);
   if (slotsKey !== prevSlotsKey) {
@@ -348,7 +348,6 @@ export function ModelSlots({
           slot: n,
           modelId: null,
           modelParams: {},
-          active: n === 1,
           createdAt: new Date(),
           updatedAt: new Date(),
         },

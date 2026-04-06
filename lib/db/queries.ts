@@ -650,8 +650,7 @@ export async function upsertModelSlot(
   mode: string,
   slot: number,
   modelId: string,
-  modelParams: Record<string, unknown>,
-  active: boolean
+  modelParams: Record<string, unknown>
 ): Promise<ModelSlot> {
   const [row] = await db
     .insert(modelSlots)
@@ -660,14 +659,12 @@ export async function upsertModelSlot(
       slot,
       modelId,
       modelParams,
-      active,
     })
     .onConflictDoUpdate({
       target: [modelSlots.mode, modelSlots.slot],
       set: {
         modelId,
         modelParams,
-        active,
         updatedAt: new Date(),
       },
     })
@@ -676,8 +673,8 @@ export async function upsertModelSlot(
 }
 
 /**
- * Clears a model slot by setting modelId to null, modelParams to {},
- * and active to false. Used for removing a model from a slot.
+ * Clears a model slot by setting modelId to null and modelParams to {}.
+ * Used for removing a model from a slot.
  */
 export async function clearModelSlot(
   mode: string,
@@ -688,7 +685,6 @@ export async function clearModelSlot(
     .set({
       modelId: null,
       modelParams: {},
-      active: false,
       updatedAt: new Date(),
     })
     .where(
@@ -711,36 +707,35 @@ export async function seedModelSlotDefaults(): Promise<void> {
     slot: number;
     modelId: string | null;
     modelParams: Record<string, unknown>;
-    active: boolean;
   }[] = [
     // txt2img
-    { mode: "txt2img", slot: 1, modelId: "black-forest-labs/flux-schnell", modelParams: {}, active: true },
-    { mode: "txt2img", slot: 2, modelId: "black-forest-labs/flux-2-pro", modelParams: {}, active: false },
-    { mode: "txt2img", slot: 3, modelId: "black-forest-labs/flux-2-max", modelParams: {}, active: false },
+    { mode: "txt2img", slot: 1, modelId: "black-forest-labs/flux-schnell", modelParams: {} },
+    { mode: "txt2img", slot: 2, modelId: "black-forest-labs/flux-2-pro", modelParams: {} },
+    { mode: "txt2img", slot: 3, modelId: "black-forest-labs/flux-2-max", modelParams: {} },
     // img2img
-    { mode: "img2img", slot: 1, modelId: "black-forest-labs/flux-schnell", modelParams: { prompt_strength: 0.6 }, active: true },
-    { mode: "img2img", slot: 2, modelId: "black-forest-labs/flux-2-pro", modelParams: { prompt_strength: 0.6 }, active: false },
-    { mode: "img2img", slot: 3, modelId: "black-forest-labs/flux-2-max", modelParams: { prompt_strength: 0.6 }, active: false },
+    { mode: "img2img", slot: 1, modelId: "black-forest-labs/flux-schnell", modelParams: { prompt_strength: 0.6 } },
+    { mode: "img2img", slot: 2, modelId: "black-forest-labs/flux-2-pro", modelParams: { prompt_strength: 0.6 } },
+    { mode: "img2img", slot: 3, modelId: "black-forest-labs/flux-2-max", modelParams: { prompt_strength: 0.6 } },
     // upscale
-    { mode: "upscale", slot: 1, modelId: "philz1337x/crystal-upscaler", modelParams: { scale: 4 }, active: true },
-    { mode: "upscale", slot: 2, modelId: "nightmareai/real-esrgan", modelParams: { scale: 2 }, active: false },
-    { mode: "upscale", slot: 3, modelId: null, modelParams: {}, active: false },
+    { mode: "upscale", slot: 1, modelId: "philz1337x/crystal-upscaler", modelParams: { scale: 4 } },
+    { mode: "upscale", slot: 2, modelId: "nightmareai/real-esrgan", modelParams: { scale: 2 } },
+    { mode: "upscale", slot: 3, modelId: null, modelParams: {} },
     // inpaint
-    { mode: "inpaint", slot: 1, modelId: "black-forest-labs/flux-fill-pro", modelParams: {}, active: true },
-    { mode: "inpaint", slot: 2, modelId: null, modelParams: {}, active: false },
-    { mode: "inpaint", slot: 3, modelId: null, modelParams: {}, active: false },
+    { mode: "inpaint", slot: 1, modelId: "black-forest-labs/flux-fill-pro", modelParams: {} },
+    { mode: "inpaint", slot: 2, modelId: null, modelParams: {} },
+    { mode: "inpaint", slot: 3, modelId: null, modelParams: {} },
     // outpaint
-    { mode: "outpaint", slot: 1, modelId: "black-forest-labs/flux-fill-pro", modelParams: {}, active: true },
-    { mode: "outpaint", slot: 2, modelId: null, modelParams: {}, active: false },
-    { mode: "outpaint", slot: 3, modelId: null, modelParams: {}, active: false },
+    { mode: "outpaint", slot: 1, modelId: "black-forest-labs/flux-fill-pro", modelParams: {} },
+    { mode: "outpaint", slot: 2, modelId: null, modelParams: {} },
+    { mode: "outpaint", slot: 3, modelId: null, modelParams: {} },
     // erase
-    { mode: "erase", slot: 1, modelId: "bria/eraser", modelParams: {}, active: true },
-    { mode: "erase", slot: 2, modelId: null, modelParams: {}, active: false },
-    { mode: "erase", slot: 3, modelId: null, modelParams: {}, active: false },
+    { mode: "erase", slot: 1, modelId: "bria/eraser", modelParams: {} },
+    { mode: "erase", slot: 2, modelId: null, modelParams: {} },
+    { mode: "erase", slot: 3, modelId: null, modelParams: {} },
     // instruction
-    { mode: "instruction", slot: 1, modelId: "black-forest-labs/flux-kontext-pro", modelParams: {}, active: true },
-    { mode: "instruction", slot: 2, modelId: null, modelParams: {}, active: false },
-    { mode: "instruction", slot: 3, modelId: null, modelParams: {}, active: false },
+    { mode: "instruction", slot: 1, modelId: "black-forest-labs/flux-kontext-pro", modelParams: {} },
+    { mode: "instruction", slot: 2, modelId: null, modelParams: {} },
+    { mode: "instruction", slot: 3, modelId: null, modelParams: {} },
   ];
 
   await db

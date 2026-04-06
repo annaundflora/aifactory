@@ -169,9 +169,11 @@ function makeModelSlot(overrides: Partial<ModelSlot> = {}): ModelSlot {
     id: overrides.id ?? "ms-default",
     mode: overrides.mode ?? "img2img",
     slot: overrides.slot ?? 1,
-    modelId: overrides.modelId ?? "black-forest-labs/flux-schnell",
+    modelId:
+      "modelId" in overrides
+        ? (overrides.modelId as string | null)
+        : "black-forest-labs/flux-schnell",
     modelParams: overrides.modelParams ?? {},
-    active: overrides.active ?? true,
     createdAt: overrides.createdAt ?? new Date(),
     updatedAt: overrides.updatedAt ?? new Date(),
   };
@@ -306,7 +308,6 @@ const SLOT_FLUX_SCHNELL = makeModelSlot({
   slot: 1,
   modelId: "black-forest-labs/flux-schnell",
   modelParams: { steps: 4 },
-  active: true,
 });
 
 const SLOT_FLUX_PRO = makeModelSlot({
@@ -315,16 +316,15 @@ const SLOT_FLUX_PRO = makeModelSlot({
   slot: 2,
   modelId: "black-forest-labs/flux-pro",
   modelParams: { steps: 25, prompt_strength: 0.6 },
-  active: true,
 });
 
+// Empty slot 3 (no model assigned -- not part of generation)
 const SLOT_FLUX_MAX_INACTIVE = makeModelSlot({
   id: "ms-slot3",
   mode: "img2img",
   slot: 3,
-  modelId: "black-forest-labs/flux-2-max",
-  modelParams: { prompt_strength: 0.8 },
-  active: false,
+  modelId: null,
+  modelParams: {},
 });
 
 const SLOT_UPSCALE = makeModelSlot({
@@ -333,7 +333,6 @@ const SLOT_UPSCALE = makeModelSlot({
   slot: 1,
   modelId: "upscale-model",
   modelParams: {},
-  active: true,
 });
 
 const MODEL_SCHNELL = makeModel({
@@ -946,8 +945,9 @@ describe("Slice 13: Chat Panel -- ModelSlots (compact) Acceptance", () => {
     it("should verify source file has correct imports via static analysis", async () => {
       // Read the source file and check imports directly
       const fs = await import("fs");
+      const path = await import("path");
       const sourceCode = fs.readFileSync(
-        "/home/dev/aifactory/.claude/worktrees/model-slots/components/canvas/canvas-chat-panel.tsx",
+        path.resolve(__dirname, "..", "canvas-chat-panel.tsx"),
         "utf-8"
       );
 

@@ -171,7 +171,7 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
   // ----- Sync current model + mode to Assistant context refs -----
   const { imageModelIdRef, generationModeRef } = usePromptAssistant();
   const firstActiveSlot = modelSlots.find(
-    (s) => s.mode === currentMode && s.active && s.modelId != null,
+    (s) => s.mode === currentMode && s.modelId != null,
   );
   imageModelIdRef.current = firstActiveSlot?.modelId ?? null;
   generationModeRef.current = currentMode;

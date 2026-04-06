@@ -102,7 +102,6 @@ interface MockModelSlot {
   slot: number;
   modelId: string | null;
   modelParams: Record<string, unknown>;
-  active: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -110,8 +109,7 @@ interface MockModelSlot {
 function makeSlot(
   mode: string,
   slot: number,
-  modelId: string | null,
-  active: boolean
+  modelId: string | null
 ): MockModelSlot {
   return {
     id: `uuid-${mode}-${slot}`,
@@ -119,44 +117,43 @@ function makeSlot(
     slot,
     modelId,
     modelParams: {},
-    active,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
 }
 
 /**
- * 21 slots: 7 modes x 3 slots each. Mix of active, inactive, and empty.
+ * 21 slots: 7 modes x 3 slots each. Mix of assigned and empty.
  */
 const FULL_SLOTS: MockModelSlot[] = [
   // txt2img
-  makeSlot("txt2img", 1, "black-forest-labs/flux-schnell", true),
-  makeSlot("txt2img", 2, "black-forest-labs/flux-2-pro", false),
-  makeSlot("txt2img", 3, null, false),
+  makeSlot("txt2img", 1, "black-forest-labs/flux-schnell"),
+  makeSlot("txt2img", 2, "black-forest-labs/flux-2-pro"),
+  makeSlot("txt2img", 3, null),
   // img2img
-  makeSlot("img2img", 1, "black-forest-labs/flux-schnell", true),
-  makeSlot("img2img", 2, "black-forest-labs/flux-2-pro", true),
-  makeSlot("img2img", 3, null, false),
+  makeSlot("img2img", 1, "black-forest-labs/flux-schnell"),
+  makeSlot("img2img", 2, "black-forest-labs/flux-2-pro"),
+  makeSlot("img2img", 3, null),
   // upscale
-  makeSlot("upscale", 1, "philz1337x/clarity-upscaler", true),
-  makeSlot("upscale", 2, "nightmareai/real-esrgan", false),
-  makeSlot("upscale", 3, null, false),
+  makeSlot("upscale", 1, "philz1337x/clarity-upscaler"),
+  makeSlot("upscale", 2, "nightmareai/real-esrgan"),
+  makeSlot("upscale", 3, null),
   // inpaint
-  makeSlot("inpaint", 1, "black-forest-labs/flux-fill-pro", true),
-  makeSlot("inpaint", 2, null, false),
-  makeSlot("inpaint", 3, null, false),
+  makeSlot("inpaint", 1, "black-forest-labs/flux-fill-pro"),
+  makeSlot("inpaint", 2, null),
+  makeSlot("inpaint", 3, null),
   // outpaint
-  makeSlot("outpaint", 1, "black-forest-labs/flux-fill-pro", true),
-  makeSlot("outpaint", 2, null, false),
-  makeSlot("outpaint", 3, null, false),
+  makeSlot("outpaint", 1, "black-forest-labs/flux-fill-pro"),
+  makeSlot("outpaint", 2, null),
+  makeSlot("outpaint", 3, null),
   // erase
-  makeSlot("erase", 1, "bria/eraser", true),
-  makeSlot("erase", 2, null, false),
-  makeSlot("erase", 3, null, false),
+  makeSlot("erase", 1, "bria/eraser"),
+  makeSlot("erase", 2, null),
+  makeSlot("erase", 3, null),
   // instruction
-  makeSlot("instruction", 1, "black-forest-labs/flux-kontext-pro", true),
-  makeSlot("instruction", 2, null, false),
-  makeSlot("instruction", 3, null, false),
+  makeSlot("instruction", 1, "black-forest-labs/flux-kontext-pro"),
+  makeSlot("instruction", 2, null),
+  makeSlot("instruction", 3, null),
 ];
 
 function makeModel(
@@ -382,93 +379,53 @@ describe("Slice 14: Settings Dialog Read-Only — Acceptance Tests", () => {
   });
 
   // =========================================================================
-  // AC-2
+  // AC-2: slot with model shows display name
   // =========================================================================
 
-  /**
-   * AC-2: GIVEN ein Slot hat `modelId: "black-forest-labs/flux-schnell"` und `active: true`
-   *       WHEN die Slot-Zeile gerendert wird
-   *       THEN zeigt sie das Slot-Label (z.B. "Slot 1"), den Model-Display-Namen und einen gruenen Status-Dot mit Text "on"
-   */
-  it("AC-2: should show model display name and green status dot for active slot", async () => {
+  it("should show model display name for slot with assigned model", async () => {
     renderDialog();
 
-    // txt2img slot 1 is active with flux-schnell
     const slotRow = await screen.findByTestId("slot-row-txt2img-1");
 
-    // Slot label
     expect(within(slotRow).getByText("Slot 1")).toBeInTheDocument();
-
-    // Model display name: since flux-schnell is in the model catalog,
-    // it should show the model's name property ("flux-schnell")
     expect(within(slotRow).getByText("flux-schnell")).toBeInTheDocument();
-
-    // Green status dot
-    const statusDot = screen.getByTestId("status-dot-txt2img-1");
-    expect(statusDot).toHaveClass("bg-green-500");
-
-    // Text "on"
-    expect(within(slotRow).getByText("on")).toBeInTheDocument();
   });
 
-  // =========================================================================
-  // AC-3
-  // =========================================================================
-
-  /**
-   * AC-3: GIVEN ein Slot hat `modelId: "black-forest-labs/flux-2-pro"` und `active: false`
-   *       WHEN die Slot-Zeile gerendert wird
-   *       THEN zeigt sie das Slot-Label, den Model-Display-Namen und einen grauen Status-Dot mit Text "off"
-   */
-  it("AC-3: should show model display name and gray status dot for inactive slot", async () => {
+  it("should show model display name for second populated slot as well", async () => {
     renderDialog();
 
-    // txt2img slot 2 is inactive with flux-2-pro
     const slotRow = await screen.findByTestId("slot-row-txt2img-2");
 
-    // Slot label
     expect(within(slotRow).getByText("Slot 2")).toBeInTheDocument();
-
-    // Model display name
     expect(within(slotRow).getByText("flux-2-pro")).toBeInTheDocument();
-
-    // Gray status dot
-    const statusDot = screen.getByTestId("status-dot-txt2img-2");
-    expect(statusDot).toHaveClass("bg-gray-400");
-
-    // Text "off"
-    expect(within(slotRow).getByText("off")).toBeInTheDocument();
   });
 
   // =========================================================================
-  // AC-4
+  // AC-4: empty slot shows "not assigned"
   // =========================================================================
 
-  /**
-   * AC-4: GIVEN ein Slot hat `modelId: null` (leerer Slot)
-   *       WHEN die Slot-Zeile gerendert wird
-   *       THEN zeigt sie das Slot-Label, den Text "not assigned" in muted Styling und einen grauen Status-Dot mit Text "off"
-   */
-  it('AC-4: should show "not assigned" text and gray dot for slot with null modelId', async () => {
+  it('should show "not assigned" text for slot with null modelId', async () => {
     renderDialog();
 
-    // txt2img slot 3 has modelId: null
     const slotRow = await screen.findByTestId("slot-row-txt2img-3");
 
-    // Slot label
     expect(within(slotRow).getByText("Slot 3")).toBeInTheDocument();
 
-    // "not assigned" text with muted styling
     const notAssigned = within(slotRow).getByText("not assigned");
     expect(notAssigned).toBeInTheDocument();
     expect(notAssigned).toHaveClass("text-muted-foreground");
+  });
 
-    // Gray status dot
-    const statusDot = screen.getByTestId("status-dot-txt2img-3");
-    expect(statusDot).toHaveClass("bg-gray-400");
+  it("should not render status dots (legacy on/off indicator was removed)", async () => {
+    renderDialog();
 
-    // Text "off"
-    expect(within(slotRow).getByText("off")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("TEXT TO IMAGE")).toBeInTheDocument();
+    });
+
+    expect(screen.queryAllByTestId(/^status-dot-/)).toHaveLength(0);
+    expect(screen.queryByText("on")).not.toBeInTheDocument();
+    expect(screen.queryByText("off")).not.toBeInTheDocument();
   });
 
   // =========================================================================
@@ -562,7 +519,7 @@ describe("Slice 14: Settings Dialog Read-Only — Acceptance Tests", () => {
     // Prepare updated slots to be returned after sync
     const updatedSlots = FULL_SLOTS.map((s) =>
       s.mode === "txt2img" && s.slot === 3
-        ? { ...s, modelId: "new-owner/new-model", active: true }
+        ? { ...s, modelId: "new-owner/new-model" }
         : s
     );
     mockGetModelSlots.mockResolvedValue(updatedSlots);
@@ -616,7 +573,7 @@ describe("Slice 14: Settings Dialog Read-Only — Acceptance Tests", () => {
     // Prepare updated slots for the event-triggered refresh
     const updatedSlots = FULL_SLOTS.map((s) =>
       s.mode === "outpaint" && s.slot === 2
-        ? { ...s, modelId: "new-owner/updated-model", active: true }
+        ? { ...s, modelId: "new-owner/updated-model" }
         : s
     );
     mockGetModelSlots.mockResolvedValue(updatedSlots);
@@ -678,9 +635,9 @@ describe("Slice 14: ModelModeSection — Unit Tests", () => {
 
   it("should render slot rows with correct labels for all 3 slots", () => {
     const slots = [
-      makeSlot("txt2img", 1, "owner/model-a", true),
-      makeSlot("txt2img", 2, "owner/model-b", false),
-      makeSlot("txt2img", 3, null, false),
+      makeSlot("txt2img", 1, "owner/model-a"),
+      makeSlot("txt2img", 2, "owner/model-b"),
+      makeSlot("txt2img", 3, null),
     ];
 
     const models = [
@@ -704,9 +661,9 @@ describe("Slice 14: ModelModeSection — Unit Tests", () => {
 
   it("should display model name from catalog instead of raw replicateId", () => {
     const slots = [
-      makeSlot("txt2img", 1, "owner/model-a", true),
-      makeSlot("txt2img", 2, null, false),
-      makeSlot("txt2img", 3, null, false),
+      makeSlot("txt2img", 1, "owner/model-a"),
+      makeSlot("txt2img", 2, null),
+      makeSlot("txt2img", 3, null),
     ];
 
     const models = [
@@ -729,9 +686,9 @@ describe("Slice 14: ModelModeSection — Unit Tests", () => {
 
   it("should fall back to raw modelId when model is not in catalog", () => {
     const slots = [
-      makeSlot("txt2img", 1, "unknown-owner/unknown-model", true),
-      makeSlot("txt2img", 2, null, false),
-      makeSlot("txt2img", 3, null, false),
+      makeSlot("txt2img", 1, "unknown-owner/unknown-model"),
+      makeSlot("txt2img", 2, null),
+      makeSlot("txt2img", 3, null),
     ];
 
     // Provide a model list that does NOT contain the assigned model.
@@ -758,42 +715,11 @@ describe("Slice 14: ModelModeSection — Unit Tests", () => {
     ).toBeInTheDocument();
   });
 
-  it("should render green dot for active=true and gray dot for active=false", () => {
+  it("should not render any on/off status indicator", () => {
     const slots = [
-      makeSlot("txt2img", 1, "owner/active-model", true),
-      makeSlot("txt2img", 2, "owner/inactive-model", false),
-      makeSlot("txt2img", 3, null, false),
-    ];
-
-    const models = [
-      makeModel("owner", "active-model", { txt2img: true, img2img: false, upscale: false, inpaint: false, outpaint: false }),
-      makeModel("owner", "inactive-model", { txt2img: true, img2img: false, upscale: false, inpaint: false, outpaint: false }),
-    ];
-
-    render(
-      <ModelModeSection
-        mode="txt2img"
-        slots={slots as any}
-        models={models as any}
-        hasEverSynced={true}
-      />
-    );
-
-    const activeDot = screen.getByTestId("status-dot-txt2img-1");
-    expect(activeDot).toHaveClass("bg-green-500");
-
-    const inactiveDot = screen.getByTestId("status-dot-txt2img-2");
-    expect(inactiveDot).toHaveClass("bg-gray-400");
-
-    const emptyDot = screen.getByTestId("status-dot-txt2img-3");
-    expect(emptyDot).toHaveClass("bg-gray-400");
-  });
-
-  it("should show 'on' text for active slots and 'off' for inactive/empty slots", () => {
-    const slots = [
-      makeSlot("txt2img", 1, "owner/m1", true),
-      makeSlot("txt2img", 2, "owner/m2", false),
-      makeSlot("txt2img", 3, null, false),
+      makeSlot("txt2img", 1, "owner/m1"),
+      makeSlot("txt2img", 2, "owner/m2"),
+      makeSlot("txt2img", 3, null),
     ];
 
     const models = [
@@ -810,22 +736,16 @@ describe("Slice 14: ModelModeSection — Unit Tests", () => {
       />
     );
 
-    const rows = screen.getAllByTestId(/^slot-row-txt2img/);
-    expect(rows).toHaveLength(3);
-
-    // Row 1: active
-    expect(within(rows[0]).getByText("on")).toBeInTheDocument();
-    // Row 2: inactive
-    expect(within(rows[1]).getByText("off")).toBeInTheDocument();
-    // Row 3: empty/inactive
-    expect(within(rows[2]).getByText("off")).toBeInTheDocument();
+    expect(screen.queryAllByTestId(/^status-dot-/)).toHaveLength(0);
+    expect(screen.queryByText("on")).not.toBeInTheDocument();
+    expect(screen.queryByText("off")).not.toBeInTheDocument();
   });
 
   it("should show 'not assigned' with muted styling for null modelId slots", () => {
     const slots = [
-      makeSlot("inpaint", 1, null, false),
-      makeSlot("inpaint", 2, null, false),
-      makeSlot("inpaint", 3, null, false),
+      makeSlot("inpaint", 1, null),
+      makeSlot("inpaint", 2, null),
+      makeSlot("inpaint", 3, null),
     ];
 
     const models = [
@@ -850,9 +770,9 @@ describe("Slice 14: ModelModeSection — Unit Tests", () => {
 
   it("should render the correct MODE_LABELS heading", () => {
     const slots = [
-      makeSlot("outpaint", 1, null, false),
-      makeSlot("outpaint", 2, null, false),
-      makeSlot("outpaint", 3, null, false),
+      makeSlot("outpaint", 1, null),
+      makeSlot("outpaint", 2, null),
+      makeSlot("outpaint", 3, null),
     ];
 
     render(
@@ -869,9 +789,9 @@ describe("Slice 14: ModelModeSection — Unit Tests", () => {
 
   it("should not render any interactive elements (no combobox, checkbox, input)", () => {
     const slots = [
-      makeSlot("txt2img", 1, "owner/m1", true),
-      makeSlot("txt2img", 2, "owner/m2", false),
-      makeSlot("txt2img", 3, null, false),
+      makeSlot("txt2img", 1, "owner/m1"),
+      makeSlot("txt2img", 2, "owner/m2"),
+      makeSlot("txt2img", 3, null),
     ];
 
     const models = [
@@ -933,7 +853,7 @@ describe("Slice 14: Settings Dialog Read-Only — Integration Tests", () => {
     // Update the mock to return different data
     const updatedSlots = FULL_SLOTS.map((s) =>
       s.mode === "txt2img" && s.slot === 1
-        ? { ...s, modelId: "new-owner/brand-new-model", active: false }
+        ? { ...s, modelId: "new-owner/brand-new-model" }
         : s
     );
     mockGetModelSlots.mockResolvedValue(updatedSlots);

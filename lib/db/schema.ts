@@ -215,7 +215,6 @@ export const modelSlots = pgTable(
     slot: integer("slot").notNull(),
     modelId: varchar("model_id", { length: 255 }),
     modelParams: jsonb("model_params").notNull().default({}),
-    active: boolean("active").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

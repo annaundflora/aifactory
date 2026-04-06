@@ -96,7 +96,6 @@ export function ModelModeSection({
           modeSlots.map((slot, index) => {
             const slotNumber = SLOTS[index];
             const modelId = slot?.modelId ?? null;
-            const isActive = slot?.active ?? false;
             const displayName = getModelDisplayName(modelId);
 
             return (
@@ -114,17 +113,6 @@ export function ModelModeSection({
                   ) : (
                     <span className="text-muted-foreground">not assigned</span>
                   )}
-                </span>
-                <span className="flex items-center gap-1.5 shrink-0">
-                  <span
-                    className={`inline-block size-2 rounded-full ${
-                      isActive ? "bg-green-500" : "bg-gray-400"
-                    }`}
-                    data-testid={`status-dot-${mode}-${slotNumber}`}
-                  />
-                  <span className="text-xs text-muted-foreground">
-                    {isActive ? "on" : "off"}
-                  </span>
                 </span>
               </div>
             );

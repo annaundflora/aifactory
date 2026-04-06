@@ -99,6 +99,13 @@
       "when": 1774814196882,
       "tag": "0013_drop_prompt_style_negative",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1775332800000,
+      "tag": "0014_drop_model_slots_active",
+      "breakpoints": true
     }
   ]
 }

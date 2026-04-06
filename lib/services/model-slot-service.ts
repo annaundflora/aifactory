@@ -58,8 +58,9 @@ async function checkCompatibility(
 /**
  * ModelSlotService — business logic for model slot CRUD.
  *
- * Encapsulates compatibility checks, min-1-active rule, auto-activation
- * on model assignment to empty slots, and seed-defaults on first access.
+ * Encapsulates compatibility checks and seed-defaults on first access.
+ * Every slot with an assigned model is considered live; there is no
+ * separate active toggle.
  */
 export const ModelSlotService = {
   /**
@@ -87,8 +88,7 @@ export const ModelSlotService = {
 
   /**
    * Updates the model assignment for a specific slot. Validates model
-   * compatibility before writing. Auto-activates the slot if it was
-   * previously empty (model_id was null).
+   * compatibility before writing.
    *
    * Returns the updated ModelSlot row, or `{ error: string }` on
    * business rule violation.
@@ -105,80 +105,18 @@ export const ModelSlotService = {
       return { error: "Model not compatible with mode" };
     }
 
-    // Fetch the current slot state to determine auto-activation
     const modeSlots = await getModelSlotsByMode(mode);
     const currentSlot = modeSlots.find((s) => s.slot === slot);
-
-    // Determine active state: auto-activate if slot was empty (model_id was null)
-    let active: boolean;
-    if (currentSlot && currentSlot.modelId === null) {
-      // Slot was empty -> auto-activate on model assignment
-      active = true;
-    } else if (currentSlot) {
-      // Slot already had a model -> preserve current active state
-      active = currentSlot.active;
-    } else {
-      // Slot doesn't exist yet (shouldn't happen after seed, but be safe)
-      active = false;
-    }
 
     const params = modelParams ?? currentSlot?.modelParams as Record<string, unknown> ?? {};
 
-    const updated = await upsertModelSlot(mode, slot, modelId, params, active);
-    return updated;
-  },
-
-  /**
-   * Toggles the active state of a model slot.
-   *
-   * Business rules:
-   * - Cannot deactivate the last active slot for a mode (min-1-active)
-   * - Cannot activate a slot with no model assigned (model_id is null)
-   *
-   * Returns the updated ModelSlot row, or `{ error: string }` on violation.
-   */
-  async toggleActive(
-    mode: string,
-    slot: SlotNumber,
-    active: boolean
-  ): Promise<ModelSlot | { error: string }> {
-    const modeSlots = await getModelSlotsByMode(mode);
-    const currentSlot = modeSlots.find((s) => s.slot === slot);
-
-    if (!currentSlot) {
-      return { error: "Slot not found" };
-    }
-
-    // Reject activating an empty slot (no model assigned)
-    if (active && currentSlot.modelId === null) {
-      return { error: "Cannot activate empty slot" };
-    }
-
-    // Reject deactivating the last active slot
-    if (!active) {
-      const activeCount = modeSlots.filter((s) => s.active).length;
-      if (activeCount <= 1 && currentSlot.active) {
-        return { error: "Cannot deactivate last active slot" };
-      }
-    }
-
-    // Safe: activating an empty slot (modelId=null) is rejected above,
-    // so modelId is non-null when active=true. When active=false, modelId
-    // could theoretically be null (deactivating an already-inactive empty
-    // slot) which is a harmless upsert preserving the same state.
-    const updated = await upsertModelSlot(
-      mode,
-      slot,
-      currentSlot.modelId as string,
-      currentSlot.modelParams as Record<string, unknown>,
-      active
-    );
+    const updated = await upsertModelSlot(mode, slot, modelId, params);
     return updated;
   },
 
   /**
    * Clears a model slot (removes the model assignment).
-   * Sets modelId=null, modelParams={}, active=false.
+   * Sets modelId=null, modelParams={}.
    *
    * Business rule: Cannot clear the last slot that has a model
    * for a given mode (at least one model must remain).

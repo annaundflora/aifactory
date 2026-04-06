@@ -89,14 +89,17 @@ describe('Slice 01: DB Schema + Migration Acceptance', () => {
       config.columns.map((c) => [c.name, c])
     )
 
-    // All 8 columns present
+    // Current schema columns (active column was removed in migration 0014)
     const expectedColumns = [
       'id', 'mode', 'slot', 'model_id',
-      'model_params', 'active', 'created_at', 'updated_at',
+      'model_params', 'created_at', 'updated_at',
     ]
     for (const col of expectedColumns) {
       expect(columnMap[col]).toBeDefined()
     }
+
+    // active column no longer exists
+    expect(columnMap['active']).toBeUndefined()
 
     // id: uuid PK
     expect(columnMap['id'].columnType).toBe('PgUUID')
@@ -118,11 +121,6 @@ describe('Slice 01: DB Schema + Migration Acceptance', () => {
     expect(columnMap['model_params'].columnType).toBe('PgJsonb')
     expect(columnMap['model_params'].notNull).toBe(true)
     expect(columnMap['model_params'].hasDefault).toBe(true)
-
-    // active: boolean NOT NULL DEFAULT false
-    expect(columnMap['active'].columnType).toBe('PgBoolean')
-    expect(columnMap['active'].notNull).toBe(true)
-    expect(columnMap['active'].hasDefault).toBe(true)
 
     // timestamps
     expect(columnMap['created_at'].columnType).toBe('PgTimestamp')
@@ -289,16 +287,17 @@ describe('Slice 01: DB Schema + Migration Acceptance', () => {
     expect(modelSlots.slot).toBeDefined()
     expect(modelSlots.modelId).toBeDefined()
     expect(modelSlots.modelParams).toBeDefined()
-    expect(modelSlots.active).toBeDefined()
     expect(modelSlots.createdAt).toBeDefined()
     expect(modelSlots.updatedAt).toBeDefined()
+
+    // active column was removed in migration 0014
+    expect((modelSlots as unknown as Record<string, unknown>).active).toBeUndefined()
 
     // Verify TypeScript types
     expectTypeOf<ModelSlotsSelect['id']>().toEqualTypeOf<string>()
     expectTypeOf<ModelSlotsSelect['mode']>().toEqualTypeOf<string>()
     expectTypeOf<ModelSlotsSelect['slot']>().toEqualTypeOf<number>()
     expectTypeOf<ModelSlotsSelect['modelId']>().toEqualTypeOf<string | null>()
-    expectTypeOf<ModelSlotsSelect['active']>().toEqualTypeOf<boolean>()
   })
 
   // =================================================================

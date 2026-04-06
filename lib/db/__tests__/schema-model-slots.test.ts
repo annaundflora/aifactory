@@ -38,7 +38,7 @@ describe('modelSlots schema definition', () => {
      *       AND ein UNIQUE-Index auf (mode, slot) existiert
      */
     expect(config.name).toBe('model_slots')
-    expect(config.columns.length).toBe(8)
+    expect(config.columns.length).toBe(7)
 
     // id: UUID, primary key, default gen_random_uuid()
     expect(columnMap['id']).toBeDefined()
@@ -71,11 +71,8 @@ describe('modelSlots schema definition', () => {
     expect(columnMap['model_params'].notNull).toBe(true)
     expect(columnMap['model_params'].hasDefault).toBe(true)
 
-    // active: BOOLEAN NOT NULL DEFAULT false
-    expect(columnMap['active']).toBeDefined()
-    expect(columnMap['active'].columnType).toBe('PgBoolean')
-    expect(columnMap['active'].notNull).toBe(true)
-    expect(columnMap['active'].hasDefault).toBe(true)
+    // active column should no longer exist (removed in migration 0014)
+    expect(columnMap['active']).toBeUndefined()
 
     // created_at: TIMESTAMPTZ NOT NULL DEFAULT now()
     expect(columnMap['created_at']).toBeDefined()
@@ -115,7 +112,6 @@ describe('modelSlots schema definition', () => {
     expect(modelSlots.slot).toBeDefined()
     expect(modelSlots.modelId).toBeDefined()
     expect(modelSlots.modelParams).toBeDefined()
-    expect(modelSlots.active).toBeDefined()
     expect(modelSlots.createdAt).toBeDefined()
     expect(modelSlots.updatedAt).toBeDefined()
 
@@ -125,9 +121,11 @@ describe('modelSlots schema definition', () => {
     expect(modelSlots.slot.name).toBe('slot')
     expect(modelSlots.modelId.name).toBe('model_id')
     expect(modelSlots.modelParams.name).toBe('model_params')
-    expect(modelSlots.active.name).toBe('active')
     expect(modelSlots.createdAt.name).toBe('created_at')
     expect(modelSlots.updatedAt.name).toBe('updated_at')
+
+    // active column was removed in migration 0014
+    expect((modelSlots as unknown as Record<string, unknown>).active).toBeUndefined()
 
     // modelSettings must NOT be exported from schema.ts
     expect(schemaExports.modelSlots).toBeDefined()
@@ -139,7 +137,6 @@ describe('modelSlots schema definition', () => {
     expectTypeOf<ModelSlotsSelect>().toHaveProperty('slot')
     expectTypeOf<ModelSlotsSelect>().toHaveProperty('modelId')
     expectTypeOf<ModelSlotsSelect>().toHaveProperty('modelParams')
-    expectTypeOf<ModelSlotsSelect>().toHaveProperty('active')
     expectTypeOf<ModelSlotsSelect>().toHaveProperty('createdAt')
     expectTypeOf<ModelSlotsSelect>().toHaveProperty('updatedAt')
 
@@ -147,7 +144,6 @@ describe('modelSlots schema definition', () => {
     expectTypeOf<ModelSlotsSelect['mode']>().toEqualTypeOf<string>()
     expectTypeOf<ModelSlotsSelect['slot']>().toEqualTypeOf<number>()
     expectTypeOf<ModelSlotsSelect['modelId']>().toEqualTypeOf<string | null>()
-    expectTypeOf<ModelSlotsSelect['active']>().toEqualTypeOf<boolean>()
     expectTypeOf<ModelSlotsSelect['createdAt']>().toEqualTypeOf<Date>()
     expectTypeOf<ModelSlotsSelect['updatedAt']>().toEqualTypeOf<Date>()
   })
