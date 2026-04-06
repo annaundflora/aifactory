@@ -352,7 +352,7 @@ export function MaskCanvas({ imageRef }: MaskCanvasProps) {
   // -------------------------------------------------------------------------
 
   const getCanvasCoords = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>): { x: number; y: number } => {
+    (e: React.PointerEvent<HTMLCanvasElement>): { x: number; y: number } => {
       const canvas = canvasRef.current;
       if (!canvas) return { x: 0, y: 0 };
       const rect = canvas.getBoundingClientRect();
@@ -467,15 +467,34 @@ export function MaskCanvas({ imageRef }: MaskCanvasProps) {
   }, []);
 
   // -------------------------------------------------------------------------
-  // Mouse event handlers
+  // Pointer event handlers — unified mouse/touch/pen input
+  //
+  // Uses Pointer Events (instead of Mouse Events) so touch input and the
+  // Apple Pencil on iPad work the same as a desktop mouse. Combined with
+  // `touch-action: none` on the canvas element, this prevents Safari from
+  // hijacking the drag as a scroll/pinch gesture.
   // -------------------------------------------------------------------------
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
+      // Ignore secondary mouse buttons (right-click, middle-click) so they
+      // don't start a stroke. Touch and pen tip report button === 0.
+      if (e.button > 0) return;
+
       e.preventDefault();
 
-      // Snapshot current canvas state BEFORE painting for undo stack
+      // Capture the pointer so pointermove/pointerup continue to target the
+      // canvas even if the finger/pen drifts outside its bounds mid-stroke.
       const canvas = canvasRef.current;
+      if (canvas && typeof canvas.setPointerCapture === "function") {
+        try {
+          canvas.setPointerCapture(e.pointerId);
+        } catch {
+          // Some environments (jsdom) may throw — safe to ignore.
+        }
+      }
+
+      // Snapshot current canvas state BEFORE painting for undo stack
       if (canvas) {
         const ctx = canvas.getContext("2d");
         if (ctx && canvas.width > 0 && canvas.height > 0) {
@@ -492,8 +511,8 @@ export function MaskCanvas({ imageRef }: MaskCanvasProps) {
     [getCanvasCoords, drawDot]
   );
 
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
       const pos = getCanvasCoords(e);
 
       // Always update cursor indicator
@@ -507,29 +526,40 @@ export function MaskCanvas({ imageRef }: MaskCanvasProps) {
     [getCanvasCoords, drawStroke, drawCursor]
   );
 
-  const handleMouseUp = useCallback(() => {
-    if (!isDrawingRef.current) return;
-    isDrawingRef.current = false;
-    lastPosRef.current = null;
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
+      const canvas = canvasRef.current;
+      if (canvas && typeof canvas.releasePointerCapture === "function") {
+        try {
+          canvas.releasePointerCapture(e.pointerId);
+        } catch {
+          // Ignore — capture may already be released.
+        }
+      }
 
-    // AC-3: Dispatch SET_MASK_DATA with current canvas ImageData
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+      if (!isDrawingRef.current) return;
+      isDrawingRef.current = false;
+      lastPosRef.current = null;
 
-    if (canvas.width > 0 && canvas.height > 0) {
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      dispatch({ type: "SET_MASK_DATA", maskData: imageData });
-    }
-  }, [dispatch]);
+      // AC-3: Dispatch SET_MASK_DATA with current canvas ImageData
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
 
-  const handleMouseLeave = useCallback(() => {
+      if (canvas.width > 0 && canvas.height > 0) {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        dispatch({ type: "SET_MASK_DATA", maskData: imageData });
+      }
+    },
+    [dispatch]
+  );
+
+  const handlePointerLeave = useCallback(() => {
     clearCursor();
-    if (isDrawingRef.current) {
-      handleMouseUp();
-    }
-  }, [clearCursor, handleMouseUp]);
+    // Note: while pointer-captured (active stroke) the pointer still targets
+    // this canvas, so pointerleave fires only for the unpressed cursor
+    // indicator — no need to finalize the mask here.
+  }, [clearCursor]);
 
   // -------------------------------------------------------------------------
   // AC-8: Don't render when editMode is null
@@ -550,12 +580,13 @@ export function MaskCanvas({ imageRef }: MaskCanvasProps) {
       <canvas
         ref={canvasRef}
         data-testid="mask-canvas"
-        className="pointer-events-auto absolute z-10"
-        style={{ cursor: "none" }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseLeave}
+        className="pointer-events-auto absolute z-10 touch-none"
+        style={{ cursor: "none", touchAction: "none" }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onPointerLeave={handlePointerLeave}
       />
       {/* Cursor indicator canvas — above mask canvas, passes through clicks */}
       <canvas

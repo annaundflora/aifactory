@@ -216,13 +216,13 @@ function pressKey(
 }
 
 /**
- * Helper: simulate a full stroke (mousedown -> mousemove -> mouseup) on the
- * canvas to push an entry onto the internal mask undo stack.
+ * Helper: simulate a full stroke (pointerdown -> pointermove -> pointerup) on
+ * the canvas to push an entry onto the internal mask undo stack.
  */
 function simulateStroke(canvas: HTMLElement) {
-  fireEvent.mouseDown(canvas, { clientX: 100, clientY: 100 });
-  fireEvent.mouseMove(canvas, { clientX: 150, clientY: 150 });
-  fireEvent.mouseUp(canvas);
+  fireEvent.pointerDown(canvas, { clientX: 100, clientY: 100 });
+  fireEvent.pointerMove(canvas, { clientX: 150, clientY: 150 });
+  fireEvent.pointerUp(canvas);
 }
 
 // ===========================================================================

@@ -299,8 +299,8 @@ describe("MaskCanvas Acceptance Tests", () => {
     });
 
     // Simulate drawing: mousedown then mousemove
-    fireEvent.mouseDown(canvas, { clientX: 100, clientY: 100 });
-    fireEvent.mouseMove(canvas, { clientX: 150, clientY: 150 });
+    fireEvent.pointerDown(canvas, { clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(canvas, { clientX: 150, clientY: 150 });
 
     // On mousedown, drawDot is called (arc + fill)
     expect(maskCtx.beginPath).toHaveBeenCalled();
@@ -330,8 +330,8 @@ describe("MaskCanvas Acceptance Tests", () => {
       bottom: 512, right: 512, x: 0, y: 0, toJSON: () => {},
     });
 
-    fireEvent.mouseDown(canvas, { clientX: 100, clientY: 100 });
-    fireEvent.mouseMove(canvas, { clientX: 120, clientY: 120 });
+    fireEvent.pointerDown(canvas, { clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(canvas, { clientX: 120, clientY: 120 });
 
     expect(maskCtx.beginPath).toHaveBeenCalled();
     expect(maskCtx.stroke).toHaveBeenCalled();
@@ -358,14 +358,14 @@ describe("MaskCanvas Acceptance Tests", () => {
     });
 
     // Draw something first
-    fireEvent.mouseDown(canvas, { clientX: 100, clientY: 100 });
-    fireEvent.mouseMove(canvas, { clientX: 150, clientY: 150 });
+    fireEvent.pointerDown(canvas, { clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(canvas, { clientX: 150, clientY: 150 });
 
     // Reset dispatch tracking to isolate mouseup dispatch
     mockDispatch.mockClear();
 
-    // mouseup should trigger SET_MASK_DATA dispatch
-    fireEvent.mouseUp(canvas);
+    // pointerup should trigger SET_MASK_DATA dispatch
+    fireEvent.pointerUp(canvas);
 
     expect(mockDispatch).toHaveBeenCalledTimes(1);
     expect(mockDispatch).toHaveBeenCalledWith(
@@ -404,8 +404,8 @@ describe("MaskCanvas Acceptance Tests", () => {
     });
 
     // Paint with eraser tool
-    fireEvent.mouseDown(canvas, { clientX: 200, clientY: 200 });
-    fireEvent.mouseMove(canvas, { clientX: 250, clientY: 250 });
+    fireEvent.pointerDown(canvas, { clientX: 200, clientY: 200 });
+    fireEvent.pointerMove(canvas, { clientX: 250, clientY: 250 });
 
     // globalCompositeOperation should have been set to "destination-out"
     expect(maskCtx.globalCompositeOperation).toBe("destination-out");
@@ -463,7 +463,7 @@ describe("MaskCanvas Acceptance Tests", () => {
     (maskCtx.arc as ReturnType<typeof vi.fn>).mockClear();
 
     // Paint with new brush size
-    fireEvent.mouseDown(canvas, { clientX: 100, clientY: 100 });
+    fireEvent.pointerDown(canvas, { clientX: 100, clientY: 100 });
 
     // drawDot draws an arc with radius = brushSize / 2 = 40
     expect(maskCtx.arc).toHaveBeenCalledWith(
@@ -502,8 +502,8 @@ describe("MaskCanvas Acceptance Tests", () => {
       bottom: 512, right: 512, x: 0, y: 0, toJSON: () => {},
     });
 
-    // Move mouse without clicking -- should draw cursor indicator on cursor canvas
-    fireEvent.mouseMove(canvas, { clientX: 200, clientY: 200 });
+    // Move pointer without pressing -- should draw cursor indicator on cursor canvas
+    fireEvent.pointerMove(canvas, { clientX: 200, clientY: 200 });
 
     // The cursor canvas context should have arc drawn (circle indicator)
     expect(cursorCtx.arc).toHaveBeenCalled();
@@ -626,7 +626,12 @@ describe("MaskCanvas Unit Tests", () => {
     expect(screen.queryByTestId("mask-canvas")).not.toBeInTheDocument();
   });
 
-  it("should dispatch SET_MASK_DATA on mouseLeave while drawing", () => {
+  it("should dispatch SET_MASK_DATA on pointerCancel while drawing", () => {
+    // With pointer capture, pointerleave no longer fires mid-stroke (capture
+    // keeps events targeted to the canvas). The analogous "interrupted"
+    // scenario is pointercancel, which Safari fires when the OS takes over
+    // the gesture (e.g. a system swipe). We must still commit whatever was
+    // drawn up to that point.
     resetMockState({ editMode: "inpaint", brushSize: 40 });
     render(<MaskCanvas imageRef={imageRef} />);
 
@@ -637,26 +642,26 @@ describe("MaskCanvas Unit Tests", () => {
     });
 
     // Start drawing
-    fireEvent.mouseDown(canvas, { clientX: 50, clientY: 50 });
+    fireEvent.pointerDown(canvas, { clientX: 50, clientY: 50 });
     mockDispatch.mockClear();
 
-    // Leave canvas while drawing
-    fireEvent.mouseLeave(canvas);
+    // Pointer cancel (e.g. iOS system gesture interrupts the stroke)
+    fireEvent.pointerCancel(canvas);
 
-    // Should dispatch SET_MASK_DATA (same behavior as mouseup)
+    // Should dispatch SET_MASK_DATA (same behavior as pointerup)
     expect(mockDispatch).toHaveBeenCalledWith(
       expect.objectContaining({ type: "SET_MASK_DATA" })
     );
   });
 
-  it("should not dispatch SET_MASK_DATA on mouseup when not drawing", () => {
+  it("should not dispatch SET_MASK_DATA on pointerup when not drawing", () => {
     resetMockState({ editMode: "inpaint" });
     render(<MaskCanvas imageRef={imageRef} />);
 
     const canvas = screen.getByTestId("mask-canvas");
 
-    // mouseup without prior mousedown -- should not dispatch
-    fireEvent.mouseUp(canvas);
+    // pointerup without prior pointerdown -- should not dispatch
+    fireEvent.pointerUp(canvas);
     expect(mockDispatch).not.toHaveBeenCalled();
   });
 
@@ -684,7 +689,7 @@ describe("MaskCanvas Unit Tests", () => {
       bottom: 256, right: 256, x: 0, y: 0, toJSON: () => {},
     });
 
-    fireEvent.mouseDown(canvas, { clientX: 100, clientY: 100 });
+    fireEvent.pointerDown(canvas, { clientX: 100, clientY: 100 });
 
     // For brush tool, globalCompositeOperation should be "source-over"
     expect(maskCtx.globalCompositeOperation).toBe("source-over");
