@@ -1,0 +1,11 @@
+{
+  "feature": "canvas-zoom",
+  "slice": "slice-03",
+  "timestamp": "2026-04-10T13:30:00Z",
+  "status": "completed",
+  "implementation": {"status": "completed", "files_changed": ["components/canvas/zoom-controls.tsx", "components/canvas/canvas-detail-view.tsx"], "commit_hash": "90c98c6"},
+  "review": {"verdict": "APPROVED", "findings": [], "iterations": 1},
+  "deterministic_gate": {"detected_stack": "TypeScript", "lint_passed": true, "lint_iterations": 1},
+  "tests": {"test_files": ["__tests__/components/canvas/zoom-controls.test.tsx"], "test_count": 11, "ac_coverage": {"total": 11, "covered": 11}},
+  "validation": {"overall_status": "passed", "retries": 0}
+}

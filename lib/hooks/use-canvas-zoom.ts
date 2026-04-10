@@ -37,6 +37,22 @@ export interface UseCanvasZoomReturn {
    * Reset zoom to fit level and pan to (0, 0).
    */
   resetToFit: () => void;
+  /**
+   * Wheel event handler for the canvas area.
+   * Handles Ctrl+Scroll (zoom), plain Scroll (vertical pan), Shift+Scroll (horizontal pan).
+   * Must be registered via addEventListener with { passive: false }.
+   */
+  handleWheel: (e: WheelEvent) => void;
+  /**
+   * Keydown handler for document-level keyboard shortcuts (+/-/0).
+   * Includes isInputFocused guard and isCanvasHovered check.
+   */
+  handleKeyDown: (e: KeyboardEvent) => void;
+  /**
+   * Ref tracking whether the mouse is currently over the canvas area.
+   * Consumed by slice-05 (Space+Drag) and used internally for keyboard guard.
+   */
+  isCanvasHoveredRef: React.RefObject<boolean>;
 }
 
 // ---------------------------------------------------------------------------
@@ -63,6 +79,9 @@ export function useCanvasZoom(
 
   // Track whether we are "following" fit level (i.e., user hasn't manually zoomed)
   const isFollowingFitRef = useRef(true);
+
+  // Track whether the mouse is hovering over the canvas area (used by keyboard guard + slice-05)
+  const isCanvasHoveredRef = useRef(false);
 
   // ---------------------------------------------------------------------------
   // Fit-Level Calculation with ResizeObserver
@@ -242,10 +261,128 @@ export function useCanvasZoom(
     });
   }, [fitLevel, dispatch]);
 
+  // ---------------------------------------------------------------------------
+  // Refs for stable access in event handlers (avoids stale closures)
+  // ---------------------------------------------------------------------------
+
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  const fitLevelRef = useRef(fitLevel);
+  fitLevelRef.current = fitLevel;
+
+  const zoomToPointRef = useRef(zoomToPoint);
+  zoomToPointRef.current = zoomToPoint;
+
+  const zoomToStepRef = useRef(zoomToStep);
+  zoomToStepRef.current = zoomToStep;
+
+  const resetToFitRef = useRef(resetToFit);
+  resetToFitRef.current = resetToFit;
+
+  // ---------------------------------------------------------------------------
+  // Wheel Handler (Slice 4)
+  // Ctrl+Scroll: continuous zoom with cursor anchor
+  // Plain Scroll: vertical pan (only when zoomed beyond fit)
+  // Shift+Scroll: horizontal pan (only when zoomed beyond fit)
+  // ---------------------------------------------------------------------------
+
+  const handleWheel = useCallback(
+    (e: WheelEvent) => {
+      const { zoomLevel, panX, panY } = stateRef.current;
+      const currentFitLevel = fitLevelRef.current;
+
+      if (e.ctrlKey || e.metaKey) {
+        // Prevent browser zoom
+        e.preventDefault();
+
+        // Continuous zoom: newZoom = oldZoom * (1 - deltaY * 0.01)
+        const newZoom = Math.min(
+          ZOOM_MAX,
+          Math.max(ZOOM_MIN, zoomLevel * (1 - e.deltaY * 0.01))
+        );
+
+        // Cursor position relative to the container
+        const container = containerRef.current;
+        if (!container) return;
+        const rect = container.getBoundingClientRect();
+        const cursorX = e.clientX - rect.left;
+        const cursorY = e.clientY - rect.top;
+
+        zoomToPointRef.current(newZoom, cursorX, cursorY);
+        return;
+      }
+
+      // Pan only when zoomed beyond fit level
+      if (Math.abs(zoomLevel - currentFitLevel) < 0.001) return;
+
+      if (e.shiftKey) {
+        // Horizontal pan: Shift+Scroll
+        e.preventDefault();
+        dispatch({
+          type: "SET_ZOOM_PAN",
+          zoomLevel,
+          panX: panX - e.deltaY,
+          panY,
+        });
+      } else {
+        // Vertical pan: plain scroll
+        dispatch({
+          type: "SET_ZOOM_PAN",
+          zoomLevel,
+          panX,
+          panY: panY - e.deltaY,
+        });
+      }
+    },
+    [containerRef, dispatch]
+  );
+
+  // ---------------------------------------------------------------------------
+  // Keyboard Handler (Slice 4)
+  // +/= -> zoom in, - -> zoom out, 0 -> reset to fit
+  // Guards: isInputFocused() + isCanvasHovered
+  // ---------------------------------------------------------------------------
+
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      // Guard: don't trigger when input/textarea/contenteditable is focused
+      const el = document.activeElement;
+      if (el) {
+        const tag = el.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA") return;
+        if (el instanceof HTMLElement && el.isContentEditable) return;
+      }
+
+      // Guard: only trigger when mouse is over the canvas area
+      if (!isCanvasHoveredRef.current) return;
+
+      switch (e.key) {
+        case "+":
+        case "=":
+          e.preventDefault();
+          zoomToStepRef.current("in");
+          break;
+        case "-":
+          e.preventDefault();
+          zoomToStepRef.current("out");
+          break;
+        case "0":
+          e.preventDefault();
+          resetToFitRef.current();
+          break;
+      }
+    },
+    []
+  );
+
   return {
     fitLevel,
     zoomToPoint,
     zoomToStep,
     resetToFit,
+    handleWheel,
+    handleKeyDown,
+    isCanvasHoveredRef,
   };
 }

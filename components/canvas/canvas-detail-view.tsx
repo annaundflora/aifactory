@@ -134,6 +134,7 @@ export function CanvasDetailView({
   // ---------------------------------------------------------------------------
   // Image ref for MaskCanvas overlay + Zoom hook
   // ---------------------------------------------------------------------------
+  const canvasAreaRef = useRef<HTMLElement | null>(null);
   const imageContainerRef = useRef<HTMLDivElement | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const transformWrapperRef = useRef<HTMLDivElement | null>(null);
@@ -147,6 +148,48 @@ export function CanvasDetailView({
   // Zoom Hook — integrates with container + image refs
   // ---------------------------------------------------------------------------
   const canvasZoom = useCanvasZoom(imageContainerRef, imageRef);
+
+  // ---------------------------------------------------------------------------
+  // Wheel + Keyboard Event Listeners (Slice 4)
+  // - Wheel on canvas-area <main> with { passive: false } (not React onWheel)
+  // - Keydown on document for +/-/0 shortcuts
+  // - mouseenter/mouseleave on canvas-area for isCanvasHovered tracking
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    const canvasArea = canvasAreaRef.current;
+    if (!canvasArea) return;
+
+    // Wheel listener: must use addEventListener with passive:false
+    // so that preventDefault() works for Ctrl+Scroll (AC-6)
+    const wheelHandler = canvasZoom.handleWheel;
+    canvasArea.addEventListener("wheel", wheelHandler, { passive: false });
+
+    // Keyboard listener on document (AC-8, AC-9, AC-10)
+    const keydownHandler = canvasZoom.handleKeyDown;
+    document.addEventListener("keydown", keydownHandler);
+
+    // Mouse hover tracking for keyboard guard + slice-05 (AC-7)
+    const hoveredRef = canvasZoom.isCanvasHoveredRef;
+
+    const handleMouseEnter = () => {
+      hoveredRef.current = true;
+    };
+    const handleMouseLeave = () => {
+      hoveredRef.current = false;
+    };
+
+    canvasArea.addEventListener("mouseenter", handleMouseEnter);
+    canvasArea.addEventListener("mouseleave", handleMouseLeave);
+
+    // Cleanup (AC-12): remove all listeners on unmount
+    return () => {
+      canvasArea.removeEventListener("wheel", wheelHandler);
+      document.removeEventListener("keydown", keydownHandler);
+      canvasArea.removeEventListener("mouseenter", handleMouseEnter);
+      canvasArea.removeEventListener("mouseleave", handleMouseLeave);
+    };
+  }, [canvasZoom.handleWheel, canvasZoom.handleKeyDown, canvasZoom.isCanvasHoveredRef]);
 
   // ---------------------------------------------------------------------------
   // Click-to-Edit (SAM) state — local component state per spec constraints
@@ -888,6 +931,7 @@ export function CanvasDetailView({
 
         {/* Center: Canvas area (flex: 1) */}
         <main
+          ref={canvasAreaRef}
           className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-muted/40"
           data-testid="canvas-area"
           onTouchStart={handleTouchStart}
