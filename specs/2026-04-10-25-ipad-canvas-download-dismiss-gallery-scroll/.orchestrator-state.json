@@ -3,15 +3,15 @@
   "feature_name": "25-ipad-canvas-download-dismiss-gallery-scroll",
   "status": "in_progress",
   "current_state": "implementing",
-  "current_slice_id": "slice-01",
+  "current_slice_id": "slice-03",
   "retry_count": 0,
   "failed_stage": null,
   "waves": [
     {"wave": 1, "slices": ["slice-01", "slice-03"]},
     {"wave": 2, "slices": ["slice-02", "slice-04"]}
   ],
-  "completed_slices": [],
-  "evidence_files": [],
+  "completed_slices": ["slice-01"],
+  "evidence_files": ["evidence/slice-01.json"],
   "worktree_path": "/home/dev/aifactory/.claude/worktrees/25-ipad-canvas-download-dismiss-gallery-scroll",
   "branch": "25-ipad-canvas-download-dismiss-gallery-scroll",
   "github_available": true,
