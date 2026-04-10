@@ -104,7 +104,7 @@
 **Error Paths:**
 - Web Share API nicht verfuegbar → Fallback auf Anchor-Download
 - Blob-Fetch schlaegt fehl → Toast "Download fehlgeschlagen" (existiert)
-- User bricht Share-Sheet ab → Canvas bleibt offen, kein Error
+- User bricht Share-Sheet ab → `navigator.share()` rejected mit `AbortError` → silent catchen (kein Toast), Canvas bleibt offen
 
 ---
 
@@ -158,19 +158,21 @@
 | `downloading` | Fetch complete + canShare=true | -- | `sharing` | Feature Detection: `navigator.canShare({ files })` |
 | `downloading` | Fetch complete + canShare=false | -- | `idle` (Anchor fallback) | Standard-Download als Fallback |
 | `downloading` | Fetch error | Toast "Download fehlgeschlagen" | `error` | -- |
-| `sharing` | User waehlt Aktion / schliesst Sheet | Spinner weg | `idle` | -- |
+| `sharing` | User waehlt Aktion / schliesst Sheet | Spinner weg | `idle` | Share-Sheet Dismiss rejected mit `AbortError` → silent catchen, kein Toast |
 | `error` | -- | Toast verschwindet nach Timeout | `idle` | -- |
 
 ---
 
 ## Business Rules
 
-- iOS/iPadOS-Erkennung via Feature Detection: `navigator.share !== undefined` UND `navigator.canShare({ files: [testFile] })` gibt `true` zurueck
+- iOS/iPadOS-Erkennung via Feature Detection (Post-Fetch): Blob fetchen → `File` erstellen → `navigator.canShare({ files: [file] })` pruefen. Kein separater Pre-Check mit Dummy-File noetig, da der Fetch ohnehin stattfindet
 - Kein User-Agent-Sniffing
 - Fallback auf Anchor-Download wenn Web Share nicht verfuegbar
+- `navigator.share()` rejected mit `AbortError` wenn User Share-Sheet schliesst → als "kein Fehler" behandeln, keinen Error-Toast zeigen
 - `URL.revokeObjectURL()` erst NACH Share-Abschluss (nicht sofort wie aktuell)
 - Scroll-Position wird nur im Memory gehalten (useRef), nicht persistiert (kein localStorage)
 - Scroll-Restore nur fuer den Gallery-Scroll-Container, kein anderer Scroll-State
+- Scroll-Restore Timing: `handleDetailViewClose` nutzt `startViewTransitionIfSupported()` — nach `display: none` Entfernung braucht der Browser einen Render-Cycle bevor `scrollTop` gesetzt werden kann. `requestAnimationFrame` nach State-Update verwenden
 
 ---
 
@@ -199,7 +201,7 @@ Slice 1 (Download)     Slice 2 (Scroll)
 | # | Name | Scope | Testability | Dependencies |
 |---|------|-------|-------------|--------------|
 | 1 | iPad-safe Download | Web Share API auf iOS, Fallback Anchor-Download. `downloadImage()` refactoren oder neue `shareImage()` Funktion. `canvas-toolbar.tsx` Handler anpassen. | Manuell auf iPad: Download oeffnet Share-Sheet statt Quick Look. Canvas bleibt offen. Desktop: Download funktioniert wie bisher. | -- |
-| 2 | Gallery Scroll Restore | Ref auf Gallery Scroll Container. scrollTop speichern bei Canvas-Open (`handleSelectGeneration`), wiederherstellen bei Canvas-Close (nach `display: none` entfernt). | Manuell: Galerie scrollen, Canvas oeffnen, zurueck, Scroll-Position wiederhergestellt. | -- |
+| 2 | Gallery Scroll Restore | Ref auf Gallery Scroll Container. scrollTop speichern bei Canvas-Open (`handleSelectGeneration`), wiederherstellen bei Canvas-Close (nach `display: none` entfernt). Achtung: `requestAnimationFrame` fuer Restore nach Render-Cycle noetig. | Manuell: Galerie scrollen, Canvas oeffnen, zurueck, Scroll-Position wiederhergestellt. | -- |
 
 ### Recommended Order
 
@@ -249,6 +251,8 @@ Slice 1 (Download)     Slice 2 (Scroll)
 | 2026-04-10 | Web | iPad Safari navigiert bei Blob-URL anchor.click() zur URL statt Download. Quick Look Preview oeffnet sich. |
 | 2026-04-10 | Web | Web Share API (`navigator.share({ files })`) funktioniert auf iOS Safari und oeffnet natives Share-Sheet mit "In Fotos speichern". |
 | 2026-04-10 | Web | Browser stellt scrollTop bei `display: none` → visible Wechsel nicht automatisch her. Manuelles Save/Restore noetig. |
+| 2026-04-10 | Web | `navigator.share()` rejected mit `AbortError` wenn User Share-Sheet dismissed. Muss silent gefangen werden. |
+| 2026-04-10 | Codebase | `handleDetailViewClose` nutzt `startViewTransitionIfSupported()` — scrollTop Restore braucht `requestAnimationFrame` nach State-Update wegen Render-Cycle. |
 
 ---
 
