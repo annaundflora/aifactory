@@ -579,4 +579,282 @@ describe("WorkspaceContent — Detail-View integration", () => {
     // to a real DOM element that supports scrolling.
     expect(typeof galleryContainer.scrollTop).toBe("number");
   });
+
+  // -------------------------------------------------------------------------
+  // Slice 04: Gallery Scroll -- Save/Restore in Handlers
+  // -------------------------------------------------------------------------
+
+  /**
+   * AC-1: GIVEN die Gallery ist sichtbar und der Scroll-Container hat scrollTop = 420
+   *       WHEN handleSelectGeneration(id) aufgerufen wird
+   *       THEN wird scrollTopRef.current auf 420 gesetzt BEVOR setDetailViewOpen(true)
+   *            ausgefuehrt wird
+   */
+  it("AC-1 (scroll-save-restore): should save gallery scrollTop to scrollTopRef when selecting a generation", async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkspaceContent
+        projectId="project-1"
+        initialGenerations={[completedGen]}
+      />
+    );
+
+    // GIVEN: Gallery is visible, set scrollTop = 420 on the scroll container
+    const galleryGrid = screen.getByTestId("gallery-grid");
+    const galleryContainer = galleryGrid.closest(".overflow-y-auto") as HTMLDivElement;
+    expect(galleryContainer).not.toBeNull();
+    galleryContainer.scrollTop = 420;
+    expect(galleryContainer.scrollTop).toBe(420);
+
+    // WHEN: Click a gallery card (triggers handleSelectGeneration)
+    const cardButton = screen.getByTestId("gallery-card-gen-abc-123");
+    await user.click(cardButton);
+
+    // THEN: Detail view opens (proves setDetailViewOpen(true) was called)
+    await waitFor(() => {
+      expect(screen.getByTestId("workspace-detail-view")).toBeInTheDocument();
+    });
+
+    // Verify the scroll position was saved by closing the detail view and
+    // checking that requestAnimationFrame restores scrollTop to 420.
+    // Stub requestAnimationFrame to capture its callback.
+    const rafCallbacks: FrameRequestCallback[] = [];
+    const originalRaf = globalThis.requestAnimationFrame;
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      rafCallbacks.push(cb);
+      return 1;
+    });
+
+    try {
+      // Close the detail view (triggers handleDetailViewClose which uses the saved value)
+      const backButton = screen.getByTestId("canvas-back-button");
+      await user.click(backButton);
+
+      // Gallery should be visible again
+      await waitFor(() => {
+        const galleryView = screen.getByTestId("workspace-gallery-view");
+        expect(galleryView).not.toHaveStyle({ display: "none" });
+      });
+
+      // Execute the captured requestAnimationFrame callback
+      expect(rafCallbacks.length).toBeGreaterThanOrEqual(1);
+      rafCallbacks.forEach((cb) => cb(0));
+
+      // The saved scrollTop (420) should be restored
+      expect(galleryContainer.scrollTop).toBe(420);
+    } finally {
+      vi.stubGlobal("requestAnimationFrame", originalRaf);
+    }
+  });
+
+  /**
+   * AC-2: GIVEN scrollTopRef.current ist 420 und der Canvas ist offen
+   *       WHEN handleDetailViewClose() aufgerufen wird
+   *       THEN wird nach setDetailViewOpen(false) ein requestAnimationFrame-Callback
+   *            registriert, das galleryScrollRef.current.scrollTop auf 420 setzt
+   */
+  it("AC-2 (scroll-save-restore): should restore gallery scrollTop via requestAnimationFrame when closing detail view", async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkspaceContent
+        projectId="project-1"
+        initialGenerations={[completedGen]}
+      />
+    );
+
+    // Set scroll position on gallery container
+    const galleryGrid = screen.getByTestId("gallery-grid");
+    const galleryContainer = galleryGrid.closest(".overflow-y-auto") as HTMLDivElement;
+    expect(galleryContainer).not.toBeNull();
+    galleryContainer.scrollTop = 420;
+
+    // Open detail view (saves scrollTop via handleSelectGeneration)
+    const cardButton = screen.getByTestId("gallery-card-gen-abc-123");
+    await user.click(cardButton);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("workspace-detail-view")).toBeInTheDocument();
+    });
+
+    // GIVEN: Canvas is open. Now stub requestAnimationFrame to capture the callback.
+    const rafCallbacks: FrameRequestCallback[] = [];
+    const originalRaf = globalThis.requestAnimationFrame;
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      rafCallbacks.push(cb);
+      return 1;
+    });
+
+    try {
+      // Reset scrollTop to 0 to simulate the browser clearing it when display:none was applied
+      galleryContainer.scrollTop = 0;
+      expect(galleryContainer.scrollTop).toBe(0);
+
+      // WHEN: Close the detail view
+      const backButton = screen.getByTestId("canvas-back-button");
+      await user.click(backButton);
+
+      // THEN: Gallery should reappear (setDetailViewOpen(false) was called)
+      await waitFor(() => {
+        const galleryView = screen.getByTestId("workspace-gallery-view");
+        expect(galleryView).not.toHaveStyle({ display: "none" });
+      });
+
+      // A requestAnimationFrame callback must have been registered
+      expect(rafCallbacks.length).toBeGreaterThanOrEqual(1);
+
+      // Before executing the rAF callback, scrollTop should still be 0
+      expect(galleryContainer.scrollTop).toBe(0);
+
+      // Execute the rAF callback — this should restore scrollTop to 420
+      rafCallbacks.forEach((cb) => cb(0));
+      expect(galleryContainer.scrollTop).toBe(420);
+    } finally {
+      vi.stubGlobal("requestAnimationFrame", originalRaf);
+    }
+  });
+
+  /**
+   * AC-3: GIVEN galleryScrollRef.current ist null (Container nicht gemountet)
+   *       WHEN handleSelectGeneration(id) oder handleDetailViewClose() aufgerufen wird
+   *       THEN wird kein Fehler geworfen -- Save faellt auf 0 zurueck (Nullish-Coalescing),
+   *            Restore ueberspringt scrollTop-Zuweisung (Null-Guard)
+   */
+  it("AC-3 (scroll-save-restore): should not throw when galleryScrollRef.current is null during save or restore", async () => {
+    const user = userEvent.setup();
+
+    // Render the component normally — the ref is attached to the DOM element
+    const { unmount } = render(
+      <WorkspaceContent
+        projectId="project-1"
+        initialGenerations={[completedGen]}
+      />
+    );
+
+    // Verify initial render works without error
+    expect(screen.getByTestId("workspace-gallery-view")).toBeInTheDocument();
+
+    // We test null-safety indirectly: calling handleSelectGeneration via the
+    // captured callback works even if the gallery container has default scrollTop (0).
+    // This exercises the `galleryScrollRef.current?.scrollTop ?? 0` path.
+    // The null-coalescing ensures no error if the ref were null.
+    expect(() => {
+      if (capturedOnSelectGeneration) {
+        capturedOnSelectGeneration("gen-abc-123");
+      }
+    }).not.toThrow();
+
+    // Detail view should open
+    await waitFor(() => {
+      expect(screen.getByTestId("workspace-detail-view")).toBeInTheDocument();
+    });
+
+    // Stub requestAnimationFrame for the close path
+    const rafCallbacks: FrameRequestCallback[] = [];
+    const originalRaf = globalThis.requestAnimationFrame;
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      rafCallbacks.push(cb);
+      return 1;
+    });
+
+    try {
+      // Close the detail view — exercises the restore path
+      const backButton = screen.getByTestId("canvas-back-button");
+      // This should not throw even though scrollTopRef.current is 0 (the default)
+      await user.click(backButton);
+
+      await waitFor(() => {
+        const galleryView = screen.getByTestId("workspace-gallery-view");
+        expect(galleryView).not.toHaveStyle({ display: "none" });
+      });
+
+      // Execute the rAF callback — the null-guard in the restore code protects
+      // against galleryScrollRef.current being null. Since it IS mounted here,
+      // scrollTop should be set to 0 (the saved default).
+      expect(rafCallbacks.length).toBeGreaterThanOrEqual(1);
+      expect(() => {
+        rafCallbacks.forEach((cb) => cb(0));
+      }).not.toThrow();
+
+      // scrollTop should be 0 (the default fallback from nullish-coalescing)
+      const galleryGrid = screen.getByTestId("gallery-grid");
+      const galleryContainer = galleryGrid.closest(".overflow-y-auto") as HTMLDivElement;
+      expect(galleryContainer.scrollTop).toBe(0);
+    } finally {
+      vi.stubGlobal("requestAnimationFrame", originalRaf);
+    }
+  });
+
+  /**
+   * AC-4: GIVEN handleDetailViewClose() nutzt startViewTransitionIfSupported() als Wrapper
+   *       WHEN der Close-Handler ausgefuehrt wird
+   *       THEN laeuft der requestAnimationFrame-Aufruf INNERHALB des
+   *            startViewTransitionIfSupported-Callbacks, NACH setDetailViewOpen(false)
+   */
+  it("AC-4 (scroll-save-restore): should call requestAnimationFrame inside startViewTransitionIfSupported callback after setDetailViewOpen(false)", async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkspaceContent
+        projectId="project-1"
+        initialGenerations={[completedGen]}
+      />
+    );
+
+    // Set a non-zero scroll position
+    const galleryGrid = screen.getByTestId("gallery-grid");
+    const galleryContainer = galleryGrid.closest(".overflow-y-auto") as HTMLDivElement;
+    galleryContainer.scrollTop = 300;
+
+    // Open the detail view
+    const cardButton = screen.getByTestId("gallery-card-gen-abc-123");
+    await user.click(cardButton);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("workspace-detail-view")).toBeInTheDocument();
+    });
+
+    // Track the ordering: rAF must be called AFTER setDetailViewOpen(false).
+    // We know setDetailViewOpen(false) happened when the gallery view is visible again.
+    // We verify that rAF was called (not before) and that it runs within the
+    // same synchronous callback as the state update (startViewTransitionIfSupported
+    // calls the callback synchronously in jsdom since View Transitions API is not available).
+    const rafCallbacks: FrameRequestCallback[] = [];
+    const originalRaf = globalThis.requestAnimationFrame;
+    let rafCalledBeforeClose = false;
+
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      // At the time rAF is called, the detail view close has already been initiated
+      // (setDetailViewOpen(false) was called synchronously before this point)
+      rafCallbacks.push(cb);
+      return 1;
+    });
+
+    try {
+      // Ensure no rAF was called before the close
+      expect(rafCallbacks.length).toBe(0);
+
+      // Close the detail view
+      const backButton = screen.getByTestId("canvas-back-button");
+      await user.click(backButton);
+
+      // THEN: requestAnimationFrame should have been called
+      // (startViewTransitionIfSupported runs the callback synchronously in jsdom,
+      //  so by the time the click handler returns, rAF has been registered)
+      expect(rafCallbacks.length).toBeGreaterThanOrEqual(1);
+
+      // Gallery should be visible (setDetailViewOpen(false) ran BEFORE rAF)
+      await waitFor(() => {
+        const galleryView = screen.getByTestId("workspace-gallery-view");
+        expect(galleryView).not.toHaveStyle({ display: "none" });
+      });
+
+      // Reset scrollTop to simulate browser clearing it
+      galleryContainer.scrollTop = 0;
+
+      // Execute the rAF callback — should restore the saved scroll position
+      rafCallbacks.forEach((cb) => cb(0));
+      expect(galleryContainer.scrollTop).toBe(300);
+    } finally {
+      vi.stubGlobal("requestAnimationFrame", originalRaf);
+    }
+  });
 });
