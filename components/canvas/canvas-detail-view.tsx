@@ -17,6 +17,7 @@ import { UpscalePopover } from "@/components/canvas/popovers/upscale-popover";
 import { CanvasChatPanel } from "@/components/canvas/canvas-chat-panel";
 import { MaskCanvas } from "@/components/canvas/mask-canvas";
 import { FloatingBrushToolbar } from "@/components/canvas/floating-brush-toolbar";
+import { ZoomControls } from "@/components/canvas/zoom-controls";
 import { OutpaintControls } from "@/components/canvas/outpaint-controls";
 import { useCanvasZoom } from "@/lib/hooks/use-canvas-zoom";
 import { generateImages, upscaleImage, fetchGenerations } from "@/app/actions/generations";
@@ -145,8 +146,6 @@ export function CanvasDetailView({
   // ---------------------------------------------------------------------------
   // Zoom Hook — integrates with container + image refs
   // ---------------------------------------------------------------------------
-  // Result stored for later slices (03–08) to destructure as needed.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const canvasZoom = useCanvasZoom(imageContainerRef, imageRef);
 
   // ---------------------------------------------------------------------------
@@ -930,6 +929,9 @@ export function CanvasDetailView({
           {!isClickEditActive && state.editMode !== "outpaint" && (
             <FloatingBrushToolbar onEraseAction={handleEraseAction} />
           )}
+
+          {/* Zoom Controls — floating panel bottom-right, outside Transform-Wrapper */}
+          <ZoomControls canvasZoom={canvasZoom} />
 
           {/* Image + Mask overlay */}
           <div
