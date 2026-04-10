@@ -1,0 +1,20 @@
+{
+  "spec_path": "/home/dev/aifactory/.claude/worktrees/25-ipad-canvas-download-dismiss-gallery-scroll/specs/2026-04-10-25-ipad-canvas-download-dismiss-gallery-scroll",
+  "feature_name": "25-ipad-canvas-download-dismiss-gallery-scroll",
+  "status": "in_progress",
+  "current_state": "implementing",
+  "current_slice_id": "slice-01",
+  "retry_count": 0,
+  "failed_stage": null,
+  "waves": [
+    {"wave": 1, "slices": ["slice-01", "slice-03"]},
+    {"wave": 2, "slices": ["slice-02", "slice-04"]}
+  ],
+  "completed_slices": [],
+  "evidence_files": [],
+  "worktree_path": "/home/dev/aifactory/.claude/worktrees/25-ipad-canvas-download-dismiss-gallery-scroll",
+  "branch": "25-ipad-canvas-download-dismiss-gallery-scroll",
+  "github_available": true,
+  "repo": "annaundflora/aifactory",
+  "pr_number": 28
+}
