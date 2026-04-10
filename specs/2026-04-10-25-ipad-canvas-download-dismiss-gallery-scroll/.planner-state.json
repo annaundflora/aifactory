@@ -1,0 +1,21 @@
+{
+  "spec_path": "specs/2026-04-10-25-ipad-canvas-download-dismiss-gallery-scroll",
+  "status": "completed",
+  "phase": "completed",
+  "started_at": "2026-04-10T12:00:00Z",
+  "detected_stack": "TypeScript/Node.js",
+  "total_slices": 4,
+  "current_slice_index": 4,
+  "slices": [
+    { "number": 1, "name": "downloadImage -- Web Share API Branch", "status": "approved", "retries": 0 },
+    { "number": 2, "name": "canvas-toolbar -- AbortError-Handling", "status": "approved", "retries": 0 },
+    { "number": 3, "name": "Gallery Scroll -- Refs am Container", "status": "approved", "retries": 0 },
+    { "number": 4, "name": "Gallery Scroll -- Save/Restore in Handlers", "status": "approved", "retries": 1 }
+  ],
+  "approved_slices": [1, 2, 3, 4],
+  "failed_slices": [],
+  "gate3_retries": 0,
+  "last_action": "Gate 3 APPROVED - Ready for Orchestration",
+  "completed_at": "2026-04-10T12:25:00Z",
+  "last_updated": "2026-04-10T12:25:00Z"
+}

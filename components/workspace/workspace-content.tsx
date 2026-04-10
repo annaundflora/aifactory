@@ -61,6 +61,10 @@ export function WorkspaceContent({
   const assistantPointerMoveRef = useRef<((e: PointerEvent) => void) | null>(null);
   const assistantPointerUpRef = useRef<(() => void) | null>(null);
 
+  // ----- Gallery Scroll refs (for scroll save/restore during canvas roundtrip) -----
+  const galleryScrollRef = useRef<HTMLDivElement>(null);
+  const scrollTopRef = useRef<number>(0);
+
   const handleAssistantToggle = useCallback(() => {
     setAssistantOpen((prev) => !prev);
   }, []);
@@ -297,6 +301,7 @@ export function WorkspaceContent({
   const handleSelectGeneration = useCallback(
     (id: string) => {
       startViewTransitionIfSupported(() => {
+        scrollTopRef.current = galleryScrollRef.current?.scrollTop ?? 0;
         setSelectedGenerationId(id);
         setDetailViewOpen(true);
       });
@@ -308,6 +313,11 @@ export function WorkspaceContent({
     startViewTransitionIfSupported(() => {
       setDetailViewOpen(false);
       setSelectedGenerationId(null);
+      requestAnimationFrame(() => {
+        if (galleryScrollRef.current) {
+          galleryScrollRef.current.scrollTop = scrollTopRef.current;
+        }
+      });
     });
   }, []);
 
@@ -401,7 +411,7 @@ export function WorkspaceContent({
         )}
 
         {/* Center: Gallery */}
-        <div className="min-w-[300px] flex-1 overflow-y-auto rounded-xl border border-border/80 bg-card p-6 shadow-sm">
+        <div ref={galleryScrollRef} className="min-w-[300px] flex-1 overflow-y-auto rounded-xl border border-border/80 bg-card p-6 shadow-sm">
           {/* Pending Placeholders (failed -> only toast, no card) */}
           {pendingGenerations.length > 0 && (
             <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">

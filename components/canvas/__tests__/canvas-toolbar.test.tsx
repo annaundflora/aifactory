@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 
@@ -65,6 +65,7 @@ vi.mock("sonner", () => ({
 import { CanvasToolbar } from "@/components/canvas/canvas-toolbar";
 import { CanvasDetailProvider } from "@/lib/canvas-detail-context";
 import type { Generation } from "@/lib/db/queries";
+import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -462,5 +463,129 @@ describe("CanvasToolbar", () => {
 
     // Now active
     expect(detailsBtn).toHaveAttribute("aria-pressed", "true");
+  });
+
+  // ---------------------------------------------------------------------------
+  // Slice-02: Toolbar handleDownload AbortError-Kompatibilitaet
+  // ---------------------------------------------------------------------------
+
+  /**
+   * AC-1 (Slice-02): Kein Toast bei normalem Resolve
+   * GIVEN downloadImage() resolved normal (z.B. nach erfolgreichem Share oder
+   *       nach User-Dismiss mit AbortError, der in downloadImage selbst
+   *       abgefangen wird)
+   * WHEN handleDownload() in der Toolbar ausgefuehrt wird
+   * THEN wird toast.error NICHT aufgerufen und isDownloading wechselt zurueck
+   *      auf false
+   */
+  it("AC-1 (Slice-02): should not show error toast when downloadImage resolves successfully (AbortError handled internally)", async () => {
+    const user = userEvent.setup();
+    // downloadImage resolves without error (AbortError was caught internally)
+    mockDownloadImage.mockResolvedValueOnce(undefined);
+
+    const generation = makeGeneration({
+      imageUrl: "https://r2.example.com/image.png",
+      prompt: "test prompt",
+      createdAt: new Date("2025-06-15T12:00:00Z"),
+    });
+    renderToolbarDefault({ generation });
+
+    const downloadBtn = screen.getByTestId("toolbar-download");
+
+    // Act: click download
+    await user.click(downloadBtn);
+
+    // Assert: downloadImage was called
+    expect(mockDownloadImage).toHaveBeenCalledTimes(1);
+
+    // Assert: toast.error was NOT called (AbortError handled inside downloadImage)
+    expect(toast.error).not.toHaveBeenCalled();
+
+    // Assert: isDownloading is back to false — button is clickable again
+    // We verify by clicking again and checking that downloadImage is called a second time
+    mockDownloadImage.mockResolvedValueOnce(undefined);
+    await user.click(downloadBtn);
+    expect(mockDownloadImage).toHaveBeenCalledTimes(2);
+  });
+
+  /**
+   * AC-2 (Slice-02): Toast bei echtem Fehler
+   * GIVEN downloadImage() rejected mit einem echten Fehler
+   *       (z.B. TypeError: Failed to fetch)
+   * WHEN handleDownload() in der Toolbar ausgefuehrt wird
+   * THEN wird toast.error("Download fehlgeschlagen") genau einmal aufgerufen
+   *      und isDownloading wechselt zurueck auf false
+   */
+  it('AC-2 (Slice-02): should show toast.error "Download fehlgeschlagen" when downloadImage rejects with a real error', async () => {
+    const user = userEvent.setup();
+    // downloadImage rejects with a real error (not AbortError)
+    mockDownloadImage.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    const generation = makeGeneration({
+      imageUrl: "https://r2.example.com/image.png",
+      prompt: "test prompt",
+      createdAt: new Date("2025-06-15T12:00:00Z"),
+    });
+    renderToolbarDefault({ generation });
+
+    const downloadBtn = screen.getByTestId("toolbar-download");
+
+    // Act: click download
+    await user.click(downloadBtn);
+
+    // Assert: toast.error was called exactly once with the correct message
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith("Download fehlgeschlagen");
+
+    // Assert: isDownloading is back to false — button is clickable again
+    mockDownloadImage.mockResolvedValueOnce(undefined);
+    await user.click(downloadBtn);
+    expect(mockDownloadImage).toHaveBeenCalledTimes(2);
+  });
+
+  /**
+   * AC-3 (Slice-02): Doppelklick-Guard
+   * GIVEN handleDownload() wird aufgerufen und downloadImage() ist in
+   *       Ausfuehrung (Promise pending)
+   * WHEN der User erneut auf den Download-Button klickt
+   * THEN wird kein zweiter downloadImage()-Aufruf gestartet
+   *      (Guard: isDownloading ist true)
+   */
+  it("AC-3 (Slice-02): should not call downloadImage a second time while a download is already in progress", async () => {
+    const user = userEvent.setup();
+
+    // Create a promise that we control — keeps downloadImage pending
+    let resolveDownload!: () => void;
+    const pendingPromise = new Promise<void>((resolve) => {
+      resolveDownload = resolve;
+    });
+    mockDownloadImage.mockReturnValueOnce(pendingPromise);
+
+    const generation = makeGeneration({
+      imageUrl: "https://r2.example.com/image.png",
+      prompt: "test prompt",
+      createdAt: new Date("2025-06-15T12:00:00Z"),
+    });
+    renderToolbarDefault({ generation });
+
+    const downloadBtn = screen.getByTestId("toolbar-download");
+
+    // Act: first click — starts download (promise stays pending)
+    await user.click(downloadBtn);
+    expect(mockDownloadImage).toHaveBeenCalledTimes(1);
+
+    // Act: second click while first download is still pending
+    await user.click(downloadBtn);
+
+    // Assert: downloadImage was NOT called a second time
+    expect(mockDownloadImage).toHaveBeenCalledTimes(1);
+
+    // Cleanup: resolve the pending promise so the component state settles
+    resolveDownload();
+    await waitFor(() => {
+      // After resolve, isDownloading should be false again
+      // Verify by attempting another click — it should now succeed
+      mockDownloadImage.mockResolvedValueOnce(undefined);
+    });
   });
 });

@@ -1,0 +1,13 @@
+{
+  "feature": "25-ipad-canvas-download-dismiss-gallery-scroll",
+  "slice": "slice-01",
+  "timestamp": "2026-04-10T12:02:00Z",
+  "status": "completed",
+  "implementation": {"status": "completed", "files_changed": ["lib/utils.ts"]},
+  "review": {"verdict": "APPROVED", "findings": []},
+  "deterministic_gate": {"detected_stack": "TypeScript", "lint_passed": true, "lint_iterations": 0},
+  "tests": {"test_files": ["lib/__tests__/download-utils.test.ts"], "ac_coverage": {"total": 5, "covered": 5, "missing": []}},
+  "validation": {"overall_status": "passed", "unit": "13 passed, 0 failed"},
+  "retries": 0,
+  "review_iterations": 0
+}
