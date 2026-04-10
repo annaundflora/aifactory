@@ -106,11 +106,13 @@
 2. Finger auseinanderziehen -> Zoom In zum Mittelpunkt der Finger
 3. Finger zusammenfuehren -> Zoom Out
 
-### Flow 5: Touch Zwei-Finger-Pan
-1. User bewegt zwei Finger parallel -> Bild verschiebt sich in Bewegungsrichtung
+### Flow 5: Touch Pan
+1. Wenn gezoomt + kein Mask-Modus (editMode null/instruction/outpaint): Ein-Finger-Drag -> Bild verschiebt sich (Pan)
+2. In jedem Modus: Zwei-Finger-Drag -> Bild verschiebt sich in Bewegungsrichtung
 
 ### Flow 6: Double-Tap
 1. User doppelt-tippt auf Canvas -> Toggle zwischen Fit-Ansicht und 100%
+2. Deaktiviert wenn editMode = inpaint oder erase (verhindert versehentliche Mask-Punkte + Zoom gleichzeitig)
 
 ### Flow 7: Pinch waehrend Mask-Stroke (Procreate-Style)
 1. User malt mit einem Finger eine Maske
@@ -139,6 +141,7 @@
 - Vertikaler Block, abgerundet, mit Border und Shadow (wie FloatingBrushToolbar)
 - Reihenfolge von oben nach unten: [Fit-Icon] [+] [125%] [-]
 - Z-Index ueber Bild, unter Floating Brush Toolbar
+- Canvas-Container benoetigt overflow-hidden um gezoomtes Bild zu clippen
 - Nicht ueberlappend mit OutpaintControls oder DetailsOverlay
 
 ---
@@ -163,7 +166,7 @@
 | `fit` | Bild passt in Container, Prozent zeigt berechneten Fit-Wert | Zoom-In, Ctrl+Scroll, Pinch, Double-Tap, + Taste |
 | `zoomed-in` | Bild groesser als Container, Scroll/Pan moeglich | Zoom-In, Zoom-Out, Fit, Scroll, Pan, Pinch, Double-Tap, +/-/0 Tasten |
 | `zoomed-out` | Bild kleiner als Container | Zoom-In, Fit, Ctrl+Scroll, Pinch, Double-Tap, +/0 Tasten |
-| `panning` | Cursor: Grab-Hand (Space gehalten), Bild wird verschoben | Maus-Drag verschiebt Bild, Space loslassen -> zurueck zu `zoomed-in` |
+| `panning` | Cursor: grab (Space gehalten), grabbing (waehrend Drag), Bild wird verschoben | Maus-Drag verschiebt Bild, Space loslassen -> zurueck zu `zoomed-in` |
 | `gesture-active` | Touch-Geste laeuft (Pinch oder 2F-Pan) | Zoom/Pan per Geste, Finger hoch -> zurueck zu vorherigem State |
 
 ### Transitions
@@ -175,7 +178,8 @@
 | `fit` | Double-Tap | Zoom auf 100% | `zoomed-in` (oder `fit` wenn Fit=100%) | -- |
 | `zoomed-in` | [-] klick / Ctrl+Scroll down / Pinch in / - Taste | Bild skaliert | `zoomed-in`, `fit`, oder `zoomed-out` | Je nach Ergebnis-Level |
 | `zoomed-in` | [Fit] klick / 0 Taste / Double-Tap | Bild zurueck auf Container-Passend | `fit` | Pan reset auf (0,0) |
-| `zoomed-in` | Space gedrueckt | Cursor -> Grab-Hand | `panning` | Nur Desktop |
+| `zoomed-in` | Space gedrueckt | Cursor -> Grab-Hand | `panning` | Nur Desktop. Space hat Vorrang ueber Mask-Painting |
+| `zoomed-in` | 1-Finger-Drag (Touch, kein Mask-Modus) | Bild verschiebt sich | `zoomed-in` | Nur wenn editMode null/instruction/outpaint |
 | `zoomed-in` | Scroll | Bild scrollt vertikal | `zoomed-in` | -- |
 | `zoomed-in` | Shift+Scroll | Bild scrollt horizontal | `zoomed-in` | -- |
 | `zoomed-in` | Image-Wechsel (prev/next) | Bild wechselt, Zoom resettet | `fit` | Pan reset auf (0,0) |
@@ -201,6 +205,12 @@
 - Swipe-Navigation (prev/next): Nur bei Zoom = Fit (nicht bei gezoomtem Bild)
 - Mask-Canvas muss synchron mit Bild transformieren (Zoom + Pan)
 - Bei Zoom + Masking: Pointer-Koordinaten muessen Zoom/Pan-Offset zurueckrechnen
+- Brush-Cursor (Kreis) skaliert visuell mit dem Zoom-Level -- erscheint gleich gross auf dem Bild unabhaengig vom Zoom
+- Zoom-Keyboard-Shortcuts (+/-/0) bleiben in allen Edit-Modi aktiv, auch waehrend Masking. Kein Konflikt mit Brush-Shortcuts ([/]/E) da verschiedene Tasten
+- Space-Taste hat Vorrang ueber Mask-Painting: Wenn Space gehalten, werden Pointer Events auf Mask-Canvas unterdrueckt (temporaeres Hand-Tool, wie Photoshop)
+- Double-Tap-Zoom ist deaktiviert wenn editMode = inpaint oder erase (verhindert versehentliche Mask-Punkte + Zoom gleichzeitig)
+- Touch Ein-Finger-Pan: Bei Zoom > Fit und editMode null/instruction/outpaint -> 1-Finger-Drag pannt das Bild. Bei editMode inpaint/erase -> 1-Finger-Drag malt Mask-Stroke
+- Image-Wechsel ist bereits blockiert wenn maskData existiert (bestehende Navigation-Lock). Kein spezielles Mask-Handling fuer Zoom-Reset noetig
 
 ---
 
