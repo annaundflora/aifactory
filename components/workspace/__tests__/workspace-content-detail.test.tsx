@@ -819,7 +819,7 @@ describe("WorkspaceContent — Detail-View integration", () => {
     // calls the callback synchronously in jsdom since View Transitions API is not available).
     const rafCallbacks: FrameRequestCallback[] = [];
     const originalRaf = globalThis.requestAnimationFrame;
-    let rafCalledBeforeClose = false;
+    const rafCalledBeforeClose = false;
 
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
       // At the time rAF is called, the detail view close has already been initiated
