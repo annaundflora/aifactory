@@ -20,6 +20,7 @@ import { FloatingBrushToolbar } from "@/components/canvas/floating-brush-toolbar
 import { ZoomControls } from "@/components/canvas/zoom-controls";
 import { OutpaintControls } from "@/components/canvas/outpaint-controls";
 import { useCanvasZoom } from "@/lib/hooks/use-canvas-zoom";
+import { useTouchGestures } from "@/lib/hooks/use-touch-gestures";
 import { generateImages, upscaleImage, fetchGenerations } from "@/app/actions/generations";
 import { deleteGeneration } from "@/app/actions/generations";
 import { getModelSlots } from "@/app/actions/model-slots";
@@ -192,6 +193,14 @@ export function CanvasDetailView({
   }, [canvasZoom.handleWheel, canvasZoom.handleKeyDown, canvasZoom.isCanvasHoveredRef]);
 
   // ---------------------------------------------------------------------------
+  // Touch Gestures: Pinch-to-Zoom, Zwei-Finger-Pan, Ein-Finger-Pan (Slice 7)
+  // Registered via addEventListener with { passive: false } inside the hook
+  // ---------------------------------------------------------------------------
+  useTouchGestures(canvasAreaRef, transformWrapperRef, {
+    fitLevel: canvasZoom.fitLevel,
+  });
+
+  // ---------------------------------------------------------------------------
   // Click-to-Edit (SAM) state — local component state per spec constraints
   // ---------------------------------------------------------------------------
   const [isSamLoading, setIsSamLoading] = useState(false);
@@ -254,14 +263,24 @@ export function CanvasDetailView({
   );
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    // Only capture swipe start when at fit level (AC-8: swipe nav only at fit)
+    if (Math.abs(state.zoomLevel - canvasZoom.fitLevel) > 0.001) {
+      touchStartXRef.current = null;
+      return;
+    }
     touchStartXRef.current = e.touches[0].clientX;
-  }, []);
+  }, [state.zoomLevel, canvasZoom.fitLevel]);
 
   const handleTouchEnd = useCallback(
     (e: React.TouchEvent) => {
       if (touchStartXRef.current === null) return;
       // Block swipe navigation when a mask exists (same lock as button navigation)
       if (state.maskData !== null) {
+        touchStartXRef.current = null;
+        return;
+      }
+      // AC-8: Only allow swipe navigation when at fit level (not zoomed)
+      if (Math.abs(state.zoomLevel - canvasZoom.fitLevel) > 0.001) {
         touchStartXRef.current = null;
         return;
       }
@@ -279,7 +298,7 @@ export function CanvasDetailView({
         handleNavigate(localGenerations[currentIndex + 1].id);
       }
     },
-    [currentIndex, localGenerations, handleNavigate, state.maskData]
+    [currentIndex, localGenerations, handleNavigate, state.maskData, state.zoomLevel, canvasZoom.fitLevel]
   );
 
   // ---------------------------------------------------------------------------
@@ -933,6 +952,7 @@ export function CanvasDetailView({
         <main
           ref={canvasAreaRef}
           className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-muted/40"
+          style={{ touchAction: "none" }}
           data-testid="canvas-area"
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
