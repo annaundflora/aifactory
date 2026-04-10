@@ -8,6 +8,15 @@ import "@testing-library/jest-dom/vitest";
 // Polyfills
 // ---------------------------------------------------------------------------
 
+// Polyfill ResizeObserver for jsdom (used by useCanvasZoom)
+if (typeof globalThis.ResizeObserver === "undefined") {
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof globalThis.ResizeObserver;
+}
+
 beforeAll(() => {
   Object.defineProperty(window, "matchMedia", {
     writable: true,

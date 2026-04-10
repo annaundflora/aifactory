@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect, useRef, type ReactNode } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef, type ReactNode, type RefCallback } from "react";
 import { PanelRightClose, PanelRightOpen, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -18,6 +18,7 @@ import { CanvasChatPanel } from "@/components/canvas/canvas-chat-panel";
 import { MaskCanvas } from "@/components/canvas/mask-canvas";
 import { FloatingBrushToolbar } from "@/components/canvas/floating-brush-toolbar";
 import { OutpaintControls } from "@/components/canvas/outpaint-controls";
+import { useCanvasZoom } from "@/lib/hooks/use-canvas-zoom";
 import { generateImages, upscaleImage, fetchGenerations } from "@/app/actions/generations";
 import { deleteGeneration } from "@/app/actions/generations";
 import { getModelSlots } from "@/app/actions/model-slots";
@@ -130,17 +131,24 @@ export function CanvasDetailView({
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Image ref for MaskCanvas overlay — resolved from DOM after CanvasImage mount
+  // Image ref for MaskCanvas overlay + Zoom hook
   // ---------------------------------------------------------------------------
   const imageContainerRef = useRef<HTMLDivElement | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
+  const transformWrapperRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    const container = imageContainerRef.current;
-    if (!container) return;
-    const img = container.querySelector<HTMLImageElement>('[data-testid="canvas-image"]');
-    imageRef.current = img;
-  });
+  // Callback ref for CanvasImage forwardRef — keeps imageRef in sync
+  const canvasImageRefCallback: RefCallback<HTMLImageElement> = useCallback((el) => {
+    imageRef.current = el;
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Zoom Hook — integrates with container + image refs
+  // ---------------------------------------------------------------------------
+  const { fitLevel, zoomToPoint, zoomToStep, resetToFit } = useCanvasZoom(
+    imageContainerRef,
+    imageRef
+  );
 
   // ---------------------------------------------------------------------------
   // Click-to-Edit (SAM) state — local component state per spec constraints
@@ -916,24 +924,36 @@ export function CanvasDetailView({
           {/* Image + Mask overlay */}
           <div
             ref={imageContainerRef}
-            className="relative flex min-h-0 flex-1 items-center justify-center p-4"
+            className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4"
             style={isClickEditActive ? { cursor: "crosshair" } : undefined}
             onClick={handleClickEditImageClick}
             data-testid="canvas-image-area"
           >
-            <CanvasImage
-              generation={currentGeneration}
-              isLoading={state.isGenerating}
-            />
-            {/* MaskCanvas hidden during outpaint mode (Slice 13 AC-1) */}
-            {state.editMode !== "outpaint" && (
-              <MaskCanvas imageRef={imageRef} />
-            )}
+            {/* Zoom Transform Wrapper — scales CanvasImage + MaskCanvas + OutpaintControls together */}
+            <div
+              ref={transformWrapperRef}
+              style={{
+                transform: `translate(${state.panX}px, ${state.panY}px) scale(${state.zoomLevel})`,
+                transformOrigin: "0 0",
+                willChange: "transform",
+              }}
+              data-testid="zoom-transform-wrapper"
+            >
+              <CanvasImage
+                ref={canvasImageRefCallback}
+                generation={currentGeneration}
+                isLoading={state.isGenerating}
+              />
+              {/* MaskCanvas hidden during outpaint mode (Slice 13 AC-1) */}
+              {state.editMode !== "outpaint" && (
+                <MaskCanvas imageRef={imageRef} />
+              )}
 
-            {/* OutpaintControls visible only in outpaint mode (Slice 13 AC-1, AC-2) */}
-            {state.editMode === "outpaint" && (
-              <OutpaintControls />
-            )}
+              {/* OutpaintControls visible only in outpaint mode (Slice 13 AC-1, AC-2) */}
+              {state.editMode === "outpaint" && (
+                <OutpaintControls />
+              )}
+            </div>
 
             {/* SAM loading spinner overlay — AC-3 */}
             {isSamLoading && (
