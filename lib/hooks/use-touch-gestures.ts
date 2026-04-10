@@ -11,6 +11,9 @@ import type { EditMode } from "@/lib/canvas-detail-context";
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 3.0;
 
+/** Maximum time between two taps to register as a double-tap (ms) */
+const DOUBLE_TAP_WINDOW_MS = 300;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -19,6 +22,10 @@ const ZOOM_MAX = 3.0;
 export interface UseTouchGesturesOptions {
   /** Current fit-level — used to decide single-finger-pan vs swipe */
   fitLevel: number;
+  /** Zoom to a specific level with anchor at given container coords (from useCanvasZoom) */
+  zoomToPoint: (newZoom: number, cursorX: number, cursorY: number) => void;
+  /** Reset zoom to fit level and pan to (0,0) (from useCanvasZoom) */
+  resetToFit: () => void;
 }
 
 /** Internal gesture state machine */
@@ -42,6 +49,16 @@ interface GestureState {
   /** Running pan offsets during gesture */
   currentPanX: number;
   currentPanY: number;
+}
+
+/** Tracks the last single-finger tap for double-tap detection */
+interface DoubleTapState {
+  /** Timestamp of the last single-finger tap (touchend) */
+  timestamp: number;
+  /** clientX of the last tap — used as anchor point for zoom */
+  clientX: number;
+  /** clientY of the last tap */
+  clientY: number;
 }
 
 /** Single-finger pan tracking data */
@@ -111,6 +128,7 @@ export function useTouchGestures(
   // Gesture tracking refs
   const gestureRef = useRef<GestureState | null>(null);
   const singleFingerRef = useRef<SingleFingerState | null>(null);
+  const doubleTapRef = useRef<DoubleTapState | null>(null);
 
   // ---------------------------------------------------------------------------
   // DOM mutation helper — updates transform on the wrapper div directly
@@ -283,6 +301,10 @@ export function useTouchGestures(
           // If 1 finger remains after pinch, don't start single-finger-pan
           // (user was just finishing a pinch, not starting a new drag)
           singleFingerRef.current = null;
+
+          // Reset double-tap tracking after a pinch gesture — a pinch ending
+          // should not count as the first tap of a double-tap sequence.
+          doubleTapRef.current = null;
         }
         return;
       }
@@ -297,6 +319,58 @@ export function useTouchGestures(
           panY: sf.currentPanY,
         });
         singleFingerRef.current = null;
+        // A single-finger pan is a drag, not a tap — reset double-tap tracking
+        doubleTapRef.current = null;
+        return;
+      }
+
+      // -----------------------------------------------------------------
+      // Double-Tap Detection (Slice 8)
+      // Condition: all fingers lifted (touches.length === 0) and exactly
+      // one finger was involved (changedTouches.length === 1).
+      // -----------------------------------------------------------------
+      if (e.touches.length === 0 && e.changedTouches.length === 1) {
+        const now = Date.now();
+        const touch = e.changedTouches[0];
+        const prev = doubleTapRef.current;
+
+        if (prev && now - prev.timestamp < DOUBLE_TAP_WINDOW_MS) {
+          // Double-tap detected — clear tracking so a third tap doesn't re-trigger
+          doubleTapRef.current = null;
+
+          // Guard: ignore double-tap in inpaint/erase modes (AC-4, AC-5)
+          const { editMode, zoomLevel } = stateRef.current;
+          if (editMode === "inpaint" || editMode === "erase") {
+            return;
+          }
+
+          // Toggle logic (AC-1, AC-2, AC-3):
+          // If currently at fitLevel -> zoom to 100% at tap position
+          // Otherwise -> reset to fit
+          const { fitLevel, zoomToPoint, resetToFit } = optionsRef.current;
+
+          if (Math.abs(zoomLevel - fitLevel) < 0.001) {
+            // At fit level — zoom to 100% with anchor at tap position
+            // Convert touch clientX/Y to container-relative coordinates
+            const container = containerRef.current;
+            if (container) {
+              const rect = container.getBoundingClientRect();
+              const cursorX = touch.clientX - rect.left;
+              const cursorY = touch.clientY - rect.top;
+              zoomToPoint(1.0, cursorX, cursorY);
+            }
+          } else {
+            // At any other zoom level (100% or arbitrary) — reset to fit
+            resetToFit();
+          }
+        } else {
+          // First tap — record timestamp and position
+          doubleTapRef.current = {
+            timestamp: now,
+            clientX: touch.clientX,
+            clientY: touch.clientY,
+          };
+        }
       }
     };
 

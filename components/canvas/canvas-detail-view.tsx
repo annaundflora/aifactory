@@ -265,6 +265,8 @@ export function CanvasDetailView({
   // ---------------------------------------------------------------------------
   useTouchGestures(canvasAreaRef, transformWrapperRef, {
     fitLevel: canvasZoom.fitLevel,
+    zoomToPoint: canvasZoom.zoomToPoint,
+    resetToFit: canvasZoom.resetToFit,
   });
 
   // ---------------------------------------------------------------------------
@@ -341,13 +343,13 @@ export function CanvasDetailView({
   const handleTouchEnd = useCallback(
     (e: React.TouchEvent) => {
       if (touchStartXRef.current === null) return;
-      // Block swipe navigation when a mask exists (same lock as button navigation)
-      if (state.maskData !== null) {
+      // AC-9 (Slice 8): Block swipe navigation when zoomed beyond fit level (Early-Return)
+      if (Math.abs(state.zoomLevel - canvasZoom.fitLevel) > 0.001) {
         touchStartXRef.current = null;
         return;
       }
-      // AC-8: Only allow swipe navigation when at fit level (not zoomed)
-      if (Math.abs(state.zoomLevel - canvasZoom.fitLevel) > 0.001) {
+      // Block swipe navigation when a mask exists (same lock as button navigation)
+      if (state.maskData !== null) {
         touchStartXRef.current = null;
         return;
       }

@@ -207,7 +207,7 @@ describe("useTouchGestures - Pinch-to-Zoom", () => {
   it("AC-1: should double zoomLevel when finger distance doubles during pinch", () => {
     const wrapper = createWrapper(container, transformWrapper);
     const { result } = renderHook(
-      () => useTouchGesturesWithState({ fitLevel: 1.0 }),
+      () => useTouchGesturesWithState({ fitLevel: 1.0, zoomToPoint: vi.fn(), resetToFit: vi.fn() }),
       { wrapper }
     );
 
@@ -250,7 +250,7 @@ describe("useTouchGestures - Pinch-to-Zoom", () => {
   it("AC-2: should halve zoomLevel when finger distance halves, clamped to 0.5", () => {
     const wrapper = createWrapper(container, transformWrapper);
     const { result } = renderHook(
-      () => useTouchGesturesWithState({ fitLevel: 1.0 }),
+      () => useTouchGesturesWithState({ fitLevel: 1.0, zoomToPoint: vi.fn(), resetToFit: vi.fn() }),
       { wrapper }
     );
 
@@ -287,7 +287,7 @@ describe("useTouchGestures - Pinch-to-Zoom", () => {
   it("AC-2: should clamp zoomLevel to 0.5 minimum even with extreme pinch-in", () => {
     const wrapper = createWrapper(container, transformWrapper);
     const { result } = renderHook(
-      () => useTouchGesturesWithState({ fitLevel: 1.0 }),
+      () => useTouchGesturesWithState({ fitLevel: 1.0, zoomToPoint: vi.fn(), resetToFit: vi.fn() }),
       { wrapper }
     );
 
@@ -325,7 +325,7 @@ describe("useTouchGestures - Pinch-to-Zoom", () => {
   it("AC-6: should dispatch SET_ZOOM_PAN with clamped values on touchend", () => {
     const wrapper = createWrapper(container, transformWrapper);
     const { result } = renderHook(
-      () => useTouchGesturesWithState({ fitLevel: 1.0 }),
+      () => useTouchGesturesWithState({ fitLevel: 1.0, zoomToPoint: vi.fn(), resetToFit: vi.fn() }),
       { wrapper }
     );
 
@@ -358,7 +358,7 @@ describe("useTouchGestures - Pinch-to-Zoom", () => {
   it("AC-6: should not dispatch during touchmove, only on touchend", () => {
     const wrapper = createWrapper(container, transformWrapper);
     const { result } = renderHook(
-      () => useTouchGesturesWithState({ fitLevel: 1.0 }),
+      () => useTouchGesturesWithState({ fitLevel: 1.0, zoomToPoint: vi.fn(), resetToFit: vi.fn() }),
       { wrapper }
     );
 
@@ -417,7 +417,7 @@ describe("useTouchGestures - Zwei-Finger-Pan", () => {
   it("AC-3: should update panX/panY by midpoint delta of two fingers", () => {
     const wrapper = createWrapper(container, transformWrapper);
     const { result } = renderHook(
-      () => useTouchGesturesWithState({ fitLevel: 1.0 }),
+      () => useTouchGesturesWithState({ fitLevel: 1.0, zoomToPoint: vi.fn(), resetToFit: vi.fn() }),
       { wrapper }
     );
 
@@ -469,7 +469,7 @@ describe("useTouchGestures - Zwei-Finger-Pan", () => {
   it("AC-4: should apply zoom and pan simultaneously during combined gesture", () => {
     const wrapper = createWrapper(container, transformWrapper);
     const { result } = renderHook(
-      () => useTouchGesturesWithState({ fitLevel: 1.0 }),
+      () => useTouchGesturesWithState({ fitLevel: 1.0, zoomToPoint: vi.fn(), resetToFit: vi.fn() }),
       { wrapper }
     );
 
@@ -538,7 +538,7 @@ describe("useTouchGestures - Ref-basierte Updates", () => {
   it("AC-5: should update transform wrapper style.transform directly during touchmove without dispatch", () => {
     const wrapper = createWrapper(container, transformWrapper);
     const { result } = renderHook(
-      () => useTouchGesturesWithState({ fitLevel: 1.0 }),
+      () => useTouchGesturesWithState({ fitLevel: 1.0, zoomToPoint: vi.fn(), resetToFit: vi.fn() }),
       { wrapper }
     );
 
@@ -578,7 +578,7 @@ describe("useTouchGestures - Ref-basierte Updates", () => {
   it("AC-5: should update transform on single-finger pan via ref during touchmove", () => {
     const wrapper = createWrapper(container, transformWrapper);
     const { result } = renderHook(
-      () => useTouchGesturesWithState({ fitLevel: 1.0 }),
+      () => useTouchGesturesWithState({ fitLevel: 1.0, zoomToPoint: vi.fn(), resetToFit: vi.fn() }),
       { wrapper }
     );
 
@@ -659,7 +659,7 @@ describe("useTouchGestures - Ein-Finger-Pan", () => {
   it("AC-7: should pan on single-finger drag when zoomed and editMode is null/instruction/outpaint", () => {
     const wrapper = createWrapper(container, transformWrapper);
     const { result } = renderHook(
-      () => useTouchGesturesWithState({ fitLevel: 1.0 }),
+      () => useTouchGesturesWithState({ fitLevel: 1.0, zoomToPoint: vi.fn(), resetToFit: vi.fn() }),
       { wrapper }
     );
 
@@ -706,7 +706,7 @@ describe("useTouchGestures - Ein-Finger-Pan", () => {
   it("AC-7: should pan on single-finger drag when editMode is instruction", () => {
     const wrapper = createWrapper(container, transformWrapper);
     const { result } = renderHook(
-      () => useTouchGesturesWithState({ fitLevel: 1.0 }),
+      () => useTouchGesturesWithState({ fitLevel: 1.0, zoomToPoint: vi.fn(), resetToFit: vi.fn() }),
       { wrapper }
     );
 
@@ -754,7 +754,7 @@ describe("useTouchGestures - Ein-Finger-Pan", () => {
   it("AC-7: should pan on single-finger drag when editMode is outpaint", () => {
     const wrapper = createWrapper(container, transformWrapper);
     const { result } = renderHook(
-      () => useTouchGesturesWithState({ fitLevel: 1.0 }),
+      () => useTouchGesturesWithState({ fitLevel: 1.0, zoomToPoint: vi.fn(), resetToFit: vi.fn() }),
       { wrapper }
     );
 
@@ -808,7 +808,7 @@ describe("useTouchGestures - Ein-Finger-Pan", () => {
   it("AC-8: should not intercept single-finger swipe when at fitLevel", () => {
     const wrapper = createWrapper(container, transformWrapper);
     const { result } = renderHook(
-      () => useTouchGesturesWithState({ fitLevel: 1.0 }),
+      () => useTouchGesturesWithState({ fitLevel: 1.0, zoomToPoint: vi.fn(), resetToFit: vi.fn() }),
       { wrapper }
     );
 
@@ -843,7 +843,7 @@ describe("useTouchGestures - Ein-Finger-Pan", () => {
   it("AC-9: should not pan on single-finger drag when editMode is inpaint", () => {
     const wrapper = createWrapper(container, transformWrapper);
     const { result } = renderHook(
-      () => useTouchGesturesWithState({ fitLevel: 1.0 }),
+      () => useTouchGesturesWithState({ fitLevel: 1.0, zoomToPoint: vi.fn(), resetToFit: vi.fn() }),
       { wrapper }
     );
 
@@ -894,7 +894,7 @@ describe("useTouchGestures - Ein-Finger-Pan", () => {
   it("AC-9: should not pan on single-finger drag when editMode is erase", () => {
     const wrapper = createWrapper(container, transformWrapper);
     const { result } = renderHook(
-      () => useTouchGesturesWithState({ fitLevel: 1.0 }),
+      () => useTouchGesturesWithState({ fitLevel: 1.0, zoomToPoint: vi.fn(), resetToFit: vi.fn() }),
       { wrapper }
     );
 
@@ -969,7 +969,7 @@ describe("canvas-detail-view - Touch Setup", () => {
     const addEventListenerSpy = vi.spyOn(container, "addEventListener");
 
     const wrapper = createWrapper(container, transformWrapper);
-    renderHook(() => useTouchGesturesWithState({ fitLevel: 1.0 }), { wrapper });
+    renderHook(() => useTouchGesturesWithState({ fitLevel: 1.0, zoomToPoint: vi.fn(), resetToFit: vi.fn() }), { wrapper });
 
     // The hook should register touchstart and touchmove with passive: false
     const touchstartCall = addEventListenerSpy.mock.calls.find(
