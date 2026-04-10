@@ -216,12 +216,21 @@ export function useTouchGestures(
         const rawZoom = gesture.startZoom * ratio;
         const newZoom = clamp(rawZoom, ZOOM_MIN, ZOOM_MAX);
 
-        // Simultaneous pan: midpoint delta from previous frame
-        const deltaX = newMid.x - gesture.prevMidX;
-        const deltaY = newMid.y - gesture.prevMidY;
-
-        const newPanX = gesture.currentPanX + deltaX;
-        const newPanY = gesture.currentPanY + deltaY;
+        // Anchor-point zoom compensation (AC-1): keep the image point under
+        // the finger midpoint stationary when zoom changes, while also
+        // tracking two-finger pan movement.
+        //
+        // The image point under the *previous* midpoint is:
+        //   imageX = (prevMidX - currentPanX) / oldZoom
+        // To keep that point under the *new* midpoint at newZoom:
+        //   newPanX = newMidX - imageX * newZoom
+        // This naturally combines anchor-point zoom + two-finger pan since
+        // newMid already reflects where the fingers have moved.
+        const oldZoom = gesture.currentZoom;
+        const imageX = (gesture.prevMidX - gesture.currentPanX) / oldZoom;
+        const imageY = (gesture.prevMidY - gesture.currentPanY) / oldZoom;
+        const newPanX = newMid.x - imageX * newZoom;
+        const newPanY = newMid.y - imageY * newZoom;
 
         // Update running state
         gesture.currentZoom = newZoom;
