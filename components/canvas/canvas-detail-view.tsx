@@ -145,10 +145,9 @@ export function CanvasDetailView({
   // ---------------------------------------------------------------------------
   // Zoom Hook — integrates with container + image refs
   // ---------------------------------------------------------------------------
-  const { fitLevel, zoomToPoint, zoomToStep, resetToFit } = useCanvasZoom(
-    imageContainerRef,
-    imageRef
-  );
+  // Result stored for later slices (03–08) to destructure as needed.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const canvasZoom = useCanvasZoom(imageContainerRef, imageRef);
 
   // ---------------------------------------------------------------------------
   // Click-to-Edit (SAM) state — local component state per spec constraints
