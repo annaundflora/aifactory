@@ -70,11 +70,21 @@ function makeInitialState(
 ): CanvasDetailState {
   return {
     currentGenerationId: "gen-B",
+    lastImageChangeSource: null,
     activeToolId: null,
     undoStack: [],
     redoStack: [],
     isGenerating: false,
     chatSessionId: null,
+    editMode: null,
+    maskData: null,
+    brushSize: 40,
+    brushTool: "brush",
+    outpaintDirections: [],
+    outpaintSize: 50,
+    zoomLevel: 1,
+    panX: 0,
+    panY: 0,
     ...overrides,
   };
 }
