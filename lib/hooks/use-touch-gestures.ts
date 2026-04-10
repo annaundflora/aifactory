@@ -309,19 +309,31 @@ export function useTouchGestures(
         return;
       }
 
-      // Single-finger pan end: dispatch final values
+      // Single-finger pan end: dispatch final values only if the finger
+      // actually moved. A stationary tap (< 5px movement) must fall through
+      // to the double-tap detection block below so that double-tap works
+      // even when zoomed beyond fitLevel (AC-2, AC-3, AC-6).
       if (singleFingerRef.current?.active) {
         const sf = singleFingerRef.current;
-        dispatch({
-          type: "SET_ZOOM_PAN",
-          zoomLevel: sf.currentZoom,
-          panX: sf.currentPanX,
-          panY: sf.currentPanY,
-        });
+        const movedX = sf.currentPanX - sf.startPanX;
+        const movedY = sf.currentPanY - sf.startPanY;
+        const movedDistance = Math.sqrt(movedX * movedX + movedY * movedY);
+
+        const TAP_MOVE_THRESHOLD = 5; // px — below this, treat as a tap, not a drag
         singleFingerRef.current = null;
-        // A single-finger pan is a drag, not a tap — reset double-tap tracking
-        doubleTapRef.current = null;
-        return;
+
+        if (movedDistance >= TAP_MOVE_THRESHOLD) {
+          // Real drag — dispatch pan update and reset double-tap tracking
+          dispatch({
+            type: "SET_ZOOM_PAN",
+            zoomLevel: sf.currentZoom,
+            panX: sf.currentPanX,
+            panY: sf.currentPanY,
+          });
+          doubleTapRef.current = null;
+          return;
+        }
+        // Stationary tap — fall through to double-tap detection below
       }
 
       // -----------------------------------------------------------------
