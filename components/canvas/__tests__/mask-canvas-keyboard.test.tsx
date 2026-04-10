@@ -51,6 +51,9 @@ const { mockDispatch, mockState } = vi.hoisted(() => ({
     brushTool: "brush" as "brush" | "eraser",
     outpaintDirections: [] as string[],
     outpaintSize: 50 as number,
+    zoomLevel: 1 as number,
+    panX: 0 as number,
+    panY: 0 as number,
   },
 }));
 
@@ -169,6 +172,9 @@ function resetMockState(overrides: Partial<typeof mockState> = {}) {
     brushTool: "brush",
     outpaintDirections: [],
     outpaintSize: 50,
+    zoomLevel: 1,
+    panX: 0,
+    panY: 0,
     ...overrides,
   });
 }
@@ -194,6 +200,10 @@ function createImageRef(
     y: 0,
     toJSON: () => {},
   });
+
+  // Set natural dimensions (used by syncCanvasSize for zoom-aware sizing)
+  Object.defineProperty(img, "naturalWidth", { value: width, configurable: true });
+  Object.defineProperty(img, "naturalHeight", { value: height, configurable: true });
 
   return { current: img };
 }

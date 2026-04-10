@@ -192,10 +192,17 @@ export function MaskCanvas({ imageRef }: MaskCanvasProps) {
     const img = imageRef.current;
     if (!canvas || !img) return;
 
-    const rect = img.getBoundingClientRect();
-    const width = Math.round(rect.width);
-    const height = Math.round(rect.height);
+    // Use the image's natural (intrinsic) dimensions instead of
+    // getBoundingClientRect(). When the image sits inside a CSS
+    // transform: scale(zoomLevel) wrapper, getBoundingClientRect()
+    // returns the *visually scaled* size (e.g. 1600x1200 at zoom 2.0
+    // for an 800x600 image). The canvas internal coordinate space must
+    // match the un-transformed image dimensions so that drawn pixels
+    // map 1:1 to image pixels.
+    const width = img.naturalWidth;
+    const height = img.naturalHeight;
 
+    if (!width || !height) return;
     if (canvas.width === width && canvas.height === height) return;
 
     // Preserve existing mask data before resizing
@@ -356,12 +363,17 @@ export function MaskCanvas({ imageRef }: MaskCanvasProps) {
       const canvas = canvasRef.current;
       if (!canvas) return { x: 0, y: 0 };
       const rect = canvas.getBoundingClientRect();
+      // When the canvas sits inside a CSS transform: scale(zoomLevel) wrapper,
+      // getBoundingClientRect() returns the *visually scaled* coordinates.
+      // Dividing by zoomLevel converts back to the canvas's internal coordinate
+      // space so strokes land at the correct position regardless of zoom.
+      const zoom = state.zoomLevel;
       return {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
+        x: (e.clientX - rect.left) / zoom,
+        y: (e.clientY - rect.top) / zoom,
       };
     },
-    []
+    [state.zoomLevel]
   );
 
   const drawStroke = useCallback(

@@ -471,14 +471,25 @@ export function CanvasDetailView({
       if (!imgElement) return;
 
       const rect = imgElement.getBoundingClientRect();
-      const offsetX = e.clientX - rect.left;
-      const offsetY = e.clientY - rect.top;
+      const zoom = state.zoomLevel;
 
-      // Ignore clicks outside the image bounds
-      if (offsetX < 0 || offsetY < 0 || offsetX > rect.width || offsetY > rect.height) return;
+      // When the image sits inside a CSS transform: scale(zoomLevel)
+      // wrapper, getBoundingClientRect() returns the *visually scaled*
+      // bounding box. Dividing by zoomLevel converts the pixel offset
+      // back to the un-transformed image coordinate space.
+      const offsetX = (e.clientX - rect.left) / zoom;
+      const offsetY = (e.clientY - rect.top) / zoom;
 
-      const click_x = offsetX / imgElement.clientWidth;
-      const click_y = offsetY / imgElement.clientHeight;
+      // Bounds check uses the un-transformed image dimensions
+      // (naturalWidth/naturalHeight) so that clicks outside the actual
+      // image area are correctly rejected at any zoom level.
+      const naturalW = imgElement.naturalWidth;
+      const naturalH = imgElement.naturalHeight;
+      if (offsetX < 0 || offsetY < 0 || offsetX > naturalW || offsetY > naturalH) return;
+
+      // Normalize to 0..1 range using natural (un-scaled) dimensions
+      const click_x = offsetX / naturalW;
+      const click_y = offsetY / naturalH;
 
       // If there's existing mask data, show confirmation dialog
       if (state.maskData !== null) {
@@ -489,7 +500,7 @@ export function CanvasDetailView({
 
       executeSamSegment(click_x, click_y);
     },
-    [isClickEditActive, isSamLoading, state.maskData, executeSamSegment]
+    [isClickEditActive, isSamLoading, state.maskData, state.zoomLevel, executeSamSegment]
   );
 
   /** Confirmation dialog: user chose to replace existing mask */

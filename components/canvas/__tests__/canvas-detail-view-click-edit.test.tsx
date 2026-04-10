@@ -285,6 +285,9 @@ function mockImageElementGeometry() {
     });
     Object.defineProperty(imgEl, "clientWidth", { value: 512, configurable: true });
     Object.defineProperty(imgEl, "clientHeight", { value: 512, configurable: true });
+    // Natural dimensions used by zoom-compensated coordinate normalization
+    Object.defineProperty(imgEl, "naturalWidth", { value: 512, configurable: true });
+    Object.defineProperty(imgEl, "naturalHeight", { value: 512, configurable: true });
   }
 }
 
