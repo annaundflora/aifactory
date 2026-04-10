@@ -2,7 +2,7 @@
 
 **Epic:** --
 **Issue:** #26
-**Status:** Draft
+**Status:** Approved
 **Discovery:** `discovery.md` (same folder)
 **Derived from:** Discovery constraints, NFRs, and risks
 
