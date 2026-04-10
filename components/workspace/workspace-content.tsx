@@ -63,7 +63,6 @@ export function WorkspaceContent({
 
   // ----- Gallery Scroll refs (for scroll save/restore during canvas roundtrip) -----
   const galleryScrollRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const scrollTopRef = useRef<number>(0);
 
   const handleAssistantToggle = useCallback(() => {
@@ -302,6 +301,7 @@ export function WorkspaceContent({
   const handleSelectGeneration = useCallback(
     (id: string) => {
       startViewTransitionIfSupported(() => {
+        scrollTopRef.current = galleryScrollRef.current?.scrollTop ?? 0;
         setSelectedGenerationId(id);
         setDetailViewOpen(true);
       });
@@ -313,6 +313,11 @@ export function WorkspaceContent({
     startViewTransitionIfSupported(() => {
       setDetailViewOpen(false);
       setSelectedGenerationId(null);
+      requestAnimationFrame(() => {
+        if (galleryScrollRef.current) {
+          galleryScrollRef.current.scrollTop = scrollTopRef.current;
+        }
+      });
     });
   }, []);
 
