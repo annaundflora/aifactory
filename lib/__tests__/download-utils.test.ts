@@ -111,6 +111,298 @@ describe("downloadImage", () => {
       downloadImage("https://r2.example.com/missing.png", "file.png")
     ).rejects.toThrow("Download failed: 404");
   });
+
+  // ---------------------------------------------------------------------------
+  // Slice-01: Web Share API Branch Tests
+  // ---------------------------------------------------------------------------
+
+  /**
+   * AC-1: GIVEN `navigator.canShare` existiert und `navigator.canShare({ files: [File] })` gibt `true` zurueck
+   * WHEN `downloadImage(url, filename)` aufgerufen wird
+   * THEN wird `navigator.share({ files: [file] })` mit einem `File`-Objekt aufgerufen,
+   * das aus dem gefetchten Blob erstellt wurde (Filename = `filename`-Parameter, Type = `blob.type`),
+   * und `URL.revokeObjectURL` wird nach Abschluss des Share-Calls aufgerufen
+   */
+  it("AC-1: should call navigator.share with File when canShare returns true and revoke objectURL after share resolves", async () => {
+    const fakeBlob = new Blob(["fake-image-data"], { type: "image/png" });
+    const fakeObjectUrl = "blob:http://localhost/fake-share-url";
+
+    // Mock fetch
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: vi.fn().mockResolvedValue(fakeBlob),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    // Mock URL.createObjectURL / revokeObjectURL
+    URL.createObjectURL = vi.fn().mockReturnValue(fakeObjectUrl);
+    URL.revokeObjectURL = vi.fn();
+
+    // Mock navigator.canShare and navigator.share
+    const shareMock = vi.fn().mockResolvedValue(undefined);
+    const canShareMock = vi.fn().mockReturnValue(true);
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      canShare: canShareMock,
+      share: shareMock,
+    });
+
+    await downloadImage(
+      "https://r2.example.com/projects/abc/img.png",
+      "test-download.png"
+    );
+
+    // Verify fetch was called
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://r2.example.com/projects/abc/img.png"
+    );
+
+    // Verify canShare was called with a files array containing a File
+    expect(canShareMock).toHaveBeenCalledOnce();
+    const canShareArg = canShareMock.mock.calls[0][0];
+    expect(canShareArg).toHaveProperty("files");
+    expect(canShareArg.files).toHaveLength(1);
+    expect(canShareArg.files[0]).toBeInstanceOf(File);
+
+    // Verify navigator.share was called with a File object
+    expect(shareMock).toHaveBeenCalledOnce();
+    const shareArg = shareMock.mock.calls[0][0];
+    expect(shareArg).toHaveProperty("files");
+    expect(shareArg.files).toHaveLength(1);
+    const sharedFile = shareArg.files[0];
+    expect(sharedFile).toBeInstanceOf(File);
+    expect(sharedFile.name).toBe("test-download.png");
+    expect(sharedFile.type).toBe("image/png");
+
+    // Verify revokeObjectURL was called after share resolved
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(fakeObjectUrl);
+  });
+
+  /**
+   * AC-2: GIVEN `navigator.canShare` existiert nicht
+   * WHEN `downloadImage(url, filename)` aufgerufen wird
+   * THEN wird der bestehende Anchor-Click-Pfad ausgefuehrt (createElement "a",
+   * href = objectURL, download = filename, appendChild, click, removeChild, revokeObjectURL)
+   */
+  it("AC-2: should fall back to anchor-click when canShare is not available", async () => {
+    const fakeBlob = new Blob(["fake-image-data"], { type: "image/png" });
+    const fakeObjectUrl = "blob:http://localhost/fake-fallback-url";
+
+    // Mock fetch
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: vi.fn().mockResolvedValue(fakeBlob),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    // Mock URL.createObjectURL / revokeObjectURL
+    URL.createObjectURL = vi.fn().mockReturnValue(fakeObjectUrl);
+    URL.revokeObjectURL = vi.fn();
+
+    // Ensure navigator.canShare does NOT exist
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      canShare: undefined,
+      share: undefined,
+    });
+
+    // Spy on anchor click
+    const realAnchor = document.createElement("a");
+    const clickSpy = vi.spyOn(realAnchor, "click").mockImplementation(() => {});
+    vi.spyOn(document, "createElement").mockImplementation(
+      (tag: string) => {
+        if (tag === "a") return realAnchor;
+        return Object.getPrototypeOf(document).createElement.call(
+          document,
+          tag
+        );
+      }
+    );
+    const appendChildSpy = vi.spyOn(document.body, "appendChild");
+    const removeChildSpy = vi.spyOn(document.body, "removeChild");
+
+    await downloadImage(
+      "https://r2.example.com/projects/abc/img.png",
+      "fallback-file.png"
+    );
+
+    // Verify anchor-click fallback was executed
+    expect(realAnchor.href).toBe(fakeObjectUrl);
+    expect(realAnchor.download).toBe("fallback-file.png");
+    expect(appendChildSpy).toHaveBeenCalledWith(realAnchor);
+    expect(clickSpy).toHaveBeenCalledOnce();
+    expect(removeChildSpy).toHaveBeenCalledWith(realAnchor);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(fakeObjectUrl);
+  });
+
+  /**
+   * AC-2b: GIVEN `navigator.canShare` existiert aber `navigator.canShare({ files: [File] })` gibt `false` zurueck
+   * WHEN `downloadImage(url, filename)` aufgerufen wird
+   * THEN wird der bestehende Anchor-Click-Pfad ausgefuehrt
+   */
+  it("AC-2b: should fall back to anchor-click when canShare returns false", async () => {
+    const fakeBlob = new Blob(["fake-image-data"], { type: "image/png" });
+    const fakeObjectUrl = "blob:http://localhost/fake-canshare-false-url";
+
+    // Mock fetch
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: vi.fn().mockResolvedValue(fakeBlob),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    // Mock URL.createObjectURL / revokeObjectURL
+    URL.createObjectURL = vi.fn().mockReturnValue(fakeObjectUrl);
+    URL.revokeObjectURL = vi.fn();
+
+    // canShare exists but returns false (device does not support file sharing)
+    const canShareMock = vi.fn().mockReturnValue(false);
+    const shareMock = vi.fn();
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      canShare: canShareMock,
+      share: shareMock,
+    });
+
+    // Spy on anchor click
+    const realAnchor = document.createElement("a");
+    const clickSpy = vi.spyOn(realAnchor, "click").mockImplementation(() => {});
+    vi.spyOn(document, "createElement").mockImplementation(
+      (tag: string) => {
+        if (tag === "a") return realAnchor;
+        return Object.getPrototypeOf(document).createElement.call(
+          document,
+          tag
+        );
+      }
+    );
+    const appendChildSpy = vi.spyOn(document.body, "appendChild");
+    const removeChildSpy = vi.spyOn(document.body, "removeChild");
+
+    await downloadImage(
+      "https://r2.example.com/projects/abc/img.png",
+      "canshare-false-file.png"
+    );
+
+    // Verify canShare was called and returned false
+    expect(canShareMock).toHaveBeenCalledOnce();
+
+    // Verify navigator.share was NOT called
+    expect(shareMock).not.toHaveBeenCalled();
+
+    // Verify anchor-click fallback was executed
+    expect(realAnchor.href).toBe(fakeObjectUrl);
+    expect(realAnchor.download).toBe("canshare-false-file.png");
+    expect(appendChildSpy).toHaveBeenCalledWith(realAnchor);
+    expect(clickSpy).toHaveBeenCalledOnce();
+    expect(removeChildSpy).toHaveBeenCalledWith(realAnchor);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(fakeObjectUrl);
+  });
+
+  /**
+   * AC-3: GIVEN Web Share API ist verfuegbar und `navigator.share()` rejected mit
+   * einem Error dessen `name === "AbortError"` (User schliesst Share-Sheet)
+   * WHEN `downloadImage(url, filename)` aufgerufen wird und der User das Share-Sheet dismissed
+   * THEN resolved die Funktion normal (`Promise<void>` ohne throw),
+   * `URL.revokeObjectURL` wird trotzdem aufgerufen
+   */
+  it("AC-3: should resolve without throwing when navigator.share rejects with AbortError", async () => {
+    const fakeBlob = new Blob(["fake-image-data"], { type: "image/png" });
+    const fakeObjectUrl = "blob:http://localhost/fake-abort-url";
+
+    // Mock fetch
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: vi.fn().mockResolvedValue(fakeBlob),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    // Mock URL.createObjectURL / revokeObjectURL
+    URL.createObjectURL = vi.fn().mockReturnValue(fakeObjectUrl);
+    URL.revokeObjectURL = vi.fn();
+
+    // Mock navigator.share to reject with AbortError (user dismissed share sheet)
+    // Use a plain Error with name="AbortError" to match browser behavior where
+    // DOMException extends Error. The implementation checks
+    // `error instanceof Error && error.name === "AbortError"`.
+    const abortError = Object.assign(new Error("Share canceled"), {
+      name: "AbortError",
+    });
+    const shareMock = vi.fn().mockRejectedValue(abortError);
+    const canShareMock = vi.fn().mockReturnValue(true);
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      canShare: canShareMock,
+      share: shareMock,
+    });
+
+    // Should resolve without throwing
+    await expect(
+      downloadImage(
+        "https://r2.example.com/projects/abc/img.png",
+        "abort-file.png"
+      )
+    ).resolves.toBeUndefined();
+
+    // Verify revokeObjectURL was still called (cleanup despite AbortError)
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(fakeObjectUrl);
+  });
+
+  /**
+   * AC-4: GIVEN Web Share API ist verfuegbar und `navigator.share()` rejected mit
+   * einem Error dessen `name !== "AbortError"` (z.B. `NotAllowedError`)
+   * WHEN `downloadImage(url, filename)` aufgerufen wird
+   * THEN wird der Error re-thrown (propagiert zum Caller fuer Toast-Handling),
+   * `URL.revokeObjectURL` wird trotzdem aufgerufen
+   */
+  it("AC-4: should re-throw when navigator.share rejects with non-AbortError", async () => {
+    const fakeBlob = new Blob(["fake-image-data"], { type: "image/png" });
+    const fakeObjectUrl = "blob:http://localhost/fake-notallowed-url";
+
+    // Mock fetch
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: vi.fn().mockResolvedValue(fakeBlob),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    // Mock URL.createObjectURL / revokeObjectURL
+    URL.createObjectURL = vi.fn().mockReturnValue(fakeObjectUrl);
+    URL.revokeObjectURL = vi.fn();
+
+    // Mock navigator.share to reject with NotAllowedError
+    const notAllowedError = Object.assign(new Error("Permission denied"), {
+      name: "NotAllowedError",
+    });
+    const shareMock = vi.fn().mockRejectedValue(notAllowedError);
+    const canShareMock = vi.fn().mockReturnValue(true);
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      canShare: canShareMock,
+      share: shareMock,
+    });
+
+    // Should re-throw the NotAllowedError
+    await expect(
+      downloadImage(
+        "https://r2.example.com/projects/abc/img.png",
+        "notallowed-file.png"
+      )
+    ).rejects.toThrow("Permission denied");
+
+    // Verify the re-thrown error has the correct name
+    try {
+      await downloadImage(
+        "https://r2.example.com/projects/abc/img.png",
+        "notallowed-file.png"
+      );
+    } catch (error: unknown) {
+      expect((error as Error).name).toBe("NotAllowedError");
+    }
+
+    // Verify revokeObjectURL was still called (cleanup despite error)
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(fakeObjectUrl);
+  });
 });
 
 // ---------------------------------------------------------------------------
