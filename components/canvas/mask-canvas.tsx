@@ -17,6 +17,8 @@ const BRUSH_SIZE_MAX = 100;
 
 export interface MaskCanvasProps {
   imageRef: RefObject<HTMLImageElement | null>;
+  /** Ref tracking whether Space key is held (pan mode). When true, painting is suppressed. */
+  isSpaceHeldRef?: RefObject<boolean>;
 }
 
 // ---------------------------------------------------------------------------
@@ -38,7 +40,7 @@ export interface MaskCanvasProps {
  * - `E` : toggle brush/eraser tool
  * - `Ctrl+Z` / `Cmd+Z` : undo last mask stroke
  */
-export function MaskCanvas({ imageRef }: MaskCanvasProps) {
+export function MaskCanvas({ imageRef, isSpaceHeldRef }: MaskCanvasProps) {
   const { state, dispatch } = useCanvasDetail();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const cursorCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -489,6 +491,11 @@ export function MaskCanvas({ imageRef }: MaskCanvasProps) {
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
+      // AC-7 (Slice 5): Suppress painting when Space is held (pan mode active).
+      // The pointer event will bubble up to the canvas-area where the pan
+      // drag handler picks it up instead.
+      if (isSpaceHeldRef?.current) return;
+
       // Ignore secondary mouse buttons (right-click, middle-click) so they
       // don't start a stroke. Touch and pen tip report button === 0.
       if (e.button > 0) return;

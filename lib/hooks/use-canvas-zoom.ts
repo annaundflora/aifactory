@@ -53,6 +53,41 @@ export interface UseCanvasZoomReturn {
    * Consumed by slice-05 (Space+Drag) and used internally for keyboard guard.
    */
   isCanvasHoveredRef: React.RefObject<boolean>;
+  /**
+   * Ref tracking whether the Space key is currently held down (pan mode).
+   * Consumed by MaskCanvas to suppress painting and by Touch gestures as a guard.
+   */
+  isSpaceHeldRef: React.RefObject<boolean>;
+  /**
+   * Whether a space+drag pan operation is currently in progress.
+   * Used by canvas-detail-view for cursor styling (grab vs grabbing).
+   */
+  isDraggingRef: React.RefObject<boolean>;
+  /**
+   * Keydown handler for Space key (pan mode activation).
+   * Must be registered on document. Includes isInputFocused + isCanvasHovered guards.
+   */
+  handleSpaceKeyDown: (e: KeyboardEvent) => void;
+  /**
+   * Keyup handler for Space key (pan mode deactivation).
+   * Must be registered on document.
+   */
+  handleSpaceKeyUp: (e: KeyboardEvent) => void;
+  /**
+   * PointerDown handler for canvas-area during Space+Drag pan.
+   * Starts the drag operation when space is held.
+   */
+  handlePanPointerDown: (e: PointerEvent) => void;
+  /**
+   * PointerMove handler for canvas-area during Space+Drag pan.
+   * Updates the transform wrapper style directly via ref (no React render).
+   */
+  handlePanPointerMove: (e: PointerEvent) => void;
+  /**
+   * PointerUp handler for canvas-area during Space+Drag pan.
+   * Dispatches final pan values to reducer and releases pointer capture.
+   */
+  handlePanPointerUp: (e: PointerEvent) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +107,8 @@ export interface UseCanvasZoomReturn {
  */
 export function useCanvasZoom(
   containerRef: React.RefObject<HTMLDivElement | null>,
-  imageRef: React.RefObject<HTMLImageElement | null>
+  imageRef: React.RefObject<HTMLImageElement | null>,
+  transformWrapperRef?: React.RefObject<HTMLDivElement | null>
 ): UseCanvasZoomReturn {
   const { state, dispatch } = useCanvasDetail();
   const [fitLevel, setFitLevel] = useState<number>(1.0);
@@ -376,6 +412,207 @@ export function useCanvasZoom(
     []
   );
 
+  // ---------------------------------------------------------------------------
+  // Space+Drag Pan (Slice 5)
+  // Space key activates pan mode (cursor: grab), pointer drag pans the image
+  // via direct DOM manipulation on the transform wrapper (60fps, no React render).
+  // Final pan values are dispatched to the reducer on drag end.
+  // ---------------------------------------------------------------------------
+
+  const isSpaceHeldRef = useRef(false);
+  const isDraggingRef = useRef(false);
+
+  // Track drag start pointer position and starting pan values
+  const dragStartRef = useRef<{ pointerX: number; pointerY: number; panX: number; panY: number } | null>(null);
+  // Track the active pointer ID for pointer capture release
+  const dragPointerIdRef = useRef<number | null>(null);
+
+  // Ref for canvas area element (set externally, passed via containerRef's parent)
+  // We use the containerRef's parent element as the canvas-area for pointer capture,
+  // but the actual event registration happens in canvas-detail-view.tsx.
+
+  /**
+   * Helper: check if an input element is focused (reuse pattern from keyboard handler).
+   */
+  const isInputFocused = useCallback((): boolean => {
+    const el = document.activeElement;
+    if (!el) return false;
+    const tag = el.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA") return true;
+    if (el instanceof HTMLElement && el.isContentEditable) return true;
+    return false;
+  }, []);
+
+  /**
+   * Dispatch ref — stable reference for use in event handlers.
+   */
+  const dispatchRef = useRef(dispatch);
+  dispatchRef.current = dispatch;
+
+  /**
+   * End an active drag operation — shared between pointerup and space keyup.
+   * Syncs the final pan values to the reducer and resets drag state.
+   */
+  const endDrag = useCallback((canvasAreaEl?: HTMLElement | null) => {
+    if (!isDraggingRef.current || !dragStartRef.current) return;
+
+    isDraggingRef.current = false;
+
+    // Release pointer capture if we have a target element and pointer ID
+    if (canvasAreaEl && dragPointerIdRef.current !== null) {
+      try {
+        canvasAreaEl.releasePointerCapture(dragPointerIdRef.current);
+      } catch {
+        // Pointer capture may already be released
+      }
+    }
+    dragPointerIdRef.current = null;
+
+    // Read final pan from the transform wrapper's current style
+    const wrapper = transformWrapperRef?.current;
+    if (wrapper) {
+      const currentState = stateRef.current;
+      // Parse current transform to extract pan values
+      const match = wrapper.style.transform.match(
+        /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/
+      );
+      if (match) {
+        const finalPanX = parseFloat(match[1]);
+        const finalPanY = parseFloat(match[2]);
+        dispatchRef.current({
+          type: "SET_ZOOM_PAN",
+          zoomLevel: currentState.zoomLevel,
+          panX: finalPanX,
+          panY: finalPanY,
+        });
+      }
+    }
+
+    dragStartRef.current = null;
+  }, [transformWrapperRef]);
+
+  const endDragRef = useRef(endDrag);
+  endDragRef.current = endDrag;
+
+  // Store a reference to the canvas area element for use in endDrag
+  const canvasAreaElRef = useRef<HTMLElement | null>(null);
+
+  const handleSpaceKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      // Guard: ignore key repeats (held key fires repeated keydown events)
+      if (e.repeat) return;
+
+      // Guard: only respond to Space key
+      if (e.code !== "Space") return;
+
+      // Guard: don't activate when input/textarea is focused (AC-9)
+      if (isInputFocused()) return;
+
+      // Guard: only activate when mouse is over canvas area (AC-1)
+      if (!isCanvasHoveredRef.current) return;
+
+      // Guard: don't activate if already held
+      if (isSpaceHeldRef.current) return;
+
+      // Prevent default Space behavior (page scroll)
+      e.preventDefault();
+
+      isSpaceHeldRef.current = true;
+    },
+    [isInputFocused]
+  );
+
+  const handleSpaceKeyUp = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.code !== "Space") return;
+
+      if (!isSpaceHeldRef.current) return;
+
+      isSpaceHeldRef.current = false;
+
+      // AC-6: If drag is active when Space is released, end the drag
+      if (isDraggingRef.current) {
+        endDragRef.current(canvasAreaElRef.current);
+      }
+    },
+    []
+  );
+
+  const handlePanPointerDown = useCallback(
+    (e: PointerEvent) => {
+      // Only start pan drag when Space is held
+      if (!isSpaceHeldRef.current) return;
+
+      // Only respond to primary button (left click / touch)
+      if (e.button > 0) return;
+
+      e.preventDefault();
+
+      const currentState = stateRef.current;
+      isDraggingRef.current = true;
+      dragPointerIdRef.current = e.pointerId;
+
+      dragStartRef.current = {
+        pointerX: e.clientX,
+        pointerY: e.clientY,
+        panX: currentState.panX,
+        panY: currentState.panY,
+      };
+
+      // Set pointer capture for reliable tracking outside the element
+      const target = e.currentTarget as HTMLElement;
+      canvasAreaElRef.current = target;
+      try {
+        target.setPointerCapture(e.pointerId);
+      } catch {
+        // Some environments may throw
+      }
+    },
+    []
+  );
+
+  const handlePanPointerMove = useCallback(
+    (e: PointerEvent) => {
+      if (!isDraggingRef.current || !dragStartRef.current) return;
+
+      const deltaX = e.clientX - dragStartRef.current.pointerX;
+      const deltaY = e.clientY - dragStartRef.current.pointerY;
+
+      const newPanX = dragStartRef.current.panX + deltaX;
+      const newPanY = dragStartRef.current.panY + deltaY;
+
+      // Direct DOM manipulation for 60fps — no React render
+      const wrapper = transformWrapperRef?.current;
+      if (wrapper) {
+        const currentZoom = stateRef.current.zoomLevel;
+        wrapper.style.transform = `translate(${newPanX}px, ${newPanY}px) scale(${currentZoom})`;
+      }
+    },
+    [transformWrapperRef]
+  );
+
+  const handlePanPointerUp = useCallback(
+    (e: PointerEvent) => {
+      if (!isDraggingRef.current) return;
+
+      endDragRef.current(e.currentTarget as HTMLElement);
+    },
+    []
+  );
+
+  // ---------------------------------------------------------------------------
+  // Cleanup: reset space/drag state on unmount (AC-10)
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    return () => {
+      isSpaceHeldRef.current = false;
+      isDraggingRef.current = false;
+      dragStartRef.current = null;
+      dragPointerIdRef.current = null;
+    };
+  }, []);
+
   return {
     fitLevel,
     zoomToPoint,
@@ -384,5 +621,12 @@ export function useCanvasZoom(
     handleWheel,
     handleKeyDown,
     isCanvasHoveredRef,
+    isSpaceHeldRef,
+    isDraggingRef,
+    handleSpaceKeyDown,
+    handleSpaceKeyUp,
+    handlePanPointerDown,
+    handlePanPointerMove,
+    handlePanPointerUp,
   };
 }

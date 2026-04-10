@@ -146,9 +146,9 @@ export function CanvasDetailView({
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Zoom Hook — integrates with container + image refs
+  // Zoom Hook — integrates with container + image refs + transform wrapper
   // ---------------------------------------------------------------------------
-  const canvasZoom = useCanvasZoom(imageContainerRef, imageRef);
+  const canvasZoom = useCanvasZoom(imageContainerRef, imageRef, transformWrapperRef);
 
   // ---------------------------------------------------------------------------
   // Wheel + Keyboard Event Listeners (Slice 4)
@@ -191,6 +191,73 @@ export function CanvasDetailView({
       canvasArea.removeEventListener("mouseleave", handleMouseLeave);
     };
   }, [canvasZoom.handleWheel, canvasZoom.handleKeyDown, canvasZoom.isCanvasHoveredRef]);
+
+  // ---------------------------------------------------------------------------
+  // Space+Drag Pan Event Listeners (Slice 5)
+  // - Space keydown/keyup on document for pan mode activation
+  // - Pointer events on canvas-area for drag panning
+  // - Cursor style on canvas-area based on isSpaceHeld + isDragging
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    const canvasArea = canvasAreaRef.current;
+    if (!canvasArea) return;
+
+    // Space key handlers on document
+    const spaceDown = canvasZoom.handleSpaceKeyDown;
+    const spaceUp = canvasZoom.handleSpaceKeyUp;
+    document.addEventListener("keydown", spaceDown);
+    document.addEventListener("keyup", spaceUp);
+
+    // Pointer handlers on canvas-area for drag panning
+    const panDown = canvasZoom.handlePanPointerDown;
+    const panMove = canvasZoom.handlePanPointerMove;
+    const panUp = canvasZoom.handlePanPointerUp;
+    canvasArea.addEventListener("pointerdown", panDown);
+    canvasArea.addEventListener("pointermove", panMove);
+    canvasArea.addEventListener("pointerup", panUp);
+    canvasArea.addEventListener("pointercancel", panUp);
+
+    // Cursor style management via rAF polling
+    // We use a lightweight rAF loop to sync cursor style with ref state
+    // (isSpaceHeld + isDragging are refs, not React state, so no re-renders)
+    let cursorRafId: number | null = null;
+    let lastCursor = "";
+
+    function syncCursor() {
+      let cursor = "";
+      if (canvasZoom.isSpaceHeldRef.current) {
+        cursor = canvasZoom.isDraggingRef.current ? "grabbing" : "grab";
+      }
+      // Only update DOM when cursor actually changes
+      if (cursor !== lastCursor) {
+        canvasArea!.style.cursor = cursor;
+        lastCursor = cursor;
+      }
+      cursorRafId = requestAnimationFrame(syncCursor);
+    }
+    cursorRafId = requestAnimationFrame(syncCursor);
+
+    // Cleanup (AC-10)
+    return () => {
+      document.removeEventListener("keydown", spaceDown);
+      document.removeEventListener("keyup", spaceUp);
+      canvasArea.removeEventListener("pointerdown", panDown);
+      canvasArea.removeEventListener("pointermove", panMove);
+      canvasArea.removeEventListener("pointerup", panUp);
+      canvasArea.removeEventListener("pointercancel", panUp);
+      if (cursorRafId !== null) cancelAnimationFrame(cursorRafId);
+      canvasArea.style.cursor = "";
+    };
+  }, [
+    canvasZoom.handleSpaceKeyDown,
+    canvasZoom.handleSpaceKeyUp,
+    canvasZoom.handlePanPointerDown,
+    canvasZoom.handlePanPointerMove,
+    canvasZoom.handlePanPointerUp,
+    canvasZoom.isSpaceHeldRef,
+    canvasZoom.isDraggingRef,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Touch Gestures: Pinch-to-Zoom, Zwei-Finger-Pan, Ein-Finger-Pan (Slice 7)
@@ -1022,7 +1089,7 @@ export function CanvasDetailView({
               />
               {/* MaskCanvas hidden during outpaint mode (Slice 13 AC-1) */}
               {state.editMode !== "outpaint" && (
-                <MaskCanvas imageRef={imageRef} />
+                <MaskCanvas imageRef={imageRef} isSpaceHeldRef={canvasZoom.isSpaceHeldRef} />
               )}
 
               {/* OutpaintControls visible only in outpaint mode (Slice 13 AC-1, AC-2) */}
