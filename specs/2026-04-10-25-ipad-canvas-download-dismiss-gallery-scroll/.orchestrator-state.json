@@ -2,7 +2,7 @@
   "spec_path": "/home/dev/aifactory/.claude/worktrees/25-ipad-canvas-download-dismiss-gallery-scroll/specs/2026-04-10-25-ipad-canvas-download-dismiss-gallery-scroll",
   "feature_name": "25-ipad-canvas-download-dismiss-gallery-scroll",
   "status": "in_progress",
-  "current_state": "implementing",
+  "current_state": "code_review",
   "current_slice_id": "slice-03",
   "retry_count": 0,
   "failed_stage": null,

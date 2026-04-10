@@ -63,6 +63,7 @@ export function WorkspaceContent({
 
   // ----- Gallery Scroll refs (for scroll save/restore during canvas roundtrip) -----
   const galleryScrollRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const scrollTopRef = useRef<number>(0);
 
   const handleAssistantToggle = useCallback(() => {
