@@ -1,7 +1,7 @@
 # Feature: Canvas Zoom & Pan
 
 **Epic:** --
-**Issue:** --
+**Issue:** #26
 **Status:** Ready
 **Wireframes:** -- (UI Layout beschrieben)
 
@@ -198,7 +198,7 @@
 - Zoom-Stufen (Buttons/Tasten): 50, 75, 100, 150, 200, 300%
 - Ctrl/Cmd+Scroll: Stufenloser Zoom (nicht auf feste Stufen beschraenkt)
 - Pinch: Stufenloser Zoom
-- Zoom-Ankerpunkt: Position des Cursors (Desktop) oder Mittelpunkt der Finger (Touch)
+- Zoom-Ankerpunkt: Position des Cursors (Desktop) oder Mittelpunkt der Finger (Touch). Bei Button-Klick (+/-/Fit) und Keyboard (+/-): Mitte des sichtbaren Ausschnitts
 - Zoom-Reset bei Image-Wechsel: Zurueck auf Fit, Pan auf (0,0)
 - Zoom bei Container-Resize (z.B. Chat-Panel auf/zu): Zoom-Level beibehalten, Pan-Offset anpassen
 - Keyboard-Shortcuts nur aktiv wenn Maus/Fokus ueber Canvas-Bereich (nicht Chat-Panel)
