@@ -20,3 +20,4 @@
 {"ts":"2026-04-10T23:32:16Z","slice":"slice-05","gate":"code_review","verdict":"APPROVED","blocking":0,"attempt":1}
 {"ts":"2026-04-10T23:32:27Z","slice":"slice-05","gate":"lint","result":"PASSED","attempt":1}
 {"ts":"2026-04-10T23:40:52Z","slice":"slice-05","gate":"tests","result":"PASSED","retries":0}
+{"ts":"2026-04-11T00:24:34Z","slice":"feature","gate":"systemic_review","verdict":"FAILED","findings":6}
