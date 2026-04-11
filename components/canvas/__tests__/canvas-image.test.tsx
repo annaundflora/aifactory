@@ -72,18 +72,16 @@ describe("CanvasImage", () => {
 
     render(<CanvasImage generation={generation} />);
 
-    // Container should center content
+    // Container should exist (transform wrapper handles centering/scaling now)
     const container = screen.getByTestId("canvas-image-container");
     expect(container).toBeInTheDocument();
-    expect(container.className).toMatch(/items-center/);
-    expect(container.className).toMatch(/justify-center/);
 
-    // Image element should exist with correct src and object-contain
+    // Image element should exist with correct src — uses natural dimensions
+    // (no object-contain, no max-h/w — transform wrapper handles scaling)
     const img = screen.getByTestId("canvas-image");
     expect(img).toBeInTheDocument();
     expect(img).toHaveAttribute("src", "https://example.com/main-image.png");
     expect(img).toHaveAttribute("alt", "a beautiful landscape");
-    expect(img.className).toMatch(/object-contain/);
   });
 
   /**

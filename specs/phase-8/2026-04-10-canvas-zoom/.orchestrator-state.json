@@ -1,0 +1,22 @@
+{
+  "spec_path": "/home/dev/aifactory/.claude/worktrees/canvas-zoom/specs/phase-8/2026-04-10-canvas-zoom",
+  "feature_name": "canvas-zoom",
+  "status": "in_progress",
+  "current_state": "conflict_scan",
+  "current_slice_id": null,
+  "retry_count": 0,
+  "failed_stage": null,
+  "waves": [
+    {"wave": 1, "slices": ["slice-01"], "parallel": false},
+    {"wave": 2, "slices": ["slice-02"], "parallel": false},
+    {"wave": 3, "slices": ["slice-03", "slice-04", "slice-06", "slice-07"], "parallel": true},
+    {"wave": 4, "slices": ["slice-05", "slice-08", "slice-09"], "parallel": true}
+  ],
+  "completed_slices": ["slice-01", "slice-02", "slice-06", "slice-03", "slice-04", "slice-07", "slice-05", "slice-08", "slice-09"],
+  "evidence_files": ["evidence/slice-01.json", "evidence/slice-02.json", "evidence/slice-06.json", "evidence/slice-03.json", "evidence/slice-04.json", "evidence/slice-07.json", "evidence/slice-05.json", "evidence/slice-08.json", "evidence/slice-09.json"],
+  "worktree_path": "/home/dev/aifactory/.claude/worktrees/canvas-zoom",
+  "branch": "feature/canvas-zoom",
+  "github_available": true,
+  "repo": "annaundflora/aifactory",
+  "pr_number": 27
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect, useRef, type ReactNode } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef, type ReactNode, type RefCallback } from "react";
 import { PanelRightClose, PanelRightOpen, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -15,9 +15,12 @@ import { VariationPopover } from "@/components/canvas/popovers/variation-popover
 import { Img2imgPopover } from "@/components/canvas/popovers/img2img-popover";
 import { UpscalePopover } from "@/components/canvas/popovers/upscale-popover";
 import { CanvasChatPanel } from "@/components/canvas/canvas-chat-panel";
-import { MaskCanvas } from "@/components/canvas/mask-canvas";
+import { MaskCanvas, type MaskCanvasStrokeUndoRefs } from "@/components/canvas/mask-canvas";
 import { FloatingBrushToolbar } from "@/components/canvas/floating-brush-toolbar";
+import { ZoomControls } from "@/components/canvas/zoom-controls";
 import { OutpaintControls } from "@/components/canvas/outpaint-controls";
+import { useCanvasZoom } from "@/lib/hooks/use-canvas-zoom";
+import { useTouchGestures } from "@/lib/hooks/use-touch-gestures";
 import { generateImages, upscaleImage, fetchGenerations } from "@/app/actions/generations";
 import { deleteGeneration } from "@/app/actions/generations";
 import { getModelSlots } from "@/app/actions/model-slots";
@@ -130,16 +133,153 @@ export function CanvasDetailView({
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Image ref for MaskCanvas overlay — resolved from DOM after CanvasImage mount
+  // Image ref for MaskCanvas overlay + Zoom hook
   // ---------------------------------------------------------------------------
+  const canvasAreaRef = useRef<HTMLElement | null>(null);
   const imageContainerRef = useRef<HTMLDivElement | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
+  const transformWrapperRef = useRef<HTMLDivElement | null>(null);
+
+  // Callback ref for CanvasImage forwardRef — keeps imageRef in sync
+  const canvasImageRefCallback: RefCallback<HTMLImageElement> = useCallback((el) => {
+    imageRef.current = el;
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Zoom Hook — integrates with container + image refs + transform wrapper
+  // ---------------------------------------------------------------------------
+  const canvasZoom = useCanvasZoom(imageContainerRef, imageRef, transformWrapperRef);
+
+  // ---------------------------------------------------------------------------
+  // Wheel + Keyboard Event Listeners (Slice 4)
+  // - Wheel on canvas-area <main> with { passive: false } (not React onWheel)
+  // - Keydown on document for +/-/0 shortcuts
+  // - mouseenter/mouseleave on canvas-area for isCanvasHovered tracking
+  // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    const container = imageContainerRef.current;
-    if (!container) return;
-    const img = container.querySelector<HTMLImageElement>('[data-testid="canvas-image"]');
-    imageRef.current = img;
+    const canvasArea = canvasAreaRef.current;
+    if (!canvasArea) return;
+
+    // Wheel listener: must use addEventListener with passive:false
+    // so that preventDefault() works for Ctrl+Scroll (AC-6)
+    const wheelHandler = canvasZoom.handleWheel;
+    canvasArea.addEventListener("wheel", wheelHandler, { passive: false });
+
+    // Keyboard listener on document (AC-8, AC-9, AC-10)
+    const keydownHandler = canvasZoom.handleKeyDown;
+    document.addEventListener("keydown", keydownHandler);
+
+    // Mouse hover tracking for keyboard guard + slice-05 (AC-7)
+    const hoveredRef = canvasZoom.isCanvasHoveredRef;
+
+    const handleMouseEnter = () => {
+      hoveredRef.current = true;
+    };
+    const handleMouseLeave = () => {
+      hoveredRef.current = false;
+    };
+
+    canvasArea.addEventListener("mouseenter", handleMouseEnter);
+    canvasArea.addEventListener("mouseleave", handleMouseLeave);
+
+    // Cleanup (AC-12): remove all listeners on unmount
+    return () => {
+      canvasArea.removeEventListener("wheel", wheelHandler);
+      document.removeEventListener("keydown", keydownHandler);
+      canvasArea.removeEventListener("mouseenter", handleMouseEnter);
+      canvasArea.removeEventListener("mouseleave", handleMouseLeave);
+    };
+  }, [canvasZoom.handleWheel, canvasZoom.handleKeyDown, canvasZoom.isCanvasHoveredRef]);
+
+  // ---------------------------------------------------------------------------
+  // Space+Drag Pan Event Listeners (Slice 5)
+  // - Space keydown/keyup on document for pan mode activation
+  // - Pointer events on canvas-area for drag panning
+  // - Cursor style on canvas-area based on isSpaceHeld + isDragging
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    const canvasArea = canvasAreaRef.current;
+    if (!canvasArea) return;
+
+    // Space key handlers on document
+    const spaceDown = canvasZoom.handleSpaceKeyDown;
+    const spaceUp = canvasZoom.handleSpaceKeyUp;
+    document.addEventListener("keydown", spaceDown);
+    document.addEventListener("keyup", spaceUp);
+
+    // Pointer handlers on canvas-area for drag panning
+    const panDown = canvasZoom.handlePanPointerDown;
+    const panMove = canvasZoom.handlePanPointerMove;
+    const panUp = canvasZoom.handlePanPointerUp;
+    canvasArea.addEventListener("pointerdown", panDown);
+    canvasArea.addEventListener("pointermove", panMove);
+    canvasArea.addEventListener("pointerup", panUp);
+    canvasArea.addEventListener("pointercancel", panUp);
+
+    // Cursor style management via rAF polling
+    // We use a lightweight rAF loop to sync cursor style with ref state
+    // (isSpaceHeld + isDragging are refs, not React state, so no re-renders)
+    let cursorRafId: number | null = null;
+    let lastCursor = "";
+
+    function syncCursor() {
+      let cursor = "";
+      if (canvasZoom.isSpaceHeldRef.current) {
+        cursor = canvasZoom.isDraggingRef.current ? "grabbing" : "grab";
+      }
+      // Only update DOM when cursor actually changes
+      if (cursor !== lastCursor) {
+        canvasArea!.style.cursor = cursor;
+        lastCursor = cursor;
+      }
+      cursorRafId = requestAnimationFrame(syncCursor);
+    }
+    cursorRafId = requestAnimationFrame(syncCursor);
+
+    // Cleanup (AC-10)
+    return () => {
+      document.removeEventListener("keydown", spaceDown);
+      document.removeEventListener("keyup", spaceUp);
+      canvasArea.removeEventListener("pointerdown", panDown);
+      canvasArea.removeEventListener("pointermove", panMove);
+      canvasArea.removeEventListener("pointerup", panUp);
+      canvasArea.removeEventListener("pointercancel", panUp);
+      if (cursorRafId !== null) cancelAnimationFrame(cursorRafId);
+      canvasArea.style.cursor = "";
+    };
+  }, [
+    canvasZoom.handleSpaceKeyDown,
+    canvasZoom.handleSpaceKeyUp,
+    canvasZoom.handlePanPointerDown,
+    canvasZoom.handlePanPointerMove,
+    canvasZoom.handlePanPointerUp,
+    canvasZoom.isSpaceHeldRef,
+    canvasZoom.isDraggingRef,
+  ]);
+
+  // ---------------------------------------------------------------------------
+  // Stroke-Undo refs from MaskCanvas (Slice 9)
+  // MaskCanvas exposes isDrawingRef, maskUndoStackRef, canvasRef, and a
+  // performStrokeUndo callback. These are passed into useTouchGestures so the
+  // gesture hook can trigger Procreate-style undo on 1->2 finger transition.
+  // ---------------------------------------------------------------------------
+  const strokeUndoRefsRef = useRef<MaskCanvasStrokeUndoRefs | null>(null);
+  const handleStrokeUndoRefsReady = useCallback((refs: MaskCanvasStrokeUndoRefs) => {
+    strokeUndoRefsRef.current = refs;
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Touch Gestures: Pinch-to-Zoom, Zwei-Finger-Pan, Ein-Finger-Pan (Slice 7)
+  // + Procreate-style Stroke-Undo on 1->2 finger transition (Slice 9)
+  // Registered via addEventListener with { passive: false } inside the hook
+  // ---------------------------------------------------------------------------
+  useTouchGestures(canvasAreaRef, transformWrapperRef, {
+    fitLevel: canvasZoom.fitLevel,
+    zoomToPoint: canvasZoom.zoomToPoint,
+    resetToFit: canvasZoom.resetToFit,
+    strokeUndoRefsRef,
   });
 
   // ---------------------------------------------------------------------------
@@ -205,12 +345,22 @@ export function CanvasDetailView({
   );
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    // Only capture swipe start when at fit level (AC-8: swipe nav only at fit)
+    if (Math.abs(state.zoomLevel - canvasZoom.fitLevel) > 0.001) {
+      touchStartXRef.current = null;
+      return;
+    }
     touchStartXRef.current = e.touches[0].clientX;
-  }, []);
+  }, [state.zoomLevel, canvasZoom.fitLevel]);
 
   const handleTouchEnd = useCallback(
     (e: React.TouchEvent) => {
       if (touchStartXRef.current === null) return;
+      // AC-9 (Slice 8): Block swipe navigation when zoomed beyond fit level (Early-Return)
+      if (Math.abs(state.zoomLevel - canvasZoom.fitLevel) > 0.001) {
+        touchStartXRef.current = null;
+        return;
+      }
       // Block swipe navigation when a mask exists (same lock as button navigation)
       if (state.maskData !== null) {
         touchStartXRef.current = null;
@@ -230,7 +380,7 @@ export function CanvasDetailView({
         handleNavigate(localGenerations[currentIndex + 1].id);
       }
     },
-    [currentIndex, localGenerations, handleNavigate, state.maskData]
+    [currentIndex, localGenerations, handleNavigate, state.maskData, state.zoomLevel, canvasZoom.fitLevel]
   );
 
   // ---------------------------------------------------------------------------
@@ -464,14 +614,25 @@ export function CanvasDetailView({
       if (!imgElement) return;
 
       const rect = imgElement.getBoundingClientRect();
-      const offsetX = e.clientX - rect.left;
-      const offsetY = e.clientY - rect.top;
+      const zoom = state.zoomLevel;
 
-      // Ignore clicks outside the image bounds
-      if (offsetX < 0 || offsetY < 0 || offsetX > rect.width || offsetY > rect.height) return;
+      // When the image sits inside a CSS transform: scale(zoomLevel)
+      // wrapper, getBoundingClientRect() returns the *visually scaled*
+      // bounding box. Dividing by zoomLevel converts the pixel offset
+      // back to the un-transformed image coordinate space.
+      const offsetX = (e.clientX - rect.left) / zoom;
+      const offsetY = (e.clientY - rect.top) / zoom;
 
-      const click_x = offsetX / imgElement.clientWidth;
-      const click_y = offsetY / imgElement.clientHeight;
+      // Bounds check uses the un-transformed image dimensions
+      // (naturalWidth/naturalHeight) so that clicks outside the actual
+      // image area are correctly rejected at any zoom level.
+      const naturalW = imgElement.naturalWidth;
+      const naturalH = imgElement.naturalHeight;
+      if (offsetX < 0 || offsetY < 0 || offsetX > naturalW || offsetY > naturalH) return;
+
+      // Normalize to 0..1 range using natural (un-scaled) dimensions
+      const click_x = offsetX / naturalW;
+      const click_y = offsetY / naturalH;
 
       // If there's existing mask data, show confirmation dialog
       if (state.maskData !== null) {
@@ -482,7 +643,7 @@ export function CanvasDetailView({
 
       executeSamSegment(click_x, click_y);
     },
-    [isClickEditActive, isSamLoading, state.maskData, executeSamSegment]
+    [isClickEditActive, isSamLoading, state.maskData, state.zoomLevel, executeSamSegment]
   );
 
   /** Confirmation dialog: user chose to replace existing mask */
@@ -871,7 +1032,9 @@ export function CanvasDetailView({
 
         {/* Center: Canvas area (flex: 1) */}
         <main
+          ref={canvasAreaRef}
           className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-muted/40"
+          style={{ touchAction: "none" }}
           data-testid="canvas-area"
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
@@ -913,27 +1076,42 @@ export function CanvasDetailView({
             <FloatingBrushToolbar onEraseAction={handleEraseAction} />
           )}
 
+          {/* Zoom Controls — floating panel bottom-right, outside Transform-Wrapper */}
+          <ZoomControls canvasZoom={canvasZoom} />
+
           {/* Image + Mask overlay */}
           <div
             ref={imageContainerRef}
-            className="relative flex min-h-0 flex-1 items-center justify-center p-4"
+            className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4"
             style={isClickEditActive ? { cursor: "crosshair" } : undefined}
             onClick={handleClickEditImageClick}
             data-testid="canvas-image-area"
           >
-            <CanvasImage
-              generation={currentGeneration}
-              isLoading={state.isGenerating}
-            />
-            {/* MaskCanvas hidden during outpaint mode (Slice 13 AC-1) */}
-            {state.editMode !== "outpaint" && (
-              <MaskCanvas imageRef={imageRef} />
-            )}
+            {/* Zoom Transform Wrapper — scales CanvasImage + MaskCanvas + OutpaintControls together */}
+            <div
+              ref={transformWrapperRef}
+              style={{
+                transform: `translate(${state.panX}px, ${state.panY}px) scale(${state.zoomLevel})`,
+                transformOrigin: "0 0",
+                willChange: "transform",
+              }}
+              data-testid="zoom-transform-wrapper"
+            >
+              <CanvasImage
+                ref={canvasImageRefCallback}
+                generation={currentGeneration}
+                isLoading={state.isGenerating}
+              />
+              {/* MaskCanvas hidden during outpaint mode (Slice 13 AC-1) */}
+              {state.editMode !== "outpaint" && (
+                <MaskCanvas imageRef={imageRef} isSpaceHeldRef={canvasZoom.isSpaceHeldRef} onStrokeUndoRefsReady={handleStrokeUndoRefsReady} />
+              )}
 
-            {/* OutpaintControls visible only in outpaint mode (Slice 13 AC-1, AC-2) */}
-            {state.editMode === "outpaint" && (
-              <OutpaintControls />
-            )}
+              {/* OutpaintControls visible only in outpaint mode (Slice 13 AC-1, AC-2) */}
+              {state.editMode === "outpaint" && (
+                <OutpaintControls />
+              )}
+            </div>
 
             {/* SAM loading spinner overlay — AC-3 */}
             {isSamLoading && (

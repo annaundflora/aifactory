@@ -104,6 +104,9 @@ describe("canvasDetailReducer (after cleanup)", () => {
       brushTool: "brush",
       outpaintDirections: [],
       outpaintSize: 50,
+      zoomLevel: 1,
+      panX: 0,
+      panY: 0,
     };
 
     // Dispatching a removed action type should hit the default case and return state unchanged

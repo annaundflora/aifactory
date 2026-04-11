@@ -15,8 +15,24 @@ const BRUSH_SIZE_MAX = 100;
 // Props
 // ---------------------------------------------------------------------------
 
+/** Refs exposed by MaskCanvas for Procreate-style stroke-undo (Slice 9). */
+export interface MaskCanvasStrokeUndoRefs {
+  /** Whether a stroke is currently being drawn */
+  isDrawingRef: React.MutableRefObject<boolean>;
+  /** Stack of canvas snapshots taken before each stroke */
+  maskUndoStackRef: React.MutableRefObject<ImageData[]>;
+  /** The mask painting canvas element */
+  canvasRef: React.MutableRefObject<HTMLCanvasElement | null>;
+  /** Performs stroke-undo: restores canvas to previous state, sets isDrawing=false, dispatches SET_MASK_DATA */
+  performStrokeUndo: () => void;
+}
+
 export interface MaskCanvasProps {
   imageRef: RefObject<HTMLImageElement | null>;
+  /** Ref tracking whether Space key is held (pan mode). When true, painting is suppressed. */
+  isSpaceHeldRef?: RefObject<boolean>;
+  /** Callback fired once when stroke-undo refs are ready, so parent can pass them to useTouchGestures (Slice 9). */
+  onStrokeUndoRefsReady?: (refs: MaskCanvasStrokeUndoRefs) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -38,12 +54,14 @@ export interface MaskCanvasProps {
  * - `E` : toggle brush/eraser tool
  * - `Ctrl+Z` / `Cmd+Z` : undo last mask stroke
  */
-export function MaskCanvas({ imageRef }: MaskCanvasProps) {
+export function MaskCanvas({ imageRef, isSpaceHeldRef, onStrokeUndoRefsReady }: MaskCanvasProps) {
   const { state, dispatch } = useCanvasDetail();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const cursorCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef(false);
   const lastPosRef = useRef<{ x: number; y: number } | null>(null);
+  // Track active pointerId for pointer capture release during stroke-undo (Slice 9)
+  const activePointerIdRef = useRef<number | null>(null);
 
   // Mask undo stack — component-local, stores ImageData snapshots before each stroke
   const maskUndoStackRef = useRef<ImageData[]>([]);
@@ -75,6 +93,79 @@ export function MaskCanvas({ imageRef }: MaskCanvasProps) {
       maskUndoStackRef.current = [];
     }
   }, [state.maskData]);
+
+  // -------------------------------------------------------------------------
+  // Procreate-style stroke-undo callback (Slice 9)
+  // Restores canvas to previous snapshot from maskUndoStackRef, sets
+  // isDrawing=false, and dispatches SET_MASK_DATA so state stays consistent.
+  // Called by useTouchGestures when a 2nd finger arrives during active stroke.
+  // -------------------------------------------------------------------------
+
+  const performStrokeUndo = useCallback(() => {
+    // Set isDrawing to false first (AC-2: atomically stop drawing)
+    isDrawingRef.current = false;
+    lastPosRef.current = null;
+
+    // AC-2: Release pointer capture so touch events flow to the gesture handler
+    const canvas = canvasRef.current;
+    const pointerId = activePointerIdRef.current;
+    if (canvas && pointerId !== null && typeof canvas.releasePointerCapture === "function") {
+      try {
+        canvas.releasePointerCapture(pointerId);
+      } catch {
+        // Ignore — capture may already be released
+      }
+    }
+    activePointerIdRef.current = null;
+
+    const stack = maskUndoStackRef.current;
+    if (stack.length === 0) {
+      // AC-7: Empty stack — no canvas restore, just stop drawing
+      return;
+    }
+
+    const previousState = stack.pop()!;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Restore canvas to the previous state (same pattern as Ctrl+Z undo)
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (previousState.width === canvas.width && previousState.height === canvas.height) {
+      ctx.putImageData(previousState, 0, 0);
+    } else {
+      // Dimensions changed — scale the snapshot
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = previousState.width;
+      tempCanvas.height = previousState.height;
+      const tempCtx = tempCanvas.getContext("2d");
+      if (tempCtx) {
+        tempCtx.putImageData(previousState, 0, 0);
+        ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
+      }
+    }
+
+    // AC-8: Dispatch SET_MASK_DATA so state is consistent with canvas content
+    if (canvas.width > 0 && canvas.height > 0) {
+      const restoredData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const hasContent = restoredData.data.some((v, i) => i % 4 === 3 && v > 0);
+      dispatch({ type: "SET_MASK_DATA", maskData: hasContent ? restoredData : null });
+    } else {
+      dispatch({ type: "SET_MASK_DATA", maskData: null });
+    }
+  }, [dispatch]);
+
+  // Expose stroke-undo refs to parent (Slice 9)
+  useEffect(() => {
+    if (onStrokeUndoRefsReady) {
+      onStrokeUndoRefsReady({
+        isDrawingRef,
+        maskUndoStackRef,
+        canvasRef,
+        performStrokeUndo,
+      });
+    }
+  }, [onStrokeUndoRefsReady, performStrokeUndo]);
 
   // -------------------------------------------------------------------------
   // Keyboard shortcuts (AC-1 through AC-8)
@@ -192,10 +283,17 @@ export function MaskCanvas({ imageRef }: MaskCanvasProps) {
     const img = imageRef.current;
     if (!canvas || !img) return;
 
-    const rect = img.getBoundingClientRect();
-    const width = Math.round(rect.width);
-    const height = Math.round(rect.height);
+    // Use the image's natural (intrinsic) dimensions instead of
+    // getBoundingClientRect(). When the image sits inside a CSS
+    // transform: scale(zoomLevel) wrapper, getBoundingClientRect()
+    // returns the *visually scaled* size (e.g. 1600x1200 at zoom 2.0
+    // for an 800x600 image). The canvas internal coordinate space must
+    // match the un-transformed image dimensions so that drawn pixels
+    // map 1:1 to image pixels.
+    const width = img.naturalWidth;
+    const height = img.naturalHeight;
 
+    if (!width || !height) return;
     if (canvas.width === width && canvas.height === height) return;
 
     // Preserve existing mask data before resizing
@@ -356,12 +454,17 @@ export function MaskCanvas({ imageRef }: MaskCanvasProps) {
       const canvas = canvasRef.current;
       if (!canvas) return { x: 0, y: 0 };
       const rect = canvas.getBoundingClientRect();
+      // When the canvas sits inside a CSS transform: scale(zoomLevel) wrapper,
+      // getBoundingClientRect() returns the *visually scaled* coordinates.
+      // Dividing by zoomLevel converts back to the canvas's internal coordinate
+      // space so strokes land at the correct position regardless of zoom.
+      const zoom = state.zoomLevel;
       return {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
+        x: (e.clientX - rect.left) / zoom,
+        y: (e.clientY - rect.top) / zoom,
       };
     },
-    []
+    [state.zoomLevel]
   );
 
   const drawStroke = useCallback(
@@ -477,11 +580,19 @@ export function MaskCanvas({ imageRef }: MaskCanvasProps) {
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
+      // AC-7 (Slice 5): Suppress painting when Space is held (pan mode active).
+      // The pointer event will bubble up to the canvas-area where the pan
+      // drag handler picks it up instead.
+      if (isSpaceHeldRef?.current) return;
+
       // Ignore secondary mouse buttons (right-click, middle-click) so they
       // don't start a stroke. Touch and pen tip report button === 0.
       if (e.button > 0) return;
 
       e.preventDefault();
+
+      // Track active pointerId for stroke-undo pointer capture release (Slice 9)
+      activePointerIdRef.current = e.pointerId;
 
       // Capture the pointer so pointermove/pointerup continue to target the
       // canvas even if the finger/pen drifts outside its bounds mid-stroke.
@@ -528,6 +639,7 @@ export function MaskCanvas({ imageRef }: MaskCanvasProps) {
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
+      activePointerIdRef.current = null;
       const canvas = canvasRef.current;
       if (canvas && typeof canvas.releasePointerCapture === "function") {
         try {

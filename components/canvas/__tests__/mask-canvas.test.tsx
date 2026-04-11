@@ -52,6 +52,9 @@ const { mockDispatch, mockState } = vi.hoisted(() => ({
     brushTool: "brush" as "brush" | "eraser",
     outpaintDirections: [] as string[],
     outpaintSize: 50 as number,
+    zoomLevel: 1 as number,
+    panX: 0 as number,
+    panY: 0 as number,
   },
 }));
 
@@ -186,6 +189,9 @@ function resetMockState(overrides: Partial<typeof mockState> = {}) {
     brushTool: "brush",
     outpaintDirections: [],
     outpaintSize: 50,
+    zoomLevel: 1,
+    panX: 0,
+    panY: 0,
     ...overrides,
   });
 }
@@ -216,6 +222,10 @@ function createImageRef(
     y: 0,
     toJSON: () => {},
   });
+
+  // Set natural dimensions (used by syncCanvasSize for zoom-aware sizing)
+  Object.defineProperty(img, "naturalWidth", { value: width, configurable: true });
+  Object.defineProperty(img, "naturalHeight", { value: height, configurable: true });
 
   return { current: img };
 }
@@ -558,7 +568,9 @@ describe("MaskCanvas Acceptance Tests", () => {
     expect(canvas).toHaveAttribute("width", "512");
     expect(canvas).toHaveAttribute("height", "512");
 
-    // Simulate image resize by changing the getBoundingClientRect return value
+    // Simulate image resize by changing natural dimensions and bounding rect
+    Object.defineProperty(imageRef.current!, "naturalWidth", { value: 800, configurable: true });
+    Object.defineProperty(imageRef.current!, "naturalHeight", { value: 600, configurable: true });
     imageRef.current!.getBoundingClientRect = () => ({
       width: 800,
       height: 600,

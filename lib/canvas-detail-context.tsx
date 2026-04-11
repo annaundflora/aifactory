@@ -46,6 +46,12 @@ export interface CanvasDetailState {
   outpaintDirections: OutpaintDirection[];
   /** Outpaint extension size as percentage */
   outpaintSize: OutpaintSize;
+  /** Current zoom level — clamped to 0.5..3.0 */
+  zoomLevel: number;
+  /** Horizontal pan offset in pixels */
+  panX: number;
+  /** Vertical pan offset in pixels */
+  panY: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -67,7 +73,30 @@ export type CanvasDetailAction =
   | { type: "SET_BRUSH_TOOL"; brushTool: BrushTool }
   | { type: "SET_OUTPAINT_DIRECTIONS"; outpaintDirections: OutpaintDirection[] }
   | { type: "SET_OUTPAINT_SIZE"; outpaintSize: OutpaintSize }
-  | { type: "CLEAR_MASK" };
+  | { type: "CLEAR_MASK" }
+  | { type: "SET_ZOOM_PAN"; zoomLevel: number; panX: number; panY: number }
+  | { type: "RESET_ZOOM_PAN" };
+
+// ---------------------------------------------------------------------------
+// Zoom Constants
+// ---------------------------------------------------------------------------
+
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 3.0;
+const ZOOM_DEFAULT = 1;
+const PAN_DEFAULT = 0;
+
+/** Clamp a number to [min, max]. Returns min if value is NaN or not finite. */
+function clampZoom(value: number): number {
+  if (!Number.isFinite(value)) return ZOOM_MIN;
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
+}
+
+/** Sanitize a pan value — returns 0 if NaN or not finite. */
+function sanitizePan(value: number): number {
+  if (!Number.isFinite(value)) return PAN_DEFAULT;
+  return value;
+}
 
 // ---------------------------------------------------------------------------
 // Reducer (pure function, no side effects)
@@ -83,6 +112,9 @@ export function canvasDetailReducer(
         ...state,
         currentGenerationId: action.generationId,
         lastImageChangeSource: action.source ?? null,
+        zoomLevel: ZOOM_DEFAULT,
+        panX: PAN_DEFAULT,
+        panY: PAN_DEFAULT,
       };
 
     case "SET_ACTIVE_TOOL":
@@ -196,6 +228,22 @@ export function canvasDetailReducer(
         maskData: null,
       };
 
+    case "SET_ZOOM_PAN":
+      return {
+        ...state,
+        zoomLevel: clampZoom(action.zoomLevel),
+        panX: sanitizePan(action.panX),
+        panY: sanitizePan(action.panY),
+      };
+
+    case "RESET_ZOOM_PAN":
+      return {
+        ...state,
+        zoomLevel: ZOOM_DEFAULT,
+        panX: PAN_DEFAULT,
+        panY: PAN_DEFAULT,
+      };
+
     default:
       return state;
   }
@@ -239,6 +287,9 @@ export function CanvasDetailProvider({
     brushTool: "brush",
     outpaintDirections: [],
     outpaintSize: 50,
+    zoomLevel: ZOOM_DEFAULT,
+    panX: PAN_DEFAULT,
+    panY: PAN_DEFAULT,
   });
 
   // ---------------------------------------------------------------------------
