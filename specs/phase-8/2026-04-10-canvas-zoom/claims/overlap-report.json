@@ -1,0 +1,88 @@
+{
+  "session_id": "canvas-zoom-actual-scan-2026-04-10",
+  "feature": "canvas-zoom",
+  "branch": "feature/canvas-zoom",
+  "scan_timestamp": "2026-04-10T00:00:00Z",
+  "entities_changed": [
+    {
+      "file": "lib/canvas-detail-context.tsx",
+      "entity": "CanvasDetailState",
+      "entity_type": "interface",
+      "diff_summary": { "additions": 6, "deletions": 0 }
+    },
+    {
+      "file": "lib/canvas-detail-context.tsx",
+      "entity": "CanvasDetailAction",
+      "entity_type": "type",
+      "diff_summary": { "additions": 2, "deletions": 1 }
+    },
+    {
+      "file": "lib/canvas-detail-context.tsx",
+      "entity": "clampZoom",
+      "entity_type": "function",
+      "diff_summary": { "additions": 4, "deletions": 0 }
+    },
+    {
+      "file": "lib/canvas-detail-context.tsx",
+      "entity": "sanitizePan",
+      "entity_type": "function",
+      "diff_summary": { "additions": 4, "deletions": 0 }
+    },
+    {
+      "file": "lib/canvas-detail-context.tsx",
+      "entity": "canvasDetailReducer",
+      "entity_type": "function",
+      "diff_summary": { "additions": 19, "deletions": 0 }
+    },
+    {
+      "file": "lib/canvas-detail-context.tsx",
+      "entity": "CanvasDetailProvider",
+      "entity_type": "function",
+      "diff_summary": { "additions": 3, "deletions": 0 }
+    },
+    {
+      "file": "lib/hooks/use-canvas-zoom.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "diff_summary": { "additions": 632, "deletions": 0 }
+    },
+    {
+      "file": "lib/hooks/use-touch-gestures.ts",
+      "entity": null,
+      "entity_type": "new_file",
+      "diff_summary": { "additions": 443, "deletions": 0 }
+    },
+    {
+      "file": "components/canvas/canvas-detail-view.tsx",
+      "entity": "CanvasDetailView",
+      "entity_type": "function",
+      "diff_summary": { "additions": 178, "deletions": 25 }
+    },
+    {
+      "file": "components/canvas/canvas-image.tsx",
+      "entity": "CanvasImage",
+      "entity_type": "function",
+      "diff_summary": { "additions": 99, "deletions": 92 }
+    },
+    {
+      "file": "components/canvas/mask-canvas.tsx",
+      "entity": "MaskCanvas",
+      "entity_type": "function",
+      "diff_summary": { "additions": 105, "deletions": 14 }
+    },
+    {
+      "file": "components/canvas/zoom-controls.tsx",
+      "entity": null,
+      "entity_type": "new_file",
+      "diff_summary": { "additions": 113, "deletions": 0 }
+    }
+  ],
+  "overlaps": [],
+  "summary": {
+    "files_changed": 7,
+    "entities_changed": 12,
+    "overlapping_files": 0,
+    "overlapping_entities": 0,
+    "max_severity": "none"
+  }
+}
