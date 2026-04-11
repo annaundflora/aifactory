@@ -18,6 +18,14 @@ const DOUBLE_TAP_WINDOW_MS = 300;
 // Types
 // ---------------------------------------------------------------------------
 
+/** Stroke-undo refs exposed by MaskCanvas for Procreate-style undo (Slice 9) */
+export interface StrokeUndoRefs {
+  /** Whether a mask stroke is currently being drawn */
+  isDrawingRef: React.MutableRefObject<boolean>;
+  /** Performs the stroke undo: restores canvas + dispatches SET_MASK_DATA + sets isDrawing=false */
+  performStrokeUndo: () => void;
+}
+
 /** Options passed into the useTouchGestures hook */
 export interface UseTouchGesturesOptions {
   /** Current fit-level — used to decide single-finger-pan vs swipe */
@@ -26,6 +34,12 @@ export interface UseTouchGesturesOptions {
   zoomToPoint: (newZoom: number, cursorX: number, cursorY: number) => void;
   /** Reset zoom to fit level and pan to (0,0) (from useCanvasZoom) */
   resetToFit: () => void;
+  /**
+   * Ref to stroke-undo refs from MaskCanvas (Slice 9). Uses a RefObject so the
+   * event handler always reads the latest value without needing a re-render.
+   * When current is non-null, enables Procreate-style undo on 1->2 finger transition.
+   */
+  strokeUndoRefsRef?: React.RefObject<StrokeUndoRefs | null>;
 }
 
 /** Internal gesture state machine */
@@ -174,6 +188,33 @@ export function useTouchGestures(
       if (touches.length === 2) {
         // Start pinch/pan gesture
         e.preventDefault();
+
+        // ------------------------------------------------------------------
+        // Procreate-style Stroke-Undo (Slice 9):
+        // If a mask stroke is currently being drawn (isDrawing === true) and
+        // the editMode is inpaint/erase, undo the stroke via rAF-gated
+        // callback before starting the pinch/pan gesture.
+        // ------------------------------------------------------------------
+        const undoRefs = optionsRef.current.strokeUndoRefsRef?.current;
+        if (undoRefs) {
+          const { editMode } = stateRef.current;
+          const isMaskMode = editMode === "inpaint" || editMode === "erase";
+
+          if (isMaskMode && undoRefs.isDrawingRef.current) {
+            // AC-9: requestAnimationFrame-gated to ensure current paint frame
+            // is complete before restoring. The isDrawing check is atomic via
+            // the ref (no stale closure).
+            requestAnimationFrame(() => {
+              // Re-check isDrawingRef inside rAF — guard against race where
+              // pointerUp already fired between touchstart and this rAF frame
+              if (undoRefs.isDrawingRef.current) {
+                undoRefs.performStrokeUndo();
+              }
+            });
+          }
+          // AC-5/AC-6: If isDrawing is false or editMode is not inpaint/erase,
+          // no undo is performed — just proceed to pinch/pan gesture.
+        }
 
         const dist = getTouchDistance(touches[0], touches[1]);
         const mid = getTouchMidpoint(touches[0], touches[1]);

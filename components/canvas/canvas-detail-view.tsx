@@ -15,7 +15,7 @@ import { VariationPopover } from "@/components/canvas/popovers/variation-popover
 import { Img2imgPopover } from "@/components/canvas/popovers/img2img-popover";
 import { UpscalePopover } from "@/components/canvas/popovers/upscale-popover";
 import { CanvasChatPanel } from "@/components/canvas/canvas-chat-panel";
-import { MaskCanvas } from "@/components/canvas/mask-canvas";
+import { MaskCanvas, type MaskCanvasStrokeUndoRefs } from "@/components/canvas/mask-canvas";
 import { FloatingBrushToolbar } from "@/components/canvas/floating-brush-toolbar";
 import { ZoomControls } from "@/components/canvas/zoom-controls";
 import { OutpaintControls } from "@/components/canvas/outpaint-controls";
@@ -260,13 +260,26 @@ export function CanvasDetailView({
   ]);
 
   // ---------------------------------------------------------------------------
+  // Stroke-Undo refs from MaskCanvas (Slice 9)
+  // MaskCanvas exposes isDrawingRef, maskUndoStackRef, canvasRef, and a
+  // performStrokeUndo callback. These are passed into useTouchGestures so the
+  // gesture hook can trigger Procreate-style undo on 1->2 finger transition.
+  // ---------------------------------------------------------------------------
+  const strokeUndoRefsRef = useRef<MaskCanvasStrokeUndoRefs | null>(null);
+  const handleStrokeUndoRefsReady = useCallback((refs: MaskCanvasStrokeUndoRefs) => {
+    strokeUndoRefsRef.current = refs;
+  }, []);
+
+  // ---------------------------------------------------------------------------
   // Touch Gestures: Pinch-to-Zoom, Zwei-Finger-Pan, Ein-Finger-Pan (Slice 7)
+  // + Procreate-style Stroke-Undo on 1->2 finger transition (Slice 9)
   // Registered via addEventListener with { passive: false } inside the hook
   // ---------------------------------------------------------------------------
   useTouchGestures(canvasAreaRef, transformWrapperRef, {
     fitLevel: canvasZoom.fitLevel,
     zoomToPoint: canvasZoom.zoomToPoint,
     resetToFit: canvasZoom.resetToFit,
+    strokeUndoRefsRef,
   });
 
   // ---------------------------------------------------------------------------
@@ -1091,7 +1104,7 @@ export function CanvasDetailView({
               />
               {/* MaskCanvas hidden during outpaint mode (Slice 13 AC-1) */}
               {state.editMode !== "outpaint" && (
-                <MaskCanvas imageRef={imageRef} isSpaceHeldRef={canvasZoom.isSpaceHeldRef} />
+                <MaskCanvas imageRef={imageRef} isSpaceHeldRef={canvasZoom.isSpaceHeldRef} onStrokeUndoRefsReady={handleStrokeUndoRefsReady} />
               )}
 
               {/* OutpaintControls visible only in outpaint mode (Slice 13 AC-1, AC-2) */}
