@@ -388,3 +388,270 @@ describe("MaskCanvas - Zoom Coordinate Compensation", () => {
     expect(moveToCall[1]).toBe(50);
   });
 });
+
+// ===========================================================================
+// Slice 9: Procreate-Style Stroke-Undo — MaskCanvas Integration
+// ===========================================================================
+
+describe("MaskCanvas - Stroke-Undo Integration", () => {
+  let mockCtx: ReturnType<typeof createMockContext2D>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCtx = createMockContext2D();
+
+    mockState = {
+      editMode: "inpaint",
+      brushSize: 20,
+      brushTool: "brush",
+      maskData: null,
+      zoomLevel: 1.0,
+    };
+
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      mockCtx as unknown as CanvasRenderingContext2D
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // AC-8: maskData-Konsistenz nach Undo
+  // GIVEN ein Stroke-Undo wurde ausgefuehrt (AC-1)
+  // WHEN der maskData-State nach dem Undo ausgelesen wird
+  // THEN ist maskData konsistent mit dem Canvas-Inhalt (kein "Ghost-Stroke"
+  //      der visuell weg ist aber im State noch existiert)
+  // ---------------------------------------------------------------------------
+  it("AC-8: should have consistent maskData state after stroke undo (no ghost stroke)", () => {
+    // Track the onStrokeUndoRefsReady callback to get a reference to performStrokeUndo
+    let capturedRefs: import("@/components/canvas/mask-canvas").MaskCanvasStrokeUndoRefs | null = null;
+    const handleRefsReady = vi.fn((refs: import("@/components/canvas/mask-canvas").MaskCanvasStrokeUndoRefs) => {
+      capturedRefs = refs;
+    });
+
+    const imageRef = createRef<HTMLImageElement>();
+    const img = createMockImageElement(800, 600);
+    Object.defineProperty(imageRef, "current", { value: img, writable: true });
+
+    render(
+      <MaskCanvas
+        imageRef={imageRef as React.RefObject<HTMLImageElement | null>}
+        onStrokeUndoRefsReady={handleRefsReady}
+      />
+    );
+
+    // onStrokeUndoRefsReady should have been called with refs
+    expect(handleRefsReady).toHaveBeenCalledTimes(1);
+    expect(capturedRefs).not.toBeNull();
+
+    const canvas = screen.getByTestId("mask-canvas");
+
+    canvas.getBoundingClientRect = () =>
+      ({
+        left: 0,
+        top: 0,
+        right: 800,
+        bottom: 600,
+        width: 800,
+        height: 600,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      } as DOMRect);
+
+    // Step 1: Start a stroke (pointerDown pushes snapshot to undo stack + sets isDrawing=true)
+    fireEvent.pointerDown(canvas, {
+      clientX: 100,
+      clientY: 100,
+      pointerId: 1,
+      button: 0,
+    });
+
+    // Verify isDrawing is true after pointerDown
+    expect(capturedRefs!.isDrawingRef.current).toBe(true);
+
+    // Step 2: Draw some pixels (pointerMove)
+    fireEvent.pointerMove(canvas, {
+      clientX: 200,
+      clientY: 200,
+      pointerId: 1,
+      button: 0,
+    });
+
+    // Step 3: Before lifting the finger, simulate stroke-undo via performStrokeUndo
+    // (This is what useTouchGestures would call on 1->2 finger transition)
+
+    // Set up the mock to return ImageData with alpha content for the restored state
+    // The undo stack should have one entry (pushed during pointerDown)
+    expect(capturedRefs!.maskUndoStackRef.current.length).toBe(1);
+
+    // Mock getImageData to return data that indicates "has content" for the restore
+    // (after putImageData, getImageData is called to dispatch SET_MASK_DATA)
+    const restoredImageData = {
+      width: 800,
+      height: 600,
+      data: new Uint8ClampedArray(800 * 600 * 4),
+    };
+    // Set some alpha pixels to simulate content
+    restoredImageData.data[3] = 128; // First pixel has alpha
+
+    // Override getImageData to return our test data after restore
+    const getImageDataSpy = mockCtx.getImageData as ReturnType<typeof vi.fn>;
+    getImageDataSpy.mockReturnValue(restoredImageData);
+
+    // Call performStrokeUndo
+    capturedRefs!.performStrokeUndo();
+
+    // Verify AC-8: isDrawing should be false
+    expect(capturedRefs!.isDrawingRef.current).toBe(false);
+
+    // Verify AC-8: The undo stack entry was popped
+    expect(capturedRefs!.maskUndoStackRef.current.length).toBe(0);
+
+    // Verify AC-8: Canvas was restored (clearRect + putImageData called)
+    expect(mockCtx.clearRect).toHaveBeenCalled();
+    expect(mockCtx.putImageData).toHaveBeenCalled();
+
+    // Verify AC-8: SET_MASK_DATA was dispatched with restored data
+    // (ensures state is consistent with canvas content, no ghost stroke)
+    expect(mockDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "SET_MASK_DATA",
+      })
+    );
+
+    // The last SET_MASK_DATA call should have maskData (not null) because
+    // our mock getImageData returns data with alpha content
+    const setMaskDataCalls = mockDispatch.mock.calls.filter(
+      (call) => call[0]?.type === "SET_MASK_DATA"
+    );
+    const lastSetMaskData = setMaskDataCalls[setMaskDataCalls.length - 1];
+    expect(lastSetMaskData[0].maskData).not.toBeNull();
+  });
+
+  it("AC-8: should dispatch SET_MASK_DATA with null when restored canvas is empty", () => {
+    let capturedRefs: import("@/components/canvas/mask-canvas").MaskCanvasStrokeUndoRefs | null = null;
+    const handleRefsReady = vi.fn((refs: import("@/components/canvas/mask-canvas").MaskCanvasStrokeUndoRefs) => {
+      capturedRefs = refs;
+    });
+
+    const imageRef = createRef<HTMLImageElement>();
+    const img = createMockImageElement(800, 600);
+    Object.defineProperty(imageRef, "current", { value: img, writable: true });
+
+    render(
+      <MaskCanvas
+        imageRef={imageRef as React.RefObject<HTMLImageElement | null>}
+        onStrokeUndoRefsReady={handleRefsReady}
+      />
+    );
+
+    expect(capturedRefs).not.toBeNull();
+
+    const canvas = screen.getByTestId("mask-canvas");
+    canvas.getBoundingClientRect = () =>
+      ({
+        left: 0, top: 0, right: 800, bottom: 600,
+        width: 800, height: 600, x: 0, y: 0,
+        toJSON: () => ({}),
+      } as DOMRect);
+
+    // Start a stroke to push to undo stack
+    fireEvent.pointerDown(canvas, {
+      clientX: 100, clientY: 100, pointerId: 1, button: 0,
+    });
+
+    // Mock getImageData to return completely transparent data (empty canvas after restore)
+    const emptyImageData = {
+      width: 800,
+      height: 600,
+      data: new Uint8ClampedArray(800 * 600 * 4), // All zeros = fully transparent
+    };
+    (mockCtx.getImageData as ReturnType<typeof vi.fn>).mockReturnValue(emptyImageData);
+
+    // Perform stroke undo
+    capturedRefs!.performStrokeUndo();
+
+    // SET_MASK_DATA should be dispatched with null (empty canvas = no mask)
+    const setMaskDataCalls = mockDispatch.mock.calls.filter(
+      (call) => call[0]?.type === "SET_MASK_DATA"
+    );
+    const lastSetMaskData = setMaskDataCalls[setMaskDataCalls.length - 1];
+    expect(lastSetMaskData[0].maskData).toBeNull();
+  });
+
+  it("AC-7/AC-8: performStrokeUndo with empty stack sets isDrawing false without canvas restore", () => {
+    let capturedRefs: import("@/components/canvas/mask-canvas").MaskCanvasStrokeUndoRefs | null = null;
+    const handleRefsReady = vi.fn((refs: import("@/components/canvas/mask-canvas").MaskCanvasStrokeUndoRefs) => {
+      capturedRefs = refs;
+    });
+
+    const imageRef = createRef<HTMLImageElement>();
+    const img = createMockImageElement(800, 600);
+    Object.defineProperty(imageRef, "current", { value: img, writable: true });
+
+    render(
+      <MaskCanvas
+        imageRef={imageRef as React.RefObject<HTMLImageElement | null>}
+        onStrokeUndoRefsReady={handleRefsReady}
+      />
+    );
+
+    expect(capturedRefs).not.toBeNull();
+
+    // Manually set isDrawing=true without pushing to undo stack
+    capturedRefs!.isDrawingRef.current = true;
+    expect(capturedRefs!.maskUndoStackRef.current.length).toBe(0);
+
+    // Clear any previous mock calls
+    mockCtx.clearRect.mockClear();
+    mockCtx.putImageData.mockClear();
+    mockDispatch.mockClear();
+
+    // Perform stroke undo with empty stack
+    capturedRefs!.performStrokeUndo();
+
+    // isDrawing should be false
+    expect(capturedRefs!.isDrawingRef.current).toBe(false);
+
+    // Canvas restore should NOT have been called (empty stack)
+    expect(mockCtx.clearRect).not.toHaveBeenCalled();
+    expect(mockCtx.putImageData).not.toHaveBeenCalled();
+
+    // SET_MASK_DATA should NOT have been dispatched (no restore happened)
+    const setMaskDataCalls = mockDispatch.mock.calls.filter(
+      (call) => call[0]?.type === "SET_MASK_DATA"
+    );
+    expect(setMaskDataCalls.length).toBe(0);
+  });
+
+  it("should expose refs via onStrokeUndoRefsReady callback", () => {
+    let capturedRefs: import("@/components/canvas/mask-canvas").MaskCanvasStrokeUndoRefs | null = null;
+    const handleRefsReady = vi.fn((refs: import("@/components/canvas/mask-canvas").MaskCanvasStrokeUndoRefs) => {
+      capturedRefs = refs;
+    });
+
+    const imageRef = createRef<HTMLImageElement>();
+    const img = createMockImageElement(800, 600);
+    Object.defineProperty(imageRef, "current", { value: img, writable: true });
+
+    render(
+      <MaskCanvas
+        imageRef={imageRef as React.RefObject<HTMLImageElement | null>}
+        onStrokeUndoRefsReady={handleRefsReady}
+      />
+    );
+
+    // Callback should have been called
+    expect(handleRefsReady).toHaveBeenCalledTimes(1);
+
+    // All required refs/callbacks should be present
+    expect(capturedRefs).toBeDefined();
+    expect(capturedRefs!.isDrawingRef).toBeDefined();
+    expect(capturedRefs!.maskUndoStackRef).toBeDefined();
+    expect(capturedRefs!.canvasRef).toBeDefined();
+    expect(typeof capturedRefs!.performStrokeUndo).toBe("function");
+
+    // Initial values
+    expect(capturedRefs!.isDrawingRef.current).toBe(false);
+    expect(capturedRefs!.maskUndoStackRef.current).toEqual([]);
+  });
+});
