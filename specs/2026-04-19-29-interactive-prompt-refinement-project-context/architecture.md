@@ -82,23 +82,23 @@
 
 | Method | Path | Request | Response | Auth | Business Logic |
 |--------|------|---------|----------|------|----------------|
-| POST | `/api/assistant/sessions/{id}/messages` | `SendMessageRequest` (extended) | SSE stream | required + session ownership | New fields: `project_id`, `reference_slots`, `last_result_image_url`. Service hydrates `context_instructions` from DB by `project_id`, builds multimodal HumanMessage, streams agent. SSE events extended with `flow-state`, `intent-summary`, `paste-confirm-suggestion` and tool-result events for `finalize_and_generate`, `set_slot_role`, `set_slot_strength`, `set_model_params`. |
+| POST | `/api/assistant/sessions/{id}/messages` | `SendMessageRequest` (extended) | SSE stream | required + session ownership | New fields: `project_id`, `reference_slots`, `last_result_image_url`. Service hydrates `context_instructions` from DB by `project_id`, builds multimodal HumanMessage, streams agent. SSE events extended with `flow-state`, `intent-summary`, `paste-confirm-suggestion`, `slot-load-failed` and tool-result events for `emit_intent_summary`, `set_slot_role`, `set_slot_strength`, `set_model_params`. |
 | GET | `/api/assistant/sessions/{id}` (existing) | -- | `SessionDetailResponse` (extended state with `flow_state`, `intent_axes`) | required | UI uses `state.flow_state` to re-hydrate FSM on session resume. |
 
 ### Endpoints — Image Generation (EXISTING, called from Auto-Generate)
 
 | Method | Path | Request | Response | Auth | Business Logic |
 |--------|------|---------|----------|------|----------------|
-| -- | `app/actions/generations.ts: generateImages()` (server action, no HTTP) | existing | existing | `requireAuth()` | Triggered programmatically by frontend `applyToWorkspace()` follow-up after `finalize_and_generate` SSE event. |
+| -- | `app/actions/generations.ts: generateImages()` (server action, no HTTP) | existing | existing | `requireAuth()` | Triggered programmatically by the IntentSummaryCard "So generieren" click handler (NOT by SSE event). Sequence: user click → `useIsGenerationPending()` precondition → `applyToWorkspace()` → `generateImages()`. |
 
 ### LangGraph Tool Schemas (Agent-internal, NOT REST)
 
 | Tool | Payload (JSON Schema) | Purpose | Persists to LangGraph state? |
 |------|-----------------------|---------|------------------------------|
-| `finalize_and_generate` (NEW) | `{ "prompt": str (1..2000), "settings_diff": object?, "model_id": str? }` | Signals: assistant has reached final intent; frontend must Auto-Apply + Auto-Generate. | Yes (last `final_intent`, `flow_state="generating"`) |
-| `set_slot_role` (NEW) | `{ "slot_index": int (0..N-1), "role": "subject" \| "style" \| "composition" }` | Updates a ReferenceBar slot role in the active workspace. | No (UI-only via SSE) |
+| `emit_intent_summary` (NEW) | `{ "prompt": str (1..2000), "settings_diff": SettingsDiff?, "model_id": str? }` | Signals: assistant has reached semantic confidence about the user's intent. **Carries the payload only — does NOT trigger generate.** Frontend renders the Intent-Summary-Card; user click on "So generieren" is the gate that triggers Auto-Apply + Auto-Generate. | Yes (sets `flow_state="summarizing"`; persists `final_intent` payload). The state transition to `"generating"` happens via reducer on user click, not via tool. |
+| `set_slot_role` (NEW) | `{ "slot_index": int (0..N-1), "role": "subject" \| "style" \| "composition" }` | Updates a ReferenceBar slot role in the active workspace. `slot_index` is the snake_case DTO field; frontend maps onto existing `slotPosition` in `prompt-area.tsx`. | No (UI-only via SSE) |
 | `set_slot_strength` (NEW) | `{ "slot_index": int (0..N-1), "strength": float (0.0..1.0) }` | Updates a slot strength in the active workspace. | No |
-| `set_model_params` (NEW) | `{ "params": object }` | Updates Workspace-Variation `modelParams`. Validation per active model schema (existing model-knowledge module). | No |
+| `set_model_params` (NEW) | `{ "params": object }` | Updates Workspace-Variation `modelParams`. Validation per active model schema (existing model-knowledge module). **Note:** there is no `set_model_id` tool — the active model can only be switched via `emit_intent_summary.model_id` at the end of the interview. Mid-interview, the assistant uses `recommend_model` for textual recommendations only. | No |
 | `draft_prompt` (existing) | unchanged | Drafts EN prompt — used during interview. | unchanged |
 | `refine_prompt` (existing) | unchanged | Refines an EN prompt — used after Paste-Detect "Direkt verfeinern". | unchanged |
 | `analyze_image` (existing) | unchanged | Used inside multi-reference interview to extract style/subject/composition. | unchanged |
@@ -107,6 +107,33 @@
 
 > `generate_project_context` is **not** an agent tool. Per Discovery Open Question #2, it is a separate REST endpoint (`POST /api/projects/context/generate`) — no session instantiation needed; one LLM call per click.
 
+### `SettingsDiff` Type Schema
+
+The `settings_diff` field of `emit_intent_summary` and `IntentSummaryPayload` is a typed object so the frontend renders deklarativ per field type (and a future "click to revert" / "hover shows previous value" stays viable). Backend constructs the diff from tool calls observed in the current turn.
+
+```ts
+type SettingsDiff = {
+  slotRoles?: {
+    slotIndex: number;
+    from: 'subject' | 'style' | 'composition' | null;
+    to: 'subject' | 'style' | 'composition';
+  }[];
+  slotStrengths?: {
+    slotIndex: number;
+    from: number | null;
+    to: number;
+  }[];
+  modelId?: { from: string; to: string };
+  modelParams?: {
+    key: string;
+    from: unknown;
+    to: unknown;
+  }[];
+};
+```
+
+All four sub-arrays are optional; if no settings changed, the entire `settings_diff` is omitted from the payload (Wireframe state `no_settings_diff`).
+
 ### Data Transfer Objects (DTOs)
 
 | DTO | Fields | Validation | Notes |
@@ -114,12 +141,13 @@
 | `UpdateProjectContextRequest` | `context_instructions: string \| null` | string length 0..8000; null/empty allowed (clears) | UTF-8; whitespace trimmed before length check |
 | `ProjectContextResponse` | `id: uuid`, `context_instructions: string \| null`, `context_updated_at: ISO datetime \| null` | -- | Used by both GET and PATCH |
 | `GenerateProjectContextRequest` | `brief: string` | length 10..500 | |
-| `GenerateProjectContextResponse` | `draft: string`, `model: string` | draft length ≤ 8000 | `model` is OpenRouter model id used for call |
+| `GenerateProjectContextResponse` | `draft: string` | draft length ≤ 8000 | -- |
 | `ReferenceSlotDTO` (new, in `backend/app/models/dtos.py`) | `slot_index: int (0..N-1)`, `image_url: HttpUrl`, `role: "subject" \| "style" \| "composition" \| null`, `strength: float (0.0..1.0) \| null` | -- | Snapshot of active slot at turn-build time; Frontend sends list every turn |
 | `SendMessageRequest` (extended, `backend/app/models/dtos.py:21-59`) | adds: `project_id: UUID?`, `reference_slots: list[ReferenceSlotDTO] (max 5)?`, `last_result_image_url: HttpUrl?` | existing constraints kept (`content` 1..5000, `image_urls` max 5, `model` allowlist, `image_model_id` ≤ 200, `generation_mode` Literal) | Adding `project_id` enables Backend to load `context_instructions` |
-| `IntentSummaryPayload` (new SSE event payload) | `axes: { subject?, medium?, style?, lighting?, composition?, palette? }`, `prompt_preview: string`, `settings_diff: object?` | every axis ≤ 200 chars | Sent by backend when LLM emits semantic-confidence signal; frontend renders Intent-Summary-Card |
+| `IntentSummaryPayload` (new SSE event payload) | `axes: { subject?, medium?, style?, lighting?, composition?, palette? }`, `prompt_preview: string`, `settings_diff: SettingsDiff?` | every axis ≤ 200 chars; `settings_diff` follows the typed schema above | Sent by backend when LLM calls `emit_intent_summary`; frontend renders Intent-Summary-Card |
 | `PasteConfirmPayload` (new SSE event payload) | `triggered_by: "first_user_message"`, `seed_text: string` | seed_text ≤ 5000 | Sent once per session if heuristic matches |
-| `FlowStateEvent` (new SSE event payload) | `flow_state: Literal[…]` | enum from FSM | Pushed each time `flow_state` changes |
+| `FlowStateEvent` (new SSE event payload) | `flow_state: Literal[…]` | enum from FSM | Pushed each time backend `flow_state` changes (idle → interviewing → summarizing → reviewing → refining; `generating` is set frontend-side on user click) |
+| `SlotLoadFailedPayload` (new SSE event payload) | `slot_index: int`, `reason: "fetch_failed" \| "invalid_url"` | -- | Sent by backend when a reference-slot URL cannot be fetched. Frontend renders inline System-Message in chat (NOT a toast). |
 | `SessionStateDTO` (extended) | adds: `flow_state: str`, `intent_axes: object?` | -- | Used by GET `/sessions/{id}` resume |
 
 ### Paste-Detect Heuristic (Frontend)
@@ -192,9 +220,10 @@ ALTER TABLE "projects"
 | `_call_model_sync` / `_call_model_async` (EXTEND, `backend/app/agent/graph.py:235-257`) | Forward `project_context` from `configurable` into `build_assistant_system_prompt` | LangGraph state, configurable | new model invocation | Reads `flow_state` from state for prompt steering (optional) |
 | `build_assistant_system_prompt` (EXTEND, `backend/app/agent/prompts.py:85-123`) | Compose base + project-context block + knowledge | `image_model_id, generation_mode, project_context` | system-prompt str | -- |
 | `_BASE_PROMPT` rewrite (EXTEND, `backend/app/agent/prompts.py:17-82`) | New behaviour: adaptive interview, semantic-confidence stop, FSM-aware tool calls | -- | -- | -- |
-| `finalize_and_generate` tool node (NEW, `backend/app/agent/tools/prompt_tools.py`) | Captures payload; sets `flow_state="generating"`; emits SSE tool-result | `{ prompt, settings_diff?, model_id? }` | tool-result dict | Writes `final_intent` into LangGraph state |
+| `emit_intent_summary` tool node (NEW, `backend/app/agent/tools/prompt_tools.py`) | Captures payload; sets `flow_state="summarizing"`; emits SSE tool-result + `intent-summary` event | `{ prompt, settings_diff?, model_id? }` | tool-result dict | Writes `final_intent` into LangGraph state. Does NOT trigger generate. |
 | `set_slot_role` / `set_slot_strength` / `set_model_params` tool nodes (NEW) | Capture payload; emit SSE tool-result | per-tool payload | tool-result dict | None — frontend applies via reducer + `setVariation` |
-| Frontend SSE handler (EXTEND, `lib/assistant/use-assistant-runtime.ts:154-216`) | Dispatches reducer actions on tool-result + flow-state events | SSE events | reducer dispatch | Calls `setVariation` (slot role, strength, model params); calls `applyToWorkspace` + `generateImages` server action on `finalize_and_generate` |
+| Frontend SSE handler (EXTEND, `lib/assistant/use-assistant-runtime.ts:154-216`) | Dispatches reducer actions on tool-result + flow-state events | SSE events | reducer dispatch | Calls `setVariation` (slot role, strength, model params). On user-click of "So generieren" (NOT on tool-result): dispatches `SET_FLOW_STATE("generating")`, calls `applyToWorkspace` + `generateImages` server action. |
+| `useIsGenerationPending` hook (NEW, `lib/hooks/use-is-generation-pending.ts`) | Derived selector: returns `true` if any generation in the active workspace has `status === "pending"` | -- | `boolean` | Reads from existing generations store (the same source `workspace-content.tsx:291` filters today). Consumed by `IntentSummaryCard` "So generieren" handler to apply the concurrent-generation block. |
 
 ### Business Logic Flow — Assistant Turn
 
@@ -232,23 +261,28 @@ POST /api/assistant/sessions/{id}/messages  (SSE)
 [Streaming: text-delta events]
   ↓ (if tool call)
 [Tool node]
-  finalize_and_generate / set_slot_role / set_slot_strength / set_model_params / draft_prompt / refine_prompt / ...
-  ↓ tool-result event
+  emit_intent_summary / set_slot_role / set_slot_strength / set_model_params / draft_prompt / refine_prompt / ...
+  ↓ tool-result event + intent-summary event + flow-state="summarizing" event
 [Frontend SSE handler]
-  on tool-result(finalize_and_generate):
-    dispatch RENDER_INTENT_SUMMARY (server already pushed intent-summary event)
-    on user click "So generieren":
-      → applyToWorkspace(prompt, modelId, modelParams)
-      → SET_DRAFT_PROMPT triggers existing auto-apply effect (assistant-context.tsx:546)
-      → generateImages() server action  [Auto-Generate]
-  on tool-result(set_slot_role|strength|model_params):
-    → setVariation patch (modelParams) + dispatch SET_SLOT_ROLE/STRENGTH
+  on intent-summary event:
+    → RENDER_INTENT_SUMMARY (card payload — axes, prompt_preview, settings_diff)
   on flow-state event:
     → SET_FLOW_STATE
-  on intent-summary event:
-    → RENDER_INTENT_SUMMARY (card payload)
+  on tool-result(set_slot_role|strength|model_params):
+    → setVariation patch (modelParams) + dispatch SET_SLOT_ROLE/STRENGTH
   on paste-confirm-suggestion event:
     → RENDER_PASTE_CONFIRM
+  on slot-load-failed event:
+    → RENDER_SYSTEM_MESSAGE inline ("Slot N konnte nicht geladen werden")
+  on user click "So generieren" (in IntentSummaryCard):
+    → useIsGenerationPending() ? show toast "Bereits eine Generierung laeuft" : continue
+    → dispatch SET_FLOW_STATE("generating")
+    → applyToWorkspace(prompt, modelId, modelParams)
+    → SET_DRAFT_PROMPT triggers existing auto-apply effect (assistant-context.tsx:546)
+    → generateImages() server action  [Auto-Generate]
+  on user click "Nochmal diskutieren" (in IntentSummaryCard):
+    → dispatch SET_FLOW_STATE("interviewing")
+    → sendMessage("Was soll anders sein?") to assistant
 ```
 
 ### Multimodal Pipeline — Priority Order & Budget
@@ -260,26 +294,41 @@ POST /api/assistant/sessions/{id}/messages  (SSE)
 | 3 | Chat-input uploads (`image_urls`, newest first) | Always when present |
 
 **Budget enforcement location:** `AssistantService.stream_response` before HumanMessage build.
-**Cap source:** existing `app/agent/prompt_knowledge` model-knowledge module (per LLM model: `max_images_per_turn`, `max_total_image_bytes`). If new fields not yet present in the module, defaults — Claude Sonnet 4.6: 5 images / 20MB; gpt-5.4: 4 / 16MB; gemini-3.1-pro-preview: 8 / 32MB. Drop from lowest priority until under cap.
-**Vision-model fallback:** if active LLM `vision == false` (per model-knowledge module), all `image_url` parts are stripped silently; assistant continues with text only (per Business Rule in Discovery).
+**Cap source:** new constants module `backend/app/agent/chat_llm_limits.py` (NEW FILE), separate from `prompt_knowledge.py` because the existing `data/prompt-knowledge.json` covers IMAGE models only (flux, nano-banana, gpt-image-…), not chat LLMs. The module exposes:
+
+```python
+CHAT_LLM_LIMITS: dict[str, dict] = {
+    "anthropic/claude-sonnet-4.6":     {"max_images": 5, "max_total_bytes": 20_000_000, "vision": True},
+    "openai/gpt-5.4":                  {"max_images": 4, "max_total_bytes": 16_000_000, "vision": True},
+    "google/gemini-3.1-pro-preview":   {"max_images": 8, "max_total_bytes": 32_000_000, "vision": True},
+}
+DEFAULT_LIMITS = {"max_images": 4, "max_total_bytes": 16_000_000, "vision": False}
+```
+
+Lookup helper `get_chat_llm_limits(model_id) -> dict` returns the matched entry or `DEFAULT_LIMITS` (fail-safe to text-only when an unknown model slips in via the allowlist).
+
+Drop from lowest priority until under cap.
+
+**Vision-model fallback:** if `get_chat_llm_limits(model_id)["vision"] == False`, all `image_url` parts are stripped silently; assistant continues with text only (per Business Rule in Discovery).
 
 ### Auto-Apply + Auto-Generate Trigger
 
-| Step | Where | Action |
-|------|-------|--------|
-| 1 | Backend tool node `finalize_and_generate` | Sets state, emits `tool-result` SSE with `{ tool: "finalize_and_generate", payload }` |
-| 2 | Frontend SSE handler (`use-assistant-runtime.ts`) | Dispatches `RENDER_INTENT_SUMMARY` (card already shown earlier in turn) → user click "So generieren" → `applyToWorkspace(prompt, modelId, modelParams)` |
-| 3 | Frontend reducer (`assistant-context.tsx:487-551`) | Existing `SET_DRAFT_PROMPT` auto-apply effect (line 546-551) calls `setVariation()` |
-| 4 | Frontend post-apply | Calls `generateImages()` server action (`app/actions/generations.ts`) for the active project |
-| 5 | Generate completes | Frontend stores `lastResultImageUrl` ref → next turn includes it as multimodal input |
+The "So generieren" button click is the **single user gate**. The backend tool only carries the payload and signals semantic confidence. State semantics:
 
-> The "So generieren" button click is the single user gate. Tool-call delivery alone does not auto-fire generation.
+| Trigger | `flow_state` after | Side effects |
+|---------|-------------------|--------------|
+| Backend tool `emit_intent_summary` fires | `summarizing` | SSE `tool-result` + SSE `intent-summary` payload + SSE `flow-state` event. **No generate.** |
+| User click "So generieren" in card | `generating` | (a) `useIsGenerationPending()` precondition check; (b) `applyToWorkspace(prompt, modelId, modelParams)`; (c) existing `SET_DRAFT_PROMPT` auto-apply effect at `assistant-context.tsx:546-551` calls `setVariation()`; (d) `generateImages()` server action for active project. |
+| Backend `generations.status` flips to `succeeded` | `reviewing` | Frontend stores `lastResultImageUrl` ref → next turn includes it as multimodal input; assistant proactive starter on next stream. |
+| User click "Nochmal diskutieren" in card | `interviewing` | Sends `"Was soll anders sein?"` to assistant. Card freezes (history). **No rollback needed** because state never advanced past `summarizing`. |
+
+> The tool name `emit_intent_summary` reflects exactly what it does: emit the summary payload. It does NOT initiate generation.
 
 ### Concurrent-Generation Handling (per Discovery Q5)
 
 | Scenario | Behaviour |
 |----------|-----------|
-| `summarizing` state, user clicks "So generieren", but a previous `generateImages()` is still pending for the project | Frontend reducer detects `pendingGenerationId !== null` → shows toast "Es läuft bereits eine Generierung. Bitte warten." → does NOT call `generateImages` → Intent-Summary-Card stays in `pending` state until previous gen settles → on settle, retries automatically. Tool call is acknowledged backend-side but no second generate is dispatched. |
+| `summarizing` state, user clicks "So generieren", but a previous `generateImages()` is still pending for the project | `useIsGenerationPending()` returns `true` → shows toast "Es läuft bereits eine Generierung. Bitte warten." → does NOT call `generateImages` → Intent-Summary-Card stays interactive (button label "So generieren (wartend…)") until previous gen settles. On `pendingGenerations.length === 0` change, the click handler is automatically re-armed; one retry is dispatched (UX polish over Discovery Q5 baseline "Block mit Hinweis"). Tool call is acknowledged backend-side but no second generate is dispatched. |
 
 ### Validation Rules
 
@@ -289,7 +338,8 @@ POST /api/assistant/sessions/{id}/messages  (SSE)
 | `brief` (helper) | length 10..500 | "Please describe your project briefly (10–500 characters)." |
 | `reference_slots` | array length ≤ 5; each `image_url` valid URL; `slot_index` unique | 422 with offending index |
 | `last_result_image_url` | valid URL; same domain pattern as Replicate / S3 presigned | 422 |
-| `finalize_and_generate.prompt` | non-empty, ≤ 2000 chars | tool error → assistant retries |
+| `emit_intent_summary.prompt` | non-empty, ≤ 2000 chars | tool error → assistant retries |
+| `emit_intent_summary.settings_diff` | matches `SettingsDiff` schema (typed sub-arrays) | tool error |
 | `set_slot_role.role` | enum `"subject" \| "style" \| "composition"` | tool error |
 | `set_slot_strength.strength` | float 0.0..1.0 (inclusive) | tool error |
 | `set_model_params.params` | matches active model JSON-schema (existing model-knowledge) | tool error |
@@ -408,11 +458,12 @@ POST /api/assistant/sessions/{id}/messages  (SSE)
 |---------|----------------|
 | FSM source of truth | `flow_state` field on backend LangGraph state; mirrored to frontend reducer |
 | Frontend FSM storage | `assistantReducer` (`lib/assistant/assistant-context.tsx`) — new field `flowState` |
-| Backend → Frontend propagation | New SSE event `event: flow-state\ndata: {"flow_state":"..."}`; emitted by `AssistantService` whenever the LangGraph state's `flow_state` field changes mid-stream (post-process detection in existing `_after_node` hook or in `TOOL_STATE_MAPPING`) |
+| Backend → Frontend propagation | New SSE event `event: flow-state\ndata: {"flow_state":"..."}`; emitted by `AssistantService` whenever the LangGraph state's `flow_state` field changes mid-stream (post-process detection in existing `_after_node` hook or in `TOOL_STATE_MAPPING`). Backend emits transitions for `idle → interviewing → summarizing → reviewing → refining`. The `generating` transition is set frontend-side on user click (no backend round-trip required). |
 | Frontend dispatch | New reducer action `SET_FLOW_STATE` |
-| Card subscription | `chat-thread.tsx` reads `flowState` + a per-message `card` payload from reducer; renders `<IntentSummaryCard>` or `<PasteDetectConfirmCard>` inline |
+| Card subscription | `chat-thread.tsx` reads `flowState` + a per-message `card` payload from reducer; renders `<IntentSummaryCard>` or `<PasteDetectConfirmCard>` inline. **History semantics:** `IntentSummaryCard` remains in chat history after Generate or Discuss click (user can scroll back); `PasteDetectConfirmCard` is removed from history once a button is clicked (replaced by the resulting assistant turn). |
 | Resume on session reload | `GET /api/assistant/sessions/{id}` returns `state.flow_state` + `state.intent_axes`; `assistant-context.tsx:44-64` (existing hydrate) extended to dispatch `SET_FLOW_STATE` |
-| Banner subscription | `<NoContextBanner>` subscribes to `projects.context_instructions` (loaded once per session into context provider) + reducer flag `noContextBannerDismissed` |
+| Banner subscription | `<NoContextBanner>` subscribes to `projects.context_instructions` (loaded once per session into context provider) + reducer flag `noContextBannerDismissed`. **Dismiss scope:** tab-session (Reducer-Lifecycle); resets only on tab reload, NOT on project switch. |
+| Multimodal indicator | New small line under `<ChatInput>` rendering "Sieht: X Refs + letztes Ergebnis" when any are attached; subscribes to `referenceSlotsRef` + `lastResultImageUrlRef`. Hidden when no multimodal content is being sent. |
 
 ### System-Prompt Composition
 
@@ -440,10 +491,11 @@ POST /api/assistant/sessions/{id}/messages  (SSE)
 | Project not owned | 404 | "Project not found" toast | Info log |
 | OpenRouter call failure (`/context/generate`) | 502 + retry hint | Modal shows "Could not generate. Try again." | Error log w/ correlation id |
 | OpenRouter call failure (assistant turn) | SSE `error` event (existing) | Existing error toast in chat | Existing |
-| `finalize_and_generate` payload invalid | Tool retry by LLM (existing tool-error pattern) | -- | Debug log |
-| `generateImages()` server-action failure post-auto-apply | Toast "Generierung fehlgeschlagen — manuell versuchen?"; Workspace generate button stays active | per Discovery error path | Existing |
-| Concurrent-generation block | Toast hint; FSM stays in `summarizing` | "Es läuft bereits eine Generierung. Bitte warten." | Info log |
-| Missing/invalid reference-slot URL | Backend skips that part; assistant message lists "Slot N konnte nicht geladen werden" | per Discovery | Warning log |
+| `emit_intent_summary` payload invalid | Tool retry by LLM (existing tool-error pattern) | -- | Debug log |
+| `generateImages()` server-action failure post-auto-apply | Toast "Generierung fehlgeschlagen — manuell versuchen?"; Workspace generate button stays active; reducer transitions `flow_state` back to `summarizing` so user can retry from the card | per Discovery error path | Existing |
+| Concurrent-generation block | Toast hint; FSM stays in `summarizing`; one auto-retry on settle | "Es läuft bereits eine Generierung. Bitte warten." | Info log |
+| Missing/invalid reference-slot URL | Backend skips that part; emits SSE `slot-load-failed` event with `slot_index` + reason; frontend renders inline System-Message in chat ("Slot N konnte nicht geladen werden — bitte neu hochladen") | per Discovery | Warning log |
+| Project-Context-Settings: Cancel with unsaved changes | Confirm dialog "Ungespeicherte Änderungen verwerfen?"; only on dirty state | -- | -- |
 | Vision-model fallback (non-vision LLM with images) | Backend silently strips image parts | No user-visible error | Warning log once per session |
 | Multimodal budget overflow | Backend drops lowest-priority items | No user-visible error | Debug log with dropped count |
 
@@ -460,35 +512,38 @@ POST /api/assistant/sessions/{id}/messages  (SSE)
 | `lib/db/queries.ts` | `getProject`, `listProjectsByUser` etc. | + `updateProjectContext({id,userId,contextInstructions})` + `getProjectContext({id,userId})` | New helpers; `$inferSelect` types pick up new columns automatically. | A |
 | `app/actions/projects.ts` | Existing CRUD actions with `requireAuth()` | + `updateProjectContext` server action | Same shape (auth → validate → DB → revalidatePath); used by Settings UI. | A |
 | `app/api/projects/[id]/context/route.ts` (NEW FILE) | -- | Next.js Route Handler GET + PATCH | Both call `requireAuth()`, ownership check, query helper. | A |
-| `app/api/projects/context/generate/route.ts` (NEW FILE) | -- | Next.js Route Handler POST | Validates `brief`; calls OpenRouter once; returns draft. | C |
-| `backend/app/models/dtos.py` | `SendMessageRequest` without project/slots/last-result | Same DTO + `project_id`, `reference_slots: list[ReferenceSlotDTO]`, `last_result_image_url`. New `ReferenceSlotDTO`. Extended `SessionStateDTO` with `flow_state`, `intent_axes`. | Add Pydantic fields with constraints; keep backward-compat for fields. | I, F |
-| `backend/app/services/assistant_service.py` | Builds HumanMessage with text + chat image_urls | Builds HumanMessage with text + chat uploads + reference slots (img2img only) + last_result_image_url under per-model budget. Hydrates `project_context` and passes via `configurable`. Emits new SSE events `flow-state`, `intent-summary`, `paste-confirm-suggestion`. | Refactor `_build_human_message` (or equivalent); inject `ProjectRepository`; add SSE event emitters. | D, F, I, H |
+| `app/api/projects/context/generate/route.ts` (NEW FILE) | -- | Next.js Route Handler POST | Validates `brief`; calls OpenRouter once; returns `{ draft }` (no `model` field). | C |
+| `backend/app/models/dtos.py` | `SendMessageRequest` without project/slots/last-result | Same DTO + `project_id`, `reference_slots: list[ReferenceSlotDTO]`, `last_result_image_url`. New `ReferenceSlotDTO` with `slot_index` (snake_case; maps to existing frontend `slotPosition`). New `SettingsDiff` model. Extended `SessionStateDTO` with `flow_state`, `intent_axes`. | Add Pydantic fields with constraints; keep backward-compat for fields. | I, F |
+| `backend/app/services/assistant_service.py` | Builds HumanMessage with text + chat image_urls | Builds HumanMessage with text + chat uploads + reference slots (img2img only) + last_result_image_url under per-model budget. Hydrates `project_context` and passes via `configurable`. Emits new SSE events `flow-state`, `intent-summary`, `paste-confirm-suggestion`, `slot-load-failed`. | Refactor `_build_human_message` (or equivalent); inject `ProjectRepository` + `chat_llm_limits`; add SSE event emitters. | D, F, I, H |
+| `backend/app/agent/chat_llm_limits.py` (NEW FILE) | -- | Constants module: `CHAT_LLM_LIMITS` dict + `DEFAULT_LIMITS` + lookup helper `get_chat_llm_limits(model_id)` | Plain Python dict; per chat-LLM `max_images`, `max_total_bytes`, `vision`. Separate from `prompt_knowledge.py` (image-model knowledge). | I |
 | `backend/app/services/project_repository.py` (NEW FILE) | -- | Read-only repository for `projects.context_instructions` (ownership-checked) | psycopg query mirroring `SessionRepository`. | D |
-| `backend/app/agent/prompts.py:17-82` (`_BASE_PROMPT`) | Anti-questionnaire, must-haves list | Adaptive interview, semantic-confidence stop signal, two-stage confirm rules (partial vs final), FSM transition guidance, new tool catalog | Full rewrite of base prompt content. | E |
+| `backend/app/agent/prompts.py:17-82` (`_BASE_PROMPT`) | Anti-questionnaire, must-haves list | Adaptive interview, semantic-confidence stop signal, two-stage confirm rules (partial vs final), FSM transition guidance, new tool catalog (incl. `emit_intent_summary`), AND **sequential multi-reference interview rules** (per Discovery Slice K — assistant scans reference slots one-by-one, asks per image "Subject? Style? Composition?", calls `set_slot_role`, confirms, moves to next). | Full rewrite of base prompt content. | E, K |
 | `backend/app/agent/prompts.py:85-123` (`build_assistant_system_prompt`) | Signature `(image_model_id, generation_mode)` | Add 3rd parameter `project_context: Optional[str]`; insert escaped block between base and knowledge. | Add escape helper `_escape_project_context`. | D |
 | `backend/app/agent/state.py:12-43` (`PromptAssistantState`) | Has `phase: str`, `collected_info`, etc. | + `flow_state: str` (default `"idle"`); + `intent_axes: dict` (default `{}`); + `final_intent: dict?` | Update `DEFAULT_STATE_VALUES` accordingly. | E, F |
-| `backend/app/agent/graph.py:36-52` (`ALL_TOOLS`, `TOOL_STATE_MAPPING`) | 5 tools registered | + `finalize_and_generate`, `set_slot_role`, `set_slot_strength`, `set_model_params` | Add to registry; `TOOL_STATE_MAPPING` for `finalize_and_generate` only. | F, J |
+| `backend/app/agent/graph.py:36-52` (`ALL_TOOLS`, `TOOL_STATE_MAPPING`) | 5 tools registered | + `emit_intent_summary`, `set_slot_role`, `set_slot_strength`, `set_model_params` | Add to registry; `TOOL_STATE_MAPPING` maps `emit_intent_summary` → `flow_state="summarizing"` only. The transition to `"generating"` happens in the frontend reducer on user click. | F, J |
 | `backend/app/agent/graph.py:235-257` (`_call_model_*`) | Reads `image_model_id`, `generation_mode` from configurable | + Reads `project_context` from configurable; passes to `build_assistant_system_prompt` | Forward parameter through both sync + async nodes. | D |
-| `backend/app/agent/tools/prompt_tools.py:15+` | `draft_prompt`, `refine_prompt` `@tool` definitions | + `finalize_and_generate` `@tool` | Pydantic input schema; persists `final_intent` to state. | F |
+| `backend/app/agent/tools/prompt_tools.py:15+` | `draft_prompt`, `refine_prompt` `@tool` definitions | + `emit_intent_summary` `@tool` | Pydantic input schema (incl. `SettingsDiff`); persists `final_intent` to state. Sets `flow_state="summarizing"` via `TOOL_STATE_MAPPING`. Does NOT trigger generate. | F |
 | `backend/app/agent/tools/workspace_tools.py` (NEW FILE) | -- | `set_slot_role`, `set_slot_strength`, `set_model_params` `@tool` definitions | New file mirroring existing tool style. | J |
 | `lib/assistant/use-assistant-runtime.ts:354-373` | Body: content, image_urls, model, image_model_id, generation_mode | + `project_id`, `reference_slots`, `last_result_image_url`. New refs `referenceSlotsRef`, `lastResultImageUrlRef`, `projectIdRef`. Slot inclusion gated on `generationModeRef.current === "img2img"`. | Mirror existing ref pattern (lines 104-107). | I, H |
-| `lib/assistant/use-assistant-runtime.ts:154-216` (SSE handler) | Switches on text-delta, tool-call-result, text-done, error | + `flow-state`, `intent-summary`, `paste-confirm-suggestion`, tool-result branches for `finalize_and_generate`, `set_slot_role`, `set_slot_strength`, `set_model_params` | Each new branch dispatches a reducer action and (where needed) calls `setVariation` / `applyToWorkspace` / `generateImages`. | F, G, I, J |
-| `lib/assistant/assistant-context.tsx:104-252` (reducer) | Existing actions | + `SET_FLOW_STATE`, `RENDER_INTENT_SUMMARY`, `RENDER_PASTE_CONFIRM`, `DISMISS_PASTE_CONFIRM`, `DISMISS_NO_CONTEXT_BANNER`, `SET_SLOT_ROLE`, `SET_SLOT_STRENGTH`, `SET_LAST_RESULT_IMAGE_URL` | Extend `AssistantState` + `AssistantAction` union. | F, L, M, J, H |
-| `lib/assistant/assistant-context.tsx:487-551` (apply flow) | Existing `applyToWorkspace` + auto-apply effect | Re-used unchanged; new path: `finalize_and_generate` SSE handler dispatches `SET_DRAFT_PROMPT` → effect already calls `applyToWorkspace`; then runtime calls `generateImages`. | No change to apply mechanics; only new caller. | G |
+| `lib/assistant/use-assistant-runtime.ts:154-216` (SSE handler) | Switches on text-delta, tool-call-result, text-done, error | + `flow-state`, `intent-summary`, `paste-confirm-suggestion`, `slot-load-failed`, tool-result branches for `emit_intent_summary`, `set_slot_role`, `set_slot_strength`, `set_model_params` | Each new branch dispatches a reducer action. `applyToWorkspace` / `generateImages` are NOT called from SSE handlers — they fire from the IntentSummaryCard click handler. | F, G, I, J |
+| `lib/assistant/assistant-context.tsx:104-252` (reducer) | Existing actions | + `SET_FLOW_STATE`, `RENDER_INTENT_SUMMARY`, `RENDER_PASTE_CONFIRM`, `DISMISS_PASTE_CONFIRM`, `DISMISS_NO_CONTEXT_BANNER`, `RENDER_SYSTEM_MESSAGE`, `SET_SLOT_ROLE`, `SET_SLOT_STRENGTH`, `SET_LAST_RESULT_IMAGE_URL` | Extend `AssistantState` + `AssistantAction` union. | F, L, M, J, H |
+| `lib/assistant/assistant-context.tsx:487-551` (apply flow) | Existing `applyToWorkspace` + auto-apply effect | Re-used unchanged; new path: IntentSummaryCard "So generieren" click → `useIsGenerationPending` precondition → `SET_FLOW_STATE("generating")` + `SET_DRAFT_PROMPT` → existing effect calls `applyToWorkspace`; then card-click handler calls `generateImages`. | No change to apply mechanics; only new caller. | G |
+| `lib/hooks/use-is-generation-pending.ts` (NEW FILE) | -- | Selector hook returning `boolean` derived from existing generations store (`status === "pending"`). | Mirrors the filter in `workspace-content.tsx:291`; consumed by IntentSummaryCard click handler. | G |
 | `lib/assistant/paste-detect.ts` (NEW FILE) | -- | Pure heuristic function `detectPastedPrompt(text): boolean` | Implements length/comma/keyword rules. | L |
 | `components/assistant/chat-thread.tsx` | Renders user/assistant/error/init bubbles | + Renders `IntentSummaryCard` and `PasteDetectConfirmCard` when corresponding payload present | Special-cased card variants; cards remain in history after click. | F, L |
-| `components/assistant/intent-summary-card.tsx` (NEW FILE) | -- | Renders axes, prompt preview, settings diff, two buttons; calls reducer / sendMessage | Fully new component. | F |
-| `components/assistant/paste-detect-confirm-card.tsx` (NEW FILE) | -- | Renders prompt-detected hint + two buttons | Fully new component. | L |
+| `components/assistant/intent-summary-card.tsx` (NEW FILE) | -- | Renders axes, prompt preview, `SettingsDiff` rendered deklarativ pro Sub-Array (slotRoles, slotStrengths, modelId, modelParams), two buttons. "So generieren" handler: precondition `useIsGenerationPending` → toast or proceed; `SET_FLOW_STATE("generating")` + apply + generate. "Nochmal diskutieren" handler: `SET_FLOW_STATE("interviewing")` + sendMessage. **Card remains in chat history after click.** | Fully new component. | F |
+| `components/assistant/paste-detect-confirm-card.tsx` (NEW FILE) | -- | Renders prompt-detected hint + two buttons. **Card is removed from history after click** (replaced by resulting assistant turn). | Fully new component. | L |
+| `components/assistant/multimodal-indicator.tsx` (NEW FILE) | -- | Small line under chat-input: "Sieht: X Refs + letztes Ergebnis"; hidden when nothing attached. Subscribes to `referenceSlotsRef` + `lastResultImageUrlRef` via context. | Fully new component. | I, H |
 | `components/assistant/no-context-banner.tsx` (NEW FILE) | -- | Banner above chat thread, dismissible per session | Fully new component. | M |
-| `components/assistant/assistant-panel.tsx` | Renders header + chat-thread + chat-input | + Renders `<NoContextBanner>` above `<ChatThread>` when context empty + not session-dismissed | One added child. | M |
-| `components/projects/project-context-settings.tsx` (NEW FILE) | -- | Textarea + counter + "Help me write this" button + Save | Modal or full-page route reusing `Dialog` primitive (`components/ui/dialog.tsx`). | B |
+| `components/assistant/assistant-panel.tsx` | Renders header + chat-thread + chat-input | + Renders `<NoContextBanner>` above `<ChatThread>` when context empty + not tab-dismissed; + Renders `<MultimodalIndicator>` below `<ChatInput>` when attachments exist | Two added children. | M, I, H |
+| `components/projects/project-context-settings.tsx` (NEW FILE) | -- | Textarea + counter + "Help me write this" button + Save + Cancel. Cancel with dirty state shows confirm dialog ("Ungespeicherte Änderungen verwerfen?"); Cancel without dirty state closes immediately. | Modal or full-page route reusing `Dialog` primitive (`components/ui/dialog.tsx`). | B |
 | `components/projects/help-me-write-modal.tsx` (NEW FILE) | -- | Brief input + Generate + Draft preview + Accept/Regenerate/Cancel | Calls `POST /api/projects/context/generate`. | C |
 | `components/project-card.tsx:209` | Has rename/delete actions | + "Edit context" entry → opens settings | Add list-entry; route to settings. | B |
 | `components/workspace/workspace-header.tsx:182` | Has settings opener | + Optional secondary entry to project-context settings | Add list-entry. | B |
 | `backend/app/routes/messages.py:13` | Existing message route | Unchanged signature; downstream service consumes new DTO fields | No code change here aside from passing DTO through. | I, F |
 | `backend/app/agent/prompts.py` exports | `SYSTEM_PROMPT` alias | unchanged (kept for backward-compat) | Tests update if relying on phrase `kein Fragebogen`. | E |
 
-> Total file rows: 25 changed/new, with 8 new files. Slices A, B, C, D, E, F, G, H, I, J, K, L, M each have at least one row attribution.
+> Total file rows: 28 changed/new, with 11 new files. Slices A, B, C, D, E, F, G, H, I, J, K, L, M each have at least one row attribution. Slice K is attributed to the `_BASE_PROMPT` rewrite (no separate code change — its behaviour is encoded in the prompt rules, evaluated as part of Slice E's eval set).
 
 ---
 
@@ -499,10 +554,12 @@ POST /api/assistant/sessions/{id}/messages  (SSE)
 | Constraint | Technical Implication | Solution |
 |------------|----------------------|----------|
 | Project-Context only for assistant LLM, never for image-model API (Discovery scope, Q14) | Must NOT touch `app/actions/generations.ts` payload assembly | Project context lives only in FastAPI `AssistantService` and `build_assistant_system_prompt`. `generateImages()` server action signature stays intact. |
-| Multimodal budget (Discovery Q4: model-specific caps) | Per-LLM cap enforcement before HumanMessage build | Read `max_images_per_turn` / `max_total_image_bytes` from existing model-knowledge module; drop lowest priority. Cap source-of-truth: same module as today, with new per-model fields. |
-| Concurrent-Generation: block with hint (Discovery Q5) | Frontend reducer must know pending generation state | `assistantReducer` reads `pendingGenerationId` from existing workspace context; "So generieren" path checks and bails with toast. |
+| Multimodal budget (Discovery Q4: model-specific caps) | Per-LLM cap enforcement before HumanMessage build | Read from new `backend/app/agent/chat_llm_limits.py` (separate from `prompt_knowledge.py` — that module is image-model knowledge only). Drop lowest priority until under cap. |
+| Concurrent-Generation: block with hint (Discovery Q5) | Frontend must know pending generation state | New selector hook `useIsGenerationPending()` derives from existing generations store. Card "So generieren" handler calls the hook; if `true`, shows toast + keeps card interactive; auto-retries once on settle. |
 | Reference slots → assistant only in img2img (Discovery Business Rule) | Slot-to-multimodal pipeline must be modus-conditioned | Frontend gates `reference_slots` send on `generationModeRef.current === "img2img"` (`use-assistant-runtime.ts`); Backend defensively re-checks. |
-| Non-vision LLM fallback (Discovery Business Rule) | Multimodal must silently degrade | `AssistantService` checks `vision == false` flag from model-knowledge → strips image parts before LLM call. |
+| Non-vision LLM fallback (Discovery Business Rule) | Multimodal must silently degrade | `AssistantService` reads `get_chat_llm_limits(model_id)["vision"]` from `chat_llm_limits.py`; if `False`, strips image parts before LLM call. |
+| Slot state cross-reload (browser refresh) | Slot roles set by `set_slot_role` must not be lost on hard refresh | Slot state lives in PromptArea local state (existing); same persistence behaviour as today. No new persistence work for the assistant feature; if an existing reload-restore mechanism exists for slots it carries over, otherwise behaviour matches today's slot UX. |
+| No mid-interview model switching tool | Assistant cannot change `model_id` mid-flight, only at finalize | Existing `recommend_model` provides textual suggestions during interview; `emit_intent_summary.model_id` is the only mutating path. `set_model_params` updates params (knobs), not model identity. |
 | LangGraph Checkpointer Postgres persists state | New `flow_state` field must serialise via `add_messages`/Pydantic | `PromptAssistantState` extension keeps fields plain str/dict, serialisable by `langgraph-checkpoint-postgres`. |
 | Project-Context max 8000 chars (Discovery Data) | Storage must allow >255 | TEXT column (no length limit at DB); enforcement at DTO. |
 | Help-me-write-this is independent of agent session (Q2) | No `session_id` required | Implemented as Next.js Route Handler that calls OpenRouter directly; not a LangGraph tool. |
@@ -551,8 +608,8 @@ POST /api/assistant/sessions/{id}/messages  (SSE)
 | Metric | Type | Target | Alert |
 |--------|------|--------|-------|
 | `assistant.turn.duration_ms` | Histogram | p95 < 12s | if p95 > 20s for 5min |
-| `assistant.tool.finalize_and_generate.count` | Counter | -- | -- |
-| `assistant.tool.finalize_and_generate.error_rate` | Gauge | < 1% | if > 5% for 10min |
+| `assistant.tool.emit_intent_summary.count` | Counter | -- | -- |
+| `assistant.tool.emit_intent_summary.error_rate` | Gauge | < 1% | if > 5% for 10min |
 | `assistant.intent_summary.accept_ratio` | Gauge | (business KPI) | -- |
 | `assistant.multimodal.dropped_parts.count` | Counter | -- | -- |
 | `assistant.multimodal.vision_fallback.count` | Counter | -- | -- |
@@ -570,10 +627,10 @@ POST /api/assistant/sessions/{id}/messages  (SSE)
 | Assumption | Technical Validation | Impact if Wrong |
 |------------|---------------------|-----------------|
 | LangGraph checkpointer can serialise `flow_state: str` + `intent_axes: dict` without schema migration | Try-and-verify in dev; values are JSON-compatible | Fall back to in-memory only; UI re-derives FSM from message history |
-| Per-LLM `max_images_per_turn` / `max_total_image_bytes` available in model-knowledge module | Confirmed during Slice I; if missing, add fields | Use static defaults (5/20MB) until module updated |
+| Per-LLM caps in `chat_llm_limits.py` are accurate | Architecture-defined; revisit per LLM provider release notes | Tune dict values; no code change needed elsewhere |
 | OpenRouter response time for "Help me write this" stays < 8s p95 | Same model used in chat; one-shot is bounded by output length | Add timeout + retry button (already in modal `error` state) |
 | `projects.context_instructions` ≤ 8000 chars is enough headroom (Claude Projects parity) | Discovery Data | If users hit limit often → bump cap (TEXT column has no DB-side issue) |
-| Frontend `pendingGenerationId` is the source of truth for "is a gen running" | Existing workspace context already exposes pending IDs | Need a new flag in workspace context if not exposed |
+| Existing generations store exposes `status === "pending"` per generation | Verified: `workspace-content.tsx:291` already filters by `status === "pending"` | New `useIsGenerationPending()` hook reads the same source — no new state, no provider rewiring |
 | LangGraph state propagation via SSE works for `flow_state` mid-turn | LangGraph 1.1+ exposes state on tool-result via existing handler in `assistant_service.py:175-231` | Polling `GET /sessions/{id}` as fallback (already implemented for resume) |
 | Reference-slot URLs are reachable by OpenRouter from the FastAPI side | Presigned S3 URLs reachable from OpenRouter today (existing chat-input upload path) | If not: Backend re-fetches and uploads to OpenRouter media endpoint |
 
@@ -584,9 +641,9 @@ POST /api/assistant/sessions/{id}/messages  (SSE)
 | Prompt injection via `context_instructions` jailbreaks the LLM | Med | High (assistant misbehaves project-wide) | Fenced "informativ" block + escape sequences + `_BASE_PROMPT` rule | If exploited, hot-fix `_escape_project_context` and add detection regex |
 | LLM never reaches semantic confidence (loops on questions) | Med | Med (frustrating UX) | Slice E eval set with vague-input examples; explicit base-prompt rule; user can always type "mach einfach" → forces Summary | Manual escape: existing `draft_prompt` tool still callable directly |
 | Multimodal-Budget under-counts tokens of large images | Med | Med (LLM 400) | Conservative defaults; dropping order well-defined | Auto-retry with images=0 on token-overflow error |
-| Tool-call delivery race: `finalize_and_generate` + user already pressed manual Generate | Low | Med (double-generate, lost credits) | Concurrent-Generation guard (Q5 block-with-hint) | Existing duplicate-detection on Generate button (debounce) |
+| Tool-call delivery race: `emit_intent_summary` arrives + user already pressed manual Generate | Low | Med (double-generate, lost credits) | Concurrent-Generation guard via `useIsGenerationPending()` (Q5 block-with-hint) | Existing duplicate-detection on Generate button (debounce) |
 | `set_model_params` validates against stale model schema | Low | Med | Validation references active model-knowledge at call time | Tool returns error → assistant retries or asks user |
-| Banner-dismiss state leaks across projects | Low | Low | Reducer flag is per-session, not per-project; resets on project change | Re-show banner on each project switch |
+| Banner-dismiss state leaks across projects | Low | Low | Reducer flag is **tab-session-scoped** (lifecycle = reducer); does NOT reset on project switch (resetting would force the user to re-dismiss after each project change). Resets only on tab reload. | Acceptable: a re-dismissed-once-per-tab banner is less annoying than a re-dismissed-per-project one. |
 | New SSE event types break old frontend during deploy | Low | Med | Feature-flagged on backend; old frontend ignores unknown events | Backwards-compatible SSE event names (additive only) |
 | `0015` migration race with concurrent feature branches | Low | Med | Drizzle convention is sequential; coordinate via PR merge order | If conflict: rename to next available number, regenerate `meta` |
 | Reference-slot URL becomes invalid mid-turn (rotated presigned) | Low | Low | Backend skips slot, surfaces "Slot N konnte nicht geladen werden" message | User re-uploads |
@@ -610,7 +667,7 @@ POST /api/assistant/sessions/{id}/messages  (SSE)
 | Auto-generate trigger | Frontend `generateImages()` server action call after apply | Reuse existing generate path; no backend coupling between assistant and generate |
 | FSM source of truth | Backend LangGraph state field (`flow_state`) | Single source; checkpointer-persisted; UI mirrors |
 | SSE event for FSM | New `flow-state` event | Stays additive to existing protocol; ignored by old clients |
-| New tools | `@tool`-decorated Python functions in `backend/app/agent/tools/` | Match existing 5-tool pattern; auto-registered in `ALL_TOOLS` |
+| New tools | `@tool`-decorated Python functions in `backend/app/agent/tools/` | Match existing 5-tool pattern; auto-registered in `ALL_TOOLS`. Tool naming: `emit_intent_summary` (not `finalize_and_generate`) — name reflects that the tool only emits the intent payload; the user click is the gate that triggers Generate. |
 | Project-Context block placement | Between `_BASE_PROMPT` and `MODEL-KNOWLEDGE` | Base behaviour first, then project-specific descriptive metadata, then technical model knowledge — consistent with Claude Projects style |
 | Paste-Detect heuristic | Frontend pure function | No backend trip needed; fast; deterministic |
 | Banner dismiss persistence | React reducer in-memory only | Per Discovery: session-scope; persistent dismiss is overkill |
@@ -641,9 +698,13 @@ POST /api/assistant/sessions/{id}/messages  (SSE)
 | 2 | Wer triggert `generate_project_context` — Frontend-Endpoint oder Agent-Tool? | A) REST-Endpoint B) Agent-Tool | A | A — `POST /api/projects/context/generate` is a Next.js Route Handler, NOT a LangGraph tool. |
 | 3 | Soll User generierten Context vor Übernahme ablehnen können? | A) Annehmen / Neu generieren / Abbrechen B) Nur Annehmen | A | A — Helper-Modal exposes Accept / Regenerate / Cancel. |
 | 4 | Multimodal-Budget — konkrete Caps? | A) Fix B) Modell-spezifisch C) Dynamisch | B | B — Per-LLM `max_images_per_turn` + `max_total_image_bytes` from existing model-knowledge module; defaults applied if module fields missing. |
-| 5 | Concurrent-Generation Verhalten? | A) Queue B) Block mit Hinweis C) Abort | B | B — Frontend reducer detects `pendingGenerationId`; toast hint; FSM stays `summarizing` until previous gen settles, then auto-retries. |
+| 5 | Concurrent-Generation Verhalten? | A) Queue B) Block mit Hinweis C) Abort | B | B — Frontend uses `useIsGenerationPending()` hook (derived from existing generations store); toast hint; FSM stays `summarizing` until previous gen settles, then auto-retries once. |
 | 6 (NEW) | Wo greift die Multimodal-Budget-Enforcement? | A) Frontend (pre-send) B) Backend (pre-LLM) C) Beide | B | B — `AssistantService.stream_response` enforces; frontend just sends snapshot. Reduces drift between LLM-cap source and enforcement point. |
-| 7 (NEW) | Wo wohnt der FSM-Status? | A) Frontend reducer only B) Backend LangGraph state + mirrored | B | B — Backend `PromptAssistantState.flow_state` is canonical; frontend mirrors via SSE; resumable. |
+| 7 (NEW) | Wo wohnt der FSM-Status? | A) Frontend reducer only B) Backend LangGraph state + mirrored | B | B — Backend `PromptAssistantState.flow_state` is canonical for `idle/interviewing/summarizing/reviewing/refining`; frontend mirrors via SSE; resumable. The `generating` transition is set frontend-side on user click (no backend round-trip). |
+| 8 (NEW) | Wer triggert Auto-Generate — Tool oder Click? | A) Tool fires generate B) Click is the gate, tool only emits payload | B | B — Tool renamed to `emit_intent_summary`; `flow_state` advances to `summarizing` on tool-call; click on "So generieren" advances to `generating` and triggers `applyToWorkspace` + `generateImages`. |
+| 9 (NEW) | Wo leben die Multimodal-Caps für Chat-LLMs? | A) `prompt_knowledge.json` (existing image-model knowledge) B) New module `chat_llm_limits.py` | B | B — `data/prompt-knowledge.json` is image-model-only (flux, nano-banana, gpt-image…); chat-LLM caps live in a new constants module. |
+| 10 (NEW) | `settings_diff` Schema | A) Strukturiertes typed Object B) Pre-formatierte Display-Strings C) Loose dict | A | A — `SettingsDiff` typed object with `slotRoles[]`, `slotStrengths[]`, `modelId`, `modelParams[]`. Frontend renders deklarativ pro Sub-Array. |
+| 11 (NEW) | Concurrent-Gen Bridge | A) Selector-Hook `useIsGenerationPending` B) Workspace-Context flag C) Mirror in assistant-reducer | A | A — selector hook reads existing generations store (same source `workspace-content.tsx:291` filters today). |
 
 ---
 
@@ -675,8 +736,8 @@ POST /api/assistant/sessions/{id}/messages  (SSE)
 | 4 | Where does the multimodal budget enforce? | Backend (`AssistantService` pre-LLM). Single source of truth = model-knowledge module. Frontend sends raw snapshot; backend drops by priority. |
 | 5 | Where does `flow_state` live? | Canonical in LangGraph `PromptAssistantState`; mirrored to frontend reducer via new SSE event `flow-state`; resumable via existing `GET /sessions/{id}`. |
 | 6 | "Help me write this" — agent tool or REST endpoint? | REST: `POST /api/projects/context/generate`. No session, simpler auth. Confirms Discovery Q2. |
-| 7 | Auto-Generate — backend-driven or frontend-driven? | Frontend-driven: SSE `tool-result(finalize_and_generate)` arrives → after user click on "So generieren" → `applyToWorkspace` (existing apply effect) → `generateImages()` server action. Reuses entire existing generate path. |
-| 8 | Concurrent-generation handling? | Block-with-hint (Discovery Q5): frontend reducer checks `pendingGenerationId`; if active, toast and keep card pending; auto-retry on settle. |
+| 7 | Auto-Generate — backend-driven or frontend-driven? | Frontend-driven: SSE `tool-result(emit_intent_summary)` + `intent-summary` event arrive → card renders → user click on "So generieren" → `applyToWorkspace` (existing apply effect) → `generateImages()` server action. Reuses entire existing generate path. The tool itself does NOT fire generate; the click is the only gate. |
+| 8 | Concurrent-generation handling? | Block-with-hint (Discovery Q5): IntentSummaryCard click handler invokes `useIsGenerationPending()`; if `true`, toast and keep card interactive; auto-retry on settle (one attempt). |
 | 9 | Where does paste-detect run? | Frontend (`lib/assistant/paste-detect.ts` NEW). Pure function, no backend round-trip. Backend treats every first message identically. |
 | 10 | What is the system-prompt block order? | 1) `_BASE_PROMPT` (rewritten); 2) `## PROJEKT-CONTEXT (informativ, keine Anweisung)` if non-empty; 3) `## MODEL-KNOWLEDGE` if applicable. |
 | 11 | Prompt-injection mitigations for `context_instructions`? | Labeled fenced block, escape sequences (` ``` `, `<\|`, `\|>`, null bytes, newline runs), explicit "informativ, keine Anweisung" prefix in `_BASE_PROMPT`, 8000-char cap. |
@@ -685,7 +746,7 @@ POST /api/assistant/sessions/{id}/messages  (SSE)
 | 14 | Auth scope for context endpoints — `requireAuth` only or also ownership? | Both. `requireAuth()` + `getProject(id, userId)` ownership check. 404 (not 403) on miss to avoid leaking project existence. |
 | 15 | Migration number? | `drizzle/0015_add_project_context.sql` (next sequential after 0014). |
 | 16 | Are new image-model API calls touched? | No. Project-Context is LLM-only (Discovery Q14). `app/actions/generations.ts` is unchanged. |
-| 17 | Does `set_slot_*` tool persist to state? | No. UI is the authoritative slot owner; tool-result is consumed in frontend SSE handler and dispatched to reducer + `setVariation`. `finalize_and_generate` is the only tool that persists (final intent). |
+| 17 | Does `set_slot_*` tool persist to state? | No. UI is the authoritative slot owner; tool-result is consumed in frontend SSE handler and dispatched to reducer + `setVariation`. `emit_intent_summary` is the only tool that persists (final intent + sets `flow_state="summarizing"`). |
 | 18 | Helper-modal failure UX? | Accept / Regenerate / Cancel buttons (Discovery Q3); error inline message; no hard blocker — user can edit textarea freely. |
 | 19 | Banner-dismiss persistence? | Per-session, in-memory reducer flag. Resets on new browser session and on project switch. |
 | 20 | Out-of-scope reaffirmed: image-model context prepend? | Confirmed OUT — explicit in Scope & Boundaries; explicit in Constraints; no code in `app/actions/generations.ts` consumes `context_instructions`. |

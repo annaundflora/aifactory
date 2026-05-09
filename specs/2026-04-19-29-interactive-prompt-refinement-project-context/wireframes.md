@@ -11,12 +11,14 @@
 |-------------------------------|--------|
 | `no_context_banner` | Assistant Panel (extended) |
 | `no_context_banner.link` | Assistant Panel (extended) |
+| `multimodal_indicator` | Assistant Panel (extended) |
 | `paste_confirm_card` | Paste Detect Confirm Card |
 | `paste_confirm_card.refine_btn` | Paste Detect Confirm Card |
 | `paste_confirm_card.interview_btn` | Paste Detect Confirm Card |
 | `intent_summary_card` | Intent Summary Card |
 | `intent_summary_card.generate_btn` | Intent Summary Card |
 | `intent_summary_card.discuss_btn` | Intent Summary Card |
+| `result_message` (NEW) | Reviewing Turn |
 | `context_textarea` | Project Context Settings |
 | `help_me_write_btn` | Project Context Settings |
 | `helper_brief_input` | Help-me-write-this Modal |
@@ -92,14 +94,16 @@
 │                                                            │  ┌─ Chat Input ───────────────────────────┐ │
 │                                                            │  │  [ + ]  Type a message…         [ ↑ ]  │ │
 │                                                            │  └────────────────────────────────────────┘ │
+│                                                            │  ④ Sieht: 2 Refs + letztes Ergebnis         │
 │                                                            │                                              │
 └────────────────────────────────────────────────────────────┴──────────────────────────────────────────────┘
 ```
 
 **Annotations:**
 - ① Panel header (existing): project name, sessions dropdown, model selector — unchanged
-- ② `no_context_banner`: dismissible single-line banner above the chat thread, rendered only when `context_instructions` is empty
+- ② `no_context_banner`: dismissible single-line banner above the chat thread, rendered only when `context_instructions` is empty. Dismiss is **tab-session-scoped** (resets only on tab reload, NOT on project switch).
 - ③ `no_context_banner.link`: link inside the banner that navigates to Project Context Settings
+- ④ `multimodal_indicator`: dezenter Hinweis unter dem Chat-Input, zeigt was an den Assistant mitgeschickt wird ("Sieht: X Refs + letztes Ergebnis"). Sichtbar nur wenn Multimodal-Anhänge tatsächlich vorhanden sind. Verbirgt sich bei reinem txt2img ohne Anhänge.
 
 ### State Variations
 
@@ -152,7 +156,7 @@
 | State | Visual Change |
 |-------|---------------|
 | `rendered` | as shown above, both buttons active |
-| `dismissed` | card replaced by the normal assistant response (refine result or first interview question) — card itself does not remain in history once a button has been clicked |
+| `dismissed` | card replaced by the normal assistant response (refine result or first interview question). **Card does NOT remain in chat history** — this is intentional and differs from the IntentSummaryCard. Rationale: the paste-detect step is a transient routing decision, not a durable artefact. |
 
 ---
 
@@ -209,8 +213,8 @@
 - ② Intent axes list — only axes actually filled during interview are shown (dynamic)
 - ③ `prompt_preview`: rendered as monospace block, always EN
 - ④ `settings_diff`: shown only when the assistant has proposed or set workspace settings (slot roles, strengths, model params). Omitted on pure txt2img without settings changes.
-- ⑤ `intent_summary_card.generate_btn` (Primary): triggers `finalize_and_generate` tool-call → Auto-Apply + Auto-Generate
-- ⑥ `intent_summary_card.discuss_btn` (Secondary): sends "Okay, was soll anders sein?" back to assistant, returns to interview state
+- ⑤ `intent_summary_card.generate_btn` (Primary): user click is the gate — runs `useIsGenerationPending` precondition, then advances `flow_state` from `summarizing` to `generating`, calls Auto-Apply + Auto-Generate. The tool `emit_intent_summary` was already fired earlier by the LLM; the tool only carries the payload, the click triggers the generate.
+- ⑥ `intent_summary_card.discuss_btn` (Secondary): sets `flow_state` back to `interviewing`, sends "Okay, was soll anders sein?" to assistant. **Card remains as history element** (frozen, buttons inactive) so user can scroll back through past decisions.
 
 ### State Variations
 
@@ -356,11 +360,63 @@
 
 ---
 
+## Screen: Reviewing Turn (after successful generate)
+
+**Context:** After "So generieren" click → `generateImages()` succeeds → backend attaches the result image as multimodal input on the next assistant turn → assistant proactively comments. This visualises what the user sees in the chat once the generation completes. The result image is rendered **inline as a thumbnail** in the assistant message so the user sees what the assistant is referencing.
+
+### Wireframe
+
+```
+┌─ Chat Thread (reviewing) ─────────────────────────────────────┐
+│                                                               │
+│  IntentSummaryCard (frozen, history)                          │
+│   • Subject: moody library interior                           │
+│   • Buttons inactive: ✓ So generieren · Nochmal diskutieren   │
+│                                                               │
+│  Assistant: "Hier ist das Ergebnis:"                          │
+│                                                               │
+│  ┌─ ① result_message ─────────────────────────────────────┐  │
+│  │  ┌─────────────┐                                        │  │
+│  │  │             │  Stimmung passt, Licht wirkt flach —  │  │
+│  │  │   THUMB     │  willst du es wärmer?                 │  │
+│  │  │  (~120px)   │                                        │  │
+│  │  │             │  Beksinski-Tinge ist gut getroffen,   │  │
+│  │  └─────────────┘  Komposition könnte enger.            │  │
+│  │                                                         │  │
+│  └─────────────────────────────────────────────────────────┘  │
+│                                                               │
+│  User: [next refinement message…]                             │
+│                                                               │
+└───────────────────────────────────────────────────────────────┘
+
+┌─ Chat Input ──────────────────────────────────────────────────┐
+│  [ + ]  Type a message…                              [ ↑ ]    │
+└───────────────────────────────────────────────────────────────┘
+② Sieht: 2 Refs + letztes Ergebnis
+```
+
+**Annotations:**
+- ① `result_message`: special assistant-message variant rendered when the turn carries a result-image attachment. Layout: thumbnail (left, ~120px square, rounded) + assistant text (right, multiline). Click on thumbnail opens the existing detail-view (`canvas-detail-view.tsx`) — reuse, no new modal.
+- ② `multimodal_indicator`: now shows "Sieht: 2 Refs + letztes Ergebnis" because both reference slots AND the just-generated image are attached to the next turn.
+
+### State Variations
+
+| State | Visual Change |
+|-------|---------------|
+| `result_attached` | as shown above; assistant message includes inline thumbnail |
+| `no_result_yet` | no `result_message` variant; generic assistant bubble (text-only) |
+| `txt2img_no_refs` | `multimodal_indicator` hidden (nothing to attach); chat looks like today |
+| `non_vision_model` | result thumbnail still rendered in chat for the user, but `multimodal_indicator` shows "Sieht: nur Text" — the attachment was silently stripped before being sent to the LLM |
+
+---
+
 ## Completeness Check
 
 | Check | Status |
 |-------|--------|
 | All UI Components from Discovery covered | ✅ |
-| All relevant states visualized | ✅ |
+| All relevant states visualized (incl. `reviewing`) | ✅ |
 | All screens from Discovery UI Layout covered | ✅ |
+| Multimodal-Indicator visualised | ✅ |
+| Card history-semantics distinguished (Paste = transient, IntentSummary = history) | ✅ |
 | No logic/business rules duplicated (stays in Discovery) | ✅ |

@@ -148,10 +148,10 @@
 
 - **Backend-Fehler bei Auto-Generate nach Confirm** → Error-Toast "Generierung fehlgeschlagen — manuell versuchen?" + bestehender Generate-Button im Workspace bleibt aktiv
 - **LLM kann Intent-Summary nicht gut bauen** (z.B. Subject fehlt total) → fällt automatisch zurück in Interview-Modus, stellt gezielte Nachfrage
-- **Multimodal-Input überschreitet Token-Budget** (zu viele Reference-Slots + Result-Bild + Chat-Hist.) → Backend reduziert: oldest images first, aktuelle Slots + letztes Result haben Priorität
+- **Multimodal-Input überschreitet Token-Budget** (zu viele Reference-Slots + Result-Bild + Chat-Hist.) → Backend reduziert via per-LLM-Caps aus `chat_llm_limits.py` (siehe Architecture); aktuelle Slots + letztes Result haben Priorität, oldest chat-uploads fallen zuerst
 - **"Help me write this" fehlschlägt oder liefert schlecht** → User kann beliebig oft erneut klicken oder händisch editieren; keine Hard-Dependency
 - **User generiert, ohne je mit Assistant zu sprechen** → unverändert, alter Flow funktioniert weiter
-- **Reference-Slot enthält ungültige URL** → Assistant überspringt dieses Bild, meldet "Slot N konnte nicht geladen werden — bitte neu hochladen"
+- **Reference-Slot enthält ungültige URL** → Backend skipped das Bild und pusht SSE-Event `slot-load-failed`; Frontend rendert eine **inline System-Message** im Chat: "Slot N konnte nicht geladen werden — bitte neu hochladen" (kein Toast)
 - **Project ohne Context + User fragt nach Stil-Konsistenz** → Assistant schlägt pro-aktiv vor, Context-Setting zu öffnen
 
 ---
@@ -220,9 +220,9 @@
 | Element | Type | Location | States | Behavior |
 |---------|------|----------|--------|----------|
 | `intent_summary_card` | Chat-Card | Chat-Thread | `rendered` | Zeigt strukturierte Summary + zwei Buttons. Buttons unten beschrieben. |
-| `intent_summary_card.generate_btn` | Button (Primary) | Intent-Summary-Card | `idle`, `pending`, `disabled` | `idle` → Klick löst Tool-Call `finalize_and_generate` → `pending` während Auto-Apply + Generate laufen → Card wird zur History. `disabled` falls Prompt leer. |
-| `intent_summary_card.discuss_btn` | Button (Secondary) | Intent-Summary-Card | `idle` | Sendet strukturierte Assistant-Nachricht "Okay, was soll anders sein?", zurück in Interview-Modus. Card bleibt als History. |
-| `paste_confirm_card` | Chat-Card | Chat-Thread | `rendered`, `dismissed` | Einmalig pro Session. `dismissed` nach Klick auf einen der Buttons. |
+| `intent_summary_card.generate_btn` | Button (Primary) | Intent-Summary-Card | `idle`, `pending`, `disabled` | `idle` → Klick: (1) `useIsGenerationPending`-Precondition, (2) `flow_state` von `summarizing` → `generating`, (3) Auto-Apply + Generate. `pending` während Generate läuft. **Card bleibt als History-Element bestehen** auch nach Click. `disabled` falls Prompt leer. |
+| `intent_summary_card.discuss_btn` | Button (Secondary) | Intent-Summary-Card | `idle` | Setzt `flow_state` zurück auf `interviewing`; sendet "Okay, was soll anders sein?". **Card bleibt als History-Element bestehen.** |
+| `paste_confirm_card` | Chat-Card | Chat-Thread | `rendered`, `dismissed` | Einmalig pro Session. **Wird nach Klick aus dem Chat entfernt** (nicht als History sichtbar) — die folgende Assistant-Antwort ersetzt sie an derselben Stelle. |
 | `paste_confirm_card.refine_btn` | Button | Paste-Confirm-Card | `idle` | Direkter `refine_prompt` Tool-Call → führt zur Intent-Summary-Card |
 | `paste_confirm_card.interview_btn` | Button | Paste-Confirm-Card | `idle` | Startet normalen Interview-Modus mit dem gepasteten Text als "Ausgangs-Intent" |
 | `no_context_banner` | Banner | Assistant-Panel-Top | `visible`, `dismissed-session` | Nur sichtbar, wenn `context_instructions` leer. Session-Scope-Dismiss. |
@@ -263,7 +263,7 @@
 | `paste_confirmation` | "Interview starten" geklickt | Assistant stellt erste gezielte Frage, baut auf gepastetem Text auf | `interviewing` | -- |
 | `interviewing` | Assistant stellt Zwischen-Frage oder Zwischen-Check ("Verstehe ich X richtig?") | Assistant-Message gestreamt, KEIN Generate | `interviewing` | Teil-Intent-Check: User bestätigt Detail, Assistant geht weiter, kein Apply, kein Generate |
 | `interviewing` | LLM hat semantisches Sicherheitsgefühl | Intent-Summary-Card wird gerendert | `summarizing` | LLM baut Card-Content aus akkumuliertem Intent |
-| `summarizing` | "So generieren" geklickt | finalize_and_generate-Tool-Call, Auto-Apply in Workspace-Variation, Generate-Pipeline startet | `generating` | Tool darf nur bei `summarizing` greifen |
+| `summarizing` | "So generieren" geklickt | Click setzt `flow_state="generating"`, ruft `applyToWorkspace` (existing apply effect) + `generateImages()` Server-Action. Tool `emit_intent_summary` wurde bereits zuvor vom LLM gefeuert und hat den Payload geliefert. | `generating` | Click ist der einzige Gate für Auto-Generate; Tool selbst initiiert keine Generierung. Bei laufender Generierung im Projekt: Toast + warten + auto-retry on settle. |
 | `summarizing` | "Nochmal diskutieren" geklickt | Assistant-Nachricht "Was soll anders sein?" | `interviewing` | Card bleibt im History-Stream sichtbar |
 | `generating` | Generate-Pipeline liefert Result-URL zurück | Assistant-Message "Hier ist das Ergebnis" + Result-Image als Multimodal-Content angehängt | `reviewing` | Result-Image wird im nächsten Assistant-Turn-State als image_url eingeschoben |
 | `generating` | Generate-Pipeline schlägt fehl | Error-Toast + Chat-Message "Generierung fehlgeschlagen" | `interviewing` | Settings bleiben applied, User kann manuell generieren |
@@ -303,7 +303,7 @@
 | `SendMessageRequest.reference_slots` (Backend-DTO) | No | Array von `{ slot_index, image_url, role? }` | Neues Feld; Frontend sendet aktuelle Slot-Snapshots mit jedem Turn, Backend hängt als Multimodal-Content an |
 | `SendMessageRequest.last_result_image_url` | No | URL | Frontend sendet letztes erfolgreiches Generate-Result, wenn vorhanden; Backend entscheidet (Modus, Budget), ob es angehängt wird |
 | `LangGraph-State.flow_state` | No | Enum aus FSM-States (`idle`, `paste_confirmation`, `interviewing`, `summarizing`, `generating`, `reviewing`, `refining`) | Ergänzt den bestehenden LangGraph-State, damit UI den Interview-Progress erkennt |
-| Tool: `finalize_and_generate` payload | Yes (bei Tool-Call) | `{ prompt: string, settings_diff?: object, model_id?: string }` | Neuer Tool-Call, löst Apply + Generate aus |
+| Tool: `emit_intent_summary` payload | Yes (bei Tool-Call) | `{ prompt: string, settings_diff?: SettingsDiff, model_id?: string }` | Neuer Tool-Call. Setzt `flow_state="summarizing"` und liefert den Intent-Payload. **Initiiert keine Generierung** — der User-Click auf "So generieren" ist der einzige Gate. `SettingsDiff`-Schema in Architecture spezifiziert (typisierte Sub-Arrays für `slotRoles`, `slotStrengths`, `modelId`, `modelParams`). |
 | Tool: `set_slot_role` payload | Yes (bei Tool-Call) | `{ slot_index: int, role: "subject"\|"style"\|"composition" }` | Neuer Tool-Call für i2i |
 | Tool: `set_slot_strength` payload | Yes (bei Tool-Call) | `{ slot_index: int, strength: float (0.0–1.0) }` | Neuer Tool-Call für i2i |
 | Tool: `set_model_params` payload | Yes (bei Tool-Call) | `{ params: Record<string, unknown> }` | Validierung pro Modell (bestehende Model-Param-Schemata) |
@@ -328,7 +328,7 @@ A (DB/Schema + Context-API)
           |
           +---> E (System-Prompt-Redesign: Interview + Stop-Kriterium)
                   |
-                  +---> F (Intent-Summary-Card + finalize_and_generate Tool)
+                  +---> F (Intent-Summary-Card + emit_intent_summary Tool)
                           |
                           +---> G (Auto-Apply + Auto-Generate)
                                   |
@@ -349,12 +349,12 @@ M (No-Context-Hint-Banner)     --- abhängig von A
 | C | "Help me write this" | Helper-Modal, neuer Endpoint `/api/projects/context/generate` mit Brief-Input, LLM-Call, Draft-Response | Unit-Test LLM-Call-Shape, Playwright: Brief → Draft → Accept zeigt im Hauptfeld | B |
 | D | System-Prompt-Komposition mit Project-Context | `build_assistant_system_prompt` um `project_context`-Parameter erweitern, Backend-Messages-Endpoint lädt Context pro Session | Unit-Test: Prompt enthält Block genau dann, wenn Context nicht leer | A |
 | E | System-Prompt-Redesign: Interview + Stop-Kriterium | Neuer Base-Prompt: Interview-Verhalten, adaptive Stilfragen, semantic-confidence-Signal, FSM-States, DE-Chat/EN-Prompt bleibt, strikte Regel: Zwischen-Check ≠ Generate | LLM-Evals: Vaguer Input führt zu Fragen, konkreter Input führt zu Draft; Zwischen-Check löst keinen Generate-Tool-Call aus | D |
-| F | Intent-Summary-Card + `finalize_and_generate`-Tool | Neuer Tool-Call im Agent, Frontend rendert Card-Message (Summary + Primary/Secondary-Buttons), Mapping `flow_state` → UI | Playwright: Interview → Summary → Card rendert mit korrekten Buttons | E |
-| G | Auto-Apply + Auto-Generate | Tool-Call triggert backend-seitig: Payload → Workspace-Variation-Update → Generate-Server-Action; Error-Handling inkl. Fallback | Integration-Test: Tool-Call E2E → Bild erscheint im Workspace; Error-Path testet Rollback + Toast | F |
+| F | Intent-Summary-Card + `emit_intent_summary`-Tool | Neuer Tool-Call im Agent (setzt `flow_state="summarizing"`, liefert Payload). Frontend rendert Card-Message inkl. typisierter `SettingsDiff`-Anzeige. Card bleibt nach Click in der History. | Playwright: Interview → Summary → Card rendert mit korrekten Buttons; Click "Nochmal diskutieren" setzt `flow_state` auf `interviewing` zurück. | E |
+| G | Auto-Apply + Auto-Generate | Card-Click triggert Frontend: `useIsGenerationPending`-Precondition → `flow_state="generating"` → `applyToWorkspace` → `generateImages()` Server-Action. Concurrent-Block via Toast + Auto-Retry on settle. | Integration-Test: Card-Click E2E → Bild erscheint im Workspace; Concurrent-Path testet Block + Auto-Retry; Error-Path testet Rollback nach Generate-Fehler. | F |
 | H | Result-Image als Multimodal für Refinement | Nach erfolgreichem Generate: Backend hängt Result-URL an nächsten LLM-Turn als `image_url`; Assistant-Message proaktiv-Starter | Playwright: Generate → nächster Turn zeigt Assistant-Kommentar mit Bezug zum Bild | G |
 | I | ReferenceBar → Multimodal-Pipeline | Frontend sendet `reference_slots` mit jedem Turn; Backend hängt als Multimodal-Content an; Budget-Priorisierung; Fallback bei Non-Vision-Model | Unit-Test Budget-Regeln; Playwright i2i: Slots hinzufügen, Assistant kann Bilder beschreiben | E |
 | J | i2i-Settings-Tools (`set_slot_role`, `set_slot_strength`, `set_model_params`) | Neue Tool-Calls mit Payload-Validierung, Workspace-Variation-Updates | Unit-Test Payload-Validation; Integration-Test: Tool-Call ändert State nachweisbar | I, F |
-| K | Multi-Reference-Interview-Flow | System-Prompt-Rules für sequenziellen Bild-Scan; LLM fragt pro Slot; nutzt `set_slot_role` | LLM-Evals + Playwright: 3-Slots-Interview läuft sequenziell durch | I, J, E |
+| K | Multi-Reference-Interview-Flow | System-Prompt-Rules für sequenziellen Bild-Scan; LLM fragt pro Slot; nutzt `set_slot_role`. **Kein eigener Code-Slice** — die Verhaltensregeln leben im `_BASE_PROMPT`-Rewrite (Slice E); Eval-Tests für 3-Slot-Sequenz gehören zu Slice E's Test-Suite. | LLM-Evals + Playwright: 3-Slots-Interview läuft sequenziell durch | I, J, E |
 | L | Paste-Detect-Confirm | Heuristik-Funktion (Frontend oder Agent), Card-Component, Flow-State `paste_confirmation` | Unit-Test Heuristik; Playwright: Paste-Input löst Card, Buttons führen zu richtigem Next-State | E, F |
 | M | No-Context-Hint-Banner + Dismissible-Session-State | Banner-Component im Assistant-Panel, Session-State für Dismiss | Playwright: Projekt ohne Context zeigt Banner, Klick Dismiss versteckt für Session | A |
 
@@ -366,7 +366,7 @@ M (No-Context-Hint-Banner)     --- abhängig von A
 4. **Slice M:** No-Context-Hint-Banner — parallel zu B/D, kleine UX-Politur
 5. **Slice C:** Help-me-write-this — nice-to-have nach B, reduziert Einstiegshürde
 6. **Slice E:** System-Prompt-Redesign — Kern-Delta des Features (Interview-Modus); Eval-intensiv
-7. **Slice F:** Intent-Summary-Card + finalize_and_generate — visueller Payoff, testet E in Action
+7. **Slice F:** Intent-Summary-Card + emit_intent_summary — visueller Payoff, testet E in Action
 8. **Slice G:** Auto-Apply + Auto-Generate — schließt den Haupt-Flow
 9. **Slice H:** Result-Image-Multimodal — schließt den Refinement-Loop
 10. **Slice I:** ReferenceBar → Multimodal — öffnet i2i-Feature
@@ -383,9 +383,9 @@ M (No-Context-Hint-Banner)     --- abhängig von A
 | Feature | Location | Relevant because |
 |---------|----------|------------------|
 | Multimodal-HumanMessage-Build | `lib/assistant/use-assistant-runtime.ts:148-153` | Exakt das Pattern, das für ReferenceBar- und Result-Anhänge erweitert wird |
-| Agent-Tool-Framework | `backend/app/agent/` (draft_prompt, refine_prompt, analyze_image, recommend_model, web_search) | Neue Tools (finalize_and_generate, set_slot_role, set_slot_strength, set_model_params, generate_project_context) folgen demselben Pattern |
+| Agent-Tool-Framework | `backend/app/agent/` (draft_prompt, refine_prompt, analyze_image, recommend_model, web_search) | Neue Tools (emit_intent_summary, set_slot_role, set_slot_strength, set_model_params) folgen demselben Pattern. `generate_project_context` ist KEIN Agent-Tool, sondern ein eigener REST-Endpoint. |
 | System-Prompt-Komposition | `backend/app/agent/prompts.py:85-123` (build_assistant_system_prompt) | Wird erweitert um `project_context`-Parameter |
-| Apply-to-Workspace-Flow | `lib/assistant/assistant-context.tsx:487-522` | Wird durch `finalize_and_generate`-Tool programmatisch ausgelöst, Funktion unverändert nutzbar |
+| Apply-to-Workspace-Flow | `lib/assistant/assistant-context.tsx:487-522` | Wird durch den IntentSummaryCard-Click ("So generieren") programmatisch ausgelöst, Funktion unverändert nutzbar |
 | Mode-Forwarding (txt2img/img2img) | `lib/assistant/use-assistant-runtime.ts:370-373` | Wird nicht geändert, nur genutzt: ReferenceBar-Multimodal-Pipeline nur bei `img2img` aktiv |
 | Drizzle-Schema + Migrations | `lib/db/schema.ts` + drizzle-kit | Pattern für `context_instructions`-Feld + Migration |
 
