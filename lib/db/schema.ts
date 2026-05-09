@@ -33,6 +33,8 @@ export const projects = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    contextInstructions: text("context_instructions"),
+    contextUpdatedAt: timestamp("context_updated_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
