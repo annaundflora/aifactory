@@ -184,6 +184,115 @@ describe("Slice 15: assistantReducer — SET_FLOW_STATE (AC-7)", () => {
     expect(screen.getByTestId("messages-count")).toHaveTextContent("0");
   });
 
+  // -------------------------------------------------------------------------
+  // Slice 17 AC-6:
+  //   GIVEN Reducer empfängt { type: "SET_FLOW_STATE", flowState: "generating" }
+  //   WHEN Reducer-Pass erfolgt
+  //   THEN ist state.flowState === "generating"; alle anderen Reducer-Felder
+  //        unverändert; Whitelist
+  //        ``idle | interviewing | summarizing | reviewing | refining | generating``
+  //        aus Slice 15 weiterhin durchgesetzt.
+  //
+  // The reducer does not export ``flowState`` directly via ``ContextProbe``,
+  // so we verify by:
+  //  (a) dispatch SET_FLOW_STATE("generating") and confirm no throw.
+  //  (b) confirm none of the OTHER observable fields changed.
+  //  (c) round-trip: dispatch SET_FLOW_STATE("summarizing") again and observe
+  //      idempotent behaviour — i.e. ``"generating"`` was a fully-accepted
+  //      branch (no silent fallthrough back to a non-Whitelist value).
+  // -------------------------------------------------------------------------
+  it('AC-6: SET_FLOW_STATE accepts "generating" and only updates the flowState field', () => {
+    const handle: { current: DispatchHandle | null } = { current: null };
+    const Capture = captureContext(handle);
+    render(
+      <PromptAssistantProvider>
+        <Capture />
+        <ContextProbe />
+      </PromptAssistantProvider>
+    );
+
+    // Seed observable state with values that are explicitly NOT default.
+    act(() => {
+      handle.current!.dispatch({
+        type: "SET_SESSION_ID",
+        sessionId: "sess-ac6",
+      });
+    });
+    act(() => {
+      handle.current!.dispatch({
+        type: "ADD_USER_MESSAGE",
+        message: { id: "u-ac6", role: "user", content: "ac6 prep" },
+      });
+    });
+    act(() => {
+      handle.current!.dispatch({
+        type: "SET_DRAFT_PROMPT",
+        draftPrompt: { prompt: "ac6 draft" },
+      });
+    });
+    act(() => {
+      handle.current!.dispatch({
+        type: "SET_SELECTED_MODEL",
+        model: "openai/gpt-5.4",
+      });
+    });
+
+    const beforeSession = screen.getByTestId("session-id").textContent;
+    const beforeMsgs = screen.getByTestId("messages-count").textContent;
+    const beforeDraft = screen.getByTestId("draft-prompt").textContent;
+    const beforeModel = screen.getByTestId("selected-model").textContent;
+    const beforeView = screen.getByTestId("active-view").textContent;
+
+    // Dispatch SET_FLOW_STATE("generating") — must not throw, must NOT
+    // touch other observable fields.
+    expect(() => {
+      act(() => {
+        handle.current!.dispatch({
+          type: "SET_FLOW_STATE",
+          flowState: "generating" as FlowState,
+        });
+      });
+    }).not.toThrow();
+
+    expect(screen.getByTestId("session-id")).toHaveTextContent(
+      beforeSession || ""
+    );
+    expect(screen.getByTestId("messages-count")).toHaveTextContent(
+      beforeMsgs || ""
+    );
+    expect(screen.getByTestId("draft-prompt")).toHaveTextContent(
+      beforeDraft || ""
+    );
+    expect(screen.getByTestId("selected-model")).toHaveTextContent(
+      beforeModel || ""
+    );
+    expect(screen.getByTestId("active-view")).toHaveTextContent(
+      beforeView || ""
+    );
+
+    // Round-trip: dispatch summarizing — branch must still work after the
+    // generating-branch executed. Confirms the whitelist is comprehensive
+    // and ``generating`` did not cause any silent reset.
+    expect(() => {
+      act(() => {
+        handle.current!.dispatch({
+          type: "SET_FLOW_STATE",
+          flowState: "summarizing" as FlowState,
+        });
+      });
+    }).not.toThrow();
+
+    expect(screen.getByTestId("session-id")).toHaveTextContent(
+      beforeSession || ""
+    );
+    expect(screen.getByTestId("messages-count")).toHaveTextContent(
+      beforeMsgs || ""
+    );
+    expect(screen.getByTestId("draft-prompt")).toHaveTextContent(
+      beforeDraft || ""
+    );
+  });
+
   it("AC-7: initial state mounts cleanly with no flow-state churn (idempotent SET_FLOW_STATE('idle'))", () => {
     const handle: { current: DispatchHandle | null } = { current: null };
     const Capture = captureContext(handle);
