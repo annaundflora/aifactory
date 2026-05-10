@@ -29,6 +29,11 @@ from app.agent.tools.image_tools import analyze_image
 from app.agent.tools.model_tools import get_model_info, recommend_model
 from app.agent.tools.prompt_tools import draft_prompt, emit_intent_summary, refine_prompt
 from app.agent.tools.search_tools import web_search
+from app.agent.tools.workspace_tools import (
+    set_model_params,
+    set_slot_role,
+    set_slot_strength,
+)
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -42,6 +47,9 @@ ALL_TOOLS = [
     get_model_info,
     web_search,
     emit_intent_summary,
+    set_slot_role,
+    set_slot_strength,
+    set_model_params,
 ]
 
 # Tool names whose results should update state fields via post_process_node.
