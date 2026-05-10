@@ -17,10 +17,11 @@ from typing import AsyncGenerator, Optional
 from uuid import UUID
 
 from langchain_core.messages import AIMessage, HumanMessage
-from pydantic import ValidationError
+from pydantic import HttpUrl, TypeAdapter, ValidationError
 
 from langgraph.checkpoint.memory import MemorySaver
 
+from app.agent.chat_llm_limits import get_chat_llm_limits
 from app.agent.graph import create_agent
 from app.agent.tools.prompt_tools import SettingsDiff
 from app.config import settings
@@ -30,6 +31,7 @@ from app.models.dtos import (
     IntentSummaryPayload,
     MessageDTO,
     ModelRecDTO,
+    ReferenceSlotDTO,
     SessionDetailResponse,
     SessionResponse,
     SessionStateDTO,
@@ -53,6 +55,30 @@ _FLOW_STATE_WHITELIST: frozenset[str] = frozenset(
 # tests can target it without coupling to the LangGraph tool-registry
 # import path.
 _EMIT_INTENT_SUMMARY_TOOL_NAME: str = "emit_intent_summary"
+
+# Slice 21: priority labels for multimodal content parts. Lower priority
+# numbers MUST be retained over higher priority numbers when the budget
+# (max_images / max_total_bytes) is exceeded.
+#
+# Mirrors architecture.md → "Multimodal Pipeline — Priority Order & Budget":
+#   Priority 1: ReferenceBar slot images (img2img only)
+#   Priority 2: Last successful generated result (last_result_image_url)
+#   Priority 3: Chat-input uploads (image_urls)
+_PRIO_REFERENCE_SLOT: int = 1
+_PRIO_LAST_RESULT: int = 2
+_PRIO_CHAT_UPLOAD: int = 3
+
+# Slice 21: byte estimate used when neither a per-URL size hint nor a
+# content-length lookup is wired. Conservative ~2.5MB default keeps drop
+# heuristics correct in the absence of true sizes. Tests override this via
+# the optional ``image_byte_sizes`` injection on ``stream_response``.
+_DEFAULT_IMAGE_BYTE_ESTIMATE: int = 2_500_000
+
+# Slice 21: TypeAdapter for defensive HttpUrl re-validation of slot URLs in
+# the service layer. The DTO already validates on inbound parse; the
+# re-validation here protects against direct service callers that bypass
+# DTO construction (e.g. older tests).
+_HTTP_URL_ADAPTER: TypeAdapter[HttpUrl] = TypeAdapter(HttpUrl)
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +179,9 @@ class AssistantService:
         generation_mode: Optional[str] = None,
         project_id: Optional[UUID] = None,
         user_id: Optional[UUID] = None,
+        reference_slots: Optional[list[ReferenceSlotDTO]] = None,
+        last_result_image_url: Optional[str] = None,
+        image_byte_sizes: Optional[dict[str, int]] = None,
     ) -> AsyncGenerator[dict, None]:
         """Stream a response from the LangGraph agent as SSE events.
 
@@ -182,21 +211,49 @@ class AssistantService:
                 or pre-Slice-19 routes that lack `project_id` in the DTO).
             user_id: Optional UUID of the authenticated user. Used together
                 with `project_id` for the ownership-checked context lookup.
+            reference_slots: Optional Slice 19 ``ReferenceSlotDTO`` snapshot
+                of active ReferenceBar slots. Forwarded to
+                ``_build_multimodal_content`` which:
+                  * applies the defensive ``generation_mode == "img2img"``
+                    re-check (Slice 21 AC-2);
+                  * validates each slot URL and emits a ``slot-load-failed``
+                    SSE event for malformed/unreachable entries (AC-6);
+                  * inserts surviving slots in the wire-order specified by
+                    architecture.md → "Multimodal Pipeline" (AC-1).
+            last_result_image_url: Optional URL of the most recent
+                successful generation; included as a priority-2 image part
+                per architecture.md Multimodal Pipeline.
+            image_byte_sizes: Optional ``url -> bytes`` map used by the
+                ``max_total_bytes`` budget enforcement (Slice 21 AC-8).
+                Tests inject deterministic sizes; production callers leave
+                this ``None`` so a conservative per-image estimate is used.
 
         Yields:
             Dicts with 'event' and 'data' keys for SSE formatting.
         """
         try:
-            # Build the human message
-            message_content: list | str
-            if image_urls:
-                message_content = [{"type": "text", "text": content}]
-                for url in image_urls:
-                    message_content.append(
-                        {"type": "image_url", "image_url": {"url": url}}
-                    )
-            else:
-                message_content = content
+            # Slice 21: build the multimodal HumanMessage content + collect
+            # any per-slot load failures so they can be emitted as SSE
+            # ``slot-load-failed`` events at the start of the stream (before
+            # the first text-delta).
+            message_content, slot_failures = self._build_multimodal_content(
+                content=content,
+                image_urls=image_urls,
+                reference_slots=reference_slots,
+                last_result_image_url=last_result_image_url,
+                generation_mode=generation_mode,
+                model=model,
+                image_byte_sizes=image_byte_sizes,
+            )
+
+            # Slice 21 AC-6: emit one SSE ``slot-load-failed`` event per
+            # failed slot, in slot_index order. Affected slots are already
+            # excluded from ``message_content`` by ``_build_multimodal_content``.
+            for failure in slot_failures:
+                yield {
+                    "event": "slot-load-failed",
+                    "data": json.dumps(failure),
+                }
 
             human_message = HumanMessage(content=message_content)
 
@@ -408,6 +465,294 @@ class AssistantService:
 
         # Generic fallback
         return "Ein unerwarteter Fehler ist aufgetreten. Bitte versuche es erneut."
+
+    # ----------------------------------------------------------------------
+    # Slice 21: Multimodal pipeline — build HumanMessage content + budget
+    # ----------------------------------------------------------------------
+
+    def _build_multimodal_content(
+        self,
+        content: str,
+        image_urls: Optional[list[str]],
+        reference_slots: Optional[list[ReferenceSlotDTO]],
+        last_result_image_url: Optional[str],
+        generation_mode: Optional[str],
+        model: Optional[str],
+        image_byte_sizes: Optional[dict[str, int]],
+    ) -> tuple[list | str, list[dict]]:
+        """Compose the multimodal HumanMessage content list.
+
+        Slice 21 — implements:
+
+        * AC-1: Content order matches architecture.md "Multimodal Pipeline"
+          sequence ``[text, *image_urls, *reference_slots, last_result]``.
+        * AC-2: ``reference_slots`` are filtered when ``generation_mode`` is
+          not ``"img2img"`` (defensive backend re-check).
+        * AC-3 / AC-4: priority-based dropping when the total image count
+          exceeds ``max_images`` for the resolved chat-LLM. Drop order is
+          chat uploads (P3) → last_result (P2) → reference slots (P1);
+          within the same priority, oldest-first eviction (newest-first
+          retention).
+        * AC-5 / AC-9: vision fallback. When the resolved limits report
+          ``vision=False`` (explicit non-vision OR unknown model →
+          DEFAULT_LIMITS), all image parts are stripped and a single
+          WARNING is logged.
+        * AC-6: malformed slot URLs are excluded from the content and a
+          ``slot-load-failed`` event payload is appended to the returned
+          ``slot_failures`` list (caller emits the SSE event).
+        * AC-8: ``max_total_bytes`` cap drops by the same priority order
+          until the cumulative byte estimate is at or below the cap.
+
+        Args:
+            content: User text message.
+            image_urls: Chat-input upload URLs (chronological order; oldest
+                first, newest last).
+            reference_slots: Active ReferenceBar slots snapshot (img2img
+                only; defensively re-checked here).
+            last_result_image_url: Last successfully generated image URL
+                from a prior turn.
+            generation_mode: ``"txt2img"`` or ``"img2img"``.
+            model: Chat-LLM model ID used to look up multimodal caps.
+            image_byte_sizes: Optional per-URL byte size hint. When ``None``
+                or missing for a URL, ``_DEFAULT_IMAGE_BYTE_ESTIMATE`` is
+                applied. Tests inject deterministic sizes via this hook.
+
+        Returns:
+            ``(content, slot_failures)``:
+              * ``content`` is either a plain string (no images, no parts
+                beyond text) or a list of multipart entries shaped like
+                ``[{"type": "text", "text": ...}, {"type": "image_url",
+                "image_url": {"url": ...}}, ...]``.
+              * ``slot_failures`` is a list of ``{"slot_index", "reason"}``
+                dicts (in slot_index order) for slots that could not be
+                included due to malformed URLs.
+        """
+        text_part = {"type": "text", "text": content}
+
+        slot_failures: list[dict] = []
+
+        # Resolve chat-LLM multimodal caps.
+        limits = get_chat_llm_limits(model)
+        vision_capable = bool(limits.get("vision"))
+        max_images = int(limits.get("max_images", 0) or 0)
+        max_total_bytes = int(limits.get("max_total_bytes", 0) or 0)
+
+        # AC-5 / AC-9: vision fallback — strip every image part, log once.
+        if not vision_capable:
+            logger.warning(
+                "AssistantService: vision fallback for non-vision model %r "
+                "— stripping all image parts (architecture.md → 'Vision "
+                "fallback determinism')",
+                model,
+            )
+            return content, slot_failures
+
+        # ------------------------------------------------------------------
+        # 1. Collect candidate parts with priority + chronological tag.
+        #    ``order`` is a strictly increasing per-list counter so that,
+        #    within the same priority, the smallest ``order`` is the
+        #    oldest entry (dropped first). For chat uploads the input list
+        #    is treated as oldest-first; the last entry is the newest.
+        # ------------------------------------------------------------------
+        candidates: list[dict] = []
+
+        # Chat uploads (priority 3, oldest-first ordering).
+        if image_urls:
+            for idx, url in enumerate(image_urls):
+                if not url:
+                    continue
+                candidates.append(
+                    {
+                        "priority": _PRIO_CHAT_UPLOAD,
+                        "order": idx,
+                        "url": str(url),
+                        "slot_index": None,
+                    }
+                )
+
+        # Reference slots (priority 1) — img2img only (AC-2).
+        if reference_slots and generation_mode == "img2img":
+            for idx, slot in enumerate(reference_slots):
+                slot_index = getattr(slot, "slot_index", None)
+                raw_url = getattr(slot, "image_url", None)
+                # AC-6: defensive URL validation. ``ReferenceSlotDTO``
+                # already validates HttpUrl on parse, but the service may
+                # be invoked with a hand-crafted DTO (e.g. via tests) or
+                # with a slot whose URL became invalid after construction.
+                failure_reason = self._validate_slot_url(raw_url)
+                if failure_reason is not None:
+                    slot_failures.append(
+                        {
+                            "slot_index": (
+                                slot_index if isinstance(slot_index, int) else idx
+                            ),
+                            "reason": failure_reason,
+                        }
+                    )
+                    continue
+                candidates.append(
+                    {
+                        "priority": _PRIO_REFERENCE_SLOT,
+                        "order": idx,
+                        "url": str(raw_url),
+                        "slot_index": slot_index,
+                    }
+                )
+
+        # Last successful generated result (priority 2).
+        if last_result_image_url:
+            url_str = str(last_result_image_url)
+            candidates.append(
+                {
+                    "priority": _PRIO_LAST_RESULT,
+                    "order": 0,
+                    "url": url_str,
+                    "slot_index": None,
+                }
+            )
+
+        # ------------------------------------------------------------------
+        # 2. Apply budget — drop lowest priority first; within the same
+        #    priority drop oldest first. We sort ascending by (priority,
+        #    order) for the *kept* list and pop from the right to evict
+        #    the lowest-priority + oldest entries.
+        # ------------------------------------------------------------------
+        kept = sorted(candidates, key=lambda c: (c["priority"], c["order"]))
+
+        # AC-3 / AC-4: max_images cap.
+        while max_images >= 0 and len(kept) > max_images:
+            # Evict the worst entry: highest priority number, then highest
+            # order (oldest within same priority).
+            worst_idx = self._find_worst_index(kept)
+            kept.pop(worst_idx)
+            logger.debug(
+                "AssistantService.multimodal: dropped image to honour "
+                "max_images=%d cap; remaining=%d",
+                max_images,
+                len(kept),
+            )
+
+        # AC-8: max_total_bytes cap.
+        if max_total_bytes > 0 and kept:
+            while kept and self._sum_bytes(kept, image_byte_sizes) > max_total_bytes:
+                worst_idx = self._find_worst_index(kept)
+                kept.pop(worst_idx)
+                logger.debug(
+                    "AssistantService.multimodal: dropped image to honour "
+                    "max_total_bytes=%d cap; remaining=%d",
+                    max_total_bytes,
+                    len(kept),
+                )
+
+        # ------------------------------------------------------------------
+        # 3. Render in architecture-mandated wire order (AC-1):
+        #    text → chat_uploads → reference_slots → last_result_image_url.
+        # ------------------------------------------------------------------
+        if not kept:
+            # No images survived (or none were provided). Stay
+            # backward-compatible with the legacy plain-string content path
+            # so existing behaviour is preserved when nothing is attached.
+            return content, slot_failures
+
+        kept_chat = sorted(
+            (c for c in kept if c["priority"] == _PRIO_CHAT_UPLOAD),
+            key=lambda c: c["order"],
+        )
+        kept_refs = sorted(
+            (c for c in kept if c["priority"] == _PRIO_REFERENCE_SLOT),
+            key=lambda c: c["order"],
+        )
+        kept_last = [c for c in kept if c["priority"] == _PRIO_LAST_RESULT]
+
+        message_content: list[dict] = [text_part]
+        for entry in kept_chat:
+            message_content.append(self._image_url_part(entry["url"]))
+        for entry in kept_refs:
+            message_content.append(self._image_url_part(entry["url"]))
+        for entry in kept_last:
+            message_content.append(self._image_url_part(entry["url"]))
+
+        return message_content, slot_failures
+
+    @staticmethod
+    def _find_worst_index(kept: list[dict]) -> int:
+        """Return the index of the eviction candidate in ``kept``.
+
+        The "worst" entry is the one with the highest priority number
+        (lowest priority class) and, within the same priority, the highest
+        ``order`` value -- which corresponds to the OLDEST item in our
+        encoding. Wait: re-reading "newest first retention" -- per
+        architecture.md, oldest items are dropped first. Within the
+        chat-upload list, ``order`` increases chronologically (oldest first
+        at index 0, newest last). So the entry to drop FIRST is the one
+        with the LOWEST ``order`` (oldest). The retained "newest" entry
+        has the HIGHEST ``order``.
+        """
+        worst_idx = 0
+        worst_priority = kept[0]["priority"]
+        worst_order = kept[0]["order"]
+        for i, entry in enumerate(kept[1:], start=1):
+            p = entry["priority"]
+            o = entry["order"]
+            # Prefer entries with HIGHER priority number (lower class).
+            if p > worst_priority or (
+                p == worst_priority and o < worst_order
+            ):
+                worst_idx = i
+                worst_priority = p
+                worst_order = o
+        return worst_idx
+
+    @staticmethod
+    def _sum_bytes(
+        kept: list[dict],
+        image_byte_sizes: Optional[dict[str, int]],
+    ) -> int:
+        """Return the cumulative byte estimate for ``kept`` candidates.
+
+        When a per-URL hint is missing, ``_DEFAULT_IMAGE_BYTE_ESTIMATE`` is
+        applied so the budget is still honoured pessimistically.
+        """
+        if not image_byte_sizes:
+            return _DEFAULT_IMAGE_BYTE_ESTIMATE * len(kept)
+        total = 0
+        for entry in kept:
+            total += int(
+                image_byte_sizes.get(entry["url"], _DEFAULT_IMAGE_BYTE_ESTIMATE)
+            )
+        return total
+
+    @staticmethod
+    def _image_url_part(url: str) -> dict:
+        """Build a LangChain-compatible ``image_url`` content part."""
+        return {"type": "image_url", "image_url": {"url": url}}
+
+    @staticmethod
+    def _validate_slot_url(raw_url) -> Optional[str]:
+        """Defensive HttpUrl validation for a single reference slot.
+
+        Returns:
+            ``None`` when the URL is valid (or already a Pydantic
+            ``HttpUrl``); otherwise the ``SlotLoadFailedPayload.reason``
+            literal: ``"invalid_url"`` for parse errors and
+            ``"fetch_failed"`` reserved for downstream fetch failures
+            (currently unused on this code path; kept for API parity with
+            the architecture.md → ``SlotLoadFailedPayload`` schema).
+        """
+        if raw_url is None:
+            return "invalid_url"
+        # Pydantic HttpUrl objects are already validated.
+        try:
+            url_str = str(raw_url)
+        except Exception:
+            return "invalid_url"
+        if not url_str:
+            return "invalid_url"
+        try:
+            _HTTP_URL_ADAPTER.validate_python(url_str)
+        except ValidationError:
+            return "invalid_url"
+        return None
 
     # Set of LangGraph node names whose ``on_chain_end`` events may carry a
     # ``flow_state`` state update. Currently only ``post_process`` mutates

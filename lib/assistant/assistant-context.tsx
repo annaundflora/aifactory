@@ -215,7 +215,21 @@ export type AssistantAction =
   | { type: "SET_IS_APPLIED"; isApplied: boolean }
   | { type: "DISMISS_NO_CONTEXT_BANNER" }
   | { type: "SET_FLOW_STATE"; flowState: FlowState }
-  | { type: "RENDER_INTENT_SUMMARY"; payload: IntentSummaryPayload };
+  | { type: "RENDER_INTENT_SUMMARY"; payload: IntentSummaryPayload }
+  | {
+      /**
+       * Slice 21 AC-7: append an inline System-Message to the chat
+       * history when the backend reports a failed reference-slot load
+       * (SSE ``slot-load-failed``). The reducer is a pure state mutation
+       * — toast suppression is explicit per the AC; the SSE handler
+       * dispatches this action without any toast side-effect.
+       */
+      type: "RENDER_SYSTEM_MESSAGE";
+      payload: {
+        slot_index: number;
+        reason: string;
+      };
+    };
 
 // ---------------------------------------------------------------------------
 // Reducer
@@ -354,6 +368,34 @@ function assistantReducer(
       // The card mount/un-mount is driven separately by ``flowState``; here
       // we only carry the data so the card can read it on render.
       return { ...state, intentSummaryPayload: action.payload };
+
+    case "RENDER_SYSTEM_MESSAGE": {
+      // Slice 21 AC-7: append a system-typed message to the chat history
+      // describing the failed reference-slot load. The text is fixed by
+      // architecture.md → "Error Handling" ("Slot N konnte nicht geladen
+      // werden — bitte neu hochladen"). Insertion is at the END of the
+      // messages list which is the chronological position of the SSE
+      // event in the live stream.
+      //
+      // The reducer is a PURE state mutation: it MUST NOT trigger a
+      // toast. Any UX surfaces (banner, indicator) react to this state
+      // change via subscription, not from inside the reducer.
+      const { slot_index, reason } = action.payload;
+      const systemMessage: Message = {
+        id: `system-slot-load-failed-${slot_index}-${Date.now()}`,
+        role: "system",
+        content: `Slot ${slot_index + 1} konnte nicht geladen werden — bitte neu hochladen.`,
+      };
+      // ``reason`` is intentionally not surfaced in the user-visible text
+      // (architecture mandates a single human-readable message) but is
+      // available in the action payload for telemetry / debug callers
+      // that subscribe to dispatched actions.
+      void reason;
+      return {
+        ...state,
+        messages: [...state.messages, systemMessage],
+      };
+    }
 
     default:
       return state;
