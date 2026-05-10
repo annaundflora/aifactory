@@ -3,11 +3,12 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Pencil, Trash2, ImageIcon, RefreshCw } from "lucide-react";
+import { Pencil, Trash2, ImageIcon, RefreshCw, Settings } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import ProjectContextSettings from "@/components/projects/project-context-settings";
 
 interface ProjectCardProject {
   id: string;
@@ -37,6 +38,7 @@ export function ProjectCard({
   const [renameValue, setRenameValue] = useState(project.name);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isContextSettingsOpen, setIsContextSettingsOpen] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -100,7 +102,7 @@ export function ProjectCard({
             // Prevent navigation when clicking action buttons
             if (
               (e.target as HTMLElement).closest(
-                '[data-action="rename"], [data-action="delete"], [data-action="refresh-thumbnail"]'
+                '[data-action="rename"], [data-action="delete"], [data-action="refresh-thumbnail"], [data-action="edit-context"]'
               )
             ) {
               e.preventDefault();
@@ -176,6 +178,21 @@ export function ProjectCard({
                 <span className="sr-only">Rename project</span>
               </Button>
               <Button
+                data-action="edit-context"
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                aria-label="Edit context"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsContextSettingsOpen(true);
+                }}
+              >
+                <Settings className="size-3.5" />
+                <span className="sr-only">Edit context</span>
+              </Button>
+              <Button
                 data-action="delete"
                 variant="ghost"
                 size="icon"
@@ -208,6 +225,12 @@ export function ProjectCard({
         confirmLabel="Delete"
         onConfirm={handleDeleteConfirm}
         onCancel={() => setIsDeleteDialogOpen(false)}
+      />
+
+      <ProjectContextSettings
+        projectId={project.id}
+        open={isContextSettingsOpen}
+        onOpenChange={setIsContextSettingsOpen}
       />
     </>
   );

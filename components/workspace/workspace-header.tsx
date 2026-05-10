@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { SettingsDialog } from "@/components/settings/settings-dialog";
+import ProjectContextSettings from "@/components/projects/project-context-settings";
 import {
   renameProject,
   deleteProject,
@@ -33,6 +34,7 @@ export function WorkspaceHeader({ project }: WorkspaceHeaderProps) {
   const [renameValue, setRenameValue] = useState(project.name);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isContextSettingsOpen, setIsContextSettingsOpen] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   // Sync rename value when project name changes (e.g. from sidebar rename)
@@ -158,6 +160,12 @@ export function WorkspaceHeader({ project }: WorkspaceHeaderProps) {
               <RefreshCw />
               Refresh Thumbnail
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => setIsContextSettingsOpen(true)}
+            >
+              <Settings />
+              Edit context
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-destructive focus:text-destructive"
@@ -182,6 +190,12 @@ export function WorkspaceHeader({ project }: WorkspaceHeaderProps) {
       <SettingsDialog
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}
+      />
+
+      <ProjectContextSettings
+        projectId={project.id}
+        open={isContextSettingsOpen}
+        onOpenChange={setIsContextSettingsOpen}
       />
     </>
   );
