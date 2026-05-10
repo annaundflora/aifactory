@@ -214,11 +214,25 @@ class SessionStateDTO(BaseModel):
     """Reconstructed state from LangGraph checkpoint.
 
     Contains all relevant state fields for session resume.
+
+    Fields:
+        messages: Full conversation history projected from LangGraph state.
+        draft_prompt: Current prompt draft, if any.
+        recommended_model: Current model recommendation, if any.
+        flow_state: Current FSM state of the Interactive Prompt Refinement flow.
+            Defaults to ``"idle"`` for backward compatibility with checkpoints
+            persisted before Slice 14 (architecture.md → Risks: "LangGraph state
+            field rename breaks existing sessions").
+        intent_axes: Intent-summary axes (subject/medium/style/lighting/composition/
+            palette). Defaults to empty dict for legacy checkpoints. Slice 15
+            consumers re-shape this into the typed ``IntentSummaryPayload.axes``.
     """
 
     messages: list[MessageDTO] = Field(default_factory=list)
     draft_prompt: Optional[DraftPromptDTO] = None
     recommended_model: Optional[ModelRecDTO] = None
+    flow_state: str = "idle"
+    intent_axes: dict = Field(default_factory=dict)
 
 
 class SessionDetailResponse(BaseModel):
