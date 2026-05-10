@@ -557,6 +557,18 @@ export interface PromptAssistantContextValue {
    * ``set_slot_strength`` tool.
    */
   pendingSlotStrengthPatch: AssistantState["pendingSlotStrengthPatch"];
+  /**
+   * Slice 15 / 16: mirror of the backend FSM ``flow_state`` field.
+   * Consumed by ``chat-thread.tsx`` + ``intent-summary-card.tsx`` to gate
+   * the card mount.
+   */
+  flowState: FlowState;
+  /**
+   * Slice 15 / 16: payload of the most-recent ``intent-summary`` SSE
+   * event. Read by ``IntentSummaryCard`` for rendering. ``null`` until
+   * the LLM emits an intent summary.
+   */
+  intentSummaryPayload: IntentSummaryPayload | null;
   sendMessage: (content: string, imageUrls?: string[]) => void;
   cancelStream: () => void;
   setSelectedModel: (model: string) => void;
@@ -583,7 +595,14 @@ export interface PromptAssistantContextValue {
   generationModeRef: MutableRefObject<string | null>;
 }
 
-const PromptAssistantContext =
+/**
+ * Slice 16: exported (was previously module-private) so consumers like
+ * ``chat-thread.tsx`` can use ``useContext(PromptAssistantContext)``
+ * directly to read FSM + intent-payload state in a way that gracefully
+ * tolerates the no-provider case (existing presentational tests render
+ * the thread without a provider).
+ */
+export const PromptAssistantContext =
   createContext<PromptAssistantContextValue | null>(null);
 
 // ---------------------------------------------------------------------------
@@ -876,6 +895,8 @@ export function PromptAssistantProvider({
       noContextBannerDismissed: state.noContextBannerDismissed,
       pendingSlotRolePatch: state.pendingSlotRolePatch,
       pendingSlotStrengthPatch: state.pendingSlotStrengthPatch,
+      flowState: state.flowState,
+      intentSummaryPayload: state.intentSummaryPayload,
       sendMessage,
       cancelStream,
       setSelectedModel,

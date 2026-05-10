@@ -1,10 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useMemo } from "react";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/lib/types/chat-message";
 import { ImagePreview } from "./image-preview";
 import { StreamingIndicator } from "./streaming-indicator";
+import { IntentSummaryCard } from "./intent-summary-card";
+import {
+  PromptAssistantContext,
+  type IntentSummaryPayload,
+} from "@/lib/assistant/assistant-context";
 
 // ---------------------------------------------------------------------------
 // Constants for "Verbessere" Chip (Slice 19, AC-8)
@@ -173,6 +185,89 @@ function MessageBubble({
 export function ChatThread({ messages, isStreaming, onChipClick }: ChatThreadProps) {
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
 
+  // Slice 16: subscribe to FSM + intent-summary payload for inline card.
+  // Use ``useContext`` directly (not ``usePromptAssistant``) so the thread
+  // remains usable in presentational tests that render it without a
+  // provider — in that case ``ctx`` is ``null`` and the card branch is a
+  // no-op.
+  const ctx = useContext(PromptAssistantContext);
+  const flowState = ctx?.flowState ?? "idle";
+  const intentSummaryPayload = ctx?.intentSummaryPayload ?? null;
+  const dispatch = ctx?.dispatch ?? null;
+  const sendMessage = ctx?.sendMessage ?? null;
+
+  // ---------------------------------------------------------------------
+  // Slice 16: IntentSummaryCard mount + freeze state
+  // ---------------------------------------------------------------------
+  //
+  // **Mount strategy (AC-1, AC-7, AC-8):** the card is inserted at the
+  // position in the messages list at which the LLM emitted the intent
+  // summary (i.e. ``messages.length`` at the moment ``flowState`` first
+  // becomes ``"summarizing"`` with a payload present). The card stays
+  // anchored at that position even when subsequent messages are appended
+  // (AC-7) and persists after either button is clicked (AC-6 / AC-7).
+  //
+  // **Freeze (AC-6):** clicking either button captures the current
+  // payload as ``frozenPayload`` and flips ``frozen=true``; both buttons
+  // become ``disabled`` and the visual treatment is dimmed (in the card
+  // component itself).
+  //
+  // **No-card states (AC-8):** if no intent summary has ever been
+  // received in this session, ``mountIndex`` stays ``null`` and no card
+  // is rendered.
+  const [mountIndex, setMountIndex] = useState<number | null>(null);
+  const [frozen, setFrozen] = useState(false);
+  const [frozenPayload, setFrozenPayload] =
+    useState<IntentSummaryPayload | null>(null);
+
+  // First-mount: when the FSM enters "summarizing" with a payload, anchor
+  // the card at the current end of the messages list. Subsequent
+  // payload-replays do NOT change the mount index (the card already
+  // exists in history; idempotent re-renders go to the same instance).
+  useEffect(() => {
+    if (
+      flowState === "summarizing" &&
+      intentSummaryPayload !== null &&
+      mountIndex === null
+    ) {
+      setMountIndex(messages.length);
+    }
+  }, [flowState, intentSummaryPayload, mountIndex, messages.length]);
+
+  // Discuss-click handler (AC-6, AC-9):
+  //   - capture current payload as frozen snapshot
+  //   - dispatch SET_FLOW_STATE("interviewing")
+  //   - sendMessage("Was soll anders sein?")
+  //   - flip ``frozen=true`` so both buttons become disabled
+  const handleDiscuss = useCallback(() => {
+    if (frozen) return;
+    const snapshot = intentSummaryPayload ?? frozenPayload;
+    if (snapshot) {
+      setFrozenPayload(snapshot);
+    }
+    setFrozen(true);
+    if (dispatch) {
+      dispatch({ type: "SET_FLOW_STATE", flowState: "interviewing" });
+    }
+    if (sendMessage) {
+      sendMessage("Was soll anders sein?");
+    }
+  }, [frozen, intentSummaryPayload, frozenPayload, dispatch, sendMessage]);
+
+  // Generate-click handler is an EMPTY slot for Slice 17 to wire
+  // (Auto-Apply + Auto-Generate + ``useIsGenerationPending`` precondition).
+  // Slice 16 deliberately does NOT freeze the card here; freezing on
+  // generate is a generation-pipeline concern (pending vs. settled) and
+  // belongs to Slice 17 along with the actual generate call.
+  const handleGenerate = useCallback(() => {
+    // Intentionally empty — Slice 17 attaches the real handler.
+  }, []);
+
+  // Effective payload for rendering: when frozen, use the snapshot
+  // (so a later RENDER_INTENT_SUMMARY for a different turn cannot mutate
+  // the historic card). Otherwise read live from the reducer.
+  const cardPayload = frozen ? frozenPayload : intentSummaryPayload;
+
   // AC-10: Auto-scroll to bottom when new messages arrive or content updates
   useEffect(() => {
     if (scrollAnchorRef.current) {
@@ -180,8 +275,84 @@ export function ChatThread({ messages, isStreaming, onChipClick }: ChatThreadPro
     }
   }, [messages]);
 
-  if (messages.length === 0) {
+  // Render-decision: whether to show the card at all this pass.
+  // AC-8: if the card was never mounted in this session and the FSM is
+  // not in ``summarizing``, render nothing.
+  const shouldRenderCard = mountIndex !== null && cardPayload !== null;
+
+  if (messages.length === 0 && !shouldRenderCard) {
     return null;
+  }
+
+  // Clamp the insertion index so it never points past the current
+  // messages list (defensive — RESET_SESSION wipes the messages array).
+  const insertionIndex =
+    mountIndex !== null ? Math.min(mountIndex, messages.length) : null;
+
+  const renderedMessages: React.ReactNode[] = [];
+  messages.forEach((message, idx) => {
+    if (insertionIndex !== null && idx === insertionIndex && shouldRenderCard) {
+      renderedMessages.push(
+        <IntentSummaryCard
+          key="intent-summary-card"
+          payload={cardPayload!}
+          frozen={frozen}
+          onGenerate={handleGenerate}
+          onDiscuss={handleDiscuss}
+        />
+      );
+    }
+
+    switch (message.role) {
+      case "system":
+        renderedMessages.push(
+          <InitMessageBubble key={message.id} message={message} />
+        );
+        break;
+      case "separator":
+        renderedMessages.push(
+          <ContextSeparator key={message.id} message={message} />
+        );
+        break;
+      case "user":
+      case "assistant":
+        // Hide empty streaming assistant bubble — the StreamingIndicator handles this state
+        if (
+          message.role === "assistant" &&
+          message.isStreaming &&
+          !message.content
+        ) {
+          break;
+        }
+        renderedMessages.push(
+          <MessageBubble
+            key={message.id}
+            message={message}
+            onChipClick={onChipClick}
+          />
+        );
+        break;
+      default:
+        break;
+    }
+  });
+
+  // Card was anchored at-or-past the end of the list — render after all
+  // existing messages (the very first mount lands here).
+  if (
+    insertionIndex !== null &&
+    insertionIndex >= messages.length &&
+    shouldRenderCard
+  ) {
+    renderedMessages.push(
+      <IntentSummaryCard
+        key="intent-summary-card"
+        payload={cardPayload!}
+        frozen={frozen}
+        onGenerate={handleGenerate}
+        onDiscuss={handleDiscuss}
+      />
+    );
   }
 
   return (
@@ -189,29 +360,7 @@ export function ChatThread({ messages, isStreaming, onChipClick }: ChatThreadPro
       className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4"
       data-testid="chat-thread"
     >
-      {messages.map((message) => {
-        switch (message.role) {
-          case "system":
-            return <InitMessageBubble key={message.id} message={message} />;
-          case "separator":
-            return <ContextSeparator key={message.id} message={message} />;
-          case "user":
-          case "assistant":
-            // Hide empty streaming assistant bubble — the StreamingIndicator handles this state
-            if (message.role === "assistant" && message.isStreaming && !message.content) {
-              return null;
-            }
-            return (
-              <MessageBubble
-                key={message.id}
-                message={message}
-                onChipClick={onChipClick}
-              />
-            );
-          default:
-            return null;
-        }
-      })}
+      {renderedMessages}
 
       {/* Animated streaming indicator */}
       <StreamingIndicator visible={isStreaming} />
