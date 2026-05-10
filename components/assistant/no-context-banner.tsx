@@ -12,6 +12,17 @@ import { usePromptAssistant } from "@/lib/assistant/assistant-context";
 
 export interface NoContextBannerProps {
   projectId: string;
+  /**
+   * When true, the banner is hidden via CSS (`display: none`) but the
+   * component stays mounted. This is the recommended way to hide the banner
+   * across panel-internal view-toggles (e.g. session-list ↔ chat) so the
+   * one-time `GET /api/projects/{id}/context` fetch is NOT re-triggered on
+   * every toggle. Defaults to `false`.
+   *
+   * Per Slice 10 Constraint: "KEINE Polling-Logik — Context wird nur einmal
+   * beim Panel-Mount geladen; Re-Fetch erst bei Tab-Reload" (AC-7).
+   */
+  hidden?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -64,7 +75,7 @@ function buildSettingsPath(projectId: string): string {
  *    No automatic dismiss; the user must click the (✕) explicitly.
  *  - "✕" button → dispatches `DISMISS_NO_CONTEXT_BANNER`; banner unmounts.
  */
-export function NoContextBanner({ projectId }: NoContextBannerProps) {
+export function NoContextBanner({ projectId, hidden = false }: NoContextBannerProps) {
   const { dispatch, noContextBannerDismissed } = usePromptAssistant();
 
   const [fetchState, setFetchState] = useState<FetchState>({
@@ -136,6 +147,12 @@ export function NoContextBanner({ projectId }: NoContextBannerProps) {
     <div
       role="status"
       data-testid="no_context_banner"
+      // When `hidden` is true (e.g. session-list view), keep the DOM node but
+      // hide it visually so the component does NOT unmount and the
+      // one-shot fetch above is NOT re-triggered when the parent toggles
+      // back. See AC-7 + Constraint "KEINE Polling-Logik".
+      hidden={hidden}
+      aria-hidden={hidden || undefined}
       className="flex items-center justify-between gap-3 border-b bg-muted/40 px-4 py-2 text-sm text-muted-foreground"
     >
       <div className="flex min-w-0 items-center gap-2">
