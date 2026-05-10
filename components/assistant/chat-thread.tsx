@@ -271,10 +271,30 @@ export function ChatThread({ messages, isStreaming, onChipClick }: ChatThreadPro
     // the runtime allocates one; treat ``null`` as a distinct
     // "not-yet-bound" session so the trigger can still fire pre-bind
     // (the runtime sends the message, then writes the id back).
+    //
+    // IMPORTANT: The ``__unbound__`` → real-id transition must NOT
+    // re-arm the latch. On a fresh session the runtime allocates the
+    // sessionId AFTER the first user message dispatch, so the effect
+    // first runs with ``sessionKey='__unbound__'`` (latch armed →
+    // dispatch fires), then re-runs after SET_SESSION_ID flips the
+    // key to a real id. If we re-armed on that transition the latch
+    // would reset and dispatch a SECOND time, violating AC-1
+    // ("genau einmal"). Reducer is idempotent but contract demands
+    // a single dispatch.
+    //
+    // Re-arm therefore only on transitions between two REAL session
+    // ids (e.g. RESET_SESSION → new id, LOAD_SESSION → different id).
     const sessionKey = sessionId ?? "__unbound__";
-    if (pasteTriggerSessionRef.current !== sessionKey) {
+    const previousKey = pasteTriggerSessionRef.current;
+    if (previousKey !== sessionKey) {
+      const isUnboundToRealTransition =
+        previousKey === "__unbound__" && sessionKey !== "__unbound__";
       pasteTriggerSessionRef.current = sessionKey;
-      pasteTriggerLatchedRef.current = false;
+      if (!isUnboundToRealTransition) {
+        // Either initial mount (previousKey === null), or a transition
+        // between two real ids — re-arm the single-fire latch.
+        pasteTriggerLatchedRef.current = false;
+      }
     }
 
     // Single-fire guard: if we've already evaluated for this session,
