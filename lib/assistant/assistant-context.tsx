@@ -167,6 +167,46 @@ export interface AssistantState {
    * re-render with the latest payload.
    */
   intentSummaryPayload: IntentSummaryPayload | null;
+  /**
+   * Slice 24: pending slot-role patch coming from the LangGraph
+   * ``set_slot_role`` tool result. The PromptArea subscribes via
+   * ``useEffect`` keyed on ``version`` and applies the change to its
+   * local slot state through the existing ``handleReferenceRoleChange``
+   * helper. ``null`` until the first tool call; replaced (NOT merged) on
+   * each subsequent ``SET_SLOT_ROLE`` action. The ``version`` counter
+   * (analogous to ``draftVersion``) ensures that two consecutive
+   * identical payloads still trigger two distinct subscriber runs.
+   * Transient — NOT persisted across LangGraph resume (Slice 28).
+   */
+  pendingSlotRolePatch: {
+    slotIndex: number;
+    role: "subject" | "style" | "composition";
+    version: number;
+  } | null;
+  /**
+   * Slice 24: pending slot-strength patch coming from the LangGraph
+   * ``set_slot_strength`` tool result. Same subscriber pattern as
+   * ``pendingSlotRolePatch``; ``strength`` is a float in [0.0, 1.0].
+   * Transient — NOT persisted across LangGraph resume.
+   */
+  pendingSlotStrengthPatch: {
+    slotIndex: number;
+    strength: number;
+    version: number;
+  } | null;
+  /**
+   * Slice 24: pending workspace ``modelParams`` patch coming from the
+   * LangGraph ``set_model_params`` tool result. Consumed by the existing
+   * auto-apply ``useEffect`` in the AssistantProvider, which forwards
+   * ``modelParams`` to ``setVariation`` WITHOUT touching ``promptMotiv``,
+   * ``promptStyle`` or ``negativePrompt`` (slice-boundary discipline,
+   * see ``assistant-context-apply.test.tsx`` AC-2). Transient — NOT
+   * persisted across LangGraph resume.
+   */
+  pendingModelParamsPatch: {
+    modelParams: Record<string, unknown>;
+    version: number;
+  } | null;
 }
 
 const initialState: AssistantState = {
@@ -183,6 +223,9 @@ const initialState: AssistantState = {
   noContextBannerDismissed: false,
   flowState: "idle",
   intentSummaryPayload: null,
+  pendingSlotRolePatch: null,
+  pendingSlotStrengthPatch: null,
+  pendingModelParamsPatch: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -229,6 +272,38 @@ export type AssistantAction =
         slot_index: number;
         reason: string;
       };
+    }
+  | {
+      /**
+       * Slice 24: dispatched by the SSE handler when a ``set_slot_role``
+       * tool-call-result event is received. Reducer increments the
+       * ``pendingSlotRolePatch.version`` counter so the PromptArea
+       * subscriber picks the change up even when the payload is
+       * unchanged.
+       */
+      type: "SET_SLOT_ROLE";
+      slotIndex: number;
+      role: "subject" | "style" | "composition";
+    }
+  | {
+      /**
+       * Slice 24: dispatched by the SSE handler when a
+       * ``set_slot_strength`` tool-call-result event is received.
+       */
+      type: "SET_SLOT_STRENGTH";
+      slotIndex: number;
+      strength: number;
+    }
+  | {
+      /**
+       * Slice 24: dispatched by the SSE handler when a
+       * ``set_model_params`` tool-call-result event is received. The
+       * auto-apply ``useEffect`` in the AssistantProvider forwards the
+       * ``modelParams`` to ``setVariation`` (without touching prompt
+       * fields) when the version counter increments.
+       */
+      type: "SET_MODEL_PARAMS_PATCH";
+      modelParams: Record<string, unknown>;
     };
 
 // ---------------------------------------------------------------------------
@@ -346,6 +421,9 @@ function assistantReducer(
       // Slice 10: noContextBannerDismissed has tab-session scope and MUST NOT
       // be reset on project/session switch. It only resets on tab reload
       // (provider re-mount) per architecture.md "Frontend State Machine Wiring".
+      // Slice 24 AC-10: pendingSlotRolePatch / pendingSlotStrengthPatch /
+      // pendingModelParamsPatch are transient and reset to ``null`` here
+      // (handled implicitly via spreading ``initialState``).
       return {
         ...initialState,
         selectedModel: state.selectedModel,
@@ -397,6 +475,51 @@ function assistantReducer(
       };
     }
 
+    case "SET_SLOT_ROLE": {
+      // Slice 24 AC-4: replace ``pendingSlotRolePatch`` and bump the
+      // version counter. The PromptArea subscriber observes ``version``
+      // (not the payload itself) so identical successive payloads still
+      // trigger two distinct subscriber runs — analogous to the
+      // ``draftVersion`` pattern.
+      const previousVersion = state.pendingSlotRolePatch?.version ?? 0;
+      return {
+        ...state,
+        pendingSlotRolePatch: {
+          slotIndex: action.slotIndex,
+          role: action.role,
+          version: previousVersion + 1,
+        },
+      };
+    }
+
+    case "SET_SLOT_STRENGTH": {
+      // Slice 24 AC-5: same version-bump pattern as SET_SLOT_ROLE.
+      const previousVersion = state.pendingSlotStrengthPatch?.version ?? 0;
+      return {
+        ...state,
+        pendingSlotStrengthPatch: {
+          slotIndex: action.slotIndex,
+          strength: action.strength,
+          version: previousVersion + 1,
+        },
+      };
+    }
+
+    case "SET_MODEL_PARAMS_PATCH": {
+      // Slice 24 AC-6: bump version so the auto-apply effect picks up
+      // the new modelParams payload. The reducer is pure — the actual
+      // ``setVariation({modelParams})`` call lives in the
+      // AssistantProvider's auto-apply ``useEffect``.
+      const previousVersion = state.pendingModelParamsPatch?.version ?? 0;
+      return {
+        ...state,
+        pendingModelParamsPatch: {
+          modelParams: action.modelParams,
+          version: previousVersion + 1,
+        },
+      };
+    }
+
     default:
       return state;
   }
@@ -423,6 +546,17 @@ export interface PromptAssistantContextValue {
    * the No-Context-Hint-Banner. Reset only on tab reload (provider re-mount).
    */
   noContextBannerDismissed: boolean;
+  /**
+   * Slice 24: most-recent slot-role patch from the LangGraph
+   * ``set_slot_role`` tool. PromptArea subscribes via ``useEffect`` keyed
+   * on ``version``. ``null`` until the first tool call.
+   */
+  pendingSlotRolePatch: AssistantState["pendingSlotRolePatch"];
+  /**
+   * Slice 24: most-recent slot-strength patch from the LangGraph
+   * ``set_slot_strength`` tool.
+   */
+  pendingSlotStrengthPatch: AssistantState["pendingSlotStrengthPatch"];
   sendMessage: (content: string, imageUrls?: string[]) => void;
   cancelStream: () => void;
   setSelectedModel: (model: string) => void;
@@ -706,6 +840,29 @@ export function PromptAssistantProvider({
     }
   }, [state.draftVersion, applyToWorkspace]);
 
+  // Slice 24 AC-6: Auto-apply for ``pendingModelParamsPatch``. Mirrors the
+  // ``draftVersion`` trigger pattern — fires only when the version counter
+  // advances, never on initial mount (initial value === null) and never on
+  // LOAD_SESSION (LOAD_SESSION does not touch this field). Only the
+  // ``modelParams`` slot is replaced; ``promptMotiv`` / ``promptStyle`` /
+  // ``negativePrompt`` come straight from the current ``variationData`` so
+  // the assistant never accidentally clears the user's prompt (slice-
+  // boundary discipline; see ``assistant-context-apply.test.tsx`` AC-2).
+  // ``modelId`` is preserved verbatim — there is intentionally no
+  // ``set_model_id`` tool (architecture.md → Open Decisions).
+  const pendingModelParamsVersionRef = useRef(0);
+  useEffect(() => {
+    const patch = state.pendingModelParamsPatch;
+    if (patch && patch.version > 0 && patch.version !== pendingModelParamsVersionRef.current) {
+      pendingModelParamsVersionRef.current = patch.version;
+      setVariation({
+        promptMotiv: variationData?.promptMotiv ?? "",
+        modelId: variationData?.modelId ?? "",
+        modelParams: patch.modelParams,
+      });
+    }
+  }, [state.pendingModelParamsPatch, setVariation, variationData]);
+
   const value = useMemo<PromptAssistantContextValue>(
     () => ({
       sessionId: state.sessionId,
@@ -717,6 +874,8 @@ export function PromptAssistantProvider({
       isLoadingSession: state.isLoadingSession,
       isApplied: state.isApplied,
       noContextBannerDismissed: state.noContextBannerDismissed,
+      pendingSlotRolePatch: state.pendingSlotRolePatch,
+      pendingSlotStrengthPatch: state.pendingSlotStrengthPatch,
       sendMessage,
       cancelStream,
       setSelectedModel,

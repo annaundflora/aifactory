@@ -29,6 +29,44 @@ const FLOW_STATE_WHITELIST: ReadonlySet<FlowState> = new Set<FlowState>([
 ]);
 
 // ---------------------------------------------------------------------------
+// Slice 24: Slot-Tool Payload Types + Role Whitelist
+// ---------------------------------------------------------------------------
+
+/**
+ * Slot role enum mirroring the backend Pydantic enum used by the
+ * ``set_slot_role`` LangGraph tool. Architecture.md → API → "LangGraph
+ * Tool Schemas" pins the values to ``"subject" | "style" | "composition"``.
+ */
+type SlotRole = "subject" | "style" | "composition";
+
+const SLOT_ROLE_WHITELIST: ReadonlySet<SlotRole> = new Set<SlotRole>([
+  "subject",
+  "style",
+  "composition",
+]);
+
+/**
+ * Wire-shape of the ``set_slot_role`` tool-call-result ``data`` field.
+ * Snake_case is preserved here (matches backend); the SSE handler maps
+ * ``slot_index`` → ``slotIndex`` before dispatching to the reducer.
+ */
+interface SetSlotRoleData {
+  slot_index: number;
+  role: string;
+}
+
+/** Wire-shape of the ``set_slot_strength`` tool-call-result ``data`` field. */
+interface SetSlotStrengthData {
+  slot_index: number;
+  strength: number;
+}
+
+/** Wire-shape of the ``set_model_params`` tool-call-result ``data`` field. */
+interface SetModelParamsData {
+  params: Record<string, unknown>;
+}
+
+// ---------------------------------------------------------------------------
 // ReferenceSlot Snapshot (mirrors backend ReferenceSlotDTO)
 // ---------------------------------------------------------------------------
 
@@ -263,6 +301,85 @@ export function useAssistantRuntime({
                 draftPrompt: {
                   prompt: rawData.prompt,
                 },
+              });
+            } else if (result.tool === "set_slot_role") {
+              // Slice 24 AC-1 + AC-8: snake_case → camelCase mapping plus
+              // defense-in-depth payload validation. Backend Pydantic
+              // already enforces these in Slice 23, but the frontend
+              // never trusts the wire — malformed payloads get
+              // logged + skipped.
+              const payload = result.data as Partial<SetSlotRoleData>;
+              const slotIndex = payload?.slot_index;
+              const role = payload?.role;
+              if (
+                typeof slotIndex !== "number" ||
+                !Number.isInteger(slotIndex) ||
+                typeof role !== "string" ||
+                !SLOT_ROLE_WHITELIST.has(role as SlotRole)
+              ) {
+                console.warn(
+                  "[useAssistantRuntime] Ignoring malformed " +
+                    "set_slot_role tool-call-result payload:",
+                  result.data
+                );
+                break;
+              }
+              dispatch({
+                type: "SET_SLOT_ROLE",
+                slotIndex,
+                role: role as SlotRole,
+              });
+            } else if (result.tool === "set_slot_strength") {
+              // Slice 24 AC-2 + AC-8: same defensive pattern as
+              // set_slot_role. ``strength`` must be a finite number in
+              // the inclusive range [0.0, 1.0] (architecture.md →
+              // Validation Rules → set_slot_strength).
+              const payload = result.data as Partial<SetSlotStrengthData>;
+              const slotIndex = payload?.slot_index;
+              const strength = payload?.strength;
+              if (
+                typeof slotIndex !== "number" ||
+                !Number.isInteger(slotIndex) ||
+                typeof strength !== "number" ||
+                !Number.isFinite(strength) ||
+                strength < 0 ||
+                strength > 1
+              ) {
+                console.warn(
+                  "[useAssistantRuntime] Ignoring malformed " +
+                    "set_slot_strength tool-call-result payload:",
+                  result.data
+                );
+                break;
+              }
+              dispatch({
+                type: "SET_SLOT_STRENGTH",
+                slotIndex,
+                strength,
+              });
+            } else if (result.tool === "set_model_params") {
+              // Slice 24 AC-3 + AC-8: ``params`` is mapped onto the
+              // frontend convention ``modelParams``. Validation against
+              // the active-model JSON-schema runs backend-side (Slice
+              // 23); the frontend only checks shape (object, non-null,
+              // non-array).
+              const payload = result.data as Partial<SetModelParamsData>;
+              const params = payload?.params;
+              if (
+                params === null ||
+                typeof params !== "object" ||
+                Array.isArray(params)
+              ) {
+                console.warn(
+                  "[useAssistantRuntime] Ignoring malformed " +
+                    "set_model_params tool-call-result payload:",
+                  result.data
+                );
+                break;
+              }
+              dispatch({
+                type: "SET_MODEL_PARAMS_PATCH",
+                modelParams: params as Record<string, unknown>,
               });
             }
             break;
