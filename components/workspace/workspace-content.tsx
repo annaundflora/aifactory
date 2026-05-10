@@ -17,6 +17,7 @@ import { PromptAssistantProvider } from "@/lib/assistant/assistant-context";
 import { AssistantPanelContent } from "@/components/assistant/assistant-panel";
 import { TouchDragProvider } from "@/lib/touch-drag-context";
 import { TouchDragOverlay } from "@/components/workspace/touch-drag-overlay";
+import { GenerationsProvider } from "@/lib/workspace/generations-context";
 
 const POLLING_INTERVAL_MS = 3000;
 
@@ -336,6 +337,7 @@ export function WorkspaceContent({
       )}
 
       {/* Gallery-View: hidden (not unmounted) when detail view is open */}
+      <GenerationsProvider generations={generations} projectId={projectId}>
       <PromptAssistantProvider>
       <TouchDragProvider>
       <div
@@ -455,6 +457,7 @@ export function WorkspaceContent({
       <TouchDragOverlay />
       </TouchDragProvider>
       </PromptAssistantProvider>
+      </GenerationsProvider>
     </>
   );
 }

@@ -439,6 +439,12 @@ function assistantReducer(
     case "SET_FLOW_STATE":
       // Slice 15 AC-7: only ``flowState`` is mutated; all other fields
       // (messages, draftPrompt, sessionId, …) are preserved verbatim.
+      //
+      // Slice 17 AC-6 (idempotency check): the reducer-branch accepts
+      // every member of the ``FlowState`` union, including
+      // ``"generating"`` (set frontend-side on the user click in the
+      // IntentSummaryCard, no backend round-trip). No additional
+      // whitelist enforcement needed — the type union is the contract.
       return { ...state, flowState: action.flowState };
 
     case "RENDER_INTENT_SUMMARY":
