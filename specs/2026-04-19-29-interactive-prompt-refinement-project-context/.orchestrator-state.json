@@ -1,9 +1,9 @@
 {
   "spec_path": "/home/dev/aifactory/.claude/worktrees/29-interactive-prompt-refinement-project-context/specs/2026-04-19-29-interactive-prompt-refinement-project-context",
   "feature_name": "29-interactive-prompt-refinement-project-context",
-  "status": "in_progress",
-  "current_state": "implementing",
-  "current_slice_id": "slice-01",
+  "status": "completed",
+  "current_state": "feature_complete",
+  "current_slice_id": null,
   "retry_count": 0,
   "failed_stage": null,
   "default_branch": "master",
@@ -22,21 +22,42 @@
     {"id": "wave_11_result_loop", "parallel": false, "items": ["slice-18"]},
     {"id": "wave_12_indicator", "parallel": false, "items": ["slice-22"]}
   ],
-  "completed_slices": [],
-  "evidence_files": [],
+  "completed_slices": [
+    "slice-01", "slice-02", "slice-03", "slice-04", "slice-05",
+    "slice-06", "slice-07", "slice-08", "slice-09", "slice-10",
+    "slice-11", "slice-12", "slice-13", "slice-14", "slice-15",
+    "slice-16", "slice-17", "slice-18", "slice-19", "slice-20",
+    "slice-21", "slice-22", "slice-23", "slice-24", "slice-25",
+    "slice-26", "slice-27", "slice-28"
+  ],
+  "evidence_files": ["wave-2.json", "wave-3.json", "wave-4.json", "slice-01.json"],
   "worktree_path": "/home/dev/aifactory/.claude/worktrees/29-interactive-prompt-refinement-project-context",
   "branch": "29-interactive-prompt-refinement-project-context",
   "github_available": true,
   "repo": "annaundflora/aifactory",
   "pr_number": 30,
   "security_scan": {
-    "status": null,
+    "status": "skipped",
     "verdict": null,
     "findings_total": 0,
     "findings_high": 0,
     "findings_medium": 0,
-    "report_path": null,
-    "reason": null,
+    "report_path": "/home/dev/aifactory/.claude/worktrees/29-interactive-prompt-refinement-project-context/specs/2026-04-19-29-interactive-prompt-refinement-project-context/gates/malicious-intent.md",
+    "reason": "no security hot-paths in diff (agents/workflows/deps/install-hooks/dynamic-exec unchanged)",
     "hot_paths_matched": []
+  },
+  "systemic_review": {
+    "verdict": "FAILED",
+    "findings_total": 7,
+    "report_path": "/home/dev/aifactory/.claude/worktrees/29-interactive-prompt-refinement-project-context/specs/2026-04-19-29-interactive-prompt-refinement-project-context/gates/systemic-review.md",
+    "note": "7 findings documented for PM review (not blocking)"
+  },
+  "conflict_post_scan": {
+    "has_overlap": true,
+    "high_severity_overlaps": 1,
+    "low_severity_overlaps": 2,
+    "overlapping_prs": [27, 28],
+    "report_path": "/home/dev/aifactory/.claude/worktrees/29-interactive-prompt-refinement-project-context/specs/2026-04-19-29-interactive-prompt-refinement-project-context/claims/overlap-report.json",
+    "comments_posted": [30, 28, 27]
   }
 }
