@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ChatInput } from "@/components/assistant/chat-input";
 import { ChatThread } from "@/components/assistant/chat-thread";
+import { NoContextBanner } from "@/components/assistant/no-context-banner";
 import { SessionList } from "@/components/assistant/session-list";
 import { SessionSwitcher } from "@/components/assistant/session-switcher";
 import { ModelSelector } from "@/components/assistant/model-selector";
@@ -188,6 +189,14 @@ export function AssistantPanelContent({
           </Button>
         </div>
       </div>
+
+      {/* Slice 10: No-context-hint-banner — sits above the chat thread,
+          OUTSIDE the overflow-y-auto body so the banner stays pinned at the
+          top of the panel-body (per wireframes Annotation ②). The component
+          itself decides whether to render based on context-fetch + dismiss-flag. */}
+      {activeView !== "session-list" && (
+        <NoContextBanner projectId={projectId} />
+      )}
 
       {/* Body — single column, no split view */}
       <div className="flex-1 overflow-y-auto">

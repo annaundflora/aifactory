@@ -82,6 +82,13 @@ export interface AssistantState {
   isLoadingSession: boolean;
   /** Whether the current draft has been applied to the workspace */
   isApplied: boolean;
+  /**
+   * Tab-session-scoped flag for the No-Context-Hint-Banner dismissal.
+   * Slice 10: defaults to `false` on provider-mount, set to `true` via
+   * DISMISS_NO_CONTEXT_BANNER, NOT reset on RESET_SESSION (project switch).
+   * Resets only on tab reload (provider re-mount). No persistence.
+   */
+  noContextBannerDismissed: boolean;
 }
 
 const initialState: AssistantState = {
@@ -95,6 +102,7 @@ const initialState: AssistantState = {
   activeView: "startscreen",
   isLoadingSession: false,
   isApplied: false,
+  noContextBannerDismissed: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -124,7 +132,8 @@ export type AssistantAction =
       isApplied?: boolean;
     }
   | { type: "RESET_SESSION" }
-  | { type: "SET_IS_APPLIED"; isApplied: boolean };
+  | { type: "SET_IS_APPLIED"; isApplied: boolean }
+  | { type: "DISMISS_NO_CONTEXT_BANNER" };
 
 // ---------------------------------------------------------------------------
 // Reducer
@@ -238,13 +247,20 @@ function assistantReducer(
       };
 
     case "RESET_SESSION":
+      // Slice 10: noContextBannerDismissed has tab-session scope and MUST NOT
+      // be reset on project/session switch. It only resets on tab reload
+      // (provider re-mount) per architecture.md "Frontend State Machine Wiring".
       return {
         ...initialState,
         selectedModel: state.selectedModel,
+        noContextBannerDismissed: state.noContextBannerDismissed,
       };
 
     case "SET_IS_APPLIED":
       return { ...state, isApplied: action.isApplied };
+
+    case "DISMISS_NO_CONTEXT_BANNER":
+      return { ...state, noContextBannerDismissed: true };
 
     default:
       return state;
@@ -267,6 +283,11 @@ export interface PromptAssistantContextValue {
   isLoadingSession: boolean;
   /** Whether the current draft has been applied to the workspace */
   isApplied: boolean;
+  /**
+   * Slice 10: tab-session-scoped flag indicating whether the user dismissed
+   * the No-Context-Hint-Banner. Reset only on tab reload (provider re-mount).
+   */
+  noContextBannerDismissed: boolean;
   sendMessage: (content: string, imageUrls?: string[]) => void;
   cancelStream: () => void;
   setSelectedModel: (model: string) => void;
@@ -560,6 +581,7 @@ export function PromptAssistantProvider({
       activeView: state.activeView,
       isLoadingSession: state.isLoadingSession,
       isApplied: state.isApplied,
+      noContextBannerDismissed: state.noContextBannerDismissed,
       sendMessage,
       cancelStream,
       setSelectedModel,

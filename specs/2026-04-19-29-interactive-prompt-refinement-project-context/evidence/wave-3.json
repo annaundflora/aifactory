@@ -1,0 +1,8 @@
+{
+  "wave": "wave_3_api_layer",
+  "slices": ["slice-03", "slice-04"],
+  "all_approved": true,
+  "all_tests_passed": true,
+  "slice-03": {"commit": "cb33fd15a04c0cc871b67308e15fb9bc71d295c5", "tests": "app/api/projects/[id]/context/__tests__/route.test.ts"},
+  "slice-04": {"commit": "4b1a629fda57299b59cb7d944cd5903bdba9c3d0", "tests": "app/actions/__tests__/projects.test.ts"}
+}
