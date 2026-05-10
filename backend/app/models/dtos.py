@@ -18,6 +18,41 @@ ALLOWED_MODELS = [
 ]
 
 
+class ReferenceSlotDTO(BaseModel):
+    """DTO for a single active ReferenceBar slot snapshot.
+
+    The frontend sends a list of these every assistant turn (when in img2img mode);
+    the backend uses them to build the multimodal HumanMessage. Per architecture.md
+    Section "Data Models" (line 145).
+
+    Fields:
+        slot_index: Zero-based position of the slot in the ReferenceBar.
+        image_url: Public URL of the reference image (S3 / Replicate / etc.).
+        role: Optional semantic role of the reference: subject, style or composition.
+        strength: Optional strength weight for the reference (0.0..1.0 inclusive).
+    """
+
+    slot_index: int = Field(
+        ...,
+        ge=0,
+        description="Zero-based slot position in the ReferenceBar",
+    )
+    image_url: HttpUrl = Field(
+        ...,
+        description="Public URL of the reference image",
+    )
+    role: Optional[Literal["subject", "style", "composition"]] = Field(
+        default=None,
+        description='Optional semantic role: "subject" | "style" | "composition"',
+    )
+    strength: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Optional strength weight for the reference (0.0..1.0)",
+    )
+
+
 class SendMessageRequest(BaseModel):
     """DTO for POST /api/assistant/sessions/{id}/messages.
 
@@ -27,6 +62,11 @@ class SendMessageRequest(BaseModel):
         content: The user message text (1-5000 characters).
         image_urls: Optional list of reference image URLs (max 5).
         model: Optional LLM model slug. Must be one of the allowed models.
+        image_model_id: Optional image generation model ID.
+        generation_mode: Optional generation mode ("txt2img" | "img2img").
+        project_id: Optional UUID of the project (enables loading project context).
+        reference_slots: Optional snapshot of active ReferenceBar slots (max 5).
+        last_result_image_url: Optional URL of the last successfully generated image.
     """
 
     content: str = Field(
@@ -56,6 +96,19 @@ class SendMessageRequest(BaseModel):
     generation_mode: Optional[Literal["txt2img", "img2img"]] = Field(
         default=None,
         description="Optional generation mode: 'txt2img' or 'img2img'",
+    )
+    project_id: Optional[UUID] = Field(
+        default=None,
+        description="Optional UUID of the project; enables loading project context",
+    )
+    reference_slots: Optional[list[ReferenceSlotDTO]] = Field(
+        default=None,
+        max_length=5,
+        description="Optional snapshot of active ReferenceBar slots (max 5)",
+    )
+    last_result_image_url: Optional[HttpUrl] = Field(
+        default=None,
+        description="Optional URL of the last successfully generated image",
     )
 
 

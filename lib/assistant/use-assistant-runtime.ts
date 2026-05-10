@@ -9,6 +9,22 @@ import type {
 } from "./assistant-context";
 
 // ---------------------------------------------------------------------------
+// ReferenceSlot Snapshot (mirrors backend ReferenceSlotDTO)
+// ---------------------------------------------------------------------------
+
+/**
+ * Snapshot of a single active ReferenceBar slot, sent by the frontend on every
+ * assistant turn when generation mode is "img2img". Mirrors the backend
+ * Pydantic model `ReferenceSlotDTO` in `backend/app/models/dtos.py`.
+ */
+export interface ReferenceSlotSnapshot {
+  slot_index: number;
+  image_url: string;
+  role?: "subject" | "style" | "composition" | null;
+  strength?: number | null;
+}
+
+// ---------------------------------------------------------------------------
 // SSE Event Types (from Architecture)
 // ---------------------------------------------------------------------------
 
@@ -104,6 +120,10 @@ export interface UseAssistantRuntimeOptions {
   imageModelIdRef?: MutableRefObject<string | null>;
   /** Ref holding the current generation mode (only "txt2img" | "img2img" are sent to backend) */
   generationModeRef?: MutableRefObject<string | null>;
+  /** Ref holding the current snapshot of active ReferenceBar slots (sent only when generation_mode === "img2img") */
+  referenceSlotsRef?: MutableRefObject<ReferenceSlotSnapshot[] | null>;
+  /** Ref holding the current project UUID (sent on every turn so backend can load project_context) */
+  projectIdRef?: MutableRefObject<string | null>;
 }
 
 export interface UseAssistantRuntimeReturn {
@@ -125,6 +145,8 @@ export function useAssistantRuntime({
   cancelStreamRef,
   imageModelIdRef,
   generationModeRef,
+  referenceSlotsRef,
+  projectIdRef,
 }: UseAssistantRuntimeOptions): UseAssistantRuntimeReturn {
   const abortControllerRef = useRef<AbortController | null>(null);
   const streamingRef = useRef(false);
@@ -370,6 +392,28 @@ export function useAssistantRuntime({
         const currentGenerationMode = generationModeRef?.current;
         if (currentGenerationMode === "txt2img" || currentGenerationMode === "img2img") {
           body.generation_mode = currentGenerationMode;
+        }
+
+        // Slice 19: include project_id whenever it is set (modus-independent;
+        // backend uses it for ProjectRepository.get_context).
+        const currentProjectId = projectIdRef?.current;
+        if (currentProjectId) {
+          body.project_id = currentProjectId;
+        }
+
+        // Slice 19: snapshot the active reference slots at send-time, but ONLY
+        // when generation_mode is "img2img". The field is omitted (not null) for
+        // any other mode or when the snapshot is empty.
+        if (currentGenerationMode === "img2img") {
+          const slotsSnapshot = referenceSlotsRef?.current;
+          if (slotsSnapshot && slotsSnapshot.length > 0) {
+            body.reference_slots = slotsSnapshot.map((slot) => ({
+              slot_index: slot.slot_index,
+              image_url: slot.image_url,
+              role: slot.role ?? null,
+              strength: slot.strength ?? null,
+            }));
+          }
         }
 
         const response = await fetch(
