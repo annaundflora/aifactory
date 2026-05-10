@@ -383,6 +383,7 @@ export default function HelpMeWriteModal({
             type="button"
             variant="outline"
             onClick={handleCancelClick}
+            disabled={isPending}
             data-testid="helper-cancel-btn"
           >
             Cancel
