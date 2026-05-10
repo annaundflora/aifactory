@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import HelpMeWriteModal from "@/components/projects/help-me-write-modal";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -150,6 +151,10 @@ export default function ProjectContextSettings({
   // Confirm-Discard-Dialog
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState<boolean>(false);
 
+  // Help-Me-Write Modal (Slice 09) — wird via Helper-Button geöffnet und
+  // schreibt seinen Draft via onAccept-Callback in das `context_textarea`.
+  const [helperOpen, setHelperOpen] = useState<boolean>(false);
+
   // Stable timeout ref for "✓ Saved" auto-hide (cleared on unmount / re-save)
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -224,6 +229,7 @@ export default function ProjectContextSettings({
     setSaveError(null);
     setShowSavedIndicator(false);
     setConfirmDiscardOpen(false);
+    setHelperOpen(false);
     if (savedTimeoutRef.current) {
       clearTimeout(savedTimeoutRef.current);
       savedTimeoutRef.current = null;
@@ -323,6 +329,16 @@ export default function ProjectContextSettings({
     setConfirmDiscardOpen(false);
   }, []);
 
+  /**
+   * Slice 09 — `<HelpMeWriteModal>` ruft diesen Callback genau einmal beim
+   * Klick auf "Use this" mit dem aktuellen Draft-Text. Wir übernehmen den
+   * Draft in das `context_textarea` (lokaler Editor-Draft); der Dirty-State
+   * ergibt sich automatisch via `draftValue !== loadedValue`.
+   */
+  const handleHelperAccept = useCallback((draft: string) => {
+    setDraftValue(draft);
+  }, []);
+
   // -------------------------------------------------------------------------
   // Render — Project-not-found terminal state (AC-7)
   // -------------------------------------------------------------------------
@@ -378,11 +394,10 @@ export default function ProjectContextSettings({
                   size="sm"
                   disabled={isLoading || isSaving}
                   data-testid="help-me-write-btn"
-                  // Slice 06 reserviert nur den Render-Slot; die Click-Logik
-                  // (Helper-Modal) wird in Slice 09 verdrahtet.
-                  onClick={() => {
-                    /* slot for slice-09 */
-                  }}
+                  // Slice 09 — öffnet <HelpMeWriteModal>; akzeptierter Draft
+                  // wird via handleHelperAccept in das context_textarea
+                  // geschrieben (Dirty-State über lokalen Vergleich).
+                  onClick={() => setHelperOpen(true)}
                 >
                   <Sparkles className="size-4" />
                   Help me write this
@@ -486,6 +501,18 @@ export default function ProjectContextSettings({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/*
+       * Slice 09 — Help-Me-Write Modal als Geschwister-Dialog (separater
+       * Radix-Portal, KEIN Dialog-in-Dialog). Open-State liegt lokal im
+       * Parent; Draft wird via onAccept-Callback in den Editor-State
+       * gehoben und macht damit automatisch Dirty-State sichtbar.
+       */}
+      <HelpMeWriteModal
+        open={helperOpen}
+        onOpenChange={setHelperOpen}
+        onAccept={handleHelperAccept}
+      />
     </>
   );
 }
