@@ -19,6 +19,7 @@ import {
   type IntentSummaryPayload,
 } from "@/lib/assistant/assistant-context";
 import { detectPastedPrompt } from "@/lib/assistant/paste-detect";
+import { useDetailViewOpener } from "@/lib/workspace/detail-view-opener-context";
 
 // ---------------------------------------------------------------------------
 // Constants for "Verbessere" Chip (Slice 19, AC-8)
@@ -73,6 +74,100 @@ function ContextSeparator({ message }: { message: ChatMessage }) {
         {message.content}
       </span>
       <div className="h-px flex-1 bg-border" />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ResultMessageBubble (Slice 18 — `result_message` variant)
+// ---------------------------------------------------------------------------
+
+/**
+ * Renders an assistant message that carries a ``resultImageUrl`` marker
+ * (set on the first proactive starter after a successful generate cycle —
+ * see ``use-assistant-runtime.ts`` auto-apply-settle path).
+ *
+ * Layout per wireframes.md → "Screen: Reviewing Turn" → Annotation ①:
+ *   - Thumbnail (left, ~120px square, rounded) of the just-generated image.
+ *   - Assistant text (right, multiline) with the proactive comment.
+ *
+ * Click on the thumbnail (or Enter/Space when focused) opens the existing
+ * detail-view (``components/canvas/canvas-detail-view.tsx`` via the
+ * ``DetailViewOpenerProvider`` registered in ``WorkspaceContent``).
+ * ``data-testid="result_message.thumbnail"`` matches AC-5.
+ *
+ * **Reuse-Pflicht (AC-6):** the click handler delegates to the
+ * ``openDetailView`` callback — no new modal, no new wrapper. When the
+ * opener is unavailable (presentational tests / sheet outside the
+ * workspace tree) the click is a no-op, but the marker still renders so
+ * snapshot-tests of the layout stay deterministic.
+ *
+ * **Default-bubble fallback (AC-7):** when the message lacks a
+ * ``resultImageUrl`` marker, the parent does NOT mount this component —
+ * the regular ``MessageBubble`` handles those messages unchanged.
+ */
+function ResultMessageBubble({ message }: { message: ChatMessage }) {
+  const opener = useDetailViewOpener();
+
+  const handleOpen = useCallback(() => {
+    if (!opener) return;
+    const generationId = message.resultGenerationId;
+    if (!generationId) return;
+    opener.openDetailView(generationId);
+  }, [opener, message.resultGenerationId]);
+
+  // Keyboard activation per AC-5: Enter AND Space trigger the same click
+  // handler. ``preventDefault`` on Space stops the page from scrolling
+  // (default browser behaviour for Space on focusable elements).
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        handleOpen();
+      }
+    },
+    [handleOpen]
+  );
+
+  return (
+    <div
+      className="flex w-full justify-start"
+      data-testid="result-message"
+    >
+      <div className="flex max-w-[90%] gap-3 rounded-2xl bg-muted px-4 py-2.5 text-sm leading-relaxed text-foreground rounded-bl-md">
+        {/* AC-5: thumbnail (left, ~120px square, rounded). role=button +
+            tabindex=0 so it is reachable via keyboard; the keyboard
+            handler covers Enter AND Space (AC-5 + AC-6). */}
+        {message.resultImageUrl && (
+          <div
+            data-testid="result_message.thumbnail"
+            role="button"
+            tabIndex={0}
+            aria-label="Open generated image in detail view"
+            onClick={handleOpen}
+            onKeyDown={handleKeyDown}
+            className="size-[120px] shrink-0 cursor-pointer overflow-hidden rounded-lg border border-border/60 bg-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            {/* Plain <img> — no Next/Image because the URL may be a
+                Replicate / S3 presigned host that is not configured in
+                ``next.config.ts`` image-domains. The chat ImagePreview
+                component (used for user uploads) uses the same approach.
+            */}
+            <img
+              src={message.resultImageUrl}
+              alt=""
+              className="size-full object-cover"
+              draggable={false}
+            />
+          </div>
+        )}
+        {/* Assistant text (right, multiline) — same whitespace handling
+            as the default bubble so streamed text-deltas render the same
+            way (AC-3 streaming continues to work). */}
+        <div className="min-w-0 flex-1 whitespace-pre-wrap break-words">
+          {message.content}
+        </div>
+      </div>
     </div>
   );
 }
@@ -417,21 +512,48 @@ export function ChatThread({ messages, isStreaming, onChipClick }: ChatThreadPro
         break;
       case "user":
       case "assistant":
-        // Hide empty streaming assistant bubble — the StreamingIndicator handles this state
-        if (
-          message.role === "assistant" &&
-          message.isStreaming &&
-          !message.content
-        ) {
-          break;
+        {
+          // Slice 18 AC-5: assistant messages carrying a ``resultImageUrl``
+          // marker render the ``result_message`` variant (thumbnail +
+          // text). The thumbnail must appear immediately on placeholder
+          // mount (before the proactive comment streams in) so the user
+          // sees what the assistant is referencing — therefore the
+          // empty-streaming-bubble suppression below is bypassed for
+          // result_message variants. Messages without the marker fall
+          // through to the default bubble (AC-7 — bestehende
+          // Bubble-Rendering aus Slice 16/17 unverändert).
+          const hasResultMarker =
+            message.role === "assistant" &&
+            typeof message.resultImageUrl === "string" &&
+            message.resultImageUrl.length > 0 &&
+            !message.isError;
+
+          // Hide empty streaming assistant bubble — the StreamingIndicator
+          // handles this state. Skipped for result_message variants (see
+          // above) so the thumbnail mounts at placeholder creation time.
+          if (
+            message.role === "assistant" &&
+            message.isStreaming &&
+            !message.content &&
+            !hasResultMarker
+          ) {
+            break;
+          }
+
+          if (hasResultMarker) {
+            renderedMessages.push(
+              <ResultMessageBubble key={message.id} message={message} />
+            );
+            break;
+          }
+          renderedMessages.push(
+            <MessageBubble
+              key={message.id}
+              message={message}
+              onChipClick={onChipClick}
+            />
+          );
         }
-        renderedMessages.push(
-          <MessageBubble
-            key={message.id}
-            message={message}
-            onChipClick={onChipClick}
-          />
-        );
         break;
       default:
         break;

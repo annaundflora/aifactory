@@ -9,6 +9,7 @@ import type {
   IntentSummaryPayload,
   ToolCallResult,
 } from "./assistant-context";
+import type { Generation } from "@/lib/db/queries";
 
 // ---------------------------------------------------------------------------
 // Slice 15: whitelist of FSM ``flow_state`` values accepted from SSE.
@@ -206,6 +207,23 @@ export interface UseAssistantRuntimeOptions {
   referenceSlotsRef?: MutableRefObject<ReferenceSlotSnapshot[] | null>;
   /** Ref holding the current project UUID (sent on every turn so backend can load project_context) */
   projectIdRef?: MutableRefObject<string | null>;
+  /**
+   * Slice 18: ref holding the latest succeeded result-image URL. Read at
+   * request-build time and (when set) emitted on the outgoing body as
+   * ``last_result_image_url``. Mirror of ``state.lastResultImageUrl`` —
+   * kept in sync by ``PromptAssistantProvider``.
+   */
+  lastResultImageUrlRef?: MutableRefObject<string | null>;
+  /**
+   * Slice 18: live generations array for the active project. Used by the
+   * auto-apply-settle effect to detect the ``status: pending → completed``
+   * transition with a populated ``imageUrl`` and dispatch
+   * ``SET_LAST_RESULT_IMAGE_URL``. Pass ``null`` (or omit) when no
+   * generations source is available (e.g. presentational tests, sheet
+   * mounts outside ``WorkspaceContent``); the settle effect short-circuits
+   * to a no-op in that case.
+   */
+  generations?: Generation[] | null;
 }
 
 export interface UseAssistantRuntimeReturn {
@@ -229,12 +247,114 @@ export function useAssistantRuntime({
   generationModeRef,
   referenceSlotsRef,
   projectIdRef,
+  lastResultImageUrlRef,
+  generations,
 }: UseAssistantRuntimeOptions): UseAssistantRuntimeReturn {
   const abortControllerRef = useRef<AbortController | null>(null);
   const streamingRef = useRef(false);
   // Keep latest selectedModel in a ref so async functions always read the current value
   const selectedModelRef = useRef(selectedModel);
   selectedModelRef.current = selectedModel;
+
+  // ---------------------------------------------------------------------------
+  // Slice 18: Auto-Apply-Settle Path
+  // ---------------------------------------------------------------------------
+  //
+  // Tracks generation ids that have already been "consumed" by a
+  // ``SET_LAST_RESULT_IMAGE_URL`` dispatch. When the polling pipeline in
+  // ``WorkspaceContent`` flips a generation's ``status`` from ``"pending"``
+  // to ``"completed"`` (the on-the-wire status name for "succeeded" per
+  // ``lib/db/schema.ts:66``) AND the row carries a non-empty ``imageUrl``,
+  // the settle effect dispatches the action with the URL of the NEWEST
+  // such generation (sorted by ``createdAt`` descending) and adds the id
+  // to the consumed-set so the dispatch fires EXACTLY ONCE per generation
+  // (AC-1).
+  //
+  // The consumed-set is a ``Set<string>`` ref so that re-renders never
+  // double-dispatch even when React StrictMode runs the effect twice in
+  // dev. The set is intentionally never trimmed — the per-session
+  // generation count is bounded by user behaviour (a single project
+  // rarely accumulates >100 generations in one tab session) and the
+  // memory footprint is negligible.
+  const consumedGenerationIdsRef = useRef<Set<string>>(new Set());
+  // Slice 18: marker holding the URL+id of a freshly-settled generation
+  // that has NOT yet been attached to an outgoing assistant message
+  // placeholder. Set by the settle effect, consumed (and cleared) by the
+  // next ``ADD_ASSISTANT_MESSAGE`` dispatch in ``sendMessageToSession``.
+  // This implements Pattern (a) — explicit per-message marker on
+  // ``ChatMessage.resultImageUrl`` (single-attach semantics: only the
+  // FIRST proactive starter after a successful generate carries the
+  // thumbnail, AC-8).
+  const pendingResultAttachmentRef = useRef<{
+    url: string;
+    generationId: string;
+  } | null>(null);
+
+  useEffect(() => {
+    // No generations source mounted (presentational tests / sheet outside
+    // ``WorkspaceContent``) — the settle path cannot run. Bail without
+    // touching the consumed-set so a later remount with a real source
+    // still picks up freshly-completed rows.
+    if (!generations || generations.length === 0) return;
+
+    // Find generations that just settled to "completed" with a real
+    // image URL AND have not yet been consumed by a previous dispatch.
+    // ``imageUrl`` is the column populated by the Replicate webhook on
+    // success (``lib/db/schema.ts:67`` — ``image_url text``); a successful
+    // generation without a URL is treated as not-yet-settled.
+    const freshlyCompleted = generations.filter(
+      (g) =>
+        g.status === "completed" &&
+        typeof g.imageUrl === "string" &&
+        g.imageUrl.length > 0 &&
+        !consumedGenerationIdsRef.current.has(g.id)
+    );
+    if (freshlyCompleted.length === 0) return;
+
+    // Pick the NEWEST freshly-completed row by ``createdAt``. Polling
+    // batches may surface multiple settles at once (a 4-variant batch all
+    // resolving in the same poll-window); the spec is unambiguous —
+    // dispatch carries only the URL of the newest generation (Discovery
+    // business rule line 286: only the latest result is held).
+    let newest = freshlyCompleted[0];
+    for (let i = 1; i < freshlyCompleted.length; i += 1) {
+      const candidate = freshlyCompleted[i];
+      if (
+        new Date(candidate.createdAt).getTime() >
+        new Date(newest.createdAt).getTime()
+      ) {
+        newest = candidate;
+      }
+    }
+
+    // Mark every freshly-completed row as consumed (not just ``newest``)
+    // so the next poll-tick that surfaces them again doesn't re-dispatch
+    // for the older siblings (e.g. variants 1-3 of a 4-variant batch).
+    // The dispatch itself only carries ``newest`` per AC-1.
+    for (const g of freshlyCompleted) {
+      consumedGenerationIdsRef.current.add(g.id);
+    }
+
+    // Defensive: ``imageUrl`` is non-null per the filter above, but
+    // TypeScript's narrowing through ``filter`` is not flow-precise.
+    const url = newest.imageUrl as string;
+
+    dispatch({
+      type: "SET_LAST_RESULT_IMAGE_URL",
+      url,
+      generationId: newest.id,
+    });
+
+    // Arm the per-message attachment marker for the NEXT
+    // ``ADD_ASSISTANT_MESSAGE`` placeholder. Single-attach semantics
+    // (AC-8: only the FIRST proactive starter after settle carries the
+    // thumbnail) are enforced by the ref being cleared in
+    // ``sendMessageToSession`` once consumed.
+    pendingResultAttachmentRef.current = {
+      url,
+      generationId: newest.id,
+    };
+  }, [generations, dispatch]);
 
   const cancelStream = useCallback(() => {
     if (abortControllerRef.current) {
@@ -644,6 +764,25 @@ export function useAssistantRuntime({
           }
         }
 
+        // Slice 18: include ``last_result_image_url`` whenever the
+        // reducer ref carries a URL. The field is OMITTED entirely when
+        // the ref is null/empty (chosen pattern — matches the existing
+        // optionality of ``project_id``, ``image_urls``, ``image_model_id``
+        // and the Pydantic-side ``Optional`` declared in
+        // ``backend/app/models/dtos.py:21-59``). The choice is recorded in
+        // architecture.md → "Migration Map" Zeile
+        // ``lib/assistant/use-assistant-runtime.ts:354-373`` and matches
+        // the explicit AC-2 wording: "wird das Feld entweder weggelassen
+        // oder explizit `null` gesendet (Implementer wählt 1 Pattern,
+        // gemäss bestehender DTO-Optionalität)".
+        const currentLastResultImageUrl = lastResultImageUrlRef?.current;
+        if (
+          typeof currentLastResultImageUrl === "string" &&
+          currentLastResultImageUrl.length > 0
+        ) {
+          body.last_result_image_url = currentLastResultImageUrl;
+        }
+
         const response = await fetch(
           `/api/assistant/sessions/${sessionId}/messages`,
           {
@@ -662,6 +801,16 @@ export function useAssistantRuntime({
           return;
         }
 
+        // Slice 18: consume the per-message attachment marker armed by
+        // the auto-apply-settle effect. Only the FIRST assistant message
+        // placeholder created AFTER a fresh result settles carries the
+        // ``resultImageUrl`` / ``resultGenerationId`` marker (AC-8 single-
+        // attach semantics — the chat-thread renders the result_message
+        // variant for that one message; subsequent assistant messages in
+        // the same review-loop fall back to the default bubble).
+        const pendingAttachment = pendingResultAttachmentRef.current;
+        pendingResultAttachmentRef.current = null;
+
         // Add an empty assistant message placeholder for streaming
         dispatch({
           type: "ADD_ASSISTANT_MESSAGE",
@@ -670,6 +819,12 @@ export function useAssistantRuntime({
             role: "assistant",
             content: "",
             isStreaming: true,
+            ...(pendingAttachment
+              ? {
+                  resultImageUrl: pendingAttachment.url,
+                  resultGenerationId: pendingAttachment.generationId,
+                }
+              : {}),
           },
         });
 

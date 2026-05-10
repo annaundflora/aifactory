@@ -16,6 +16,7 @@ import {
 } from "@/lib/assistant/assistant-context";
 import { useAssistantRuntime } from "@/lib/assistant/use-assistant-runtime";
 import { useWorkspaceVariation } from "@/lib/workspace-state";
+import { useGenerationsContextOptional } from "@/lib/workspace/generations-context";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -52,9 +53,17 @@ export function AssistantPanelContent({
     cancelStreamRef,
     imageModelIdRef,
     generationModeRef,
+    lastResultImageUrlRef,
   } = usePromptAssistant();
 
   const { variationData } = useWorkspaceVariation();
+
+  // Slice 18: surface the live generations array to the runtime so the
+  // auto-apply-settle effect can dispatch ``SET_LAST_RESULT_IMAGE_URL``
+  // when a generation transitions to ``status: completed``. Optional
+  // reader: returns ``null`` outside the workspace tree (e.g. session-
+  // history sheet) — the runtime short-circuits in that case.
+  const generations = useGenerationsContextOptional();
 
   const { sendMessage } = useAssistantRuntime({
     projectId,
@@ -65,6 +74,8 @@ export function AssistantPanelContent({
     cancelStreamRef,
     imageModelIdRef,
     generationModeRef,
+    lastResultImageUrlRef,
+    generations,
   });
 
   const handleSend = useCallback(

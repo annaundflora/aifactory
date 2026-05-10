@@ -281,6 +281,38 @@ export interface AssistantState {
    * ``RENDER_PASTE_CONFIRM`` is dispatched in the same session.
    */
   pasteConfirmPayload: { seedText: string } | null;
+  /**
+   * Slice 18: URL of the most-recently succeeded generation in the active
+   * session (the result image that the assistant should treat as
+   * multimodal context on the next turn). ``null`` until the first
+   * successful generate cycle settles; replaced (NOT appended — only the
+   * latest result is kept per Discovery business rule line 286) on each
+   * subsequent ``SET_LAST_RESULT_IMAGE_URL`` action.
+   *
+   * **Out-of-DB persistence:** the field lives ONLY in the per-session
+   * reducer state (architecture.md → "Out-of-DB persistence" →
+   * ``last_result_image_url``). It is sent to the backend on every
+   * outgoing user-message body via ``last_result_image_url`` (Slice 18 +
+   * Slice 19) so the backend can build the multimodal HumanMessage; the
+   * backend itself does NOT persist the URL standalone.
+   *
+   * **Reset semantics:** explicit-clear via dispatching
+   * ``SET_LAST_RESULT_IMAGE_URL`` with ``url: null`` AND implicit-reset on
+   * ``RESET_SESSION`` (project switch / new session). Persisted across
+   * LangGraph resume only via the implicit path (a freshly hydrated
+   * session has no result yet, by definition — the resume hydrate-effect
+   * does not re-populate this field).
+   */
+  lastResultImageUrl: string | null;
+  /**
+   * Slice 18: ``generations.id`` of the most-recently succeeded generation
+   * — companion to ``lastResultImageUrl``. Used by the result-message
+   * thumbnail click handler in ``chat-thread.tsx`` to open the existing
+   * detail-view for EXACTLY this generation (AC-6 Reuse-Pflicht). ``null``
+   * until the first successful settle; same persistence + reset semantics
+   * as ``lastResultImageUrl``.
+   */
+  lastResultGenerationId: string | null;
 }
 
 const initialState: AssistantState = {
@@ -301,6 +333,8 @@ const initialState: AssistantState = {
   pendingSlotStrengthPatch: null,
   pendingModelParamsPatch: null,
   pasteConfirmPayload: null,
+  lastResultImageUrl: null,
+  lastResultGenerationId: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -404,6 +438,23 @@ export type AssistantAction =
        * persist in chat history.
        */
       type: "DISMISS_PASTE_CONFIRM";
+    }
+  | {
+      /**
+       * Slice 18: dispatched by the auto-apply-settle path in
+       * ``use-assistant-runtime.ts`` when a generation in the active
+       * project transitions to ``status === "completed"`` (the on-the-wire
+       * status name for "succeeded" per ``lib/db/schema.ts:66``) WITH a
+       * non-empty ``imageUrl``. Carries the URL of the newest such
+       * generation plus its ``generations.id`` for the detail-view click
+       * path. Setting ``url`` to ``null`` (explicit-clear) is the
+       * supported reset path for AC-4 (e.g. session reset / project
+       * switch); when ``url === null`` the implementation MAY also pass
+       * ``generationId: null`` to fully clear both fields.
+       */
+      type: "SET_LAST_RESULT_IMAGE_URL";
+      url: string | null;
+      generationId?: string | null;
     };
 
 // ---------------------------------------------------------------------------
@@ -515,6 +566,16 @@ function assistantReducer(
         activeView: "chat",
         // AC-6: Restore isApplied flag (defaults to false when not provided)
         isApplied: action.isApplied ?? false,
+        // Slice 18: ``lastResultImageUrl`` lives per-session only
+        // (architecture.md → "Out-of-DB persistence"). Switching to a
+        // different session must clear it so the body builder does not
+        // accidentally include a URL from the previous session on the
+        // first turn after resume. Resume hydration in Slice 28 may
+        // re-populate it via a separate dispatch when a freshly resumed
+        // session has a final result; until then ``null`` is the safe
+        // default.
+        lastResultImageUrl: null,
+        lastResultGenerationId: null,
       };
 
     case "RESET_SESSION":
@@ -644,6 +705,37 @@ function assistantReducer(
       // ``dismissed``).
       return { ...state, pasteConfirmPayload: null };
 
+    case "SET_LAST_RESULT_IMAGE_URL": {
+      // Slice 18 AC-3 / AC-4: replace ``lastResultImageUrl`` with the
+      // provided value (``string`` for the set-path, ``null`` for the
+      // explicit-clear path). All other fields stay verbatim — this is a
+      // pure single-field mutation analog to ``SET_FLOW_STATE``.
+      //
+      // ``generationId`` is the companion field used by the
+      // result-message thumbnail click handler. When the action omits
+      // ``generationId`` we preserve the previous value (defensive — the
+      // dispatcher in ``use-assistant-runtime.ts`` always passes both
+      // together, but a hand-rolled test dispatch shouldn't accidentally
+      // clear the id when only the URL is provided). When the URL is
+      // explicitly cleared (``url: null``) we drop the id as well unless
+      // the dispatcher overrides the default by passing
+      // ``generationId: <something>`` explicitly. This keeps the two
+      // fields consistent for downstream consumers.
+      let nextGenerationId: string | null;
+      if (action.generationId !== undefined) {
+        nextGenerationId = action.generationId;
+      } else if (action.url === null) {
+        nextGenerationId = null;
+      } else {
+        nextGenerationId = state.lastResultGenerationId;
+      }
+      return {
+        ...state,
+        lastResultImageUrl: action.url,
+        lastResultGenerationId: nextGenerationId,
+      };
+    }
+
     default:
       return state;
   }
@@ -700,6 +792,19 @@ export interface PromptAssistantContextValue {
    * fires; reset to ``null`` by ``DISMISS_PASTE_CONFIRM``.
    */
   pasteConfirmPayload: { seedText: string } | null;
+  /**
+   * Slice 18: URL of the most-recently succeeded generation. Consumed by
+   * ``chat-thread.tsx`` (Pattern (b) fallback when a message lacks the
+   * per-message marker) and ``MultimodalIndicator`` (Slice 22). ``null``
+   * until the first successful generate cycle settles.
+   */
+  lastResultImageUrl: string | null;
+  /**
+   * Slice 18: ``generations.id`` of the most-recently succeeded
+   * generation — used by the result-message thumbnail click handler to
+   * open the existing detail-view (AC-6).
+   */
+  lastResultGenerationId: string | null;
   sendMessage: (content: string, imageUrls?: string[]) => void;
   cancelStream: () => void;
   setSelectedModel: (model: string) => void;
@@ -724,6 +829,15 @@ export interface PromptAssistantContextValue {
   imageModelIdRef: MutableRefObject<string | null>;
   /** Ref holding the current generation mode — written by PromptArea */
   generationModeRef: MutableRefObject<string | null>;
+  /**
+   * Slice 18: ref mirroring ``state.lastResultImageUrl`` — kept in sync
+   * via ``useEffect`` so ``useAssistantRuntime`` can read the latest
+   * value at request-build time without re-subscribing on every URL
+   * change. Mirrors the established ref-pattern (``imageModelIdRef`` /
+   * ``generationModeRef`` / ``referenceSlotsRef``) used by other
+   * slices.
+   */
+  lastResultImageUrlRef: MutableRefObject<string | null>;
 }
 
 /**
@@ -802,8 +916,20 @@ export function PromptAssistantProvider({
   const imageModelIdRef = useRef<string | null>(null);
   const generationModeRef = useRef<string | null>(null);
 
+  // Slice 18: ref mirror of ``state.lastResultImageUrl``. Kept in sync
+  // synchronously on each render so the runtime hook always reads the
+  // latest value when building the next outgoing message body — analog to
+  // ``sessionIdRef`` below and to the ref-mirror pattern documented in
+  // architecture.md → "Migration Map" → ``use-assistant-runtime.ts:354-373``
+  // (line "Mirror existing ref pattern (lines 104-107)").
+  const lastResultImageUrlRef = useRef<string | null>(null);
+
   // Keep sessionIdRef in sync with reducer state
   sessionIdRef.current = state.sessionId;
+  // Slice 18: keep the URL ref in sync — every render pass mirrors the
+  // latest reducer field. Refs do not trigger re-renders so this is a
+  // direct assignment (not a useEffect).
+  lastResultImageUrlRef.current = state.lastResultImageUrl;
 
   const sendMessage = useCallback(
     (content: string, imageUrls?: string[]) => {
@@ -1096,6 +1222,8 @@ export function PromptAssistantProvider({
       flowState: state.flowState,
       intentSummaryPayload: state.intentSummaryPayload,
       pasteConfirmPayload: state.pasteConfirmPayload,
+      lastResultImageUrl: state.lastResultImageUrl,
+      lastResultGenerationId: state.lastResultGenerationId,
       sendMessage,
       cancelStream,
       setSelectedModel,
@@ -1109,6 +1237,7 @@ export function PromptAssistantProvider({
       cancelStreamRef,
       imageModelIdRef,
       generationModeRef,
+      lastResultImageUrlRef,
     }),
     [
       state,
