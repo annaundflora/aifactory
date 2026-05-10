@@ -207,6 +207,22 @@ export interface AssistantState {
     modelParams: Record<string, unknown>;
     version: number;
   } | null;
+  /**
+   * Slice 27: payload of the most-recent ``RENDER_PASTE_CONFIRM`` action
+   * dispatched by the trigger-layer in ``chat-thread.tsx`` when the
+   * paste-detect heuristic (Slice 26) matches the FIRST user message of a
+   * session. ``null`` until the trigger fires; reset to ``null`` by
+   * ``DISMISS_PASTE_CONFIRM`` after either button click.
+   *
+   * **Transient — NOT persisted across LangGraph resume (Slice 28).**
+   * The card is a one-shot routing decision, not a durable artefact (see
+   * wireframes.md → "Screen: Paste Detect Confirm Card" → State
+   * Variations → ``dismissed``). The trigger-layer also enforces a
+   * single-fire guarantee at the call-site level (AC-2): even if a later
+   * user message would match the heuristic, no second
+   * ``RENDER_PASTE_CONFIRM`` is dispatched in the same session.
+   */
+  pasteConfirmPayload: { seedText: string } | null;
 }
 
 const initialState: AssistantState = {
@@ -226,6 +242,7 @@ const initialState: AssistantState = {
   pendingSlotRolePatch: null,
   pendingSlotStrengthPatch: null,
   pendingModelParamsPatch: null,
+  pasteConfirmPayload: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -304,6 +321,31 @@ export type AssistantAction =
        */
       type: "SET_MODEL_PARAMS_PATCH";
       modelParams: Record<string, unknown>;
+    }
+  | {
+      /**
+       * Slice 27: dispatched by the trigger-layer in ``chat-thread.tsx``
+       * when the paste-detect heuristic matches the FIRST user message
+       * of a session. Sets ``state.pasteConfirmPayload`` to
+       * ``{ seedText }`` so the chat-thread render-branch mounts the
+       * ``<PasteDetectConfirmCard />``. Idempotent at the reducer
+       * boundary — successive dispatches simply replace the payload;
+       * single-fire is enforced one level up by the trigger-layer
+       * (AC-2).
+       */
+      type: "RENDER_PASTE_CONFIRM";
+      payload: { seedText: string };
+    }
+  | {
+      /**
+       * Slice 27: dispatched by the card component itself on either
+       * button click ("Direkt verfeinern" / "Interview starten"). Sets
+       * ``state.pasteConfirmPayload`` back to ``null`` so the
+       * chat-thread render-branch un-mounts the card. The card is
+       * **transient** — unlike the IntentSummaryCard it does NOT
+       * persist in chat history.
+       */
+      type: "DISMISS_PASTE_CONFIRM";
     };
 
 // ---------------------------------------------------------------------------
@@ -526,6 +568,24 @@ function assistantReducer(
       };
     }
 
+    case "RENDER_PASTE_CONFIRM":
+      // Slice 27 AC-8: replace ``pasteConfirmPayload`` with the seed
+      // text from the first user message. The reducer mutation is
+      // idempotent — a second dispatch in the same session would simply
+      // overwrite the payload. The trigger-layer in ``chat-thread.tsx``
+      // is responsible for the single-fire guarantee (AC-2): even if a
+      // later user message would match the heuristic, no second
+      // RENDER_PASTE_CONFIRM is dispatched.
+      return { ...state, pasteConfirmPayload: action.payload };
+
+    case "DISMISS_PASTE_CONFIRM":
+      // Slice 27 AC-9: clear the payload so the chat-thread render-
+      // branch un-mounts the card. The card is transient — unlike the
+      // IntentSummaryCard it does NOT persist in history (wireframes.md
+      // → "Screen: Paste Detect Confirm Card" → State Variations →
+      // ``dismissed``).
+      return { ...state, pasteConfirmPayload: null };
+
     default:
       return state;
   }
@@ -575,6 +635,13 @@ export interface PromptAssistantContextValue {
    * the LLM emits an intent summary.
    */
   intentSummaryPayload: IntentSummaryPayload | null;
+  /**
+   * Slice 27: payload of the most-recent ``RENDER_PASTE_CONFIRM`` action.
+   * Read by ``PasteDetectConfirmCard`` for rendering and to access the
+   * original seed text on button click. ``null`` until the trigger-layer
+   * fires; reset to ``null`` by ``DISMISS_PASTE_CONFIRM``.
+   */
+  pasteConfirmPayload: { seedText: string } | null;
   sendMessage: (content: string, imageUrls?: string[]) => void;
   cancelStream: () => void;
   setSelectedModel: (model: string) => void;
@@ -903,6 +970,7 @@ export function PromptAssistantProvider({
       pendingSlotStrengthPatch: state.pendingSlotStrengthPatch,
       flowState: state.flowState,
       intentSummaryPayload: state.intentSummaryPayload,
+      pasteConfirmPayload: state.pasteConfirmPayload,
       sendMessage,
       cancelStream,
       setSelectedModel,

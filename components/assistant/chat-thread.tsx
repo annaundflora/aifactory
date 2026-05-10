@@ -13,10 +13,12 @@ import type { ChatMessage } from "@/lib/types/chat-message";
 import { ImagePreview } from "./image-preview";
 import { StreamingIndicator } from "./streaming-indicator";
 import { IntentSummaryCard } from "./intent-summary-card";
+import { PasteDetectConfirmCard } from "./paste-detect-confirm-card";
 import {
   PromptAssistantContext,
   type IntentSummaryPayload,
 } from "@/lib/assistant/assistant-context";
+import { detectPastedPrompt } from "@/lib/assistant/paste-detect";
 
 // ---------------------------------------------------------------------------
 // Constants for "Verbessere" Chip (Slice 19, AC-8)
@@ -193,6 +195,8 @@ export function ChatThread({ messages, isStreaming, onChipClick }: ChatThreadPro
   const ctx = useContext(PromptAssistantContext);
   const flowState = ctx?.flowState ?? "idle";
   const intentSummaryPayload = ctx?.intentSummaryPayload ?? null;
+  const pasteConfirmPayload = ctx?.pasteConfirmPayload ?? null;
+  const sessionId = ctx?.sessionId ?? null;
   const dispatch = ctx?.dispatch ?? null;
   const sendMessage = ctx?.sendMessage ?? null;
 
@@ -233,6 +237,77 @@ export function ChatThread({ messages, isStreaming, onChipClick }: ChatThreadPro
       setMountIndex(messages.length);
     }
   }, [flowState, intentSummaryPayload, mountIndex, messages.length]);
+
+  // ---------------------------------------------------------------------
+  // Slice 27 — Paste-Detect-Confirm trigger-layer
+  // ---------------------------------------------------------------------
+  //
+  // **Trigger contract (AC-1, AC-2, AC-3):**
+  //  - Fires exactly once per session, on the FIRST user message only.
+  //  - Dispatches ``RENDER_PASTE_CONFIRM`` with ``{ seedText }`` when
+  //    ``detectPastedPrompt`` returns ``true``.
+  //  - Subsequent user messages do NOT re-trigger, even if they would
+  //    match the heuristic (single-fire is enforced via the ref flag).
+  //  - When the heuristic returns ``false`` on the first user message
+  //    no action is dispatched and the ref flag is still latched so a
+  //    later message in the same session cannot retro-trigger.
+  //
+  // **Session boundary:** the ref flag is keyed on ``sessionId`` so a
+  // new session (RESET_SESSION → new id, or LOAD_SESSION → different
+  // id) re-arms the trigger. ``pasteTriggerSessionRef`` stores the
+  // session-key for which the single-fire latch is currently armed.
+  // When the key changes the effect compares against the stored value
+  // and re-arms the trigger.
+  const pasteTriggerSessionRef = useRef<string | null>(null);
+  // ``pasteTriggerLatchedRef`` is the actual one-shot latch. ``true``
+  // means the effect has already evaluated the first user message for
+  // the current session — even a heuristic miss latches (AC-3 implies
+  // the trigger evaluates exactly once on the FIRST user message).
+  const pasteTriggerLatchedRef = useRef(false);
+  useEffect(() => {
+    if (!dispatch) return;
+
+    // Re-arm on session change. ``sessionId`` may be ``null`` before
+    // the runtime allocates one; treat ``null`` as a distinct
+    // "not-yet-bound" session so the trigger can still fire pre-bind
+    // (the runtime sends the message, then writes the id back).
+    const sessionKey = sessionId ?? "__unbound__";
+    if (pasteTriggerSessionRef.current !== sessionKey) {
+      pasteTriggerSessionRef.current = sessionKey;
+      pasteTriggerLatchedRef.current = false;
+    }
+
+    // Single-fire guard: if we've already evaluated for this session,
+    // bail out regardless of the heuristic outcome. This is what
+    // ensures AC-2 holds even when later messages would match.
+    if (pasteTriggerLatchedRef.current) {
+      return;
+    }
+
+    // Find the first user message in the current messages list. We
+    // iterate (rather than checking ``messages[0]``) because the
+    // chat-thread also renders system / separator entries; the spec
+    // is explicit that the trigger keys on the first USER message.
+    const firstUserMessage = messages.find((m) => m.role === "user");
+    if (!firstUserMessage) {
+      // No user message yet — nothing to evaluate. Stay un-latched so
+      // the next render with a user message can fire.
+      return;
+    }
+
+    // Latch BEFORE dispatching so a synchronous re-render (from the
+    // dispatch itself) cannot double-fire. AC-3: even a non-match
+    // latches the session — the heuristic fires on the FIRST user
+    // message only, regardless of outcome.
+    pasteTriggerLatchedRef.current = true;
+
+    if (detectPastedPrompt(firstUserMessage.content)) {
+      dispatch({
+        type: "RENDER_PASTE_CONFIRM",
+        payload: { seedText: firstUserMessage.content },
+      });
+    }
+  }, [messages, sessionId, dispatch]);
 
   // Discuss-click handler (AC-6, AC-9):
   //   - capture current payload as frozen snapshot
@@ -280,7 +355,13 @@ export function ChatThread({ messages, isStreaming, onChipClick }: ChatThreadPro
   // not in ``summarizing``, render nothing.
   const shouldRenderCard = mountIndex !== null && cardPayload !== null;
 
-  if (messages.length === 0 && !shouldRenderCard) {
+  // Slice 27: render-decision for the Paste-Detect-Confirm card. The
+  // card is mounted at the END of the messages list (after the first
+  // user-message bubble) and is fully transient — DISMISS_PASTE_CONFIRM
+  // un-mounts it without leaving a history element.
+  const shouldRenderPasteCard = pasteConfirmPayload !== null;
+
+  if (messages.length === 0 && !shouldRenderCard && !shouldRenderPasteCard) {
     return null;
   }
 
@@ -353,6 +434,17 @@ export function ChatThread({ messages, isStreaming, onChipClick }: ChatThreadPro
         onDiscuss={handleDiscuss}
       />
     );
+  }
+
+  // Slice 27: render the Paste-Detect-Confirm card at the END of the
+  // thread — it always lands directly after the first user-message
+  // bubble (which is the most recent rendered element when the trigger
+  // fires). The card has no positional anchor (unlike the
+  // IntentSummaryCard) because it is transient: once dismissed it
+  // unmounts and never re-renders, so re-anchoring on subsequent turns
+  // is moot.
+  if (shouldRenderPasteCard) {
+    renderedMessages.push(<PasteDetectConfirmCard key="paste-confirm-card" />);
   }
 
   return (
