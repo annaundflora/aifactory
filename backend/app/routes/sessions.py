@@ -76,11 +76,23 @@ async def get_session(session_id: UUID):
     """Get a session with full state from the LangGraph checkpointer.
 
     Returns session metadata plus conversation state (messages, draft_prompt,
-    recommended_model) reconstructed from the LangGraph checkpoint.
+    recommended_model, flow_state, intent_axes, final_intent) reconstructed
+    from the LangGraph checkpoint. The FSM-mirror fields (``flow_state``,
+    ``intent_axes``, ``final_intent``) are surfaced so the frontend Hydrate-
+    Effekt in ``loadSession`` (``lib/assistant/assistant-context.tsx``) can
+    re-dispatch ``SET_FLOW_STATE`` and ``RENDER_INTENT_SUMMARY`` on session
+    reload (Slice 28; architecture.md → "Frontend State Machine Wiring" →
+    "Resume on session reload").
 
     AC-1: Returns state with messages array.
     AC-2: Returns draft_prompt if present.
     AC-3: Returns 404 if session not found.
+
+    Slice 28 AC-1: Returns ``flow_state``, ``intent_axes`` and ``final_intent``
+    from the persisted LangGraph state.
+    Slice 28 AC-2: Legacy checkpoints (pre-Slice-14) yield the DTO defaults
+    (``flow_state="idle"``, ``intent_axes={}``, ``final_intent=None``) — no
+    500/422 is raised.
 
     Args:
         session_id: UUID of the session.

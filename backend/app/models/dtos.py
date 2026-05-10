@@ -217,6 +217,41 @@ class ModelRecDTO(BaseModel):
     reason: str
 
 
+class FinalIntentDTO(BaseModel):
+    """Persisted ``final_intent`` payload from the LangGraph checkpoint.
+
+    Slice 28: surfaces the payload written by the ``emit_intent_summary``
+    tool so the frontend can rebuild the ``IntentSummaryPayload`` after a
+    page reload (architecture.md → "Frontend State Machine Wiring" → row
+    "Resume on session reload"). The shape mirrors the ``emit_intent_summary``
+    tool input schema (architecture.md → "Tool Catalog (NEW)").
+
+    Fields:
+        prompt: Final EN image-generation prompt (1..2000 chars).
+        settings_diff: Optional typed diff of settings changes; ``None`` when
+            no settings changed.
+        model_id: Optional image-model id captured at emit-time. Frontend
+            ``RENDER_INTENT_SUMMARY`` mapping discards this field because
+            ``IntentSummaryPayload`` does not carry it.
+    """
+
+    prompt: str = Field(
+        ...,
+        min_length=1,
+        max_length=2000,
+        description="Final EN image-generation prompt (1..2000 chars).",
+    )
+    settings_diff: Optional[SettingsDiff] = Field(
+        default=None,
+        description="Optional typed diff of settings changes.",
+    )
+    model_id: Optional[str] = Field(
+        default=None,
+        max_length=200,
+        description="Optional image-model id captured at emit-time.",
+    )
+
+
 class SessionStateDTO(BaseModel):
     """Reconstructed state from LangGraph checkpoint.
 
@@ -233,6 +268,10 @@ class SessionStateDTO(BaseModel):
         intent_axes: Intent-summary axes (subject/medium/style/lighting/composition/
             palette). Defaults to empty dict for legacy checkpoints. Slice 15
             consumers re-shape this into the typed ``IntentSummaryPayload.axes``.
+        final_intent: Slice 28 — persisted ``final_intent`` payload (written by
+            the ``emit_intent_summary`` tool). ``None`` for legacy checkpoints
+            and for sessions where the tool was never invoked. Frontend uses
+            this to rebuild the ``IntentSummaryPayload`` on session reload.
     """
 
     messages: list[MessageDTO] = Field(default_factory=list)
@@ -240,6 +279,7 @@ class SessionStateDTO(BaseModel):
     recommended_model: Optional[ModelRecDTO] = None
     flow_state: str = "idle"
     intent_axes: dict = Field(default_factory=dict)
+    final_intent: Optional[FinalIntentDTO] = None
 
 
 class SessionDetailResponse(BaseModel):

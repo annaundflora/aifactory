@@ -113,6 +113,64 @@ interface SessionDetailState {
     style?: string;
     negative_prompt?: string;
   } | null;
+  /**
+   * Slice 28: persisted FSM state from the LangGraph checkpointer
+   * (architecture.md → "Frontend State Machine Wiring" → "Resume on session
+   * reload"). Optional because legacy checkpoints (pre-Slice-14) and the
+   * defensive backend defaults may omit / default the field. The hydrate-
+   * effekt in ``loadSession`` validates against ``FLOW_STATE_WHITELIST``
+   * before dispatching ``SET_FLOW_STATE`` (AC-7).
+   */
+  flow_state?: string;
+  /**
+   * Slice 28: persisted intent-summary axes (subject/medium/style/lighting/
+   * composition/palette). Empty object for legacy checkpoints; mapped 1:1
+   * into ``IntentSummaryPayload.axes`` on resume (AC-4).
+   */
+  intent_axes?: {
+    subject?: string;
+    medium?: string;
+    style?: string;
+    lighting?: string;
+    composition?: string;
+    palette?: string;
+  };
+  /**
+   * Slice 28: persisted ``final_intent`` payload (written by the
+   * ``emit_intent_summary`` tool). ``null`` / ``undefined`` for legacy
+   * checkpoints and for sessions where the tool was never invoked. The
+   * hydrate-effekt rebuilds ``IntentSummaryPayload`` from this payload +
+   * ``intent_axes`` when ``flow_state === "summarizing"`` (AC-4).
+   * ``model_id`` is intentionally not propagated to ``IntentSummaryPayload``
+   * (which has no ``model_id`` field).
+   */
+  final_intent?: {
+    prompt: string;
+    settings_diff?: SettingsDiff | null;
+    model_id?: string | null;
+  } | null;
+}
+
+/**
+ * Slice 28 AC-7: whitelist of FSM ``flow_state`` values that the hydrate-
+ * effekt accepts. Mirrors the backend whitelist in
+ * ``backend/app/services/assistant_service.py:_FLOW_STATE_WHITELIST`` plus
+ * the frontend-only ``"generating"`` transition (set on user click in the
+ * IntentSummaryCard). Unknown values are dropped + logged via
+ * ``console.warn`` (analog to Slice 15 AC-9).
+ */
+const FLOW_STATE_WHITELIST: ReadonlySet<FlowState> = new Set<FlowState>([
+  "idle",
+  "interviewing",
+  "summarizing",
+  "reviewing",
+  "refining",
+  "generating",
+]);
+
+function isWhitelistedFlowState(value: unknown): value is FlowState {
+  return typeof value === "string"
+    && (FLOW_STATE_WHITELIST as ReadonlySet<string>).has(value);
 }
 
 interface SessionDetailResponse {
@@ -851,6 +909,73 @@ export function PromptAssistantProvider({
         sessionIdRef.current = sessionId;
         // Reset auto-title tracking for this session (it already has a title)
         autoTitleSentRef.current = sessionId;
+
+        // -------------------------------------------------------------
+        // Slice 28: FSM-Hydrate
+        // -------------------------------------------------------------
+        // Re-dispatches the FSM mirror (``SET_FLOW_STATE``) and — if the
+        // backend persisted a ``final_intent`` payload — also the
+        // ``RENDER_INTENT_SUMMARY`` action so that the IntentSummaryCard
+        // re-mounts with identical content after a page reload
+        // (architecture.md → "Frontend State Machine Wiring" → "Resume on
+        // session reload"). Defensive fallbacks per AC-6 / AC-7:
+        //   * unknown flow_state → no dispatch + console.warn
+        //   * flow_state="summarizing" without final_intent → only
+        //     SET_FLOW_STATE, no RENDER_INTENT_SUMMARY (defensive; the
+        //     IntentSummaryCard refuses to mount without a payload, see
+        //     Slice 16 AC-8)
+        const rawFlowState = data.state.flow_state;
+        if (rawFlowState !== undefined) {
+          if (isWhitelistedFlowState(rawFlowState)) {
+            dispatch({ type: "SET_FLOW_STATE", flowState: rawFlowState });
+
+            // AC-4: when resuming into ``summarizing`` AND the backend
+            // surfaces a ``final_intent`` payload, rebuild the
+            // ``IntentSummaryPayload`` and dispatch ``RENDER_INTENT_SUMMARY``.
+            // Field mapping (architecture.md → ``IntentSummaryPayload``):
+            //   final_intent.prompt        → prompt_preview
+            //   data.state.intent_axes     → axes (1:1 dict copy)
+            //   final_intent.settings_diff → settings_diff (optional)
+            //   final_intent.model_id      → DROPPED (no model_id field
+            //                                  on IntentSummaryPayload)
+            if (rawFlowState === "summarizing") {
+              const finalIntent = data.state.final_intent;
+              const intentAxes = data.state.intent_axes ?? {};
+              if (
+                finalIntent
+                && typeof finalIntent.prompt === "string"
+                && finalIntent.prompt.length > 0
+              ) {
+                const payload: IntentSummaryPayload = {
+                  axes: { ...intentAxes },
+                  prompt_preview: finalIntent.prompt,
+                };
+                if (finalIntent.settings_diff) {
+                  payload.settings_diff = finalIntent.settings_diff;
+                }
+                dispatch({ type: "RENDER_INTENT_SUMMARY", payload });
+              } else {
+                // AC-6: defensive fallback — flow_state is summarizing but
+                // there is no payload to render. The card MUST NOT mount
+                // (Slice 16 AC-8). Log so the inconsistency is visible.
+                console.warn(
+                  "[PromptAssistantContext] flow_state=summarizing but "
+                  + "final_intent is missing/invalid; skipping "
+                  + "RENDER_INTENT_SUMMARY",
+                );
+              }
+            }
+          } else {
+            // AC-7: unknown flow_state value — drop + warn (analog to
+            // Slice 15 AC-9). Reducer state ``flowState`` stays at its
+            // pre-hydrate value (initial ``"idle"``).
+            console.warn(
+              `[PromptAssistantContext] Unknown flow_state value `
+              + `${JSON.stringify(rawFlowState)} from session detail `
+              + `response; ignoring`,
+            );
+          }
+        }
       } catch {
         // AC-11: Show error toast and stay on session list
         dispatch({ type: "SET_LOADING_SESSION", isLoading: false });

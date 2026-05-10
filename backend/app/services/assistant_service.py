@@ -27,6 +27,7 @@ from app.agent.tools.prompt_tools import SettingsDiff
 from app.config import settings
 from app.models.dtos import (
     DraftPromptDTO,
+    FinalIntentDTO,
     IntentAxes,
     IntentSummaryPayload,
     MessageDTO,
@@ -1012,6 +1013,12 @@ class AssistantService:
         messages: list[MessageDTO] = []
         draft_prompt: Optional[DraftPromptDTO] = None
         recommended_model: Optional[ModelRecDTO] = None
+        # Slice 28: defaults match ``DEFAULT_STATE_VALUES`` (state.py:50-58)
+        # so legacy checkpoints (pre-Slice-14) yield the same shape as a
+        # freshly-initialised state. AC-2 verifies the no-error path.
+        flow_state_value: str = "idle"
+        intent_axes_value: dict = {}
+        final_intent_value: Optional[FinalIntentDTO] = None
 
         try:
             state_snapshot = await self._agent.aget_state(config)
@@ -1070,6 +1077,45 @@ class AssistantService:
                         reason=raw_model.get("reason", ""),
                     )
 
+                # Slice 28: extract FSM mirror fields. The DTO defaults to
+                # ``"idle"`` / ``{}`` / ``None`` for legacy checkpoints —
+                # we only override when the persisted values are actually
+                # present and of the expected type. Defensive isinstance
+                # checks prevent ``ValidationError`` on malformed legacy
+                # state and ensure AC-2 (no 500 for old sessions).
+                raw_flow_state = state_values.get("flow_state")
+                if isinstance(raw_flow_state, str) and raw_flow_state:
+                    flow_state_value = raw_flow_state
+
+                raw_intent_axes = state_values.get("intent_axes")
+                if isinstance(raw_intent_axes, dict):
+                    intent_axes_value = raw_intent_axes
+
+                # ``final_intent`` is the payload written by the
+                # ``emit_intent_summary`` tool (state.py:33-35). The shape
+                # mirrors the tool input schema: ``prompt`` / ``settings_diff`` /
+                # ``model_id``. Only ``prompt`` is required; legacy checkpoints
+                # that pre-date Slice 13 simply have ``None`` here.
+                raw_final_intent = state_values.get("final_intent")
+                if isinstance(raw_final_intent, dict) and raw_final_intent.get(
+                    "prompt"
+                ):
+                    try:
+                        final_intent_value = FinalIntentDTO.model_validate(
+                            raw_final_intent
+                        )
+                    except Exception:
+                        # Defensive: malformed persisted payload should not
+                        # break the resume endpoint. Log and fall back to
+                        # ``None`` so the frontend treats the session as
+                        # "summarizing without payload" (AC-6).
+                        logger.warning(
+                            "Could not validate final_intent for session %s; "
+                            "returning None",
+                            session_id,
+                            exc_info=True,
+                        )
+
         except Exception:
             # If the checkpoint cannot be read (e.g., no checkpoint exists),
             # return session metadata with empty state.
@@ -1083,6 +1129,9 @@ class AssistantService:
             messages=messages,
             draft_prompt=draft_prompt,
             recommended_model=recommended_model,
+            flow_state=flow_state_value,
+            intent_axes=intent_axes_value,
+            final_intent=final_intent_value,
         )
 
         return SessionDetailResponse(session=session, state=state)
