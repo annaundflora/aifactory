@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ import {
 } from "@/lib/workspace/generations-context";
 import { useWorkspaceVariation } from "@/lib/workspace-state";
 import { generateImages } from "@/app/actions/generations";
+import { useIsGenerationPending } from "@/lib/hooks/use-is-generation-pending";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -294,15 +296,15 @@ export function IntentSummaryCard({
     generations !== null;
 
   // Derived: is any generation for this project currently pending?
-  // Mirrors the filter at workspace-content.tsx:217 (architecture.md →
-  // "Concurrent-Generation Handling"). Falls back to ``false`` when not
-  // wired so the unwired-fallback path never trips the concurrent block.
-  const isGenerationPending =
-    isWired && generations !== null && projectId !== null
-      ? generations.some(
-          (g) => g.projectId === projectId && g.status === "pending"
-        )
-      : false;
+  // Sourced from ``useIsGenerationPending`` (architecture.md → "Concurrent-
+  // Generation Handling" / Slice 17 deliverable) so the selector logic lives
+  // in exactly one place. The hook returns ``false`` when no
+  // ``GenerationsProvider`` is mounted, so the unwired-fallback path never
+  // trips the concurrent block. We pass an empty string when ``projectId``
+  // is ``null`` — the hook short-circuits to ``false`` in that case (no
+  // entry will ever match an empty projectId, and unwired returns ``false``
+  // outright).
+  const isGenerationPending = useIsGenerationPending(projectId ?? "");
 
   // -------------------------------------------------------------------------
   // Slice 17 — local card-state for the "pending" visual treatment (AC-5)
@@ -589,6 +591,13 @@ export function IntentSummaryCard({
           onClick={handleGenerateClick}
           data-testid="intent_summary_card.generate_btn"
         >
+          {isAutoGenerating && (
+            <Loader2
+              className="size-4 animate-spin"
+              aria-hidden="true"
+              data-testid="intent_summary_card.generate_btn.spinner"
+            />
+          )}
           {generateBtnLabel}
         </Button>
         <Button
