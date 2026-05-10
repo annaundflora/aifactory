@@ -14,6 +14,7 @@ import logging
 import time
 from collections import defaultdict
 from typing import AsyncGenerator, Optional
+from uuid import UUID
 
 from langchain_core.messages import AIMessage, HumanMessage
 
@@ -29,6 +30,7 @@ from app.models.dtos import (
     SessionResponse,
     SessionStateDTO,
 )
+from app.services.project_repository import ProjectRepository
 from app.services.session_repository import SessionRepository
 
 logger = logging.getLogger(__name__)
@@ -110,9 +112,15 @@ class AssistantService:
     - error: On error
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        project_repo: Optional[ProjectRepository] = None,
+    ):
         self._agent = create_agent(checkpointer=MemorySaver())
         self._repo = SessionRepository()
+        # Slice 11: read-only repository for per-project assistant context.
+        # Injected for testability (AsyncMock in unit tests).
+        self._project_repo = project_repo or ProjectRepository()
 
     async def stream_response(
         self,
@@ -122,14 +130,18 @@ class AssistantService:
         model: Optional[str] = None,
         image_model_id: Optional[str] = None,
         generation_mode: Optional[str] = None,
+        project_id: Optional[UUID] = None,
+        user_id: Optional[UUID] = None,
     ) -> AsyncGenerator[dict, None]:
         """Stream a response from the LangGraph agent as SSE events.
 
         Orchestrates:
         1. Rate limiting check (done by caller in route)
         2. Build HumanMessage with optional images
-        3. Invoke LangGraph astream_events() with thread config
-        4. Convert events to SSE format (text-delta, tool-call-result, text-done, error)
+        3. Slice 11: Hydrate per-project assistant context (if `project_id` +
+           `user_id` are provided) and stamp it into `configurable`.
+        4. Invoke LangGraph astream_events() with thread config
+        5. Convert events to SSE format (text-delta, tool-call-result, text-done, error)
 
         Args:
             session_id: The session/thread ID for LangGraph config.
@@ -138,6 +150,17 @@ class AssistantService:
             model: Optional LLM model override slug.
             image_model_id: Optional image generation model ID for knowledge injection.
             generation_mode: Optional generation mode ('txt2img' or 'img2img').
+            project_id: Optional UUID of the project this turn belongs to.
+                When provided together with `user_id`, the per-project context
+                (`projects.context_instructions`) is loaded once per turn and
+                forwarded to the LangGraph nodes via `configurable`. When
+                missing, no repository call is made and `configurable
+                ["project_context"]` is set to `None` (no block injected) —
+                this preserves backward-compatibility for callers that have
+                not yet been wired up to pass `project_id` (e.g. older tests
+                or pre-Slice-19 routes that lack `project_id` in the DTO).
+            user_id: Optional UUID of the authenticated user. Used together
+                with `project_id` for the ownership-checked context lookup.
 
         Yields:
             Dicts with 'event' and 'data' keys for SSE formatting.
@@ -156,6 +179,38 @@ class AssistantService:
 
             human_message = HumanMessage(content=message_content)
 
+            # Slice 11: Load the per-project assistant context (raw, not
+            # escaped — escape happens centrally in `prompts.py` so the
+            # transformation lives next to the consumer).
+            #
+            # Contract:
+            # - Both `project_id` AND `user_id` present  -> exactly 1 call
+            #   to `ProjectRepository.get_context` per `stream_response`
+            #   invocation; first tuple element propagates as-is (None
+            #   passes through unchanged when context_instructions IS NULL).
+            # - Either parameter missing                 -> no repository
+            #   call; `configurable["project_context"]` is set to None.
+            project_context: Optional[str] = None
+            if project_id is not None and user_id is not None:
+                context_value, _owner_id = await self._project_repo.get_context(
+                    project_id, user_id
+                )
+                project_context = context_value
+                # Logging contract (Slice 5 AC-6 + Slice 11 Constraints):
+                # Boolean / length markers only -- NEVER plaintext context.
+                logger.debug(
+                    "AssistantService.stream_response: project_context loaded",
+                    extra={
+                        "session_id": session_id,
+                        "has_project_context": project_context is not None,
+                        "context_length": (
+                            len(project_context)
+                            if project_context is not None
+                            else 0
+                        ),
+                    },
+                )
+
             # LangGraph config with thread_id for session persistence.
             # Pass the actual image URLs so analyze_image uses the correct R2 URLs
             # instead of whatever URLs the LLM hallucinates.
@@ -166,6 +221,10 @@ class AssistantService:
                     "model": model,
                     "image_model_id": image_model_id,
                     "generation_mode": generation_mode,
+                    # Slice 11: forwarded into _call_model_sync/_call_model_async
+                    # in `graph.py`, which passes it as the third argument to
+                    # `build_assistant_system_prompt`.
+                    "project_context": project_context,
                 }
             }
 

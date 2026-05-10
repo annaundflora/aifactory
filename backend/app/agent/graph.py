@@ -237,8 +237,13 @@ def create_agent(
         configurable = config.get("configurable", {})
         image_model_id = configurable.get("image_model_id")
         generation_mode = configurable.get("generation_mode")
+        # Slice 11: forward optional per-project context from configurable
+        # into build_assistant_system_prompt. Missing key -> None (no block).
+        project_context = configurable.get("project_context")
         system_msg = SystemMessage(
-            content=build_assistant_system_prompt(image_model_id, generation_mode)
+            content=build_assistant_system_prompt(
+                image_model_id, generation_mode, project_context
+            )
         )
         messages = [system_msg] + list(state["messages"])
         response = _get_llm(config).invoke(messages)
@@ -249,8 +254,13 @@ def create_agent(
         configurable = config.get("configurable", {})
         image_model_id = configurable.get("image_model_id")
         generation_mode = configurable.get("generation_mode")
+        # Slice 11: forward optional per-project context from configurable
+        # into build_assistant_system_prompt. Missing key -> None (no block).
+        project_context = configurable.get("project_context")
         system_msg = SystemMessage(
-            content=build_assistant_system_prompt(image_model_id, generation_mode)
+            content=build_assistant_system_prompt(
+                image_model_id, generation_mode, project_context
+            )
         )
         messages = [system_msg] + list(state["messages"])
         response = await _get_llm(config).ainvoke(messages)
