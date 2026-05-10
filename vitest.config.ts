@@ -13,6 +13,7 @@ export default defineConfig({
       '**/dist/**',
       'worktrees/**',
       'e2e/**',
+      'tests/e2e/**',
     ],
     server: {
       deps: {

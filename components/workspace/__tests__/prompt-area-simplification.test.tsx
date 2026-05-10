@@ -209,20 +209,35 @@ vi.mock('@/lib/assistant/use-assistant-runtime', () => ({
 }))
 
 // Mock workspace-state
+//
+// Slice 22 lifted ``generationMode`` and ``referenceSlots`` from prompt-area's
+// local state into the WorkspaceStateProvider. The img2img-mode test drives a
+// UI mode switch and then asserts ``callArgs.generationMode === 'img2img'``,
+// which only works if the mock is REACTIVE. We back the mock with React
+// ``useState`` so set-callers actually trigger a re-render.
 const mockClearVariation = vi.fn()
-vi.mock('@/lib/workspace-state', () => ({
-  useWorkspaceVariation: () => ({
-    variationData: null,
-    setVariation: vi.fn(),
-    clearVariation: mockClearVariation,
-    // Slice 22: lifted reference-slot + generation-mode state
-    referenceSlots: [],
-    setReferenceSlots: vi.fn(),
-    generationMode: 'txt2img',
-    setGenerationMode: vi.fn(),
-  }),
-  WorkspaceStateProvider: ({ children }: { children: ReactNode }) => children,
-}))
+vi.mock('@/lib/workspace-state', async () => {
+  const React = await import('react')
+  return {
+    useWorkspaceVariation: () => {
+      const [generationMode, setGenerationMode] = React.useState<
+        'txt2img' | 'img2img' | 'upscale'
+      >('txt2img')
+      const [referenceSlots, setReferenceSlots] = React.useState<unknown[]>([])
+      return {
+        variationData: null,
+        setVariation: vi.fn(),
+        clearVariation: mockClearVariation,
+        // Slice 22: lifted reference-slot + generation-mode state (stateful)
+        referenceSlots,
+        setReferenceSlots,
+        generationMode,
+        setGenerationMode,
+      }
+    },
+    WorkspaceStateProvider: ({ children }: { children: ReactNode }) => children,
+  }
+})
 
 // Mock ReferenceBar
 vi.mock('@/components/workspace/reference-bar', () => ({
