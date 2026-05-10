@@ -156,16 +156,26 @@ class TestSystemPrompt:
         )
 
     def test_system_prompt_creative_partner_role(self):
-        """System prompt must define a creative partner role, not a questionnaire."""
+        """System prompt must define a creative partner role with adaptive interview style.
+
+        Slice 12 rewrote `_BASE_PROMPT`: the explicit "Fragebogen"-Anti-marker was
+        replaced by a positive description of the adaptive interview behaviour
+        ("adaptiv statt starr abgearbeitet", "Frage nicht alles auf einmal").
+        We assert against the new positive phrasing here.
+        """
         from app.agent.prompts import SYSTEM_PROMPT
 
         prompt_lower = SYSTEM_PROMPT.lower()
         assert "kreativ" in prompt_lower, (
             "System prompt must define a creative partner role"
         )
-        assert "fragebogen" in prompt_lower, (
-            "System prompt must explicitly state it should NOT be a questionnaire "
-            "(mention 'Fragebogen' to distinguish the role)"
+        # New base prompt explicitly contrasts adaptive interviewing with a
+        # starr abgearbeiteter (questionnaire-like) flow. Either marker is
+        # sufficient evidence that the role is "creative partner, not
+        # questionnaire".
+        assert "adaptiv" in prompt_lower or "interview-partner" in prompt_lower, (
+            "System prompt must describe the role as an adaptive interview partner "
+            "(must contain 'adaptiv' or 'Interview-Partner')"
         )
 
     def test_system_prompt_must_haves_motiv(self):
