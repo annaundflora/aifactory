@@ -158,7 +158,7 @@ describe('Projects Schema Extensions', () => {
     expect(columnMap['updated_at'].notNull).toBe(true)
     expect(columnMap['updated_at'].hasDefault).toBe(true)
 
-    // Verify total column count: 4 existing + 2 new + 1 userId = 7
-    expect(config.columns.length).toBe(7)
+    // Verify total column count: 4 existing + 2 thumbnail + 1 userId + 2 context (slice-01) = 9
+    expect(config.columns.length).toBe(9)
   })
 })

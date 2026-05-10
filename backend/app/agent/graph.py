@@ -27,28 +27,68 @@ from app.agent.prompts import build_assistant_system_prompt
 from app.agent.state import PromptAssistantState
 from app.agent.tools.image_tools import analyze_image
 from app.agent.tools.model_tools import get_model_info, recommend_model
-from app.agent.tools.prompt_tools import draft_prompt, refine_prompt
+from app.agent.tools.prompt_tools import draft_prompt, emit_intent_summary, refine_prompt
 from app.agent.tools.search_tools import web_search
+from app.agent.tools.workspace_tools import (
+    set_model_params,
+    set_slot_role,
+    set_slot_strength,
+)
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 # Tool registry: all tools available to the agent.
-ALL_TOOLS = [draft_prompt, refine_prompt, analyze_image, recommend_model, get_model_info, web_search]
+ALL_TOOLS = [
+    draft_prompt,
+    refine_prompt,
+    analyze_image,
+    recommend_model,
+    get_model_info,
+    web_search,
+    emit_intent_summary,
+    set_slot_role,
+    set_slot_strength,
+    set_model_params,
+]
 
 # Tool names whose results should update state fields via post_process_node.
-# Maps tool name -> state field to update.
+# Maps tool name -> state field name OR (for tools handled by a special
+# branch) the target ``flow_state`` value. ``emit_intent_summary`` is the
+# only entry where the value is NOT a state-field name but the target
+# ``flow_state`` ("summarizing"); post_process_node detects this via the
+# TOOL_PAYLOAD_FROM_ARGS lookup and routes through the special branch.
 TOOL_STATE_MAPPING: dict[str, str] = {
     "draft_prompt": "draft_prompt",
     "refine_prompt": "draft_prompt",
     "analyze_image": "reference_images",
     "recommend_model": "recommended_model",
+    # NOTE: value is the FSM target state ("summarizing"), not a state field.
+    # post_process_node consults TOOL_PAYLOAD_FROM_ARGS to find the actual
+    # state-field name ("final_intent") for this tool.
+    "emit_intent_summary": "summarizing",
 }
 
 # Tools whose results should be appended to a list field (not overwritten).
 # The value is the state field that holds the list.
 TOOL_APPEND_MAPPING: dict[str, str] = {
     "analyze_image": "reference_images",
+}
+
+# Tools whose invocation transitions ``flow_state`` to a fixed value.
+# Maps tool name -> target ``flow_state`` value (NOT a state-field name).
+# Slice 13: ``emit_intent_summary`` advances FSM to ``"summarizing"``.
+TOOL_FLOW_STATE_MAPPING: dict[str, str] = {
+    "emit_intent_summary": "summarizing",
+}
+
+# Tools whose ``final_intent`` (or analogous payload field) is sourced from the
+# AIMessage tool-call arguments rather than the ToolMessage content. This is
+# required for emit_intent_summary because the post_process_node must persist
+# the user-intent payload exactly as the LLM emitted it (the validated tool
+# args), not a re-serialisation of the tool result.
+TOOL_PAYLOAD_FROM_ARGS: dict[str, str] = {
+    "emit_intent_summary": "final_intent",
 }
 
 
@@ -62,6 +102,9 @@ def post_process_node(state: PromptAssistantState) -> dict:
     For draft_prompt and refine_prompt: updates state["draft_prompt"] (overwrite).
     For analyze_image: appends {"url": <image_url>, "analysis": <result>} to
     state["reference_images"] (append, not overwrite).
+    For emit_intent_summary: persists the validated AIMessage tool-call
+    arguments to state["final_intent"] and advances state["flow_state"] to
+    "summarizing" (per TOOL_FLOW_STATE_MAPPING / TOOL_PAYLOAD_FROM_ARGS).
 
     Returns:
         Dict with state field updates (e.g., {"draft_prompt": {...}}).
@@ -122,6 +165,34 @@ def post_process_node(state: PromptAssistantState) -> dict:
                 "post_process_node: Skipping error result from tool %s: %s",
                 tool_name,
                 str(content.get("error", ""))[:100],
+            )
+            continue
+
+        # Special branch: emit_intent_summary (and any future tool that
+        # persists the validated tool-call arguments verbatim and triggers a
+        # ``flow_state`` transition). The payload comes from the AIMessage
+        # tool_call args (LLM-emitted intent), NOT from the tool result, so
+        # that what we persist matches what the user is shown in the
+        # Intent-Summary-Card.
+        if tool_name in TOOL_PAYLOAD_FROM_ARGS:
+            payload_field = TOOL_PAYLOAD_FROM_ARGS[tool_name]
+            tool_call_id = getattr(msg, "tool_call_id", None)
+            args = tool_call_args.get(tool_call_id, {}) if tool_call_id else {}
+
+            # Persist the tool args as the intent payload.
+            updates[payload_field] = dict(args)
+
+            # Advance flow_state if a transition is registered for this tool.
+            target_flow_state = TOOL_FLOW_STATE_MAPPING.get(tool_name)
+            if target_flow_state is not None:
+                updates["flow_state"] = target_flow_state
+
+            logger.debug(
+                "post_process_node: Tool %s persisted payload to state[%s] "
+                "and set flow_state=%s",
+                tool_name,
+                payload_field,
+                target_flow_state,
             )
             continue
 
@@ -237,8 +308,13 @@ def create_agent(
         configurable = config.get("configurable", {})
         image_model_id = configurable.get("image_model_id")
         generation_mode = configurable.get("generation_mode")
+        # Slice 11: forward optional per-project context from configurable
+        # into build_assistant_system_prompt. Missing key -> None (no block).
+        project_context = configurable.get("project_context")
         system_msg = SystemMessage(
-            content=build_assistant_system_prompt(image_model_id, generation_mode)
+            content=build_assistant_system_prompt(
+                image_model_id, generation_mode, project_context
+            )
         )
         messages = [system_msg] + list(state["messages"])
         response = _get_llm(config).invoke(messages)
@@ -249,8 +325,13 @@ def create_agent(
         configurable = config.get("configurable", {})
         image_model_id = configurable.get("image_model_id")
         generation_mode = configurable.get("generation_mode")
+        # Slice 11: forward optional per-project context from configurable
+        # into build_assistant_system_prompt. Missing key -> None (no block).
+        project_context = configurable.get("project_context")
         system_msg = SystemMessage(
-            content=build_assistant_system_prompt(image_model_id, generation_mode)
+            content=build_assistant_system_prompt(
+                image_model_id, generation_mode, project_context
+            )
         )
         messages = [system_msg] + list(state["messages"])
         response = await _get_llm(config).ainvoke(messages)

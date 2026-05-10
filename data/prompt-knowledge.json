@@ -72,6 +72,15 @@
             "Mention style transfer goals explicitly if changing artistic direction"
           ]
         }
+      },
+      "params": {
+        "aspect_ratio": {"type": "string"},
+        "guidance": {"type": "number"},
+        "prompt_strength": {"type": "number"},
+        "num_inference_steps": {"type": "integer"},
+        "output_format": {"type": "string"},
+        "seed": {"type": "integer"},
+        "safety_tolerance": {"type": "integer"}
       }
     },
     "flux-2-klein-4b": {

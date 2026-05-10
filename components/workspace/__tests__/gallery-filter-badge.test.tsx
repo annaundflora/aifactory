@@ -72,7 +72,15 @@ vi.mock("@/lib/db/index", () => ({
 // Mock workspace-state to prevent WorkspaceStateProvider error
 vi.mock("@/lib/workspace-state", () => ({
   WorkspaceStateProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useWorkspaceVariation: () => ({ variation: null, setVariation: vi.fn() }),
+  useWorkspaceVariation: () => ({
+    variation: null,
+    setVariation: vi.fn(),
+    // Slice 22: lifted reference-slot + generation-mode state
+    referenceSlots: [],
+    setReferenceSlots: vi.fn(),
+    generationMode: "txt2img",
+    setGenerationMode: vi.fn(),
+  }),
   useWorkspaceVariationOptional: () => null,
 }));
 

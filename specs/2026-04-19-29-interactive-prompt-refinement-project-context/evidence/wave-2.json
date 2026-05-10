@@ -1,0 +1,8 @@
+{
+  "wave": "wave_2_data_layer",
+  "slices": ["slice-02", "slice-05"],
+  "all_approved": true,
+  "all_tests_passed": true,
+  "slice-02": {"commit": "62fc1331a1c8c69203faea8eb2887785a71e1b71", "tests": "lib/db/__tests__/queries.test.ts"},
+  "slice-05": {"commit": "8a12747e04e940d707b02157ebd2e4f6f2e561e9", "tests": "backend/tests/unit/test_project_repository.py"}
+}

@@ -142,7 +142,12 @@ class TestSlice03Acceptance:
         WHEN der System Prompt geladen wird
         THEN enthaelt er Instruktionen fuer: deutsche Chat-Sprache,
         englische Prompt-Ausgabe, kreative-Partner-Rolle (nicht Fragebogen),
-        Must-Haves (Motiv, Stil, Zweck), und Tool-Nutzungs-Hinweise
+        Must-Haves (Motiv, Stil, Zweck), und Tool-Nutzungs-Hinweise.
+
+        Updated for Slice 12: the rewritten `_BASE_PROMPT` no longer uses the
+        "Fragebogen"-Anti-marker. Instead it describes an adaptive interview
+        partner role ("adaptiv statt starr abgearbeitet"). We assert against
+        the new positive phrasing here while keeping all other AC-4 checks.
         """
         from app.agent.prompts import SYSTEM_PROMPT
 
@@ -164,14 +169,14 @@ class TestSlice03Acceptance:
             "(must contain 'Englisch')"
         )
 
-        # 3. Creative partner role (not questionnaire)
+        # 3. Creative partner role described as adaptive interview partner
         assert "kreativ" in prompt_lower, (
             "System prompt must define creative partner role "
             "(must contain 'kreativ')"
         )
-        assert "fragebogen" in prompt_lower, (
-            "System prompt must explicitly state it is NOT a questionnaire "
-            "(must mention 'Fragebogen')"
+        assert "adaptiv" in prompt_lower or "interview-partner" in prompt_lower, (
+            "System prompt must describe the role as an adaptive interview "
+            "partner (must contain 'adaptiv' or 'Interview-Partner')"
         )
 
         # 4. Must-haves: Motiv, Stil, Zweck

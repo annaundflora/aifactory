@@ -7,6 +7,7 @@ import {
   getProject as getProjectQuery,
   renameProject as renameProjectQuery,
   deleteProject as deleteProjectQuery,
+  updateProjectContext as updateProjectContextQuery,
   type Project,
 } from "@/lib/db/queries";
 import {
@@ -135,6 +136,80 @@ export async function deleteProject(input: {
     console.error("deleteProject DB error:", err);
     return { error: "Datenbankfehler" };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Project Context Actions
+// ---------------------------------------------------------------------------
+
+/**
+ * Server Action to update a project's context instructions.
+ *
+ * Validation order:
+ *   1. requireAuth() — Unauthorized → { error: "Unauthorized" }
+ *   2. Trim + normalize empty/whitespace-only to null (Clear-Pfad)
+ *   3. Length check (> 8000 chars after trim) → length error
+ *   4. Query helper (ownership-strict via Slice 02)
+ *   5. Helper returns null → "Projekt nicht gefunden"
+ *   6. revalidatePath('/projects/' + projectId) + return updated row
+ */
+export async function updateProjectContext(input: {
+  projectId: string;
+  contextInstructions: string | null;
+}): Promise<
+  | { contextInstructions: string | null; contextUpdatedAt: Date }
+  | { error: string }
+> {
+  const auth = await requireAuth();
+  if ("error" in auth) {
+    return { error: auth.error };
+  }
+
+  // Trim + normalize empty/whitespace-only to null (Clear-Pfad).
+  // Per architecture.md (Validation Rules + DTO): leerer String / null = "kein
+  // Context"; Whitespace-only wird ebenfalls als Clear behandelt (AC-8).
+  const raw = input.contextInstructions;
+  let normalized: string | null;
+  if (raw === null) {
+    normalized = null;
+  } else {
+    const trimmed = raw.trim();
+    normalized = trimmed.length === 0 ? null : trimmed;
+  }
+
+  // Length-Check operates on String.prototype.length (post-trim).
+  if (normalized !== null && normalized.length > 8000) {
+    return { error: "Context exceeds maximum length of 8000 characters." };
+  }
+
+  let row: { contextInstructions: string | null; contextUpdatedAt: Date | null } | null;
+  try {
+    row = await updateProjectContextQuery({
+      projectId: input.projectId,
+      userId: auth.userId,
+      contextInstructions: normalized,
+    });
+  } catch (err) {
+    console.error("updateProjectContext DB error:", err);
+    return { error: "Datenbankfehler" };
+  }
+
+  // Helper returned null → ownership mismatch or project does not exist.
+  // Map to "Projekt nicht gefunden" to avoid existence-leakage (architecture.md
+  // → 404 statt 403 für Ownership-Mismatch).
+  if (row === null) {
+    return { error: "Projekt nicht gefunden" };
+  }
+
+  revalidatePath("/projects/" + input.projectId);
+
+  // Helper returns contextUpdatedAt as Date (Postgres `now()` via .returning()).
+  // The DB column is non-null after a successful UPDATE; cast to satisfy the
+  // discriminated-union signature.
+  return {
+    contextInstructions: row.contextInstructions,
+    contextUpdatedAt: row.contextUpdatedAt as Date,
+  };
 }
 
 // ---------------------------------------------------------------------------

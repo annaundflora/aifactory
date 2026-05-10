@@ -46,6 +46,11 @@ vi.mock("@/lib/workspace-state", () => ({
     variationData: null,
     setVariation: vi.fn(),
     clearVariation: vi.fn(),
+    // Slice 22: lifted reference-slot + generation-mode state
+    referenceSlots: [],
+    setReferenceSlots: vi.fn(),
+    generationMode: "txt2img",
+    setGenerationMode: vi.fn(),
   }),
   useWorkspaceVariationOptional: () => null,
   WorkspaceStateProvider: ({ children }: { children: React.ReactNode }) => children,

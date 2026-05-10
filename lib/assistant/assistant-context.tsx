@@ -38,6 +38,69 @@ export interface ToolCallResult {
 export type ActiveView = "chat" | "session-list" | "startscreen";
 
 // ---------------------------------------------------------------------------
+// Slice 15: FSM mirror + IntentSummaryPayload types
+// ---------------------------------------------------------------------------
+
+/**
+ * Whitelisted FSM states for the Interactive Prompt Refinement flow.
+ *
+ * Mirrors the backend ``flow_state`` enum (architecture.md → "Data
+ * Transfer Objects" → ``FlowStateEvent``). Five values are emitted by the
+ * backend (``idle | interviewing | summarizing | reviewing | refining``);
+ * ``generating`` is set frontend-side on the user click in the
+ * IntentSummaryCard (no backend round-trip).
+ */
+export type FlowState =
+  | "idle"
+  | "interviewing"
+  | "summarizing"
+  | "reviewing"
+  | "refining"
+  | "generating";
+
+/**
+ * Typed diff payload for ``IntentSummaryPayload.settings_diff``.
+ *
+ * Mirrors architecture.md → "SettingsDiff Type Schema". All four
+ * sub-arrays are optional; the backend omits the entire ``settings_diff``
+ * field when no settings changed.
+ */
+export interface SettingsDiff {
+  slotRoles?: Array<{
+    slotIndex: number;
+    from: "subject" | "style" | "composition" | null;
+    to: "subject" | "style" | "composition";
+  }>;
+  slotStrengths?: Array<{
+    slotIndex: number;
+    from: number | null;
+    to: number;
+  }>;
+  modelId?: { from: string; to: string };
+  modelParams?: Array<{ key: string; from: unknown; to: unknown }>;
+}
+
+/**
+ * Wire payload of the SSE ``intent-summary`` event.
+ *
+ * Mirrors architecture.md → "Data Transfer Objects" →
+ * ``IntentSummaryPayload``. ``settings_diff`` is omitted when no settings
+ * changed (per AC-3 in the Slice 15 spec).
+ */
+export interface IntentSummaryPayload {
+  axes: {
+    subject?: string;
+    medium?: string;
+    style?: string;
+    lighting?: string;
+    composition?: string;
+    palette?: string;
+  };
+  prompt_preview: string;
+  settings_diff?: SettingsDiff;
+}
+
+// ---------------------------------------------------------------------------
 // Session Detail Response (from backend GET /api/assistant/sessions/{id})
 // ---------------------------------------------------------------------------
 
@@ -50,6 +113,64 @@ interface SessionDetailState {
     style?: string;
     negative_prompt?: string;
   } | null;
+  /**
+   * Slice 28: persisted FSM state from the LangGraph checkpointer
+   * (architecture.md → "Frontend State Machine Wiring" → "Resume on session
+   * reload"). Optional because legacy checkpoints (pre-Slice-14) and the
+   * defensive backend defaults may omit / default the field. The hydrate-
+   * effekt in ``loadSession`` validates against ``FLOW_STATE_WHITELIST``
+   * before dispatching ``SET_FLOW_STATE`` (AC-7).
+   */
+  flow_state?: string;
+  /**
+   * Slice 28: persisted intent-summary axes (subject/medium/style/lighting/
+   * composition/palette). Empty object for legacy checkpoints; mapped 1:1
+   * into ``IntentSummaryPayload.axes`` on resume (AC-4).
+   */
+  intent_axes?: {
+    subject?: string;
+    medium?: string;
+    style?: string;
+    lighting?: string;
+    composition?: string;
+    palette?: string;
+  };
+  /**
+   * Slice 28: persisted ``final_intent`` payload (written by the
+   * ``emit_intent_summary`` tool). ``null`` / ``undefined`` for legacy
+   * checkpoints and for sessions where the tool was never invoked. The
+   * hydrate-effekt rebuilds ``IntentSummaryPayload`` from this payload +
+   * ``intent_axes`` when ``flow_state === "summarizing"`` (AC-4).
+   * ``model_id`` is intentionally not propagated to ``IntentSummaryPayload``
+   * (which has no ``model_id`` field).
+   */
+  final_intent?: {
+    prompt: string;
+    settings_diff?: SettingsDiff | null;
+    model_id?: string | null;
+  } | null;
+}
+
+/**
+ * Slice 28 AC-7: whitelist of FSM ``flow_state`` values that the hydrate-
+ * effekt accepts. Mirrors the backend whitelist in
+ * ``backend/app/services/assistant_service.py:_FLOW_STATE_WHITELIST`` plus
+ * the frontend-only ``"generating"`` transition (set on user click in the
+ * IntentSummaryCard). Unknown values are dropped + logged via
+ * ``console.warn`` (analog to Slice 15 AC-9).
+ */
+const FLOW_STATE_WHITELIST: ReadonlySet<FlowState> = new Set<FlowState>([
+  "idle",
+  "interviewing",
+  "summarizing",
+  "reviewing",
+  "refining",
+  "generating",
+]);
+
+function isWhitelistedFlowState(value: unknown): value is FlowState {
+  return typeof value === "string"
+    && (FLOW_STATE_WHITELIST as ReadonlySet<string>).has(value);
 }
 
 interface SessionDetailResponse {
@@ -82,6 +203,116 @@ export interface AssistantState {
   isLoadingSession: boolean;
   /** Whether the current draft has been applied to the workspace */
   isApplied: boolean;
+  /**
+   * Tab-session-scoped flag for the No-Context-Hint-Banner dismissal.
+   * Slice 10: defaults to `false` on provider-mount, set to `true` via
+   * DISMISS_NO_CONTEXT_BANNER, NOT reset on RESET_SESSION (project switch).
+   * Resets only on tab reload (provider re-mount). No persistence.
+   */
+  noContextBannerDismissed: boolean;
+  /**
+   * Slice 15: mirror of the backend FSM ``flow_state`` field. Updated by
+   * the SSE ``flow-state`` event handler in ``use-assistant-runtime.ts``
+   * via the ``SET_FLOW_STATE`` action. Defaults to ``"idle"``; the
+   * ``"generating"`` transition is set frontend-side on user click in the
+   * IntentSummaryCard (no backend round-trip).
+   */
+  flowState: FlowState;
+  /**
+   * Slice 15: payload of the most-recently-received ``intent-summary`` SSE
+   * event. ``null`` until the LLM calls ``emit_intent_summary``; replaced
+   * (idempotent) on each subsequent event so the IntentSummaryCard can
+   * re-render with the latest payload.
+   */
+  intentSummaryPayload: IntentSummaryPayload | null;
+  /**
+   * Slice 24: pending slot-role patch coming from the LangGraph
+   * ``set_slot_role`` tool result. The PromptArea subscribes via
+   * ``useEffect`` keyed on ``version`` and applies the change to its
+   * local slot state through the existing ``handleReferenceRoleChange``
+   * helper. ``null`` until the first tool call; replaced (NOT merged) on
+   * each subsequent ``SET_SLOT_ROLE`` action. The ``version`` counter
+   * (analogous to ``draftVersion``) ensures that two consecutive
+   * identical payloads still trigger two distinct subscriber runs.
+   * Transient — NOT persisted across LangGraph resume (Slice 28).
+   */
+  pendingSlotRolePatch: {
+    slotIndex: number;
+    role: "subject" | "style" | "composition";
+    version: number;
+  } | null;
+  /**
+   * Slice 24: pending slot-strength patch coming from the LangGraph
+   * ``set_slot_strength`` tool result. Same subscriber pattern as
+   * ``pendingSlotRolePatch``; ``strength`` is a float in [0.0, 1.0].
+   * Transient — NOT persisted across LangGraph resume.
+   */
+  pendingSlotStrengthPatch: {
+    slotIndex: number;
+    strength: number;
+    version: number;
+  } | null;
+  /**
+   * Slice 24: pending workspace ``modelParams`` patch coming from the
+   * LangGraph ``set_model_params`` tool result. Consumed by the existing
+   * auto-apply ``useEffect`` in the AssistantProvider, which forwards
+   * ``modelParams`` to ``setVariation`` WITHOUT touching ``promptMotiv``,
+   * ``promptStyle`` or ``negativePrompt`` (slice-boundary discipline,
+   * see ``assistant-context-apply.test.tsx`` AC-2). Transient — NOT
+   * persisted across LangGraph resume.
+   */
+  pendingModelParamsPatch: {
+    modelParams: Record<string, unknown>;
+    version: number;
+  } | null;
+  /**
+   * Slice 27: payload of the most-recent ``RENDER_PASTE_CONFIRM`` action
+   * dispatched by the trigger-layer in ``chat-thread.tsx`` when the
+   * paste-detect heuristic (Slice 26) matches the FIRST user message of a
+   * session. ``null`` until the trigger fires; reset to ``null`` by
+   * ``DISMISS_PASTE_CONFIRM`` after either button click.
+   *
+   * **Transient — NOT persisted across LangGraph resume (Slice 28).**
+   * The card is a one-shot routing decision, not a durable artefact (see
+   * wireframes.md → "Screen: Paste Detect Confirm Card" → State
+   * Variations → ``dismissed``). The trigger-layer also enforces a
+   * single-fire guarantee at the call-site level (AC-2): even if a later
+   * user message would match the heuristic, no second
+   * ``RENDER_PASTE_CONFIRM`` is dispatched in the same session.
+   */
+  pasteConfirmPayload: { seedText: string } | null;
+  /**
+   * Slice 18: URL of the most-recently succeeded generation in the active
+   * session (the result image that the assistant should treat as
+   * multimodal context on the next turn). ``null`` until the first
+   * successful generate cycle settles; replaced (NOT appended — only the
+   * latest result is kept per Discovery business rule line 286) on each
+   * subsequent ``SET_LAST_RESULT_IMAGE_URL`` action.
+   *
+   * **Out-of-DB persistence:** the field lives ONLY in the per-session
+   * reducer state (architecture.md → "Out-of-DB persistence" →
+   * ``last_result_image_url``). It is sent to the backend on every
+   * outgoing user-message body via ``last_result_image_url`` (Slice 18 +
+   * Slice 19) so the backend can build the multimodal HumanMessage; the
+   * backend itself does NOT persist the URL standalone.
+   *
+   * **Reset semantics:** explicit-clear via dispatching
+   * ``SET_LAST_RESULT_IMAGE_URL`` with ``url: null`` AND implicit-reset on
+   * ``RESET_SESSION`` (project switch / new session). Persisted across
+   * LangGraph resume only via the implicit path (a freshly hydrated
+   * session has no result yet, by definition — the resume hydrate-effect
+   * does not re-populate this field).
+   */
+  lastResultImageUrl: string | null;
+  /**
+   * Slice 18: ``generations.id`` of the most-recently succeeded generation
+   * — companion to ``lastResultImageUrl``. Used by the result-message
+   * thumbnail click handler in ``chat-thread.tsx`` to open the existing
+   * detail-view for EXACTLY this generation (AC-6 Reuse-Pflicht). ``null``
+   * until the first successful settle; same persistence + reset semantics
+   * as ``lastResultImageUrl``.
+   */
+  lastResultGenerationId: string | null;
 }
 
 const initialState: AssistantState = {
@@ -95,6 +326,15 @@ const initialState: AssistantState = {
   activeView: "startscreen",
   isLoadingSession: false,
   isApplied: false,
+  noContextBannerDismissed: false,
+  flowState: "idle",
+  intentSummaryPayload: null,
+  pendingSlotRolePatch: null,
+  pendingSlotStrengthPatch: null,
+  pendingModelParamsPatch: null,
+  pasteConfirmPayload: null,
+  lastResultImageUrl: null,
+  lastResultGenerationId: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -124,7 +364,98 @@ export type AssistantAction =
       isApplied?: boolean;
     }
   | { type: "RESET_SESSION" }
-  | { type: "SET_IS_APPLIED"; isApplied: boolean };
+  | { type: "SET_IS_APPLIED"; isApplied: boolean }
+  | { type: "DISMISS_NO_CONTEXT_BANNER" }
+  | { type: "SET_FLOW_STATE"; flowState: FlowState }
+  | { type: "RENDER_INTENT_SUMMARY"; payload: IntentSummaryPayload }
+  | {
+      /**
+       * Slice 21 AC-7: append an inline System-Message to the chat
+       * history when the backend reports a failed reference-slot load
+       * (SSE ``slot-load-failed``). The reducer is a pure state mutation
+       * — toast suppression is explicit per the AC; the SSE handler
+       * dispatches this action without any toast side-effect.
+       */
+      type: "RENDER_SYSTEM_MESSAGE";
+      payload: {
+        slot_index: number;
+        reason: string;
+      };
+    }
+  | {
+      /**
+       * Slice 24: dispatched by the SSE handler when a ``set_slot_role``
+       * tool-call-result event is received. Reducer increments the
+       * ``pendingSlotRolePatch.version`` counter so the PromptArea
+       * subscriber picks the change up even when the payload is
+       * unchanged.
+       */
+      type: "SET_SLOT_ROLE";
+      slotIndex: number;
+      role: "subject" | "style" | "composition";
+    }
+  | {
+      /**
+       * Slice 24: dispatched by the SSE handler when a
+       * ``set_slot_strength`` tool-call-result event is received.
+       */
+      type: "SET_SLOT_STRENGTH";
+      slotIndex: number;
+      strength: number;
+    }
+  | {
+      /**
+       * Slice 24: dispatched by the SSE handler when a
+       * ``set_model_params`` tool-call-result event is received. The
+       * auto-apply ``useEffect`` in the AssistantProvider forwards the
+       * ``modelParams`` to ``setVariation`` (without touching prompt
+       * fields) when the version counter increments.
+       */
+      type: "SET_MODEL_PARAMS_PATCH";
+      modelParams: Record<string, unknown>;
+    }
+  | {
+      /**
+       * Slice 27: dispatched by the trigger-layer in ``chat-thread.tsx``
+       * when the paste-detect heuristic matches the FIRST user message
+       * of a session. Sets ``state.pasteConfirmPayload`` to
+       * ``{ seedText }`` so the chat-thread render-branch mounts the
+       * ``<PasteDetectConfirmCard />``. Idempotent at the reducer
+       * boundary — successive dispatches simply replace the payload;
+       * single-fire is enforced one level up by the trigger-layer
+       * (AC-2).
+       */
+      type: "RENDER_PASTE_CONFIRM";
+      payload: { seedText: string };
+    }
+  | {
+      /**
+       * Slice 27: dispatched by the card component itself on either
+       * button click ("Direkt verfeinern" / "Interview starten"). Sets
+       * ``state.pasteConfirmPayload`` back to ``null`` so the
+       * chat-thread render-branch un-mounts the card. The card is
+       * **transient** — unlike the IntentSummaryCard it does NOT
+       * persist in chat history.
+       */
+      type: "DISMISS_PASTE_CONFIRM";
+    }
+  | {
+      /**
+       * Slice 18: dispatched by the auto-apply-settle path in
+       * ``use-assistant-runtime.ts`` when a generation in the active
+       * project transitions to ``status === "completed"`` (the on-the-wire
+       * status name for "succeeded" per ``lib/db/schema.ts:66``) WITH a
+       * non-empty ``imageUrl``. Carries the URL of the newest such
+       * generation plus its ``generations.id`` for the detail-view click
+       * path. Setting ``url`` to ``null`` (explicit-clear) is the
+       * supported reset path for AC-4 (e.g. session reset / project
+       * switch); when ``url === null`` the implementation MAY also pass
+       * ``generationId: null`` to fully clear both fields.
+       */
+      type: "SET_LAST_RESULT_IMAGE_URL";
+      url: string | null;
+      generationId?: string | null;
+    };
 
 // ---------------------------------------------------------------------------
 // Reducer
@@ -235,16 +566,175 @@ function assistantReducer(
         activeView: "chat",
         // AC-6: Restore isApplied flag (defaults to false when not provided)
         isApplied: action.isApplied ?? false,
+        // Slice 18: ``lastResultImageUrl`` lives per-session only
+        // (architecture.md → "Out-of-DB persistence"). Switching to a
+        // different session must clear it so the body builder does not
+        // accidentally include a URL from the previous session on the
+        // first turn after resume. Resume hydration in Slice 28 may
+        // re-populate it via a separate dispatch when a freshly resumed
+        // session has a final result; until then ``null`` is the safe
+        // default.
+        lastResultImageUrl: null,
+        lastResultGenerationId: null,
       };
 
     case "RESET_SESSION":
+      // Slice 10: noContextBannerDismissed has tab-session scope and MUST NOT
+      // be reset on project/session switch. It only resets on tab reload
+      // (provider re-mount) per architecture.md "Frontend State Machine Wiring".
+      // Slice 24 AC-10: pendingSlotRolePatch / pendingSlotStrengthPatch /
+      // pendingModelParamsPatch are transient and reset to ``null`` here
+      // (handled implicitly via spreading ``initialState``).
       return {
         ...initialState,
         selectedModel: state.selectedModel,
+        noContextBannerDismissed: state.noContextBannerDismissed,
       };
 
     case "SET_IS_APPLIED":
       return { ...state, isApplied: action.isApplied };
+
+    case "DISMISS_NO_CONTEXT_BANNER":
+      return { ...state, noContextBannerDismissed: true };
+
+    case "SET_FLOW_STATE":
+      // Slice 15 AC-7: only ``flowState`` is mutated; all other fields
+      // (messages, draftPrompt, sessionId, …) are preserved verbatim.
+      //
+      // Slice 17 AC-6 (idempotency check): the reducer-branch accepts
+      // every member of the ``FlowState`` union, including
+      // ``"generating"`` (set frontend-side on the user click in the
+      // IntentSummaryCard, no backend round-trip). No additional
+      // whitelist enforcement needed — the type union is the contract.
+      return { ...state, flowState: action.flowState };
+
+    case "RENDER_INTENT_SUMMARY":
+      // Slice 15 AC-8: replace the previous payload (idempotent re-render).
+      // The card mount/un-mount is driven separately by ``flowState``; here
+      // we only carry the data so the card can read it on render.
+      return { ...state, intentSummaryPayload: action.payload };
+
+    case "RENDER_SYSTEM_MESSAGE": {
+      // Slice 21 AC-7: append a system-typed message to the chat history
+      // describing the failed reference-slot load. The text is fixed by
+      // architecture.md → "Error Handling" ("Slot N konnte nicht geladen
+      // werden — bitte neu hochladen"). Insertion is at the END of the
+      // messages list which is the chronological position of the SSE
+      // event in the live stream.
+      //
+      // The reducer is a PURE state mutation: it MUST NOT trigger a
+      // toast. Any UX surfaces (banner, indicator) react to this state
+      // change via subscription, not from inside the reducer.
+      const { slot_index, reason } = action.payload;
+      const systemMessage: Message = {
+        id: `system-slot-load-failed-${slot_index}-${Date.now()}`,
+        role: "system",
+        content: `Slot ${slot_index + 1} konnte nicht geladen werden — bitte neu hochladen.`,
+      };
+      // ``reason`` is intentionally not surfaced in the user-visible text
+      // (architecture mandates a single human-readable message) but is
+      // available in the action payload for telemetry / debug callers
+      // that subscribe to dispatched actions.
+      void reason;
+      return {
+        ...state,
+        messages: [...state.messages, systemMessage],
+      };
+    }
+
+    case "SET_SLOT_ROLE": {
+      // Slice 24 AC-4: replace ``pendingSlotRolePatch`` and bump the
+      // version counter. The PromptArea subscriber observes ``version``
+      // (not the payload itself) so identical successive payloads still
+      // trigger two distinct subscriber runs — analogous to the
+      // ``draftVersion`` pattern.
+      const previousVersion = state.pendingSlotRolePatch?.version ?? 0;
+      return {
+        ...state,
+        pendingSlotRolePatch: {
+          slotIndex: action.slotIndex,
+          role: action.role,
+          version: previousVersion + 1,
+        },
+      };
+    }
+
+    case "SET_SLOT_STRENGTH": {
+      // Slice 24 AC-5: same version-bump pattern as SET_SLOT_ROLE.
+      const previousVersion = state.pendingSlotStrengthPatch?.version ?? 0;
+      return {
+        ...state,
+        pendingSlotStrengthPatch: {
+          slotIndex: action.slotIndex,
+          strength: action.strength,
+          version: previousVersion + 1,
+        },
+      };
+    }
+
+    case "SET_MODEL_PARAMS_PATCH": {
+      // Slice 24 AC-6: bump version so the auto-apply effect picks up
+      // the new modelParams payload. The reducer is pure — the actual
+      // ``setVariation({modelParams})`` call lives in the
+      // AssistantProvider's auto-apply ``useEffect``.
+      const previousVersion = state.pendingModelParamsPatch?.version ?? 0;
+      return {
+        ...state,
+        pendingModelParamsPatch: {
+          modelParams: action.modelParams,
+          version: previousVersion + 1,
+        },
+      };
+    }
+
+    case "RENDER_PASTE_CONFIRM":
+      // Slice 27 AC-8: replace ``pasteConfirmPayload`` with the seed
+      // text from the first user message. The reducer mutation is
+      // idempotent — a second dispatch in the same session would simply
+      // overwrite the payload. The trigger-layer in ``chat-thread.tsx``
+      // is responsible for the single-fire guarantee (AC-2): even if a
+      // later user message would match the heuristic, no second
+      // RENDER_PASTE_CONFIRM is dispatched.
+      return { ...state, pasteConfirmPayload: action.payload };
+
+    case "DISMISS_PASTE_CONFIRM":
+      // Slice 27 AC-9: clear the payload so the chat-thread render-
+      // branch un-mounts the card. The card is transient — unlike the
+      // IntentSummaryCard it does NOT persist in history (wireframes.md
+      // → "Screen: Paste Detect Confirm Card" → State Variations →
+      // ``dismissed``).
+      return { ...state, pasteConfirmPayload: null };
+
+    case "SET_LAST_RESULT_IMAGE_URL": {
+      // Slice 18 AC-3 / AC-4: replace ``lastResultImageUrl`` with the
+      // provided value (``string`` for the set-path, ``null`` for the
+      // explicit-clear path). All other fields stay verbatim — this is a
+      // pure single-field mutation analog to ``SET_FLOW_STATE``.
+      //
+      // ``generationId`` is the companion field used by the
+      // result-message thumbnail click handler. When the action omits
+      // ``generationId`` we preserve the previous value (defensive — the
+      // dispatcher in ``use-assistant-runtime.ts`` always passes both
+      // together, but a hand-rolled test dispatch shouldn't accidentally
+      // clear the id when only the URL is provided). When the URL is
+      // explicitly cleared (``url: null``) we drop the id as well unless
+      // the dispatcher overrides the default by passing
+      // ``generationId: <something>`` explicitly. This keeps the two
+      // fields consistent for downstream consumers.
+      let nextGenerationId: string | null;
+      if (action.generationId !== undefined) {
+        nextGenerationId = action.generationId;
+      } else if (action.url === null) {
+        nextGenerationId = null;
+      } else {
+        nextGenerationId = state.lastResultGenerationId;
+      }
+      return {
+        ...state,
+        lastResultImageUrl: action.url,
+        lastResultGenerationId: nextGenerationId,
+      };
+    }
 
     default:
       return state;
@@ -267,6 +757,54 @@ export interface PromptAssistantContextValue {
   isLoadingSession: boolean;
   /** Whether the current draft has been applied to the workspace */
   isApplied: boolean;
+  /**
+   * Slice 10: tab-session-scoped flag indicating whether the user dismissed
+   * the No-Context-Hint-Banner. Reset only on tab reload (provider re-mount).
+   */
+  noContextBannerDismissed: boolean;
+  /**
+   * Slice 24: most-recent slot-role patch from the LangGraph
+   * ``set_slot_role`` tool. PromptArea subscribes via ``useEffect`` keyed
+   * on ``version``. ``null`` until the first tool call.
+   */
+  pendingSlotRolePatch: AssistantState["pendingSlotRolePatch"];
+  /**
+   * Slice 24: most-recent slot-strength patch from the LangGraph
+   * ``set_slot_strength`` tool.
+   */
+  pendingSlotStrengthPatch: AssistantState["pendingSlotStrengthPatch"];
+  /**
+   * Slice 15 / 16: mirror of the backend FSM ``flow_state`` field.
+   * Consumed by ``chat-thread.tsx`` + ``intent-summary-card.tsx`` to gate
+   * the card mount.
+   */
+  flowState: FlowState;
+  /**
+   * Slice 15 / 16: payload of the most-recent ``intent-summary`` SSE
+   * event. Read by ``IntentSummaryCard`` for rendering. ``null`` until
+   * the LLM emits an intent summary.
+   */
+  intentSummaryPayload: IntentSummaryPayload | null;
+  /**
+   * Slice 27: payload of the most-recent ``RENDER_PASTE_CONFIRM`` action.
+   * Read by ``PasteDetectConfirmCard`` for rendering and to access the
+   * original seed text on button click. ``null`` until the trigger-layer
+   * fires; reset to ``null`` by ``DISMISS_PASTE_CONFIRM``.
+   */
+  pasteConfirmPayload: { seedText: string } | null;
+  /**
+   * Slice 18: URL of the most-recently succeeded generation. Consumed by
+   * ``chat-thread.tsx`` (Pattern (b) fallback when a message lacks the
+   * per-message marker) and ``MultimodalIndicator`` (Slice 22). ``null``
+   * until the first successful generate cycle settles.
+   */
+  lastResultImageUrl: string | null;
+  /**
+   * Slice 18: ``generations.id`` of the most-recently succeeded
+   * generation — used by the result-message thumbnail click handler to
+   * open the existing detail-view (AC-6).
+   */
+  lastResultGenerationId: string | null;
   sendMessage: (content: string, imageUrls?: string[]) => void;
   cancelStream: () => void;
   setSelectedModel: (model: string) => void;
@@ -291,9 +829,25 @@ export interface PromptAssistantContextValue {
   imageModelIdRef: MutableRefObject<string | null>;
   /** Ref holding the current generation mode — written by PromptArea */
   generationModeRef: MutableRefObject<string | null>;
+  /**
+   * Slice 18: ref mirroring ``state.lastResultImageUrl`` — kept in sync
+   * via ``useEffect`` so ``useAssistantRuntime`` can read the latest
+   * value at request-build time without re-subscribing on every URL
+   * change. Mirrors the established ref-pattern (``imageModelIdRef`` /
+   * ``generationModeRef`` / ``referenceSlotsRef``) used by other
+   * slices.
+   */
+  lastResultImageUrlRef: MutableRefObject<string | null>;
 }
 
-const PromptAssistantContext =
+/**
+ * Slice 16: exported (was previously module-private) so consumers like
+ * ``chat-thread.tsx`` can use ``useContext(PromptAssistantContext)``
+ * directly to read FSM + intent-payload state in a way that gracefully
+ * tolerates the no-provider case (existing presentational tests render
+ * the thread without a provider).
+ */
+export const PromptAssistantContext =
   createContext<PromptAssistantContextValue | null>(null);
 
 // ---------------------------------------------------------------------------
@@ -362,8 +916,20 @@ export function PromptAssistantProvider({
   const imageModelIdRef = useRef<string | null>(null);
   const generationModeRef = useRef<string | null>(null);
 
+  // Slice 18: ref mirror of ``state.lastResultImageUrl``. Kept in sync
+  // synchronously on each render so the runtime hook always reads the
+  // latest value when building the next outgoing message body — analog to
+  // ``sessionIdRef`` below and to the ref-mirror pattern documented in
+  // architecture.md → "Migration Map" → ``use-assistant-runtime.ts:354-373``
+  // (line "Mirror existing ref pattern (lines 104-107)").
+  const lastResultImageUrlRef = useRef<string | null>(null);
+
   // Keep sessionIdRef in sync with reducer state
   sessionIdRef.current = state.sessionId;
+  // Slice 18: keep the URL ref in sync — every render pass mirrors the
+  // latest reducer field. Refs do not trigger re-renders so this is a
+  // direct assignment (not a useEffect).
+  lastResultImageUrlRef.current = state.lastResultImageUrl;
 
   const sendMessage = useCallback(
     (content: string, imageUrls?: string[]) => {
@@ -469,6 +1035,73 @@ export function PromptAssistantProvider({
         sessionIdRef.current = sessionId;
         // Reset auto-title tracking for this session (it already has a title)
         autoTitleSentRef.current = sessionId;
+
+        // -------------------------------------------------------------
+        // Slice 28: FSM-Hydrate
+        // -------------------------------------------------------------
+        // Re-dispatches the FSM mirror (``SET_FLOW_STATE``) and — if the
+        // backend persisted a ``final_intent`` payload — also the
+        // ``RENDER_INTENT_SUMMARY`` action so that the IntentSummaryCard
+        // re-mounts with identical content after a page reload
+        // (architecture.md → "Frontend State Machine Wiring" → "Resume on
+        // session reload"). Defensive fallbacks per AC-6 / AC-7:
+        //   * unknown flow_state → no dispatch + console.warn
+        //   * flow_state="summarizing" without final_intent → only
+        //     SET_FLOW_STATE, no RENDER_INTENT_SUMMARY (defensive; the
+        //     IntentSummaryCard refuses to mount without a payload, see
+        //     Slice 16 AC-8)
+        const rawFlowState = data.state.flow_state;
+        if (rawFlowState !== undefined) {
+          if (isWhitelistedFlowState(rawFlowState)) {
+            dispatch({ type: "SET_FLOW_STATE", flowState: rawFlowState });
+
+            // AC-4: when resuming into ``summarizing`` AND the backend
+            // surfaces a ``final_intent`` payload, rebuild the
+            // ``IntentSummaryPayload`` and dispatch ``RENDER_INTENT_SUMMARY``.
+            // Field mapping (architecture.md → ``IntentSummaryPayload``):
+            //   final_intent.prompt        → prompt_preview
+            //   data.state.intent_axes     → axes (1:1 dict copy)
+            //   final_intent.settings_diff → settings_diff (optional)
+            //   final_intent.model_id      → DROPPED (no model_id field
+            //                                  on IntentSummaryPayload)
+            if (rawFlowState === "summarizing") {
+              const finalIntent = data.state.final_intent;
+              const intentAxes = data.state.intent_axes ?? {};
+              if (
+                finalIntent
+                && typeof finalIntent.prompt === "string"
+                && finalIntent.prompt.length > 0
+              ) {
+                const payload: IntentSummaryPayload = {
+                  axes: { ...intentAxes },
+                  prompt_preview: finalIntent.prompt,
+                };
+                if (finalIntent.settings_diff) {
+                  payload.settings_diff = finalIntent.settings_diff;
+                }
+                dispatch({ type: "RENDER_INTENT_SUMMARY", payload });
+              } else {
+                // AC-6: defensive fallback — flow_state is summarizing but
+                // there is no payload to render. The card MUST NOT mount
+                // (Slice 16 AC-8). Log so the inconsistency is visible.
+                console.warn(
+                  "[PromptAssistantContext] flow_state=summarizing but "
+                  + "final_intent is missing/invalid; skipping "
+                  + "RENDER_INTENT_SUMMARY",
+                );
+              }
+            }
+          } else {
+            // AC-7: unknown flow_state value — drop + warn (analog to
+            // Slice 15 AC-9). Reducer state ``flowState`` stays at its
+            // pre-hydrate value (initial ``"idle"``).
+            console.warn(
+              `[PromptAssistantContext] Unknown flow_state value `
+              + `${JSON.stringify(rawFlowState)} from session detail `
+              + `response; ignoring`,
+            );
+          }
+        }
       } catch {
         // AC-11: Show error toast and stay on session list
         dispatch({ type: "SET_LOADING_SESSION", isLoading: false });
@@ -550,6 +1183,29 @@ export function PromptAssistantProvider({
     }
   }, [state.draftVersion, applyToWorkspace]);
 
+  // Slice 24 AC-6: Auto-apply for ``pendingModelParamsPatch``. Mirrors the
+  // ``draftVersion`` trigger pattern — fires only when the version counter
+  // advances, never on initial mount (initial value === null) and never on
+  // LOAD_SESSION (LOAD_SESSION does not touch this field). Only the
+  // ``modelParams`` slot is replaced; ``promptMotiv`` / ``promptStyle`` /
+  // ``negativePrompt`` come straight from the current ``variationData`` so
+  // the assistant never accidentally clears the user's prompt (slice-
+  // boundary discipline; see ``assistant-context-apply.test.tsx`` AC-2).
+  // ``modelId`` is preserved verbatim — there is intentionally no
+  // ``set_model_id`` tool (architecture.md → Open Decisions).
+  const pendingModelParamsVersionRef = useRef(0);
+  useEffect(() => {
+    const patch = state.pendingModelParamsPatch;
+    if (patch && patch.version > 0 && patch.version !== pendingModelParamsVersionRef.current) {
+      pendingModelParamsVersionRef.current = patch.version;
+      setVariation({
+        promptMotiv: variationData?.promptMotiv ?? "",
+        modelId: variationData?.modelId ?? "",
+        modelParams: patch.modelParams,
+      });
+    }
+  }, [state.pendingModelParamsPatch, setVariation, variationData]);
+
   const value = useMemo<PromptAssistantContextValue>(
     () => ({
       sessionId: state.sessionId,
@@ -560,6 +1216,14 @@ export function PromptAssistantProvider({
       activeView: state.activeView,
       isLoadingSession: state.isLoadingSession,
       isApplied: state.isApplied,
+      noContextBannerDismissed: state.noContextBannerDismissed,
+      pendingSlotRolePatch: state.pendingSlotRolePatch,
+      pendingSlotStrengthPatch: state.pendingSlotStrengthPatch,
+      flowState: state.flowState,
+      intentSummaryPayload: state.intentSummaryPayload,
+      pasteConfirmPayload: state.pasteConfirmPayload,
+      lastResultImageUrl: state.lastResultImageUrl,
+      lastResultGenerationId: state.lastResultGenerationId,
       sendMessage,
       cancelStream,
       setSelectedModel,
@@ -573,6 +1237,7 @@ export function PromptAssistantProvider({
       cancelStreamRef,
       imageModelIdRef,
       generationModeRef,
+      lastResultImageUrlRef,
     }),
     [
       state,

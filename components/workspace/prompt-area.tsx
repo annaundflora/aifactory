@@ -112,8 +112,15 @@ function createInitialModeStates(): ModeStates {
 // ---------------------------------------------------------------------------
 
 export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: assistantOpenProp, onAssistantToggle }: PromptAreaProps) {
-  // ----- Mode state -----
-  const [currentMode, setCurrentMode] = useState<GenerationMode>("txt2img");
+  // ----- Variation state consumption (and Slice 22: lifted reference slots + generation mode) -----
+  const {
+    variationData,
+    clearVariation,
+    referenceSlots,
+    setReferenceSlots,
+    generationMode: currentMode,
+    setGenerationMode: setCurrentMode,
+  } = useWorkspaceVariation();
 
   // ----- Per-mode state (State Persistence Matrix) -----
   const [modeStates, setModeStates] = useState<ModeStates>(() =>
@@ -161,15 +168,25 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
   // ----- Variant count -----
   const [variantCount, setVariantCount] = useState(1);
 
-  // ----- img2img-specific state: reference slots (replaces sourceImageUrl + strength) -----
-  const [referenceSlots, setReferenceSlots] = useState<ReferenceSlotData[]>([]);
+  // ----- img2img-specific state: reference slots (Slice 22: hochgehoben in WorkspaceStateProvider) -----
+  // ``referenceSlots`` + ``setReferenceSlots`` werden oben aus
+  // ``useWorkspaceVariation()`` gelesen — siehe Slice-22 State-Lifting.
 
   // ----- upscale-specific state -----
   const [upscaleSourceImageUrl, setUpscaleSourceImageUrl] = useState<string | null>(null);
   const [upscaleScale, setUpscaleScale] = useState<2 | 4>(DEFAULT_SCALE);
 
   // ----- Sync current model + mode to Assistant context refs -----
-  const { imageModelIdRef, generationModeRef } = usePromptAssistant();
+  const {
+    imageModelIdRef,
+    generationModeRef,
+    // Slice 24: pending slot patches from LangGraph tool-call results.
+    // Subscribers below observe ``version`` to apply the patches via
+    // the existing handleReferenceRoleChange / handleReferenceStrengthChange
+    // helpers — no new slot-update logic is introduced here.
+    pendingSlotRolePatch,
+    pendingSlotStrengthPatch,
+  } = usePromptAssistant();
   const firstActiveSlot = modelSlots.find(
     (s) => s.mode === currentMode && s.modelId != null,
   );
@@ -199,12 +216,9 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
     setUpscaleSourceImageUrl(null);
     setUpscaleScale(DEFAULT_SCALE);
     setShowImprove(false);
-  }, []);
+  }, [setReferenceSlots]);
 
   // Session history navigation is now handled inside AssistantSheetContent via context.setActiveView
-
-  // ----- Variation state consumption -----
-  const { variationData, clearVariation } = useWorkspaceVariation();
 
   // ---------------------------------------------------------------------------
   // Save current state into modeStates
@@ -598,6 +612,79 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
     },
     [projectId]
   );
+
+  // ---------------------------------------------------------------------------
+  // Slice 24: Slot-Tool subscribers
+  // ---------------------------------------------------------------------------
+  // Two version-keyed effects observe ``pendingSlotRolePatch`` and
+  // ``pendingSlotStrengthPatch`` from the AssistantContext. When the
+  // ``version`` counter advances (set by the SSE handler on a
+  // ``set_slot_role`` / ``set_slot_strength`` tool-call-result), the
+  // effect resolves the backend ``slotIndex`` (0..N-1) onto the
+  // frontend ``slotPosition`` by indexing into the current
+  // ``referenceSlots`` array (sparse → dense mapping; architecture.md
+  // line 99). It then forwards the patch to the existing
+  // ``handleReferenceRoleChange`` / ``handleReferenceStrengthChange``
+  // helpers — no new slot-update logic.
+  //
+  // The backend role enum (``subject | style | composition``) does not
+  // overlap with the frontend ``ReferenceRole`` enum (``general | style
+  // | content | structure | character | color``); the assistant is the
+  // sole writer of the new vocabulary so the value is forwarded
+  // verbatim with a controlled cast. A future slice may unify the
+  // enums; until then the assistant tools live in a parallel namespace
+  // and existing UI controls keep their current values untouched.
+  //
+  // Strength is mapped from float [0..1] onto the discrete frontend
+  // bucket via simple thresholds (0.25 / 0.5 / 0.75) — the frontend
+  // strength UI is bucketed; the assistant only writes within the
+  // valid bucket vocabulary.
+  const pendingSlotRoleVersionRef = useRef(0);
+  useEffect(() => {
+    if (!pendingSlotRolePatch) return;
+    if (pendingSlotRolePatch.version === pendingSlotRoleVersionRef.current) return;
+    pendingSlotRoleVersionRef.current = pendingSlotRolePatch.version;
+
+    const target = referenceSlots[pendingSlotRolePatch.slotIndex];
+    if (!target) {
+      // Defense-in-depth: backend referenced a slot that does not
+      // exist in the current snapshot (race condition: user removed
+      // the slot before the tool result arrived). Silently drop —
+      // the assistant flow can re-issue the tool on the next turn.
+      return;
+    }
+    handleReferenceRoleChange(
+      target.slotPosition,
+      pendingSlotRolePatch.role as unknown as ReferenceRole
+    );
+  }, [pendingSlotRolePatch, referenceSlots, handleReferenceRoleChange]);
+
+  const pendingSlotStrengthVersionRef = useRef(0);
+  useEffect(() => {
+    if (!pendingSlotStrengthPatch) return;
+    if (
+      pendingSlotStrengthPatch.version === pendingSlotStrengthVersionRef.current
+    ) {
+      return;
+    }
+    pendingSlotStrengthVersionRef.current = pendingSlotStrengthPatch.version;
+
+    const target = referenceSlots[pendingSlotStrengthPatch.slotIndex];
+    if (!target) return;
+
+    // Map float [0..1] onto frontend ``ReferenceStrength`` buckets.
+    const f = pendingSlotStrengthPatch.strength;
+    let bucket: ReferenceStrength;
+    if (f < 0.25) bucket = "subtle";
+    else if (f < 0.5) bucket = "moderate";
+    else if (f < 0.75) bucket = "strong";
+    else bucket = "dominant";
+    handleReferenceStrengthChange(target.slotPosition, bucket);
+  }, [
+    pendingSlotStrengthPatch,
+    referenceSlots,
+    handleReferenceStrengthChange,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Generate / Upscale handlers

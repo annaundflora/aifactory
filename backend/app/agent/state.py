@@ -23,6 +23,16 @@ class PromptAssistantState(AgentState):
         recommended_model: Currently recommended model (id, name, reason).
         collected_info: Information gathered during conversation (subject, style, purpose, etc.).
         phase: Current conversation phase (understand, explore, draft, refine).
+        flow_state: Current FSM state for the Interactive Prompt Refinement flow.
+            Plain ``str`` (not ``Literal``) — enum validation lives in the SSE layer
+            (Slice 15) and the frontend reducer (Slice 17). Expected values:
+            ``"idle" | "interviewing" | "summarizing" | "reviewing" | "refining" | "generating"``.
+        intent_axes: Generic dict container for intent-summary axes
+            (subject/medium/style/lighting/composition/palette). Typed as
+            ``IntentSummaryPayload.axes`` in Slice 15; here held as plain ``dict``.
+        final_intent: Final intent payload written by ``post_process_node`` after
+            ``emit_intent_summary`` is invoked (Slice 13). Either ``None`` (initial)
+            or a dict with ``prompt`` / ``settings_diff`` / ``model_id`` keys.
     """
 
     draft_prompt: Optional[dict]
@@ -30,6 +40,9 @@ class PromptAssistantState(AgentState):
     recommended_model: Optional[dict]
     collected_info: dict
     phase: str
+    flow_state: str
+    intent_axes: dict
+    final_intent: Optional[dict]
 
 
 # Default values for initializing a new conversation state.
@@ -40,4 +53,7 @@ DEFAULT_STATE_VALUES: dict = {
     "recommended_model": None,
     "collected_info": {},
     "phase": "understand",
+    "flow_state": "idle",
+    "intent_axes": {},
+    "final_intent": None,
 }

@@ -4,6 +4,8 @@ POST endpoint that accepts user messages, forwards them to the LangGraph agent,
 and streams the response back as Server-Sent Events (SSE).
 """
 
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException
 from sse_starlette.sse import EventSourceResponse
 
@@ -57,6 +59,15 @@ async def send_message(session_id: str, request: SendMessageRequest):
         [str(u) for u in request.image_urls] if request.image_urls else None
     )
 
+    # Slice 21: forward reference_slots + last_result_image_url so the
+    # service can build the multimodal HumanMessage. The service applies
+    # the defensive ``generation_mode == "img2img"`` re-check (AC-2).
+    last_result_str: Optional[str] = (
+        str(request.last_result_image_url)
+        if request.last_result_image_url
+        else None
+    )
+
     async def event_generator():
         async for sse_event in _service.stream_response(
             session_id=session_id,
@@ -65,6 +76,8 @@ async def send_message(session_id: str, request: SendMessageRequest):
             model=request.model,
             image_model_id=request.image_model_id,
             generation_mode=request.generation_mode,
+            reference_slots=request.reference_slots,
+            last_result_image_url=last_result_str,
         ):
             yield {
                 "event": sse_event["event"],

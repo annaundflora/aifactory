@@ -64,6 +64,61 @@ export async function deleteProject(id: string, userId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Project Context Queries (Slice 02)
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the per-project context block (`{ contextInstructions, contextUpdatedAt }`)
+ * for a project owned by `userId`, or `null` if no row matches the combined
+ * `id` + `userId` filter (project does not exist OR ownership mismatch).
+ *
+ * Defence-in-depth: selects only the two relevant columns, never `select()`
+ * over the whole row. Auth/404-mapping is handled by the route/action layer.
+ */
+export async function getProjectContext(args: {
+  projectId: string;
+  userId: string;
+}): Promise<{ contextInstructions: string | null; contextUpdatedAt: Date | null } | null> {
+  const [row] = await db
+    .select({
+      contextInstructions: projects.contextInstructions,
+      contextUpdatedAt: projects.contextUpdatedAt,
+    })
+    .from(projects)
+    .where(and(eq(projects.id, args.projectId), eq(projects.userId, args.userId)));
+  return row ?? null;
+}
+
+/**
+ * Updates the per-project context for a project owned by `userId`.
+ * Sets `context_instructions` to the provided value (string or `null` to clear)
+ * and stamps `context_updated_at` via Postgres `now()` (DB-clock consistency).
+ *
+ * Returns the updated row as `{ contextInstructions, contextUpdatedAt }` via
+ * `.returning()`. If no row matches the combined `id` + `userId` filter
+ * (project does not exist OR ownership mismatch), no UPDATE is performed and
+ * `null` is returned.
+ */
+export async function updateProjectContext(args: {
+  projectId: string;
+  userId: string;
+  contextInstructions: string | null;
+}): Promise<{ contextInstructions: string | null; contextUpdatedAt: Date | null } | null> {
+  const [row] = await db
+    .update(projects)
+    .set({
+      contextInstructions: args.contextInstructions,
+      contextUpdatedAt: sql`now()`,
+    })
+    .where(and(eq(projects.id, args.projectId), eq(projects.userId, args.userId)))
+    .returning({
+      contextInstructions: projects.contextInstructions,
+      contextUpdatedAt: projects.contextUpdatedAt,
+    });
+  return row ?? null;
+}
+
+// ---------------------------------------------------------------------------
 // Generation Queries
 // ---------------------------------------------------------------------------
 

@@ -1,0 +1,8 @@
+{
+  "wave": "wave_4_first_user_value",
+  "slices": ["slice-06", "slice-08", "slice-10", "slice-11"],
+  "all_approved": true,
+  "all_tests_passed": true,
+  "test_count": 95,
+  "review_iterations": {"slice-06": 1, "slice-08": 1, "slice-10": 2, "slice-11": 1}
+}

@@ -17,6 +17,11 @@ import { PromptAssistantProvider } from "@/lib/assistant/assistant-context";
 import { AssistantPanelContent } from "@/components/assistant/assistant-panel";
 import { TouchDragProvider } from "@/lib/touch-drag-context";
 import { TouchDragOverlay } from "@/components/workspace/touch-drag-overlay";
+import { GenerationsProvider } from "@/lib/workspace/generations-context";
+import {
+  DetailViewOpenerProvider,
+  useDetailViewOpener,
+} from "@/lib/workspace/detail-view-opener-context";
 
 const POLLING_INTERVAL_MS = 3000;
 
@@ -34,6 +39,40 @@ const ASSISTANT_DEFAULT_WIDTH = 320;
 interface WorkspaceContentProps {
   projectId: string;
   initialGenerations: Generation[];
+}
+
+// ---------------------------------------------------------------------------
+// Slice 18: DetailViewOpenerRegistration
+// ---------------------------------------------------------------------------
+
+/**
+ * Tiny effect-only component that registers the workspace's
+ * ``handleSelectGeneration`` callback into the surrounding
+ * ``DetailViewOpenerProvider`` so the assistant chat-thread (Slice 18
+ * ``result_message`` thumbnail click) can open the same detail-view that
+ * gallery-grid clicks already use today (workspace-content.tsx:298-306).
+ *
+ * Mounted INSIDE the ``DetailViewOpenerProvider`` so the ``useEffect`` can
+ * read the context. Re-registers whenever the opener identity changes
+ * (defensive — ``handleSelectGeneration`` is stable today, but the
+ * ``useCallback`` deps could be expanded later).
+ */
+function DetailViewOpenerRegistration({
+  opener,
+}: {
+  opener: (generationId: string) => void;
+}) {
+  const ctx = useDetailViewOpener();
+  useEffect(() => {
+    if (!ctx) return;
+    ctx.registerOpener(opener);
+    return () => {
+      // Defensive: unregister on unmount so a stale opener pointing at
+      // an already-unmounted ``WorkspaceContent`` does not stay live.
+      ctx.registerOpener(null);
+    };
+  }, [ctx, opener]);
+  return null;
 }
 
 export function WorkspaceContent({
@@ -321,7 +360,13 @@ export function WorkspaceContent({
   // ----- Render both views, hide gallery when detail is open -----
   // This prevents PromptArea from unmounting (and losing state) during canvas roundtrip.
   return (
-    <>
+    <DetailViewOpenerProvider>
+      {/* Slice 18: register the existing detail-view opener so the
+          assistant chat-thread (result_message thumbnail click) can
+          delegate to the SAME ``handleSelectGeneration`` path that the
+          gallery-grid uses. Mounted at the top of the tree so it is alive
+          for the entire workspace lifetime. */}
+      <DetailViewOpenerRegistration opener={handleSelectGeneration} />
       {showDetailView && (
         <div className="fixed inset-0 z-50 flex overflow-hidden bg-background" data-testid="workspace-detail-view">
           <CanvasDetailProvider initialGenerationId={selectedGenerationId}>
@@ -336,6 +381,7 @@ export function WorkspaceContent({
       )}
 
       {/* Gallery-View: hidden (not unmounted) when detail view is open */}
+      <GenerationsProvider generations={generations} projectId={projectId}>
       <PromptAssistantProvider>
       <TouchDragProvider>
       <div
@@ -455,6 +501,7 @@ export function WorkspaceContent({
       <TouchDragOverlay />
       </TouchDragProvider>
       </PromptAssistantProvider>
-    </>
+      </GenerationsProvider>
+    </DetailViewOpenerProvider>
   );
 }

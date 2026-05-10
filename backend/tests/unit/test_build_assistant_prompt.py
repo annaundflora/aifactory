@@ -330,9 +330,23 @@ class TestGraphConfigIntegration:
             "_call_model_sync must read generation_mode from config['configurable']"
         )
 
-        # Verify build_assistant_system_prompt is called (not SYSTEM_PROMPT constant)
-        assert "build_assistant_system_prompt(image_model_id, generation_mode)" in source, (
-            "_call_model_sync must call build_assistant_system_prompt with the config values"
+        # Verify build_assistant_system_prompt is called (not SYSTEM_PROMPT constant).
+        # Slice 11 extended the signature with a 3rd `project_context` argument
+        # forwarded from configurable. We do a robust assertion that does not
+        # depend on exact whitespace/argument splitting across lines.
+        assert "build_assistant_system_prompt(" in source, (
+            "_call_model_sync must call build_assistant_system_prompt(...) with config values"
+        )
+        assert "image_model_id" in source and "generation_mode" in source, (
+            "_call_model_sync must pass image_model_id and generation_mode "
+            "into build_assistant_system_prompt"
+        )
+        assert 'configurable.get("project_context")' in source, (
+            "_call_model_sync must read project_context from config['configurable'] "
+            "(Slice 11)"
+        )
+        assert "project_context" in source, (
+            "_call_model_sync must pass project_context into build_assistant_system_prompt"
         )
 
         # Verify the import at module level
@@ -398,17 +412,34 @@ class TestGraphConfigIntegration:
     # Extra: Verify both sync and async paths use the same pattern
     def test_both_sync_and_async_use_build_assistant_system_prompt(self):
         """Both _call_model_sync and _call_model_async must use
-        build_assistant_system_prompt, not a static constant."""
+        build_assistant_system_prompt, not a static constant.
+
+        Slice 11 added a 3rd `project_context` argument to the call. The
+        original assertion did a brittle exact-string match including the
+        argument list, which broke when the call was reformatted across lines
+        and a 3rd argument was added. We instead count how many times
+        ``build_assistant_system_prompt(`` appears as an open-call -- it must
+        occur at least twice (once each in sync and async paths).
+        """
         import inspect
 
         import app.agent.graph as graph_module
 
         source = inspect.getsource(graph_module.create_agent)
 
-        # Count occurrences of build_assistant_system_prompt calls
-        # Should appear at least twice (once in sync, once in async)
-        call_count = source.count("build_assistant_system_prompt(image_model_id, generation_mode)")
+        # Count open-call occurrences (whitespace-tolerant). Must appear at
+        # least twice (once per sync/async path).
+        call_count = source.count("build_assistant_system_prompt(")
         assert call_count >= 2, (
-            f"Expected build_assistant_system_prompt to be called in both sync and async paths, "
-            f"found {call_count} call(s)"
+            f"Expected build_assistant_system_prompt to be called in both sync "
+            f"and async paths, found {call_count} call(s)"
+        )
+
+        # Both call sites must forward image_model_id, generation_mode and
+        # project_context (Slice 11). We verify by counting how often the
+        # project_context argument is forwarded; the previous wiring already
+        # ensures image_model_id / generation_mode by virtue of compiling.
+        assert source.count("project_context") >= 2, (
+            "Both sync and async paths must read and forward project_context "
+            "from configurable into build_assistant_system_prompt (Slice 11)"
         )

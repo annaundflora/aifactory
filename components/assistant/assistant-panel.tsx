@@ -5,6 +5,8 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ChatInput } from "@/components/assistant/chat-input";
 import { ChatThread } from "@/components/assistant/chat-thread";
+import { MultimodalIndicator } from "@/components/assistant/multimodal-indicator";
+import { NoContextBanner } from "@/components/assistant/no-context-banner";
 import { SessionList } from "@/components/assistant/session-list";
 import { SessionSwitcher } from "@/components/assistant/session-switcher";
 import { ModelSelector } from "@/components/assistant/model-selector";
@@ -15,6 +17,7 @@ import {
 } from "@/lib/assistant/assistant-context";
 import { useAssistantRuntime } from "@/lib/assistant/use-assistant-runtime";
 import { useWorkspaceVariation } from "@/lib/workspace-state";
+import { useGenerationsContextOptional } from "@/lib/workspace/generations-context";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -51,9 +54,17 @@ export function AssistantPanelContent({
     cancelStreamRef,
     imageModelIdRef,
     generationModeRef,
+    lastResultImageUrlRef,
   } = usePromptAssistant();
 
   const { variationData } = useWorkspaceVariation();
+
+  // Slice 18: surface the live generations array to the runtime so the
+  // auto-apply-settle effect can dispatch ``SET_LAST_RESULT_IMAGE_URL``
+  // when a generation transitions to ``status: completed``. Optional
+  // reader: returns ``null`` outside the workspace tree (e.g. session-
+  // history sheet) — the runtime short-circuits in that case.
+  const generations = useGenerationsContextOptional();
 
   const { sendMessage } = useAssistantRuntime({
     projectId,
@@ -64,6 +75,8 @@ export function AssistantPanelContent({
     cancelStreamRef,
     imageModelIdRef,
     generationModeRef,
+    lastResultImageUrlRef,
+    generations,
   });
 
   const handleSend = useCallback(
@@ -164,6 +177,9 @@ export function AssistantPanelContent({
           autoFocus={open}
           projectId={projectId}
         />
+        {/* Slice 22: Multimodal-Indicator direkt unter ChatInput.
+            Versteckt sich selbst, wenn nichts Multimodales angehängt ist. */}
+        <MultimodalIndicator />
       </div>
     );
   };
@@ -188,6 +204,24 @@ export function AssistantPanelContent({
           </Button>
         </div>
       </div>
+
+      {/* Slice 10: No-context-hint-banner — sits above the chat thread,
+          OUTSIDE the overflow-y-auto body so the banner stays pinned at the
+          top of the panel-body (per wireframes Annotation ②). The component
+          itself decides whether to render based on context-fetch + dismiss-flag.
+
+          IMPORTANT: Mount the banner UNCONDITIONALLY (never gate via JSX
+          conditional) and toggle visibility via the `hidden` prop instead.
+          A JSX conditional would unmount/remount the component on every
+          view-toggle (chat ↔ session-list), which would re-trigger the
+          `GET /api/projects/{id}/context` fetch in the banner's useEffect
+          and violate Slice 10 Constraint "KEINE Polling-Logik — Context
+          wird nur einmal beim Panel-Mount geladen; Re-Fetch erst bei
+          Tab-Reload" + AC-7. */}
+      <NoContextBanner
+        projectId={projectId}
+        hidden={activeView === "session-list"}
+      />
 
       {/* Body — single column, no split view */}
       <div className="flex-1 overflow-y-auto">
