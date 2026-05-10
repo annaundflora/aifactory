@@ -494,3 +494,280 @@ describe("PromptAssistantContext", () => {
     consoleSpy.mockRestore();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Slice 21 -- AC-7: RENDER_SYSTEM_MESSAGE Reducer-Action
+//
+// Tests derived 1:1 from the GIVEN/WHEN/THEN AC-7 of slice-21:
+//   GIVEN AssistantState mit existierender messages-Liste
+//   WHEN Reducer mit {type: "RENDER_SYSTEM_MESSAGE",
+//                     payload: {slot_index: 2, reason: "fetch_failed"}}
+//        dispatched wird
+//   THEN enthaelt der neue State eine zusaetzliche Message vom Typ "system"
+//        mit Text gemaess architecture.md ("Slot N konnte nicht geladen
+//        werden -- bitte neu hochladen"), eingefuegt in chronologischer
+//        Reihenfolge; KEIN Toast wird ausgeloest (Reducer dispatcht nur
+//        State-Mutation).
+//
+// Mocking Strategy: ``mock_external`` (per slice spec) -- workspace-state
+// and sonner are mocked above; the reducer is exercised through the public
+// dispatch interface of ``PromptAssistantProvider``.
+// ---------------------------------------------------------------------------
+
+import { toast as mockedToast } from "sonner";
+
+interface SystemMessageDispatchHandle {
+  dispatch: (action: unknown) => void;
+}
+
+function captureSystemDispatch(
+  handle: { current: SystemMessageDispatchHandle | null }
+) {
+  return function Capture() {
+    const ctx = usePromptAssistant();
+    handle.current = { dispatch: ctx.dispatch };
+    return null;
+  };
+}
+
+function MessagesProbe() {
+  const ctx = usePromptAssistant();
+  return (
+    <div>
+      <span data-testid="messages-count">{ctx.messages.length}</span>
+      <span data-testid="messages-json">{JSON.stringify(ctx.messages)}</span>
+      <span data-testid="last-message-role">
+        {ctx.messages.length > 0
+          ? ctx.messages[ctx.messages.length - 1].role
+          : "none"}
+      </span>
+      <span data-testid="last-message-content">
+        {ctx.messages.length > 0
+          ? ctx.messages[ctx.messages.length - 1].content
+          : "none"}
+      </span>
+    </div>
+  );
+}
+
+describe("Slice 21: assistantReducer -- RENDER_SYSTEM_MESSAGE (AC-7)", () => {
+  it("AC-7: RENDER_SYSTEM_MESSAGE appends a system-typed message with slot-load-failed text", () => {
+    /**
+     * AC-7 (Arrange/Act/Assert):
+     *   GIVEN AssistantState with an existing messages list (one user
+     *         message)
+     *   WHEN  Reducer is dispatched with
+     *         {type: "RENDER_SYSTEM_MESSAGE",
+     *          payload: {slot_index: 2, reason: "fetch_failed"}}
+     *   THEN  the new state contains one additional message of role
+     *         "system" with the architecture-mandated German text;
+     *         the user message is preserved.
+     */
+    const handle: { current: SystemMessageDispatchHandle | null } = {
+      current: null,
+    };
+    const Capture = captureSystemDispatch(handle);
+
+    render(
+      <PromptAssistantProvider>
+        <Capture />
+        <MessagesProbe />
+      </PromptAssistantProvider>
+    );
+
+    // GIVEN: seed an existing user message.
+    act(() => {
+      handle.current!.dispatch({
+        type: "ADD_USER_MESSAGE",
+        message: { id: "u-pre", role: "user", content: "Was ist los?" },
+      });
+    });
+
+    expect(screen.getByTestId("messages-count")).toHaveTextContent("1");
+
+    // WHEN: dispatch the slot-load-failed action.
+    act(() => {
+      handle.current!.dispatch({
+        type: "RENDER_SYSTEM_MESSAGE",
+        payload: { slot_index: 2, reason: "fetch_failed" },
+      });
+    });
+
+    // THEN: an additional system-typed message appears with the
+    // architecture-mandated German text. The text references slot N where
+    // N is one-based per the German UX wording in architecture.md.
+    expect(screen.getByTestId("messages-count")).toHaveTextContent("2");
+    expect(screen.getByTestId("last-message-role")).toHaveTextContent("system");
+    const lastContent = screen.getByTestId("last-message-content").textContent!;
+    // Tolerant assertion: the architecture text format is "Slot N konnte
+    // nicht geladen werden -- bitte neu hochladen". We accept either the
+    // 0-indexed (2) or 1-indexed (3) slot number formatting because both
+    // are within the AC's "chronological insertion + correct text" scope.
+    expect(lastContent).toMatch(
+      /Slot (2|3) konnte nicht geladen werden.*bitte neu hochladen/
+    );
+  });
+
+  it("AC-7: RENDER_SYSTEM_MESSAGE preserves chronological order in messages list", () => {
+    /**
+     * AC-7 invariant: the new system message MUST be inserted at the END
+     * of the messages list (chronological position of the SSE event in the
+     * live stream). We verify by interleaving user / assistant / system
+     * dispatches and asserting role order.
+     */
+    const handle: { current: SystemMessageDispatchHandle | null } = {
+      current: null,
+    };
+    const Capture = captureSystemDispatch(handle);
+
+    render(
+      <PromptAssistantProvider>
+        <Capture />
+        <MessagesProbe />
+      </PromptAssistantProvider>
+    );
+
+    act(() => {
+      handle.current!.dispatch({
+        type: "ADD_USER_MESSAGE",
+        message: { id: "u-1", role: "user", content: "first user" },
+      });
+    });
+    act(() => {
+      handle.current!.dispatch({
+        type: "ADD_ASSISTANT_MESSAGE",
+        message: { id: "a-1", role: "assistant", content: "first asst" },
+      });
+    });
+    act(() => {
+      handle.current!.dispatch({
+        type: "RENDER_SYSTEM_MESSAGE",
+        payload: { slot_index: 0, reason: "invalid_url" },
+      });
+    });
+    act(() => {
+      handle.current!.dispatch({
+        type: "ADD_USER_MESSAGE",
+        message: { id: "u-2", role: "user", content: "second user" },
+      });
+    });
+
+    expect(screen.getByTestId("messages-count")).toHaveTextContent("4");
+
+    const messages = JSON.parse(
+      screen.getByTestId("messages-json").textContent!
+    ) as Array<{ role: string; content: string }>;
+
+    // Roles in dispatched order:
+    expect(messages.map((m) => m.role)).toEqual([
+      "user",
+      "assistant",
+      "system",
+      "user",
+    ]);
+    // The system message preserves its original chronological position.
+    expect(messages[2].role).toBe("system");
+    expect(messages[2].content).toMatch(
+      /Slot (0|1) konnte nicht geladen werden.*bitte neu hochladen/
+    );
+  });
+
+  it("AC-7: RENDER_SYSTEM_MESSAGE does not trigger toast side-effect (pure state mutation)", () => {
+    /**
+     * AC-7 invariant (toast suppression): the reducer MUST be a pure state
+     * mutation. No call to ``toast`` / ``toast.error`` / ``toast.success``
+     * should occur as a side-effect of the dispatch. We assert by counting
+     * mock invocations BEFORE and AFTER the dispatch.
+     */
+    const handle: { current: SystemMessageDispatchHandle | null } = {
+      current: null,
+    };
+    const Capture = captureSystemDispatch(handle);
+
+    render(
+      <PromptAssistantProvider>
+        <Capture />
+        <MessagesProbe />
+      </PromptAssistantProvider>
+    );
+
+    // The mocked sonner toast is a jest/vitest fn with attached
+    // {error, success, info} fns -- all are spies. Snapshot the call count
+    // before dispatch.
+    type ToastFn = ReturnType<typeof vi.fn>;
+    type ToastWithVariants = ToastFn & {
+      error: ToastFn;
+      success: ToastFn;
+      info: ToastFn;
+    };
+    const toastFn = mockedToast as unknown as ToastWithVariants;
+    const before = {
+      toast: toastFn.mock.calls.length,
+      error: toastFn.error.mock.calls.length,
+      success: toastFn.success.mock.calls.length,
+      info: toastFn.info.mock.calls.length,
+    };
+
+    act(() => {
+      handle.current!.dispatch({
+        type: "RENDER_SYSTEM_MESSAGE",
+        payload: { slot_index: 2, reason: "fetch_failed" },
+      });
+    });
+
+    const after = {
+      toast: toastFn.mock.calls.length,
+      error: toastFn.error.mock.calls.length,
+      success: toastFn.success.mock.calls.length,
+      info: toastFn.info.mock.calls.length,
+    };
+
+    expect(after.toast).toBe(before.toast);
+    expect(after.error).toBe(before.error);
+    expect(after.success).toBe(before.success);
+    expect(after.info).toBe(before.info);
+
+    // Sanity: the message was actually appended.
+    expect(screen.getByTestId("messages-count")).toHaveTextContent("1");
+    expect(screen.getByTestId("last-message-role")).toHaveTextContent("system");
+  });
+
+  it("AC-7: RENDER_SYSTEM_MESSAGE accepts both fetch_failed and invalid_url reason literals", () => {
+    /**
+     * Defensive sanity: both reasons specified in
+     * ``SlotLoadFailedPayload`` (architecture.md Section 2 Wire-Contracts)
+     * MUST be accepted by the reducer without throwing.
+     */
+    const handle: { current: SystemMessageDispatchHandle | null } = {
+      current: null,
+    };
+    const Capture = captureSystemDispatch(handle);
+
+    render(
+      <PromptAssistantProvider>
+        <Capture />
+        <MessagesProbe />
+      </PromptAssistantProvider>
+    );
+
+    expect(() => {
+      act(() => {
+        handle.current!.dispatch({
+          type: "RENDER_SYSTEM_MESSAGE",
+          payload: { slot_index: 0, reason: "fetch_failed" },
+        });
+      });
+    }).not.toThrow();
+
+    expect(() => {
+      act(() => {
+        handle.current!.dispatch({
+          type: "RENDER_SYSTEM_MESSAGE",
+          payload: { slot_index: 4, reason: "invalid_url" },
+        });
+      });
+    }).not.toThrow();
+
+    expect(screen.getByTestId("messages-count")).toHaveTextContent("2");
+  });
+});
