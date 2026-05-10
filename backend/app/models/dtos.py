@@ -7,7 +7,14 @@ from datetime import datetime
 from typing import Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+
+# Re-export the SettingsDiff Pydantic model from the prompt-tools module so
+# Slice 15 SSE consumers can build ``IntentSummaryPayload`` payloads without
+# pulling in the LangGraph tool-registration module directly. The schema is
+# the canonical wire format mirrored in architecture.md → "SettingsDiff Type
+# Schema" and is shared with the ``emit_intent_summary`` tool input schema.
+from app.agent.tools.prompt_tools import SettingsDiff  # noqa: E402,F401
 
 
 # Allowed model slugs for the model field
@@ -257,4 +264,97 @@ class UpdateTitleRequest(BaseModel):
         min_length=1,
         max_length=255,
         description="New title for the session",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Intent Summary SSE Payload (Slice 15)
+# ---------------------------------------------------------------------------
+
+
+# Maximum length of any single ``IntentAxes`` axis string. Mirrors
+# architecture.md → "Data Transfer Objects" → ``IntentSummaryPayload``:
+# "every axis ≤ 200 chars".
+INTENT_AXES_MAX_LENGTH: int = 200
+
+
+class IntentAxes(BaseModel):
+    """Typed axes container for ``IntentSummaryPayload.axes``.
+
+    All six axes are optional; the LLM populates whatever it has gathered
+    during the interview. Each axis string is bounded by
+    :data:`INTENT_AXES_MAX_LENGTH` (200 chars) per architecture.md →
+    "Data Transfer Objects" / "Validation Rules". Field validation raises
+    a ``ValidationError`` which is propagated as an SSE ``error`` event by
+    :mod:`app.services.assistant_service` (Slice 15 AC-4).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    subject: Optional[str] = Field(
+        default=None,
+        max_length=INTENT_AXES_MAX_LENGTH,
+        description="Subject / motif axis (≤ 200 chars).",
+    )
+    medium: Optional[str] = Field(
+        default=None,
+        max_length=INTENT_AXES_MAX_LENGTH,
+        description="Medium axis (e.g. photo, illustration; ≤ 200 chars).",
+    )
+    style: Optional[str] = Field(
+        default=None,
+        max_length=INTENT_AXES_MAX_LENGTH,
+        description="Style axis (e.g. cinematic, minimalist; ≤ 200 chars).",
+    )
+    lighting: Optional[str] = Field(
+        default=None,
+        max_length=INTENT_AXES_MAX_LENGTH,
+        description="Lighting axis (≤ 200 chars).",
+    )
+    composition: Optional[str] = Field(
+        default=None,
+        max_length=INTENT_AXES_MAX_LENGTH,
+        description="Composition axis (≤ 200 chars).",
+    )
+    palette: Optional[str] = Field(
+        default=None,
+        max_length=INTENT_AXES_MAX_LENGTH,
+        description="Color palette axis (≤ 200 chars).",
+    )
+
+
+class IntentSummaryPayload(BaseModel):
+    """Wire payload of the SSE ``intent-summary`` event (Slice 15).
+
+    Mirrors architecture.md → "Data Transfer Objects" → ``IntentSummaryPayload``:
+
+    * ``axes``: typed :class:`IntentAxes` (subject/medium/style/lighting/
+      composition/palette).
+    * ``prompt_preview``: final EN image-generation prompt (1..2000 chars,
+      mirroring the ``emit_intent_summary.prompt`` constraint so the
+      preview never exceeds the validated tool argument).
+    * ``settings_diff``: optional :class:`SettingsDiff`. When the
+      ``emit_intent_summary`` tool emits no settings changes (or an empty
+      diff), the field is omitted from the JSON via
+      ``model_dump(exclude_none=True)`` (Slice 15 AC-3).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    axes: IntentAxes = Field(
+        default_factory=IntentAxes,
+        description="Typed axes container. All sub-fields optional.",
+    )
+    prompt_preview: str = Field(
+        ...,
+        min_length=1,
+        max_length=2000,
+        description="Final EN image-generation prompt (1..2000 chars).",
+    )
+    settings_diff: Optional[SettingsDiff] = Field(
+        default=None,
+        description=(
+            "Optional typed diff of settings changes. Omitted from the wire "
+            "payload (not serialised as null) when no settings changed."
+        ),
     )

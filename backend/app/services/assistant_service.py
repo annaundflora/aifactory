@@ -17,13 +17,17 @@ from typing import AsyncGenerator, Optional
 from uuid import UUID
 
 from langchain_core.messages import AIMessage, HumanMessage
+from pydantic import ValidationError
 
 from langgraph.checkpoint.memory import MemorySaver
 
 from app.agent.graph import create_agent
+from app.agent.tools.prompt_tools import SettingsDiff
 from app.config import settings
 from app.models.dtos import (
     DraftPromptDTO,
+    IntentAxes,
+    IntentSummaryPayload,
     MessageDTO,
     ModelRecDTO,
     SessionDetailResponse,
@@ -32,6 +36,23 @@ from app.models.dtos import (
 )
 from app.services.project_repository import ProjectRepository
 from app.services.session_repository import SessionRepository
+
+# Slice 15: whitelist of FSM ``flow_state`` values the backend may emit via
+# the SSE ``flow-state`` event. Mirrors architecture.md → "Data Transfer
+# Objects" → ``FlowStateEvent`` (the ``"generating"`` transition is
+# frontend-only — set on the user click in the IntentSummaryCard, not via
+# backend round-trip). The ``"idle"`` initial value is included for
+# completeness even though it is the default — no transition into ``"idle"``
+# happens during a normal stream.
+_FLOW_STATE_WHITELIST: frozenset[str] = frozenset(
+    {"idle", "interviewing", "summarizing", "reviewing", "refining"}
+)
+
+# Slice 15: name of the tool whose ``tool-call-result`` triggers the
+# additional ``intent-summary`` SSE event. Kept as a module-level constant so
+# tests can target it without coupling to the LangGraph tool-registry
+# import path.
+_EMIT_INTENT_SUMMARY_TOOL_NAME: str = "emit_intent_summary"
 
 logger = logging.getLogger(__name__)
 
@@ -230,6 +251,13 @@ class AssistantService:
 
             input_state = {"messages": [human_message]}
 
+            # Slice 15: track the last ``flow_state`` value emitted on this
+            # stream so we can dedup repeats. ``None`` means "nothing emitted
+            # yet"; the first observed transition (typically idle ->
+            # interviewing or idle -> summarizing) emits a single
+            # ``flow-state`` event.
+            last_emitted_flow_state: Optional[str] = None
+
             # Stream events from LangGraph using v2 API
             async for event in self._agent.astream_events(
                 input_state,
@@ -239,6 +267,64 @@ class AssistantService:
                 sse_event = self._convert_event(event)
                 if sse_event is not None:
                     yield sse_event
+
+                    # Slice 15 AC-2: when the just-yielded event is a
+                    # ``tool-call-result`` for ``emit_intent_summary``, build
+                    # the ``IntentSummaryPayload`` and emit the
+                    # ``intent-summary`` event right after the tool result.
+                    # The trailing ``flow-state`` event is emitted further
+                    # down via the ``on_chain_end`` / state-snapshot path.
+                    if (
+                        sse_event.get("event") == "tool-call-result"
+                        and event.get("event") == "on_tool_end"
+                        and event.get("name") == _EMIT_INTENT_SUMMARY_TOOL_NAME
+                    ):
+                        try:
+                            intent_event = await self._build_intent_summary_event(
+                                event, config
+                            )
+                        except ValidationError as exc:
+                            # AC-4: malformed payload (e.g. axis > 200 chars)
+                            # propagates as an SSE ``error`` event; the
+                            # ``intent-summary`` event is suppressed and the
+                            # stream terminates cleanly.
+                            logger.warning(
+                                "intent-summary payload validation failed for "
+                                "session %s: %s",
+                                session_id,
+                                exc,
+                            )
+                            yield {
+                                "event": "error",
+                                "data": json.dumps(
+                                    {
+                                        "message": (
+                                            "Intent-Summary konnte nicht "
+                                            "erstellt werden."
+                                        )
+                                    }
+                                ),
+                            }
+                            return
+                        if intent_event is not None:
+                            yield intent_event
+
+                # Slice 15 AC-1 / AC-2 trailer: detect ``flow_state``
+                # transitions emitted by the ``post_process`` node. The node
+                # returns its state-update dict in ``event.data.output`` for
+                # the ``on_chain_end`` event. Dedup against the last value
+                # emitted on this stream so unchanged values produce no event.
+                flow_state_value = self._extract_flow_state_transition(event)
+                if (
+                    flow_state_value is not None
+                    and flow_state_value != last_emitted_flow_state
+                    and flow_state_value in _FLOW_STATE_WHITELIST
+                ):
+                    last_emitted_flow_state = flow_state_value
+                    yield {
+                        "event": "flow-state",
+                        "data": json.dumps({"flow_state": flow_state_value}),
+                    }
 
             # Signal completion
             yield {"event": "text-done", "data": json.dumps({})}
@@ -322,6 +408,186 @@ class AssistantService:
 
         # Generic fallback
         return "Ein unerwarteter Fehler ist aufgetreten. Bitte versuche es erneut."
+
+    # Set of LangGraph node names whose ``on_chain_end`` events may carry a
+    # ``flow_state`` state update. Currently only ``post_process`` mutates
+    # ``flow_state`` (via ``TOOL_FLOW_STATE_MAPPING``); ``assistant`` is
+    # included so future slices that advance the FSM during the LLM turn
+    # (e.g. idle -> interviewing on first user-content message) propagate
+    # without further changes here. Other chain ends (LLM streams, tool
+    # input/output runnables) are filtered out so a stray ``flow_state``
+    # key in their output dict cannot leak into the SSE wire.
+    _FLOW_STATE_EMITTING_NODES: frozenset[str] = frozenset(
+        {"post_process", "assistant", "tools"}
+    )
+
+    @staticmethod
+    def _extract_flow_state_transition(event: dict) -> Optional[str]:
+        """Return ``flow_state`` value from a LangGraph ``on_chain_end`` event.
+
+        Slice 15: any graph node may surface a ``flow_state`` state update
+        in its returned dict — the post_process node is the only one wired
+        today (via ``TOOL_FLOW_STATE_MAPPING`` in ``app.agent.graph``), but
+        the detector is intentionally wider than that single name so future
+        slices (e.g. an assistant-node hook for ``idle → interviewing``)
+        propagate without further changes. ``astream_events`` v2 surfaces
+        node returns as ``event["event"] == "on_chain_end"`` with the
+        update dict in ``event["data"]["output"]``.
+
+        Returns the new ``flow_state`` value if the event is a node
+        chain-end carrying one; otherwise ``None``.
+        """
+        if event.get("event") != "on_chain_end":
+            return None
+
+        # Filter by node name so spurious ``flow_state`` keys in unrelated
+        # chains (LLM streams, tool input/output runnables, etc.) cannot
+        # leak into the SSE wire.
+        node_name = event.get("name")
+        if node_name not in AssistantService._FLOW_STATE_EMITTING_NODES:
+            return None
+
+        output = event.get("data", {}).get("output")
+        if not isinstance(output, dict):
+            return None
+
+        flow_state = output.get("flow_state")
+        if isinstance(flow_state, str) and flow_state:
+            return flow_state
+        return None
+
+    async def _build_intent_summary_event(
+        self,
+        tool_event: dict,
+        config: dict,
+    ) -> Optional[dict]:
+        """Build an SSE ``intent-summary`` event from an ``emit_intent_summary``
+        ``on_tool_end`` event.
+
+        Slice 15 AC-2 / AC-3 / AC-4:
+        * ``axes`` is read from the LangGraph state's ``intent_axes`` field
+          via ``aget_state``; it is funnelled through :class:`IntentAxes` so
+          per-axis length validation (≤ 200 chars) propagates as a Pydantic
+          ``ValidationError`` to the caller (which converts it to an SSE
+          ``error`` event).
+        * ``prompt_preview`` is the ``prompt`` field of the validated tool
+          input (from the ``on_tool_end`` event's ``input``/``output``).
+        * ``settings_diff`` is read from the tool input/output. When the
+          tool emits no settings changes, or the resulting dict is empty
+          after ``model_dump(exclude_none=True)``, the field is omitted from
+          the JSON entirely (not serialised as ``null``) — matches the
+          Wireframe ``no_settings_diff`` state.
+
+        Returns:
+            SSE event dict ``{"event": "intent-summary", "data": <json>}``,
+            or ``None`` if the tool input could not be located (defensive —
+            prevents emitting a half-built payload).
+
+        Raises:
+            ValidationError: when any axis exceeds the 200-char cap or when
+                ``prompt_preview`` violates the 1..2000 constraint. The
+                caller is responsible for converting this into an SSE
+                ``error`` event.
+        """
+        # Source the validated tool input. ``astream_events`` v2 carries the
+        # arguments under ``data.input``; LangGraph's ToolNode also echoes
+        # them into ``data.output`` via the tool body. We prefer ``input``
+        # because that is the canonical schema-validated payload — the
+        # output is a free-form dict echo from the tool body.
+        data = tool_event.get("data", {}) or {}
+        tool_input = data.get("input")
+        if isinstance(tool_input, dict) and "input" in tool_input:
+            # langgraph wraps tool args in {"input": <args_dict>}
+            tool_input = tool_input.get("input")
+        if not isinstance(tool_input, dict):
+            tool_input = data.get("output")
+            if hasattr(tool_input, "content"):
+                tool_input = tool_input.content
+            if isinstance(tool_input, str):
+                try:
+                    tool_input = json.loads(tool_input)
+                except (json.JSONDecodeError, TypeError):
+                    tool_input = None
+        if not isinstance(tool_input, dict):
+            return None
+
+        prompt_preview: Optional[str] = tool_input.get("prompt")
+        if not isinstance(prompt_preview, str):
+            return None
+
+        settings_diff_raw = tool_input.get("settings_diff")
+
+        # Read the typed ``intent_axes`` from the current graph state. We
+        # call ``aget_state`` rather than peeking at the on_tool_end event
+        # because the post_process node has not yet committed its updates
+        # at this point — but ``intent_axes`` is established earlier in the
+        # graph (e.g. by the LLM via state writes during the interview).
+        # When no checkpointer is wired, ``aget_state`` raises; we fall
+        # back to an empty axes container in that case.
+        intent_axes_raw: dict = {}
+        try:
+            state_snapshot = await self._agent.aget_state(config)
+            if state_snapshot and getattr(state_snapshot, "values", None):
+                intent_axes_raw = state_snapshot.values.get("intent_axes") or {}
+                if not isinstance(intent_axes_raw, dict):
+                    intent_axes_raw = {}
+        except Exception:
+            # Defensive: if state can't be read, ship empty axes. We log at
+            # debug so production traces are clean (the empty-axes payload
+            # is still valid per IntentAxes schema).
+            logger.debug(
+                "intent-summary: aget_state failed; falling back to empty axes",
+                exc_info=True,
+            )
+
+        # Build the typed payload. Pydantic raises ValidationError on
+        # schema violations (e.g. axis > 200 chars or prompt > 2000 chars);
+        # the caller turns that into an SSE error event.
+        payload_kwargs: dict = {
+            "axes": IntentAxes.model_validate(intent_axes_raw),
+            "prompt_preview": prompt_preview,
+        }
+
+        # Settings-diff handling (AC-3): pass through when populated, omit
+        # when empty/None. The serialisation below uses
+        # ``exclude_none=True`` so ``settings_diff`` itself is dropped from
+        # the JSON when ``None``.
+        if settings_diff_raw is not None:
+            if isinstance(settings_diff_raw, SettingsDiff):
+                settings_diff_dump = settings_diff_raw.model_dump(
+                    by_alias=True, exclude_none=True
+                )
+            elif isinstance(settings_diff_raw, dict):
+                # Re-validate via SettingsDiff to enforce the typed schema
+                # and produce a camelCase wire dump.
+                settings_diff_dump = SettingsDiff.model_validate(
+                    settings_diff_raw
+                ).model_dump(by_alias=True, exclude_none=True)
+            else:
+                settings_diff_dump = None
+
+            if settings_diff_dump:
+                # Re-validate so the final payload still type-checks against
+                # IntentSummaryPayload.settings_diff (rather than smuggling a
+                # raw dict through ``model_dump`` mode).
+                payload_kwargs["settings_diff"] = SettingsDiff.model_validate(
+                    settings_diff_dump
+                )
+
+        payload = IntentSummaryPayload(**payload_kwargs)
+
+        # ``exclude_none=True`` handles AC-3 omission of the optional
+        # ``settings_diff`` field. ``by_alias=True`` ensures any aliased
+        # sub-fields (e.g. ``SettingsDiff.modelId.from``) keep the wire
+        # spelling that the frontend expects.
+        payload_json = payload.model_dump(
+            mode="json", exclude_none=True, by_alias=True
+        )
+
+        return {
+            "event": "intent-summary",
+            "data": json.dumps(payload_json),
+        }
 
     def _convert_event(self, event: dict) -> Optional[dict]:
         """Convert a LangGraph astream_events event to an SSE event dict.

@@ -38,6 +38,69 @@ export interface ToolCallResult {
 export type ActiveView = "chat" | "session-list" | "startscreen";
 
 // ---------------------------------------------------------------------------
+// Slice 15: FSM mirror + IntentSummaryPayload types
+// ---------------------------------------------------------------------------
+
+/**
+ * Whitelisted FSM states for the Interactive Prompt Refinement flow.
+ *
+ * Mirrors the backend ``flow_state`` enum (architecture.md → "Data
+ * Transfer Objects" → ``FlowStateEvent``). Five values are emitted by the
+ * backend (``idle | interviewing | summarizing | reviewing | refining``);
+ * ``generating`` is set frontend-side on the user click in the
+ * IntentSummaryCard (no backend round-trip).
+ */
+export type FlowState =
+  | "idle"
+  | "interviewing"
+  | "summarizing"
+  | "reviewing"
+  | "refining"
+  | "generating";
+
+/**
+ * Typed diff payload for ``IntentSummaryPayload.settings_diff``.
+ *
+ * Mirrors architecture.md → "SettingsDiff Type Schema". All four
+ * sub-arrays are optional; the backend omits the entire ``settings_diff``
+ * field when no settings changed.
+ */
+export interface SettingsDiff {
+  slotRoles?: Array<{
+    slotIndex: number;
+    from: "subject" | "style" | "composition" | null;
+    to: "subject" | "style" | "composition";
+  }>;
+  slotStrengths?: Array<{
+    slotIndex: number;
+    from: number | null;
+    to: number;
+  }>;
+  modelId?: { from: string; to: string };
+  modelParams?: Array<{ key: string; from: unknown; to: unknown }>;
+}
+
+/**
+ * Wire payload of the SSE ``intent-summary`` event.
+ *
+ * Mirrors architecture.md → "Data Transfer Objects" →
+ * ``IntentSummaryPayload``. ``settings_diff`` is omitted when no settings
+ * changed (per AC-3 in the Slice 15 spec).
+ */
+export interface IntentSummaryPayload {
+  axes: {
+    subject?: string;
+    medium?: string;
+    style?: string;
+    lighting?: string;
+    composition?: string;
+    palette?: string;
+  };
+  prompt_preview: string;
+  settings_diff?: SettingsDiff;
+}
+
+// ---------------------------------------------------------------------------
 // Session Detail Response (from backend GET /api/assistant/sessions/{id})
 // ---------------------------------------------------------------------------
 
@@ -89,6 +152,21 @@ export interface AssistantState {
    * Resets only on tab reload (provider re-mount). No persistence.
    */
   noContextBannerDismissed: boolean;
+  /**
+   * Slice 15: mirror of the backend FSM ``flow_state`` field. Updated by
+   * the SSE ``flow-state`` event handler in ``use-assistant-runtime.ts``
+   * via the ``SET_FLOW_STATE`` action. Defaults to ``"idle"``; the
+   * ``"generating"`` transition is set frontend-side on user click in the
+   * IntentSummaryCard (no backend round-trip).
+   */
+  flowState: FlowState;
+  /**
+   * Slice 15: payload of the most-recently-received ``intent-summary`` SSE
+   * event. ``null`` until the LLM calls ``emit_intent_summary``; replaced
+   * (idempotent) on each subsequent event so the IntentSummaryCard can
+   * re-render with the latest payload.
+   */
+  intentSummaryPayload: IntentSummaryPayload | null;
 }
 
 const initialState: AssistantState = {
@@ -103,6 +181,8 @@ const initialState: AssistantState = {
   isLoadingSession: false,
   isApplied: false,
   noContextBannerDismissed: false,
+  flowState: "idle",
+  intentSummaryPayload: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -133,7 +213,9 @@ export type AssistantAction =
     }
   | { type: "RESET_SESSION" }
   | { type: "SET_IS_APPLIED"; isApplied: boolean }
-  | { type: "DISMISS_NO_CONTEXT_BANNER" };
+  | { type: "DISMISS_NO_CONTEXT_BANNER" }
+  | { type: "SET_FLOW_STATE"; flowState: FlowState }
+  | { type: "RENDER_INTENT_SUMMARY"; payload: IntentSummaryPayload };
 
 // ---------------------------------------------------------------------------
 // Reducer
@@ -261,6 +343,17 @@ function assistantReducer(
 
     case "DISMISS_NO_CONTEXT_BANNER":
       return { ...state, noContextBannerDismissed: true };
+
+    case "SET_FLOW_STATE":
+      // Slice 15 AC-7: only ``flowState`` is mutated; all other fields
+      // (messages, draftPrompt, sessionId, …) are preserved verbatim.
+      return { ...state, flowState: action.flowState };
+
+    case "RENDER_INTENT_SUMMARY":
+      // Slice 15 AC-8: replace the previous payload (idempotent re-render).
+      // The card mount/un-mount is driven separately by ``flowState``; here
+      // we only carry the data so the card can read it on render.
+      return { ...state, intentSummaryPayload: action.payload };
 
     default:
       return state;

@@ -5,8 +5,28 @@ import type { Dispatch, MutableRefObject } from "react";
 import type {
   AssistantAction,
   DraftPrompt,
+  FlowState,
+  IntentSummaryPayload,
   ToolCallResult,
 } from "./assistant-context";
+
+// ---------------------------------------------------------------------------
+// Slice 15: whitelist of FSM ``flow_state`` values accepted from SSE.
+// Mirrors the ``FlowState`` union in ``assistant-context.tsx``. Values
+// outside this set are dropped with a ``console.warn`` (AC-9). The
+// ``"generating"`` transition is included because Slice 28 (resume hydrate)
+// may legitimately emit a hydration event with that value when the user
+// reloaded mid-generation; Slice 15 itself never receives ``"generating"``
+// from the live stream.
+// ---------------------------------------------------------------------------
+const FLOW_STATE_WHITELIST: ReadonlySet<FlowState> = new Set<FlowState>([
+  "idle",
+  "interviewing",
+  "summarizing",
+  "reviewing",
+  "refining",
+  "generating",
+]);
 
 // ---------------------------------------------------------------------------
 // ReferenceSlot Snapshot (mirrors backend ReferenceSlotDTO)
@@ -44,6 +64,30 @@ interface SSEToolCallResultEvent {
 
 interface SSEErrorEvent {
   message: string;
+}
+
+/**
+ * Slice 15: payload of the SSE ``flow-state`` event.
+ *
+ * Wire format (per architecture.md → "Frontend State Machine Wiring"):
+ * ``event: flow-state\ndata: {"flow_state": <FlowState>}``.
+ */
+interface SSEFlowStateEvent {
+  flow_state: string;
+}
+
+/**
+ * Slice 15: payload of the SSE ``intent-summary`` event.
+ *
+ * Mirrors :data:`IntentSummaryPayload` from ``assistant-context.tsx``.
+ * Re-declared as a local interface so the SSE handler can run a structural
+ * check before dispatching (AC-10) without coupling the wire-shape to the
+ * reducer's typed union.
+ */
+interface SSEIntentSummaryEvent {
+  axes?: unknown;
+  prompt_preview?: unknown;
+  settings_diff?: unknown;
 }
 
 // ---------------------------------------------------------------------------
@@ -230,6 +274,73 @@ export function useAssistantRuntime({
               type: "ADD_ERROR_MESSAGE",
               content: error.message || "Ein Fehler ist aufgetreten.",
             });
+            break;
+          }
+
+          case "flow-state": {
+            // Slice 15 AC-5 / AC-9: parse the wire payload, validate
+            // against the whitelist, and dispatch SET_FLOW_STATE on hit.
+            // Unknown values are dropped with a console.warn so the
+            // backend is forced to stay within the architectural enum.
+            const fs = data as SSEFlowStateEvent;
+            const value = fs?.flow_state;
+            if (
+              typeof value === "string" &&
+              FLOW_STATE_WHITELIST.has(value as FlowState)
+            ) {
+              dispatch({
+                type: "SET_FLOW_STATE",
+                flowState: value as FlowState,
+              });
+            } else {
+              console.warn(
+                "[useAssistantRuntime] Ignoring flow-state event with " +
+                  "unknown flow_state value:",
+                value
+              );
+            }
+            break;
+          }
+
+          case "intent-summary": {
+            // Slice 15 AC-6 / AC-10: structural validation on
+            // ``axes`` (object) and ``prompt_preview`` (string). Missing
+            // / wrong-typed fields trigger a defensive console.warn — the
+            // stream consumer keeps running, no throw.
+            const summary = data as SSEIntentSummaryEvent;
+            const axesOk =
+              summary &&
+              typeof summary.axes === "object" &&
+              summary.axes !== null &&
+              !Array.isArray(summary.axes);
+            const promptOk = typeof summary?.prompt_preview === "string";
+            if (!axesOk || !promptOk) {
+              console.warn(
+                "[useAssistantRuntime] Ignoring malformed intent-summary " +
+                  "event (missing prompt_preview or non-object axes):",
+                rawData
+              );
+              break;
+            }
+            // settings_diff is optional; pass through verbatim when it is
+            // an object, drop it otherwise (defensive — schema mismatch
+            // here would corrupt the IntentSummaryCard render but should
+            // never happen in production).
+            const settingsDiff =
+              summary.settings_diff &&
+              typeof summary.settings_diff === "object" &&
+              !Array.isArray(summary.settings_diff)
+                ? (summary.settings_diff as IntentSummaryPayload["settings_diff"])
+                : undefined;
+
+            const payload: IntentSummaryPayload = {
+              axes: summary.axes as IntentSummaryPayload["axes"],
+              prompt_preview: summary.prompt_preview as string,
+              ...(settingsDiff !== undefined
+                ? { settings_diff: settingsDiff }
+                : {}),
+            };
+            dispatch({ type: "RENDER_INTENT_SUMMARY", payload });
             break;
           }
 
