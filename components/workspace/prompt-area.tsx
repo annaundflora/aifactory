@@ -112,8 +112,15 @@ function createInitialModeStates(): ModeStates {
 // ---------------------------------------------------------------------------
 
 export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: assistantOpenProp, onAssistantToggle }: PromptAreaProps) {
-  // ----- Mode state -----
-  const [currentMode, setCurrentMode] = useState<GenerationMode>("txt2img");
+  // ----- Variation state consumption (and Slice 22: lifted reference slots + generation mode) -----
+  const {
+    variationData,
+    clearVariation,
+    referenceSlots,
+    setReferenceSlots,
+    generationMode: currentMode,
+    setGenerationMode: setCurrentMode,
+  } = useWorkspaceVariation();
 
   // ----- Per-mode state (State Persistence Matrix) -----
   const [modeStates, setModeStates] = useState<ModeStates>(() =>
@@ -161,8 +168,9 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
   // ----- Variant count -----
   const [variantCount, setVariantCount] = useState(1);
 
-  // ----- img2img-specific state: reference slots (replaces sourceImageUrl + strength) -----
-  const [referenceSlots, setReferenceSlots] = useState<ReferenceSlotData[]>([]);
+  // ----- img2img-specific state: reference slots (Slice 22: hochgehoben in WorkspaceStateProvider) -----
+  // ``referenceSlots`` + ``setReferenceSlots`` werden oben aus
+  // ``useWorkspaceVariation()`` gelesen — siehe Slice-22 State-Lifting.
 
   // ----- upscale-specific state -----
   const [upscaleSourceImageUrl, setUpscaleSourceImageUrl] = useState<string | null>(null);
@@ -208,12 +216,9 @@ export function PromptArea({ projectId, onGenerationsCreated, assistantOpen: ass
     setUpscaleSourceImageUrl(null);
     setUpscaleScale(DEFAULT_SCALE);
     setShowImprove(false);
-  }, []);
+  }, [setReferenceSlots]);
 
   // Session history navigation is now handled inside AssistantSheetContent via context.setActiveView
-
-  // ----- Variation state consumption -----
-  const { variationData, clearVariation } = useWorkspaceVariation();
 
   // ---------------------------------------------------------------------------
   // Save current state into modeStates

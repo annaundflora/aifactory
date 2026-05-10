@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ChatInput } from "@/components/assistant/chat-input";
 import { ChatThread } from "@/components/assistant/chat-thread";
+import { MultimodalIndicator } from "@/components/assistant/multimodal-indicator";
 import { NoContextBanner } from "@/components/assistant/no-context-banner";
 import { SessionList } from "@/components/assistant/session-list";
 import { SessionSwitcher } from "@/components/assistant/session-switcher";
@@ -176,6 +177,9 @@ export function AssistantPanelContent({
           autoFocus={open}
           projectId={projectId}
         />
+        {/* Slice 22: Multimodal-Indicator direkt unter ChatInput.
+            Versteckt sich selbst, wenn nichts Multimodales angehängt ist. */}
+        <MultimodalIndicator />
       </div>
     );
   };
